@@ -1,0 +1,69 @@
+# Publishes the open repository on a version tag; the split carries it to the root.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  # The same lint, typecheck and test jobs a pull request runs.
+  check:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'pyproject.toml'
+      # The tag is what a user installs; a mismatch publishes the wrong version.
+      # tomllib is stdlib from 3.12; nothing is installed to read one field.
+      - name: the tag matches the package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(python3 -c "
+          import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          [ "$TAG" = "$PKG" ] || { echo "::error ::tag $TAG != version $PKG"; exit 1; }
+      - run: uv build
+      - run: python scripts/check_distribution.py dist
+      # -I: without it this imports the source tree beside the wheel.
+      - name: the wheel carries its data
+        run: |
+          uv run --isolated --no-project --with dist/*.whl python -I -c "
+          import codify, pathlib
+          here = pathlib.Path(codify.__file__).parent
+          assert 'site-packages' in str(here), f'imported the source tree: {here}'
+          from codify.jurisdictions import JURISDICTIONS_DIR, load_config
+          assert JURISDICTIONS_DIR.exists(), JURISDICTIONS_DIR
+          assert load_config('xa'), 'the synthetic jurisdiction did not load from the wheel'
+          from codify.frameworks.acquis import FRAMEWORKS_DIR
+          assert (FRAMEWORKS_DIR / 'eu-acquis.yaml').is_file(), FRAMEWORKS_DIR
+          "
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    # Off until the name is cleared and someone sets it. An unset variable is
+    # not a mistake here: nothing should publish before then.
+    if: vars.PUBLISH_TO_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    # Trusted publishing mints a short-lived token; no API key is stored.
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4

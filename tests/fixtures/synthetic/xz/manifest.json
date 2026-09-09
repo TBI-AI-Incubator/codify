@@ -1,0 +1,67 @@
+{
+  "jurisdiction": "xz",
+  "name": "Zerzura",
+  "gazette": "الجريدة الرسمية لزرزورة",
+  "device": "crescent",
+  "script": "arabic",
+  "direction": "rtl",
+  "authority_line": "تصدر عن السلطة الرسمية",
+  "container_labels": {
+    "part": "باب",
+    "chapter": "فصل",
+    "article": "مادة"
+  },
+  "laws": [
+    {
+      "file": "publication-1994.bluebell",
+      "doctype": "act",
+      "doctype_label": "قانون",
+      "date": "1994-03-21",
+      "number": "4",
+      "language": "ara",
+      "short_title": "قانون نشر التشريعات والجريدة الرسمية رقم ٤ لسنة ١٩٩٤",
+      "gazette_no": "العدد ٤١٢",
+      "gazette_date": "١٠ شوال ١٤١٤ هـ الموافق ٢١ مارس ١٩٩٤ م",
+      "assent": "[صدر بتاريخ ٢١ مارس ١٩٩٤]"
+    },
+    {
+      "file": "register-decision-1996.bluebell",
+      "doctype": "act",
+      "doctype_label": "قرار",
+      "date": "1996-06-11",
+      "number": "3",
+      "language": "ara",
+      "short_title": "قرار تنظيم السجل الوطني للتشريعات رقم ٣ لسنة ١٩٩٦",
+      "gazette_no": "العدد ٤٦٧",
+      "gazette_date": "٢٤ محرم ١٤١٧ هـ الموافق ١١ يونيو ١٩٩٦ م",
+      "assent": "[صدر بتاريخ ١١ يونيو ١٩٩٦]",
+      "cites": ["/akn/xz/act/1994/4"]
+    },
+    {
+      "file": "publication-amendment-2005.bluebell",
+      "doctype": "act",
+      "doctype_label": "قانون",
+      "date": "2005-10-02",
+      "number": "6",
+      "language": "ara",
+      "short_title": "قانون تعديل قانون نشر التشريعات والجريدة الرسمية رقم ٦ لسنة ٢٠٠٥",
+      "gazette_no": "العدد ٧٥٣",
+      "gazette_date": "٢٨ شعبان ١٤٢٦ هـ الموافق ٢ أكتوبر ٢٠٠٥ م",
+      "assent": "[صدر بتاريخ ٢ أكتوبر ٢٠٠٥]",
+      "amends": "/akn/xz/act/1994/4"
+    },
+    {
+      "file": "court-fees-2001.bluebell",
+      "doctype": "act",
+      "doctype_label": "قانون",
+      "date": "2001-04-15",
+      "number": "8",
+      "language": "ara",
+      "short_title": "قانون الرسوم القضائية والإدارية رقم ٨ لسنة ٢٠٠١",
+      "gazette_no": "العدد ٥٨٩",
+      "gazette_date": "٢١ محرم ١٤٢٢ هـ الموافق ١٥ أبريل ٢٠٠١ م",
+      "assent": "[صدر بتاريخ ١٥ أبريل ٢٠٠١]",
+      "cites": ["/akn/xz/act/1994/4"]
+    }
+  ]
+}

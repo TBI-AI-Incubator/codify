@@ -1,0 +1,679 @@
+{
+  "code": "it",
+  "name": "Italy",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["ita"],
+  "authoritative_language": "ita",
+  "document_classes": {
+    "legge": {
+      "label": "Legge ordinaria",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Libro",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Parte",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Sezione",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "roman",
+          "note": "Higher division above articles — NOT the basic unit. Critical distinction from Anglophone 'section'."
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered",
+          "note": "Numbered 1, 2, 3 with period. Primary subdivision. Cited 'comma 1' or 'art. 5, comma 1'."
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren",
+          "note": "a), b), c). Cited 'lettera a)'."
+        },
+        {
+          "local_term": "Numero",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "arabic_paren",
+          "note": "1), 2), 3). Cited 'numero 1)'. Sub-items within lettere."
+        }
+      ],
+      "hcontainers": [],
+      "note": "Standard primary legislation. Most statutes use only Titolo/Capo above articles; Libro/Parte appear in major codes only. Comma is the defining feature — numbered paragraphs within articles, cited by number."
+    },
+    "legge_costituzionale": {
+      "label": "Legge costituzionale",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Amends the Costituzione. Requires absolute majority in both chambers plus 3-month waiting period; if not passed by two-thirds, subject to popular referendum. Typically short — few or no higher divisions."
+    },
+    "decreto_legislativo": {
+      "label": "Decreto Legislativo",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Libro",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Parte",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren"
+        },
+        {
+          "local_term": "Numero",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "arabic_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Delegated legislation issued under Parliamentary delegation (Art. 76 Costituzione). Major codici are enacted as D.Lgs. (e.g., D.Lgs. 165/2001). EU transposition directives also implemented via D.Lgs. under annual 'legge di delegazione europea'. Same structure as legge ordinaria."
+    },
+    "decreto_legge": {
+      "label": "Decreto Legge",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren"
+        },
+        {
+          "local_term": "Numero",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "arabic_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Emergency decree with immediate legal force (Art. 77 Costituzione). Expires after 60 days if not converted by Parliament (legge di conversione). Parliament may amend during conversion. D.L. and conversion law are separate FRBR works; the integrated text is a distinct expression of the D.L. work."
+    },
+    "dpr": {
+      "label": "Decreto del Presidente della Repubblica",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Presidential regulatory decrees. Include D.P.R. (generali), D.P.C.M. (Presidente del Consiglio dei Ministri), and ministerial decrees (D.M.). Same article-based structure."
+    },
+    "codice": {
+      "label": "Codice",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Libro",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Sezione",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren"
+        },
+        {
+          "local_term": "Numero",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "arabic_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Major consolidated codes: Codice Civile (R.D. 262/1942), Codice Penale (R.D. 1398/1930), Codice di Procedura Civile, Codice di Procedura Penale (D.P.R. 447/1988), etc. Full 5-level hierarchy including Libro and Sezione. Codici use bis/ter/quater insertion numbering extensively (Art. 2-bis, Art. 12-quater). Articles number in the hundreds or thousands."
+    },
+    "regio_decreto": {
+      "label": "Regio Decreto",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Libro",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Capo",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Sezione",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Comma",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_numbered"
+        },
+        {
+          "local_term": "Lettera",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Royal decrees from the monarchy era (pre-1948 Republic). Many remain in force, most notably the Codice Civile and Codice Penale. Promulgated in the name of the King. Modelled under 'it' country code (FRBR politically neutral); enacting authority recorded in TLC metadata. FRBR subtype: 'rd'."
+    },
+    "costituzione": {
+      "label": "Costituzione della Repubblica Italiana",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Principi fondamentali",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "named",
+          "note": "Opening 12 articles before the two main parts."
+        },
+        {
+          "local_term": "Parte",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titolo",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Sezione",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Articolo",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Constitution of Italy (1 January 1948). 139 articles. Structure: 12 Principi fondamentali + Parte I (Diritti e doveri dei cittadini) + Parte II (Ordinamento della Repubblica) + Disposizioni transitorie e finali. No comma numbering — constitutional articles have plain unnumbered paragraphs (more like alinee). Modified only by legge costituzionale."
+    }
+  },
+  "default_document_class": "legge",
+  "frbr": {
+    "country_code": "it",
+    "uri_patterns": {
+      "legge": "/akn/it/act/{year}/{number}",
+      "legge_costituzionale": "/akn/it/act/cost/{year}/{number}",
+      "decreto_legislativo": "/akn/it/act/dlgs/{year}/{number}",
+      "decreto_legge": "/akn/it/act/dl/{year}/{number}",
+      "dpr": "/akn/it/act/dpr/{year}/{number}",
+      "codice": "/akn/it/act/{subtype}/{year}/{number}",
+      "regio_decreto": "/akn/it/act/rd/{year}/{number}",
+      "costituzione": "/akn/it/act/constitution/1948/constitution",
+      "bill": "/akn/it/bill/{year}/{number}",
+      "legge_regionale": "/akn/it-{region}/act/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Number is the sequential number within the calendar year (e.g., n. 241 of year 1990 → /akn/it/act/1990/241). Subtypes: 'dlgs' for Decreto Legislativo, 'dl' for Decreto Legge, 'dpr' for D.P.R., 'rd' for Regio Decreto, 'cost' for Legge Costituzionale."
+  },
+  "numbering": {
+    "act_citation": "Legge {day} {month_name} {year}, n. {number}",
+    "act_citation_short": "L. {number}/{year}",
+    "dlgs_citation": "D.Lgs. {day} {month_name} {year}, n. {number}",
+    "dlgs_citation_short": "D.Lgs. {number}/{year}",
+    "dl_citation": "D.L. {day} {month_name} {year}, n. {number}",
+    "dl_citation_short": "D.L. {number}/{year}",
+    "dpr_citation": "D.P.R. {day} {month_name} {year}, n. {number}",
+    "insertion_style": "latin_ordinal",
+    "insertion_suffixes": [
+      "bis",
+      "ter",
+      "quater",
+      "quinquies",
+      "sexies",
+      "septies",
+      "octies",
+      "novies",
+      "decies"
+    ],
+    "insertion_separator": "-",
+    "insertion_example": "Art. 2-bis",
+    "comma_format": "arabic_period",
+    "comma_example": "1. Testo del comma.",
+    "lettera_format": "alpha_lower_closeparen",
+    "lettera_example": "a) Testo della lettera.",
+    "numero_format": "arabic_closeparen",
+    "numero_example": "1) Testo del numero."
+  },
+  "enacting_formulae": [
+    {
+      "text": "La Camera dei deputati ed il Senato della Repubblica hanno approvato;\nIL PRESIDENTE DELLA REPUBBLICA\nPromulga\nla seguente legge:",
+      "document_class": "legge",
+      "position": "preamble",
+      "era": "republic",
+      "from": "1948-01-01"
+    },
+    {
+      "text": "IL PRESIDENTE DELLA REPUBBLICA\nVisti gli articoli 76 e 87 della Costituzione;\n[Vista la legge delega reference];\nVista la deliberazione del Consiglio dei ministri, adottata nella riunione del [date];\nSulla proposta del Presidente del Consiglio dei ministri e del Ministro [portfolio];\nEmana\nil seguente decreto legislativo:",
+      "document_class": "decreto_legislativo",
+      "position": "preamble",
+      "era": "republic",
+      "from": "1948-01-01"
+    },
+    {
+      "text": "IL PRESIDENTE DELLA REPUBBLICA\nVisti gli articoli 77 e 87 della Costituzione;\nRitenuta la straordinaria necessità ed urgenza di [subject];\nVista la deliberazione del Consiglio dei ministri, adottata nella riunione del [date];\nSulla proposta del Presidente del Consiglio dei ministri e del Ministro [portfolio];\nEmana\nil seguente decreto-legge:",
+      "document_class": "decreto_legge",
+      "position": "preamble",
+      "era": "republic",
+      "from": "1948-01-01"
+    },
+    {
+      "text": "[VITTORIO EMANUELE III / UMBERTO II]\nper grazia di Dio e per volontà della Nazione RE D'ITALIA\n…\nAbbiamo decretato e decretiamo:",
+      "document_class": "regio_decreto",
+      "position": "preamble",
+      "era": "monarchy",
+      "to": "1946-06-02"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "quote_marks": "guillemets",
+    "quote_open": "«",
+    "quote_close": "»",
+    "typical_phrasings": [
+      "Il comma {N} dell'articolo {N} della legge {reference} è sostituito dal seguente: «{text}»",
+      "Dopo il comma {N} dell'articolo {N} è inserito il seguente: «{text}»",
+      "Dopo l'articolo {N} è inserito il seguente: «Art. {N}-bis. {heading} - {text}»",
+      "La lettera {x}) del comma {N} dell'articolo {N} è sostituita dalla seguente: «{x}) {text}»",
+      "Le parole: «{old}» sono sostituite dalle seguenti: «{new}»",
+      "L'articolo {N} è abrogato.",
+      "Il comma {N} dell'articolo {N} è soppresso."
+    ],
+    "cross_reference_format": "articolo_year_number",
+    "cross_reference_example": "articolo 3 della legge 7 agosto 1990, n. 241"
+  },
+  "core_tlcs": [
+    {
+      "eId": "parlamento",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/parlamento",
+      "showAs": "Parlamento italiano"
+    },
+    {
+      "eId": "camera",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/camera-dei-deputati",
+      "showAs": "Camera dei Deputati"
+    },
+    {
+      "eId": "senato",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/senato-della-repubblica",
+      "showAs": "Senato della Repubblica"
+    },
+    {
+      "eId": "presidente",
+      "class": "TLCRole",
+      "href": "/ontology/role/it/presidente-della-repubblica",
+      "showAs": "Presidente della Repubblica"
+    },
+    {
+      "eId": "presidenzeConsiglio",
+      "class": "TLCRole",
+      "href": "/ontology/role/it/presidente-consiglio-ministri",
+      "showAs": "Presidente del Consiglio dei Ministri"
+    },
+    {
+      "eId": "consiglio",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/consiglio-dei-ministri",
+      "showAs": "Consiglio dei Ministri"
+    },
+    {
+      "eId": "ministro",
+      "class": "TLCRole",
+      "href": "/ontology/role/it/ministro",
+      "showAs": "Ministro"
+    },
+    {
+      "eId": "corteCostituzionale",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/corte-costituzionale",
+      "showAs": "Corte Costituzionale"
+    },
+    {
+      "eId": "consiglioDiStato",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/consiglio-di-stato",
+      "showAs": "Consiglio di Stato"
+    },
+    {
+      "eId": "corteCassazione",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/corte-di-cassazione",
+      "showAs": "Corte di Cassazione"
+    },
+    {
+      "eId": "corteConti",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/it/corte-dei-conti",
+      "showAs": "Corte dei Conti"
+    },
+    {
+      "eId": "gazzettaUfficiale",
+      "class": "TLCObject",
+      "href": "/ontology/obj/it/gazzetta-ufficiale",
+      "showAs": "Gazzetta Ufficiale della Repubblica Italiana"
+    },
+    {
+      "eId": "italia",
+      "class": "TLCLocation",
+      "href": "/ontology/place/it",
+      "showAs": "Italia"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Italian legislation uses ARTICLE (not SECTION) as the basic unit. SECTION (Sezione) is a higher division above articles — do not use it as a basic unit. Comma notation is '1. Testo...' (Arabic numeral + period at the start of the line), not parenthesised. Lettera notation is 'a) Testo...' (lowercase letter + closing paren). Numero notation is '1) Testo...' within lettere. Large codes use BOOK as the top level. Inserted articles use Latin ordinal suffixes hyphenated: Art. 2-bis, Art. 12-quater."
+  },
+  "supranational_memberships": [
+    {
+      "body": "eu",
+      "member_since": "1957-01-01",
+      "note": "Founding member (Treaty of Rome 1957). EU Regulations directly applicable. Directives transposed via D.Lgs. under annual legge di delegazione europea. Full AKN4EU profile at /akn/eu/.",
+      "direct_effect": "direct",
+      "direct_effect_instruments": ["regulation", "decision"],
+      "transposition_required": ["directive"],
+      "superseded_subjects": []
+    },
+    {
+      "body": "council-of-europe",
+      "direct_effect": "none",
+      "note": "ECHR ratified as L. 848/1955 (Convezione europea dei diritti dell'uomo). ECtHR judgments binding. Significant body of Italian case law on ECHR compatibility.",
+      "superseded_subjects": []
+    },
+    {
+      "body": "un",
+      "direct_effect": "none"
+    },
+    {
+      "body": "nato",
+      "direct_effect": "none"
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "display": {
+    "heading_type": "rubrica",
+    "heading_case": "title_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif",
+    "quote_style": "guillemets",
+    "comma_display": "arabic_period",
+    "note": "Rubriche (article headings) present in codes and many statutes; absent in shorter acts. When present, display above article number."
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 3,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 7,
+    "note": "Three documents examined: L. 241/1990 (48 articles, Capi structure, rubriche, comma numbering confirmed), D.Lgs. 165/2001 (structural and formula reference), Codice Civile R.D. 262/1942 (full Libro > Titolo > Capo > Sezione > Articolo hierarchy, bis/ter numbering confirmed). Bluebell parse test pending — comma PARAGRAPH mapping needs verification. Italy is AKN birthplace; normattiva.it provides near-AKN XML for direct import."
+  },
+  "tier": 1,
+  "status": "production",
+  "public_reference": true
+}

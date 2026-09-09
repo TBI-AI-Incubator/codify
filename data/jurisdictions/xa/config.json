@@ -1,0 +1,167 @@
+{
+  "code": "xa",
+  "name": "Atlantis",
+  "name_en": "Commonwealth of Atlantis",
+  "type": "national",
+  "tradition": ["common_law"],
+  "calendar": "gregorian",
+  "languages": ["eng"],
+  "authoritative_language": "eng",
+  "note": "Fictional common-law island. Exists only as synthetic test material: a Westminster-derived legislature (the Assembly of Atlantis) publishing in English, used to exercise the common-law Part/Chapter/Section/Subsection/Schedule hierarchy and amendment/citation tracking without shipping any real jurisdiction's law in the open test tree. Not a real place; carries no real legislation.",
+  "document_classes": {
+    "act": {
+      "label": "Act of the Assembly",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Subsection",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "roman_lower_parenthesized"
+        },
+        {
+          "local_term": "Schedule (sch)",
+          "akn_element": "hcontainer",
+          "eid_abbrev": "sch",
+          "akn_name": "schedule",
+          "level": "grouping",
+          "numbering": "arabic"
+        }
+      ],
+      "hcontainers": []
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "xa",
+    "uri_patterns": {
+      "act": "/akn/xa/act/{year}/{number}",
+      "bill": "/akn/xa/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Acts identified by calendar year and Act number, e.g. Act No. 7 of 1992."
+  },
+  "numbering": {
+    "act_citation": "{Short Title}",
+    "act_citation_alt": "Act No. {number} of {year}",
+    "insertion_style": "alphanumeric",
+    "note": "Acts cited by short title (e.g. 'Legislation Act, 1992') or by number and year."
+  },
+  "enacting_formulae": [
+    {
+      "text": "BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:",
+      "position": "preamble",
+      "document_class": "act"
+    }
+  ],
+  "amendments": {
+    "style": "textual_commonwealth",
+    "phrasing": "is amended as follows",
+    "cross_reference_format": "short_title_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "assembly",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xa/assembly",
+      "showAs": "The Assembly of Atlantis"
+    },
+    {
+      "eId": "officialGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xa/atlantis-gazette",
+      "showAs": "The Atlantis Gazette"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Never emit structural keywords — the scaffold owns hierarchy.",
+    "long_title_lead_ins": ["An Act"],
+    "citation_lead_ins": ["shall be known as", "may be cited as", "shall be cited as"],
+    "citation_subjects": ["This Act", "This Code"],
+    "citation_articles": ["the"]
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "marginal_note",
+    "heading_case": "title_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+  },
+  "tier": 4,
+  "status": "stub",
+  "synthetic": true,
+  "legal_eras": [
+    {
+      "id": "thalassocracy",
+      "label": "Thalassocracy",
+      "to": "1847-03-31",
+      "enacting_authority": "Warden of the Concentric Harbours",
+      "document_class": "act",
+      "authority_patterns": ["Warden of the Concentric Harbours", "Harbour Warden"],
+      "calendar": "lunar_hijri"
+    },
+    {
+      "id": "assembly",
+      "label": "Assembly",
+      "from": "1847-04-01",
+      "enacting_authority": "Assembly of Atlantis",
+      "document_class": "act"
+    }
+  ],
+  "furniture_line_patterns": ["Atlantis Gazette Office\\s*[-–]\\s*archival copy"],
+  "lexicon_words": ["Atlantean"],
+  "furniture_inline_patterns": ["Atlantis Gazette Office\\s*[-–]\\s*archival copy"]
+}

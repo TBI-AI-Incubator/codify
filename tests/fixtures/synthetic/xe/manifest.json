@@ -1,0 +1,52 @@
+{
+  "jurisdiction": "xe",
+  "name": "Kitezh",
+  "gazette": "ВЕДОМОСТИ КИТЕЖА",
+  "device": "star",
+  "script": "cyrillic",
+  "authority_line": "Официальное издание",
+  "container_labels": {
+    "title": "РАЗДЕЛ",
+    "chapter": "ГЛАВА"
+  },
+  "laws": [
+    {
+      "file": "normative-acts-1994.bluebell",
+      "doctype": "act",
+      "doctype_label": "Закон",
+      "date": "1994-03-15",
+      "number": "12",
+      "language": "rus",
+      "short_title": "Закон о нормативных правовых актах",
+      "gazette_no": "№ 6",
+      "gazette_date": "15 марта 1994 года",
+      "assent": "[Принят Собранием Китежа 3 марта 1994 года]"
+    },
+    {
+      "file": "access-to-legal-information-2003.bluebell",
+      "doctype": "act",
+      "doctype_label": "Закон",
+      "date": "2003-09-11",
+      "number": "27",
+      "language": "rus",
+      "short_title": "Закон о доступе к правовой информации",
+      "gazette_no": "№ 34",
+      "gazette_date": "11 сентября 2003 года",
+      "assent": "[Принят Собранием Китежа 2 сентября 2003 года]",
+      "cites": ["/akn/xe/act/1994/12"]
+    },
+    {
+      "file": "normative-acts-amendment-2011.bluebell",
+      "doctype": "act",
+      "doctype_label": "Закон",
+      "date": "2011-11-24",
+      "number": "41",
+      "language": "rus",
+      "short_title": "Закон о внесении изменений в Закон о нормативных правовых актах",
+      "gazette_no": "№ 47",
+      "gazette_date": "24 ноября 2011 года",
+      "assent": "[Принят Собранием Китежа 15 ноября 2011 года]",
+      "amends": "/akn/xe/act/1994/12"
+    }
+  ]
+}

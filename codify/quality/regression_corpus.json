@@ -1,0 +1,65 @@
+{
+  "corpus": "Independently invented examples for containment-gate tests; not measurements of a legal corpus. Hashes identify synthetic labels, not deployed sources.",
+  "passes": {
+    "recover_container_twin": {
+      "motivated_by": [
+        "C90-101"
+      ],
+      "deleted": "Synthetic example of a removed pass whose evidence record remains inspectable; not a claim about production coverage."
+    },
+    "promote_orphan_children": {
+      "motivated_by": [
+        "C90-103"
+      ]
+    },
+    "numbered_heading_fallback": {
+      "motivated_by": [
+        "C90-102",
+        "C90-104"
+      ]
+    },
+    "declare_toc_without_body": {
+      "no_motivating_document": "Raised as a general declaration when a table of contents has no matching body, rather than to recover a particular document. No document was named when it was written, and none has been found since."
+    }
+  },
+  "documents": [
+    {
+      "doc_id": "C90-101",
+      "title": "Synthetic Observatory Ledger",
+      "year": 2042,
+      "era": "synthetic",
+      "text_status": "text_layer",
+      "source_chars": 1200,
+      "note": "Invented record exercising containment semantics; no production identity or source.",
+      "source_sha256": "78834de628097b963a8fe38b7f7e292f7dc7f9282574b0517b58c7f94d3edeb2"
+    },
+    {
+      "doc_id": "C90-102",
+      "title": "Synthetic Lens Register",
+      "year": 2043,
+      "era": "synthetic",
+      "text_status": "no_text_layer",
+      "source_chars": 0,
+      "note": "Invented record exercising containment semantics; no production identity or source.",
+      "source_sha256": "f715ebcbfbd1c55f7933d565a4f8b2085e8c0be323a379546588c1d1f94001e5"
+    },
+    {
+      "doc_id": "C90-103",
+      "title": "Synthetic Dial Catalogue",
+      "year": 2044,
+      "era": "synthetic",
+      "text_status": "text_layer",
+      "source_chars": 750,
+      "note": "Invented record exercising containment semantics; no production identity or source."
+    },
+    {
+      "doc_id": "C90-104",
+      "title": "Synthetic Prism Inventory",
+      "year": 2045,
+      "era": "synthetic",
+      "text_status": "no_text_layer",
+      "source_chars": 0,
+      "note": "Invented record exercising containment semantics; no production identity or source."
+    }
+  ]
+}

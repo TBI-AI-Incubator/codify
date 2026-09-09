@@ -1,0 +1,134 @@
+{
+  "code": "xy",
+  "name": "Ys",
+  "name_en": "Republic of Ys",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["fra"],
+  "authoritative_language": "fra",
+  "note": "Fictional civil-law republic. Exists only as synthetic test material: a Napoleonic-tradition legislature (the Assembly of Ys) promulgating in French, used to exercise the civil-law Livre/Titre/Chapitre/Article/Paragraphe hierarchy and textual amendment tracking without shipping any real jurisdiction's law in the open test tree. Not a real place; carries no real legislation.",
+  "document_classes": {
+    "act": {
+      "label": "Loi",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Livre",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Titre",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Chapitre",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Alinéa",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Standard statute. Livre, Titre and Chapitre are higher divisions, not basic units. Article is the basic citable unit throughout, numbered continuously across the whole law. Paragraphe (alinéa) is the primary subdivision within an article."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "xy",
+    "uri_patterns": {
+      "act": "/akn/xy/act/{year}/{number}",
+      "bill": "/akn/xy/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Laws identified by calendar year and law number, e.g. loi n° 14 de 1998."
+  },
+  "numbering": {
+    "act_citation": "Loi n° {number} du {day} {month} {year}",
+    "act_citation_alt": "Loi n° {number} de {year}",
+    "insertion_style": "hyphen_suffix",
+    "note": "Laws cited by number and promulgation date (e.g. 'loi n° 14 du 3 mars 1998'). Inserted articles use hyphen notation: after article 6 comes 6-1, 6-2."
+  },
+  "enacting_formulae": [
+    {
+      "text": "L'Assemblée d'Ys a adopté,\nLe Président de la République d'Ys promulgue la loi dont la teneur suit :",
+      "position": "preamble",
+      "document_class": "act"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "phrasing": "est remplacé par les dispositions suivantes... est abrogé... il est inséré un article... ainsi rédigé",
+    "cross_reference_format": "number_and_date"
+  },
+  "core_tlcs": [
+    {
+      "eId": "assembleeYs",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xy/assemblee-ys",
+      "showAs": "L'Assemblée d'Ys"
+    },
+    {
+      "eId": "presidentYs",
+      "class": "TLCRole",
+      "href": "/ontology/role/xy/president-de-la-republique",
+      "showAs": "Président de la République d'Ys"
+    },
+    {
+      "eId": "journalOfficiel",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xy/journal-officiel-ys",
+      "showAs": "Journal officiel d'Ys"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup and list numbering verbatim. Never emit structural keywords: the scaffold owns hierarchy. Article is the basic unit; Livre (BOOK), Titre (TITLE) and Chapitre (CHAPTER) are higher divisions."
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "inline_heading",
+    "heading_case": "sentence_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+  },
+  "tier": 5,
+  "status": "stub",
+  "synthetic": true
+}

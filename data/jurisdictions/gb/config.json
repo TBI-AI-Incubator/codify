@@ -1,0 +1,424 @@
+{
+  "code": "gb",
+  "name": "United Kingdom",
+  "name_en": "United Kingdom of Great Britain and Northern Ireland",
+  "type": "national",
+  "tradition": ["common_law"],
+  "calendar": "gregorian",
+  "languages": ["eng"],
+  "authoritative_language": "eng",
+  "note": "Westminster Parliament legislates for the whole UK on reserved matters. England, Wales, Scotland, and Northern Ireland each have separate configs (gb-eng, gb-wls, gb-sct, gb-nir) covering devolved legislation. Scotland has a mixed common-law/civil-law tradition; that is captured in gb-sct. Welsh is co-official in Wales; that belongs on gb-wls. The UK has no codified constitution.",
+  "document_classes": {
+    "act": {
+      "label": "Act of Parliament",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Subsection",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "roman_lower_parenthesized"
+        },
+        {
+          "local_term": "Schedule (sch)",
+          "akn_element": "hcontainer",
+          "eid_abbrev": "sch",
+          "akn_name": "schedule",
+          "level": "grouping",
+          "numbering": "arabic"
+        }
+      ],
+      "hcontainers": []
+    },
+    "si": {
+      "label": "Statutory Instrument",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "note": "SIs use 'article' or 'regulation' as the basic unit term depending on subject matter, both map to AKN section. Numbered by year and SI number, e.g. SI 2023/1234.",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Regulation (reg)",
+          "akn_element": "section",
+          "eid_abbrev": "reg",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Schedule (sch)",
+          "akn_element": "hcontainer",
+          "eid_abbrev": "sch",
+          "akn_name": "schedule",
+          "level": "grouping",
+          "numbering": "arabic"
+        }
+      ],
+      "hcontainers": []
+    },
+    "ukpga": {
+      "extends": "act",
+      "label": "UK Public General Act",
+      "search_rank": 3
+    },
+    "ukla": {
+      "extends": "act",
+      "label": "UK Local Act",
+      "search_rank": 3
+    },
+    "asp": {
+      "extends": "act",
+      "label": "Scottish Parliament Act",
+      "search_rank": 3
+    },
+    "anaw": {
+      "extends": "act",
+      "label": "National Assembly for Wales Act",
+      "search_rank": 3
+    },
+    "asc": {
+      "extends": "act",
+      "label": "Senedd Act",
+      "search_rank": 3
+    },
+    "nia": {
+      "extends": "act",
+      "label": "Northern Ireland Assembly Act",
+      "search_rank": 3
+    },
+    "aosp": {
+      "extends": "act",
+      "label": "Old Scottish Parliament Act",
+      "search_rank": 3
+    },
+    "aep": {
+      "extends": "act",
+      "label": "England Act",
+      "search_rank": 3
+    },
+    "apgb": {
+      "extends": "act",
+      "label": "Great Britain Act",
+      "search_rank": 3
+    },
+    "aip": {
+      "extends": "act",
+      "label": "Ireland Act",
+      "search_rank": 3
+    },
+    "mwa": {
+      "extends": "act",
+      "label": "Welsh Assembly Measure",
+      "search_rank": 3
+    },
+    "ukcm": {
+      "extends": "act",
+      "label": "Church Measure",
+      "search_rank": 3
+    },
+    "mnia": {
+      "extends": "act",
+      "label": "Northern Ireland Assembly Measure",
+      "search_rank": 3
+    },
+    "apni": {
+      "extends": "act",
+      "label": "Northern Ireland Parliament Act",
+      "search_rank": 3
+    },
+    "gbla": {
+      "extends": "act",
+      "label": "Great Britain Local Act",
+      "search_rank": 3
+    },
+    "ukppa": {
+      "extends": "act",
+      "label": "UK Private or Personal Act",
+      "search_rank": 3
+    },
+    "uksi": {
+      "extends": "si",
+      "label": "UK Statutory Instrument",
+      "search_rank": 1
+    },
+    "wsi": {
+      "extends": "si",
+      "label": "Welsh Statutory Instrument",
+      "search_rank": 1
+    },
+    "ssi": {
+      "extends": "si",
+      "label": "Scottish Statutory Instrument",
+      "search_rank": 1
+    },
+    "nisr": {
+      "extends": "si",
+      "label": "Northern Ireland Statutory Rule",
+      "search_rank": 1
+    },
+    "nisi": {
+      "extends": "si",
+      "label": "Northern Ireland Order in Council",
+      "search_rank": 1
+    },
+    "ukmd": {
+      "extends": "si",
+      "label": "UK Ministerial Direction",
+      "search_rank": 1
+    },
+    "nisro": {
+      "extends": "si",
+      "label": "Northern Ireland Statutory Rule or Order",
+      "search_rank": 1
+    },
+    "uksro": {
+      "extends": "si",
+      "label": "UK Statutory Rule or Order",
+      "search_rank": 1
+    },
+    "ukmo": {
+      "extends": "si",
+      "label": "UK Ministerial Order",
+      "search_rank": 1
+    },
+    "ukci": {
+      "extends": "si",
+      "label": "Church Instrument",
+      "search_rank": 1
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "gb",
+    "uri_patterns": {
+      "bill": "/akn/gb/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Follows legislation.gov.uk conventions: Acts cited by regnal year and chapter before 1963, by calendar year and chapter after. Each publisher type token declared as a document class is minted as the FRBR subtype, /akn/gb/act/{token}/{year}/{number}; a token not declared here is neither walked nor minted."
+  },
+  "numbering": {
+    "act_citation": "{Short Title} {year}",
+    "act_citation_alt": "{year} c. {chapter}",
+    "citations": {
+      "si": "SI {year}/{number}",
+      "si_alt": "S.I. {year} No. {number}"
+    },
+    "insertion_style": "alphanumeric",
+    "note": "Acts cited by short title and year (e.g. 'Companies Act 2006'). Pre-1963 acts may use regnal year and chapter (e.g. '5 & 6 Eliz. 2 c. 11'). SIs cited as 'SI year/number'."
+  },
+  "enacting_formulae": [
+    {
+      "text": "BE IT ENACTED by the King's most Excellent Majesty, by and with the advice and consent of the Lords Spiritual and Temporal, and Commons, in this present Parliament assembled, and by the authority of the same, as follows:—",
+      "position": "preamble",
+      "era": "king-charles-iii",
+      "from": "2022-09-08",
+      "note": "Standard form for Acts passed by both Houses (Public Bills). Used from accession of King Charles III.",
+      "document_class": ["act", "ukpga", "ukla", "ukppa"]
+    },
+    {
+      "text": "BE IT ENACTED by the King's most Excellent Majesty, by and with the advice and consent of the Commons in this present Parliament assembled, in accordance with the provisions of the Parliament Acts 1911 and 1949, and by the authority of the same, as follows:—",
+      "position": "preamble",
+      "era": "king-charles-iii",
+      "from": "2022-09-08",
+      "note": "Money Bills and bills passed under Parliament Acts procedure (Commons only — Lords consent not required). Used from accession of King Charles III.",
+      "document_class": ["act", "ukpga", "ukla", "ukppa"]
+    },
+    {
+      "text": "BE IT ENACTED by the Queen's most Excellent Majesty, by and with the advice and consent of the Lords Spiritual and Temporal, and Commons, in this present Parliament assembled, and by the authority of the same, as follows:—",
+      "position": "preamble",
+      "era": "queen-elizabeth-ii",
+      "to": "2022-09-08",
+      "note": "Standard form used during the reign of Queen Elizabeth II.",
+      "document_class": ["act", "ukpga", "ukla", "ukppa"]
+    }
+  ],
+  "amendments": {
+    "style": "textual_commonwealth",
+    "phrasing": "is amended as follows",
+    "cross_reference_format": "short_title_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "parliament",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/gb/parliament",
+      "showAs": "UK Parliament",
+      "note": "Houses of Parliament (Westminster): House of Commons (650 seats) and House of Lords (~800 members)."
+    },
+    {
+      "eId": "crown",
+      "class": "TLCRole",
+      "href": "/ontology/role/gb/crown",
+      "showAs": "The Crown"
+    },
+    {
+      "eId": "officialGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/gb/london-gazette",
+      "showAs": "The London Gazette"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Never emit structural keywords — the scaffold owns hierarchy. Render body text in the legal register of the source language; do not translate or paraphrase."
+  },
+  "supranational_memberships": [
+    {
+      "body": "un",
+      "direct_effect": "none",
+      "member_since": "1945-10-24",
+      "note": "Founding member; permanent member of the UN Security Council (P5)."
+    },
+    {
+      "body": "council-of-europe",
+      "direct_effect": "indirect_transposition",
+      "member_since": "1949-08-05",
+      "note": "Founding member. The European Convention on Human Rights was incorporated into domestic law by the Human Rights Act 1998 (indirect transposition, not direct effect). The UK remains a member of the Council of Europe post-Brexit.",
+      "direct_effect_instruments": ["echr_via_hra_1998"],
+      "transposition_required": true
+    },
+    {
+      "body": "commonwealth-of-nations",
+      "direct_effect": "none",
+      "member_since": "1949-04-28",
+      "note": "Head of the Commonwealth. The Commonwealth has no direct-effect legal instruments."
+    },
+    {
+      "body": "nato",
+      "direct_effect": "none",
+      "member_since": "1949-08-24",
+      "note": "Founding member. NATO creates treaty obligations but no directly applicable domestic law."
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "source_adapters": [
+    {
+      "kind": "akn_native",
+      "name": "legislation.gov.uk",
+      "url_template": "https://www.legislation.gov.uk/{source_path}/data.akn",
+      "notes": "UK national legislation publisher. Serves AKN XML via /data.akn on its own type-token paths (ukpga/uksi/...); {source_path} maps our FRBR doctype to that token. The rate is the floor of a process-wide adaptive pace: two requests a second across every fetch in the process, doubling on 429, 436 or 503 (Retry-After honoured) and recovering on success. The publisher states no limit in its API notes; its robots.txt carries Crawl-delay 5, knowingly exceeded on the product lead's approval of 2026-09-06 on the strength of the relationship with the publisher's team.",
+      "rate_limit_per_minute": 120,
+      "licence": "OGL-UK-3.0"
+    }
+  ],
+  "display": {
+    "heading_type": "marginal_note",
+    "heading_case": "title_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 5,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Validated against five legislation.gov.uk AKN exports (DPA 2018, Equality 2010, Housing 2004, Finance 2020, MLR 2017 SI) via the uk-gold structure/resolution/effects benchmarks; act + si hierarchies exercised end-to-end through the anchor scaffolder and Bluebell round-trip."
+  },
+  "tier": 1,
+  "status": "draft",
+  "public_reference": true,
+  "drafting_style": {
+    "note": "Rules keyed on document class, matching uri_patterns and document_classes. Term sets are English-language and hold only for this jurisdiction's drafting register. Triggers are phrases that impose a penalty, not any mention of one: a power to amend a schedule of penalties names no offence and is correct.",
+    "terms": {
+      "penalty_terms": [
+        "liable on conviction",
+        "shall be liable to a fine",
+        "punishable by",
+        "commits an offence and is liable"
+      ],
+      "offence_terms": ["offence", "guilty", "contravenes", "commits"],
+      "power_terms": ["may by regulations", "may by order", "may make regulations"],
+      "procedure_terms": [
+        "laid before",
+        "statutory instrument",
+        "annulment",
+        "affirmative resolution",
+        "consultation"
+      ]
+    },
+    "rules": [
+      {
+        "id": "penalty_without_offence",
+        "severity": "style",
+        "applies_to": ["act", "si"],
+        "message": "This unit sets a penalty but names no offence it attaches to.",
+        "requires": {
+          "section_containing": ["penalty_terms"],
+          "must_also_contain": ["offence_terms"]
+        }
+      },
+      {
+        "id": "power_without_procedure",
+        "severity": "style",
+        "applies_to": ["act", "si"],
+        "message": "This unit confers a power but states no procedure for exercising it.",
+        "requires": {
+          "section_containing": ["power_terms"],
+          "must_also_contain": ["procedure_terms"]
+        }
+      }
+    ]
+  }
+}

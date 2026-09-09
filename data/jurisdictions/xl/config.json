@@ -1,0 +1,184 @@
+{
+  "code": "xl",
+  "name": "Langkasuka",
+  "name_en": "Republic of Langkasuka",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["ind"],
+  "authoritative_language": "ind",
+  "note": "Fictional Malay-archipelago republic. Exists only as synthetic test material: a civil-law legislature (the Dewan Langkasuka) legislating in Bahasa Indonesia, used to exercise the Indonesian Bab/Bagian/Pasal/Ayat hierarchy, enacting formulae and amendment tracking without shipping any real jurisdiction's law in the open test tree. Not a real place; carries no real legislation.",
+  "document_classes": {
+    "act": {
+      "label": "Undang-Undang",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Buku (Book)",
+          "akn_element": "book",
+          "level": "higher",
+          "bluebell_keyword": "BOOK",
+          "numbering": "ordinal_indonesian"
+        },
+        {
+          "local_term": "Bab (Chapter)",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman"
+        },
+        {
+          "local_term": "Bagian (Part/Section)",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "ordinal_indonesian"
+        },
+        {
+          "local_term": "Paragraf",
+          "akn_element": "division",
+          "level": "higher",
+          "bluebell_keyword": "DIVISION",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Pasal (Article)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Ayat (Verse/Clause)",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized",
+          "marker_form": "parenthesized_arabic"
+        },
+        {
+          "local_term": "Huruf (Letter)",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_period"
+        },
+        {
+          "local_term": "Angka (Number)",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "arabic_period"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Bab (Chapter) > Bagian (Part) inverts the European civil-law convention, following Indonesian drafting practice."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "xl",
+    "uri_patterns": {
+      "act": "/akn/xl/act/{year}/{number}",
+      "bill": "/akn/xl/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Acts identified by calendar year and instrument number, e.g. Undang-Undang Nomor 14 Tahun 2018."
+  },
+  "numbering": {
+    "act_citation": "UU {number}/{year}",
+    "act_citation_alt": "Undang-Undang Nomor {number} Tahun {year}",
+    "insertion_style": "alphanumeric",
+    "note": "Acts cited by short title (e.g. 'Undang-Undang tentang Keterbukaan Informasi Publik') or by number and year. Inserted units take an uppercase-letter suffix (Pasal 13A); deleted units keep their number and read 'Dihapus'."
+  },
+  "enacting_formulae": [
+    {
+      "text": "Dengan Persetujuan Bersama DEWAN LANGKASUKA dan PRESIDEN REPUBLIK LANGKASUKA MEMUTUSKAN: Menetapkan: UNDANG-UNDANG TENTANG [SUBJECT].",
+      "position": "preamble",
+      "document_class": "act"
+    }
+  ],
+  "amendments": {
+    "style": "structural_civil",
+    "phrasing": "Ketentuan Pasal [N] diubah sehingga berbunyi sebagai berikut:",
+    "cross_reference_format": "full_formal_with_lembaran_negara",
+    "amending_body_structure": "two_pasal_roman",
+    "amendment_item_kind": "indent"
+  },
+  "core_tlcs": [
+    {
+      "eId": "dewan",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xl/dewan-langkasuka",
+      "showAs": "The Dewan Langkasuka"
+    },
+    {
+      "eId": "presiden",
+      "class": "TLCRole",
+      "href": "/ontology/role/xl/presiden",
+      "showAs": "President of the Republic of Langkasuka"
+    },
+    {
+      "eId": "lembaranNegara",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xl/lembaran-negara-langkasuka",
+      "showAs": "State Gazette of Langkasuka"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": "structure_civil.txt",
+    "prompt_additions": "Indonesian hierarchy inverts the European convention: Bab (Chapter) > Bagian (Part/Section) > Paragraf > Pasal (Article). Use CHAPTER > PART > DIVISION > ARTICLE. Pasal carry no heading of their own. Bagian are numbered with Indonesian ordinal words (Bagian Kesatu, Bagian Ketujuh); Bab use Roman numerals; Paragraf and Pasal use Arabic. Batang tubuh order is Ketentuan Umum, then the substantive chapters, then Ketentuan Peralihan and Ketentuan Penutup last.",
+    "reference_nouns": ["Pasal", "ayat", "huruf", "angka"],
+    "ordinal_words": {
+      "Kesatu": 1,
+      "Kedua": 2,
+      "Ketiga": 3,
+      "Keempat": 4,
+      "Kelima": 5,
+      "Keenam": 6,
+      "Ketujuh": 7,
+      "Kedelapan": 8,
+      "Kesembilan": 9,
+      "Kesepuluh": 10,
+      "Kesebelas": 11,
+      "Kedua Belas": 12,
+      "Ketiga Belas": 13,
+      "Keempat Belas": 14,
+      "Kelima Belas": 15,
+      "Keenam Belas": 16,
+      "Ketujuh Belas": 17,
+      "Kedelapan Belas": 18,
+      "Kesembilan Belas": 19,
+      "Kedua Puluh": 20
+    },
+    "marker_boundary": "line_anchored",
+    "body_opens_with_container": true,
+    "prose_precursors": ["pada", "dalam", "ayat"]
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "centered",
+    "heading_case": "upper_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+  },
+  "tier": 5,
+  "status": "stub",
+  "synthetic": true
+}

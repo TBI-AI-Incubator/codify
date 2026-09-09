@@ -1,0 +1,164 @@
+{
+  "code": "xz",
+  "name": "Zerzura",
+  "name_en": "Republic of Zerzura",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["ara"],
+  "authoritative_language": "ara",
+  "note": "Fictional Saharan oasis-state. Exists only as synthetic test material: an Arabic, right-to-left, civil-law codified system (the Assembly of Zerzura enacting Qawanin) used to exercise the Bab/Fasl/Madda/Fiqra/Band hierarchy, Arabic-script rendering and amendment/citation tracking without shipping any real jurisdiction's law in the open test tree. Not a real place; carries no real legislation.",
+  "document_classes": {
+    "act": {
+      "label": "قانون (Law)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "باب (Bab/Part)",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic_ordinal"
+        },
+        {
+          "local_term": "فصل (Fasl/Chapter)",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_ordinal"
+        },
+        {
+          "local_term": "مادة (Madda/Article)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "فقرة (Fiqra/Paragraph)",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "positional_implicit"
+        },
+        {
+          "local_term": "بند (Band/Point)",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "arabic_or_alpha"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Ordinary law (Qanun) enacted by the Assembly of Zerzura. Bab groups Fusul, Fasl groups Mawadd, and the Madda is the basic assessable unit. Fiqra and Band are subdivisions within a Madda."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "xz",
+    "uri_patterns": {
+      "act": "/akn/xz/act/{year}/{number}",
+      "bill": "/akn/xz/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Laws identified by calendar year and law number, e.g. Qanun No. 4 of 1994. Arabic-Indic numerals in source documents are normalised to Western Arabic for URI construction."
+  },
+  "numbering": {
+    "act_citation": "قانون رقم {number} لسنة {year}",
+    "insertion_style": "mukrrar",
+    "insertion_arabic": "مكرراً",
+    "insertion_latin": "bis",
+    "note": "Laws cited by number and year (e.g. 'قانون رقم 4 لسنة 1994')."
+  },
+  "adoption_markers": [
+    "ratification of the agreement",
+    "ratification of the convention",
+    "publication of the agreement",
+    "publication of the convention"
+  ],
+  "enacting_formulae": [
+    {
+      "text": "أصدر مجلس الأمة الزرزوري القانون الآتي نصه:",
+      "position": "preamble",
+      "document_class": "act"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "phrasing": "يستبدل بنص المادة ({X}) من القانون رقم ({N}) لسنة ({YYYY}) النص الآتي:",
+    "deletion_phrasing": "تلغى المادة ({X}) من القانون رقم ({N}) لسنة ({YYYY}).",
+    "insertion_phrasing": "تضاف مادة جديدة برقم ({X} مكرراً) إلى القانون رقم ({N}) لسنة ({YYYY}) نصها الآتي:",
+    "cross_reference_format": "law_number_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "assemblyOfZerzura",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xz/assembly",
+      "showAs": "Assembly of Zerzura"
+    },
+    {
+      "eId": "officialGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xz/zerzura-gazette",
+      "showAs": "Official Gazette of Zerzura"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Never emit structural keywords; the scaffold owns hierarchy. Render body text in the legal register of the source Arabic; do not translate or paraphrase. Inline body references may use Arabic-Indic numerals or Western Arabic; preserve whichever the source uses."
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "inline",
+    "heading_case": "natural",
+    "script": "arabic",
+    "rtl": true,
+    "font_preference": "serif",
+    "note": "Arabic right-to-left script. Article numbers use Western Arabic numerals in eIds even where Arabic-Indic numerals appear in source. Review UI must enforce RTL text direction."
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction for the Arabic RTL hierarchy. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+  },
+  "tier": 5,
+  "status": "stub",
+  "synthetic": true,
+  "legal_eras": [
+    {
+      "id": "sultanate",
+      "label": "Zerzuran Sultanate",
+      "to": "1902-12-31",
+      "enacting_authority": "Sultan of Zerzura",
+      "document_class": "act",
+      "authority_patterns": ["سلطان زرزورة", "الديوان السلطاني"]
+    },
+    {
+      "id": "protectorate",
+      "label": "Coastal Protectorate",
+      "from": "1903-01-01",
+      "to": "1961-07-14",
+      "enacting_authority": "Resident of the Coastal Protectorate",
+      "document_class": "act",
+      "authority_patterns": ["مقيم الساحل", "حكومة الساحل"]
+    },
+    {
+      "id": "assembly",
+      "label": "National Assembly",
+      "from": "1961-07-15",
+      "enacting_authority": "National Assembly of Zerzura",
+      "document_class": "act"
+    }
+  ]
+}

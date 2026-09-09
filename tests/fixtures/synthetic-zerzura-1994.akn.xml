@@ -1,0 +1,464 @@
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <identification source="#cobalt">
+        <FRBRWork>
+          <FRBRthis value="/akn/xz/act/1994-03-21/4"/>
+          <FRBRuri value="/akn/xz/act/1994-03-21/4"/>
+          <FRBRalias value="Untitled" name="title"/>
+          <FRBRdate date="1994-03-21" name="Generation"/>
+          <FRBRauthor href=""/>
+          <FRBRcountry value="xz"/>
+          <FRBRnumber value="4"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/xz/act/1994-03-21/4/ara"/>
+          <FRBRuri value="/akn/xz/act/1994-03-21/4/ara"/>
+          <FRBRdate date="2026-08-24" name="Generation"/>
+          <FRBRauthor href=""/>
+          <FRBRlanguage language="ara"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/xz/act/1994-03-21/4/ara"/>
+          <FRBRuri value="/akn/xz/act/1994-03-21/4/ara"/>
+          <FRBRdate date="2026-08-24" name="Generation"/>
+          <FRBRauthor href=""/>
+        </FRBRManifestation>
+      </identification>
+      <references source="#cobalt">
+        <TLCOrganization eId="cobalt" href="https://github.com/laws-africa/cobalt" showAs="cobalt"/>
+      </references>
+    </meta>
+    <preface>
+      <p eId="preface__p_1">رقم ٤ لسنة ١٩٩٤</p>
+      <p eId="preface__p_2">قانون بشأن نشر التشريعات والجريدة الرسمية</p>
+      <p eId="preface__p_3">قانون ينظم صياغة التشريعات ونشرها والاستشهاد بها في جمهورية زرزورة، وينشئ هيئة النشر ويحدد اختصاصاتها، ويكفل حق كل شخص في الاطلاع على النص الرسمي للتشريع النافذ، وينشئ سجلاً وطنياً للتشريعات، ويبين الحجية القانونية للنص المنشور، وينص على العقوبات المتعلقة بسلامة السجل التشريعي، وعلى ما يتصل بذلك من أحكام.</p>
+    </preface>
+    <preamble>
+      <p eId="preamble__p_1">باسم الشعب،</p>
+      <p eId="preamble__p_2">بعد الاطلاع على النظام الأساسي لجمهورية زرزورة، ولا سيما المواد المتعلقة بسن التشريعات ونشرها،</p>
+      <p eId="preamble__p_3">وبناءً على ما أقره مجلس الأمة الزرزوري،</p>
+      <p eId="preamble__p_4">ولما كان من المصلحة العامة أن تصدر قوانين الجمهورية في صورة كاملة وموثوقة ومحدّثة، وأن يتمكن كل شخص من الوصول إلى القانون الذي يخضع لأحكامه،</p>
+      <p eId="preamble__p_5">أصدر مجلس الأمة الزرزوري القانون الآتي نصه:</p>
+    </preamble>
+    <body>
+      <part eId="part_1">
+        <num>1</num>
+        <heading>الباب الأول: أحكام تمهيدية</heading>
+        <article eId="part_1__art_1">
+          <num>1</num>
+          <heading>التسمية وبدء العمل</heading>
+          <paragraph eId="part_1__art_1__para_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_1__art_1__para_1__p_1">يسمى هذا القانون قانون نشر التشريعات والجريدة الرسمية لسنة ١٩٩٤.</p>
+            </content>
+          </paragraph>
+          <paragraph eId="part_1__art_1__para_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_1__art_1__para_2__p_1">يعمل بأحكام هذا القانون من اليوم التالي لتاريخ نشره في الجريدة الرسمية، ويجوز أن يحدد بقرار من الوزير المختص مواعيد مختلفة لبدء العمل ببعض أحكامه لأغراض مختلفة، على أن يبدأ العمل بجميع أحكامه في موعد لا يجاوز سنتين من تاريخ نشره.</p>
+            </content>
+          </paragraph>
+        </article>
+        <article eId="part_1__art_2">
+          <num>2</num>
+          <heading>التعريفات</heading>
+          <intro>
+            <p eId="part_1__art_2__intro__p_1">يقصد بالعبارات والألفاظ التالية، في تطبيق أحكام هذا القانون، المعاني المبينة قرين كل منها ما لم يدل سياق النص على خلاف ذلك:</p>
+          </intro>
+          <point eId="part_1__art_2__point_a">
+            <num>(a)</num>
+            <content>
+              <p eId="part_1__art_2__point_a__p_1">الجمهورية: جمهورية زرزورة.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_b">
+            <num>(b)</num>
+            <content>
+              <p eId="part_1__art_2__point_b__p_1">الوزير المختص: الوزير المكلف بشؤون العدل.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_c">
+            <num>(c)</num>
+            <content>
+              <p eId="part_1__art_2__point_c__p_1">التشريع: كل قانون يصدره مجلس الأمة، وكل لائحة أو نظام أو قرار ذي صفة تنظيمية يصدر تنفيذاً له، سواء صدر قبل العمل بهذا القانون أو بعده.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_d">
+            <num>(d)</num>
+            <content>
+              <p eId="part_1__art_2__point_d__p_1">النص الرسمي: نص التشريع كما صدر، متضمناً كل تعديل نافذ عليه في الوقت المعتبر، منشوراً وفق أحكام الباب الثاني من هذا القانون.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_e">
+            <num>(e)</num>
+            <content>
+              <p eId="part_1__art_2__point_e__p_1">الجريدة الرسمية: الجريدة الرسمية لجمهورية زرزورة التي تصدر بمقتضى المادة (٨) من هذا القانون.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_f">
+            <num>(f)</num>
+            <content>
+              <p eId="part_1__art_2__point_f__p_1">هيئة النشر: الهيئة المنشأة بموجب المادة (١١) من هذا القانون.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_g">
+            <num>(g)</num>
+            <content>
+              <p eId="part_1__art_2__point_g__p_1">السجل: السجل الوطني للتشريعات المنشأ بموجب المادة (١٤) من هذا القانون.</p>
+            </content>
+          </point>
+          <point eId="part_1__art_2__point_h">
+            <num>(h)</num>
+            <content>
+              <p eId="part_1__art_2__point_h__p_1">يوم العمل: أي يوم عدا أيام العطل الرسمية المقررة في الجمهورية.</p>
+            </content>
+          </point>
+        </article>
+        <article eId="part_1__art_3">
+          <num>3</num>
+          <heading>نطاق التطبيق</heading>
+          <paragraph eId="part_1__art_3__para_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_1__art_3__para_1__p_1">تسري أحكام هذا القانون على كل تشريع نافذ عند العمل بأحكام هذه المادة، وعلى كل تشريع يصدر بعد ذلك.</p>
+            </content>
+          </paragraph>
+          <paragraph eId="part_1__art_3__para_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_1__art_3__para_2__p_1">تلتزم الجهات الحكومية كافة بأحكام هذا القانون.</p>
+            </content>
+          </paragraph>
+        </article>
+        <article eId="part_1__art_4">
+          <num>4</num>
+          <heading>سيادة أحكام هذا القانون</heading>
+          <content>
+            <p eId="part_1__art_4__p_1">مع عدم الإخلال بأحكام النظام الأساسي، إذا تعارض حكم في تشريع آخر مع حكم في هذا القانون فيما يتعلق بنشر التشريعات أو الاستشهاد بها، سرى حكم هذا القانون بالقدر الذي يرفع به التعارض، ما لم ينص ذلك التشريع صراحةً على خلاف ذلك.</p>
+          </content>
+        </article>
+      </part>
+      <part eId="part_2">
+        <num>2</num>
+        <heading>الباب الثاني: نشر التشريعات</heading>
+        <chapter eId="part_2__chp_1">
+          <num>1</num>
+          <heading>الفصل الأول: واجب النشر وتحديث النص</heading>
+          <article eId="part_2__chp_1__art_5">
+            <num>5</num>
+            <heading>واجب النشر</heading>
+            <paragraph eId="part_2__chp_1__art_5__para_1">
+              <num>(1)</num>
+              <intro>
+                <p eId="part_2__chp_1__art_5__para_1__intro__p_1">تتولى هيئة النشر نشر كل تشريع نافذ في صورة إلكترونية تتيح ما يلي:</p>
+              </intro>
+              <point eId="part_2__chp_1__art_5__para_1__point_a">
+                <num>(a)</num>
+                <content>
+                  <p eId="part_2__chp_1__art_5__para_1__point_a__p_1">البحث في النص الكامل للتشريع؛</p>
+                </content>
+              </point>
+              <point eId="part_2__chp_1__art_5__para_1__point_b">
+                <num>(b)</num>
+                <content>
+                  <p eId="part_2__chp_1__art_5__para_1__point_b__p_1">استخراج أي حكم من أحكامه والاستشهاد به وإعادة إنتاجه دون نسخ يدوي؛</p>
+                </content>
+              </point>
+              <point eId="part_2__chp_1__art_5__para_1__point_c">
+                <num>(c)</num>
+                <content>
+                  <p eId="part_2__chp_1__art_5__para_1__point_c__p_1">بيان تاريخ بدء العمل بكل حكم وكل تعديل يمسه.</p>
+                </content>
+              </point>
+            </paragraph>
+            <paragraph eId="part_2__chp_1__art_5__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_2__chp_1__art_5__para_2__p_1">لا يعد نشر صورة ضوئية لصفحة مطبوعة، في ذاته، وفاءً بالالتزام المقرر في الفقرة (١) من هذه المادة.</p>
+              </content>
+            </paragraph>
+          </article>
+          <article eId="part_2__chp_1__art_6">
+            <num>6</num>
+            <heading>ميعاد النشر</heading>
+            <content>
+              <p eId="part_2__chp_1__art_6__p_1">تلتزم هيئة النشر بأن تنشر كل تشريع خلال ثلاثين يوماً من تاريخ إقراره، وينشر مع التشريع بيان تاريخ إقراره وتاريخ بدء العمل به.</p>
+            </content>
+          </article>
+          <article eId="part_2__chp_1__art_7">
+            <num>7</num>
+            <heading>تحديث النص الرسمي</heading>
+            <paragraph eId="part_2__chp_1__art_7__para_1">
+              <num>(1)</num>
+              <content>
+                <p eId="part_2__chp_1__art_7__para_1__p_1">تلتزم هيئة النشر بأن تبقي النص الرسمي لكل تشريع محدّثاً بحيث لا يجاوز التأخر في إدراج أي تعديل نافذ ثلاثين يوماً من تاريخ بدء العمل به.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_2__chp_1__art_7__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_2__chp_1__art_7__para_2__p_1">إذا عُدّل حكم، نشرت الهيئة نص الحكم بصيغته النافذة ونصه بالصيغة التي كان عليها قبل التعديل، مع بيان التشريع المعدِّل في كل حالة.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_2__chp_1__art_7__para_3">
+              <num>(3)</num>
+              <content>
+                <p eId="part_2__chp_1__art_7__para_3__p_1">يجوز لهيئة النشر أن تصحح في النص الرسمي أي خطأ مادي أو طباعي أو ما شابهه، على ألا يترتب على التصحيح تغيير في مضمون التشريع، ويقيّد كل تصحيح في السجل.</p>
+              </content>
+            </paragraph>
+          </article>
+        </chapter>
+        <chapter eId="part_2__chp_2">
+          <num>2</num>
+          <heading>الفصل الثاني: الجريدة الرسمية</heading>
+          <article eId="part_2__chp_2__art_8">
+            <num>8</num>
+            <heading>إصدار الجريدة الرسمية</heading>
+            <paragraph eId="part_2__chp_2__art_8__para_1">
+              <num>(1)</num>
+              <content>
+                <p eId="part_2__chp_2__art_8__para_1__p_1">تصدر في الجمهورية جريدة رسمية تتولى هيئة النشر إصدارها على فترات دورية تحددها اللائحة التنفيذية لهذا القانون.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_2__chp_2__art_8__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_2__chp_2__art_8__para_2__p_1">يعد النشر في الجريدة الرسمية إعلاناً كافياً بمحتوى ما ينشر فيها في مواجهة الكافة.</p>
+              </content>
+            </paragraph>
+          </article>
+          <article eId="part_2__chp_2__art_9">
+            <num>9</num>
+            <heading>أقسام الجريدة الرسمية</heading>
+            <content>
+              <p eId="part_2__chp_2__art_9__p_1">تشتمل الجريدة الرسمية على قسم للتشريعات وقسم للقرارات التنظيمية وقسم للإعلانات الرسمية، وتحدد اللائحة التنفيذية ما ينشر في كل قسم منها.</p>
+            </content>
+          </article>
+          <article eId="part_2__chp_2__art_10">
+            <num>10</num>
+            <heading>حجية النص المنشور</heading>
+            <paragraph eId="part_2__chp_2__art_10__para_1">
+              <num>(1)</num>
+              <content>
+                <p eId="part_2__chp_2__art_10__para_1__p_1">تقبل صورة النص الرسمي المنشور وفق أحكام هذا الباب، والمذيلة بإفادة من هيئة النشر بأنها محدّثة، دليلاً أمام المحاكم كافة على التشريع وعلى تاريخ بدء العمل به دون حاجة إلى إثبات آخر.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_2__chp_2__art_10__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_2__chp_2__art_10__para_2__p_1">لا يجعل حكم هذه المادة النص المنشور دليلاً قاطعاً على التشريع كما أُقر، وعند وجود تعارض يرجّح نص التشريع كما أقره مجلس الأمة.</p>
+              </content>
+            </paragraph>
+          </article>
+        </chapter>
+      </part>
+      <part eId="part_3">
+        <num>3</num>
+        <heading>الباب الثالث: هيئة النشر والسجل الوطني</heading>
+        <chapter eId="part_3__chp_1">
+          <num>1</num>
+          <heading>الفصل الأول: هيئة النشر</heading>
+          <article eId="part_3__chp_1__art_11">
+            <num>11</num>
+            <heading>إنشاء الهيئة</heading>
+            <paragraph eId="part_3__chp_1__art_11__para_1">
+              <num>(1)</num>
+              <content>
+                <p eId="part_3__chp_1__art_11__para_1__p_1">تنشأ هيئة تسمى هيئة النشر تتمتع بالشخصية الاعتبارية وبالاستقلال في ممارسة اختصاصاتها المقررة في هذا القانون.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_3__chp_1__art_11__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_3__chp_1__art_11__para_2__p_1">يصدر بتعيين رئيس الهيئة قرار ينشر في الجريدة الرسمية، ويتولى الرئيس إدارة الهيئة وفق الشروط المبينة في قرار تعيينه.</p>
+              </content>
+            </paragraph>
+          </article>
+          <article eId="part_3__chp_1__art_12">
+            <num>12</num>
+            <heading>اختصاصات الهيئة</heading>
+            <content>
+              <p eId="part_3__chp_1__art_12__p_1">تختص هيئة النشر بنشر التشريعات وفقاً لأحكام الباب الثاني، ومسك السجل، والقيام بكل ما يلزم أو يكون مناسباً لأداء هذه الاختصاصات.</p>
+            </content>
+          </article>
+          <article eId="part_3__chp_1__art_13">
+            <num>13</num>
+            <heading>استقلال الهيئة والتفويض</heading>
+            <paragraph eId="part_3__chp_1__art_13__para_1">
+              <num>(1)</num>
+              <content>
+                <p eId="part_3__chp_1__art_13__para_1__p_1">لا تخضع هيئة النشر، في ممارسة اختصاصاتها المقررة في هذا القانون، لتوجيه أي جهة فيما يتعلق بمضمون النص الرسمي.</p>
+              </content>
+            </paragraph>
+            <paragraph eId="part_3__chp_1__art_13__para_2">
+              <num>(2)</num>
+              <content>
+                <p eId="part_3__chp_1__art_13__para_2__p_1">يجوز لرئيس الهيئة أن يفوض كتابةً أياً من اختصاصاته، عدا سلطة التفويض ذاتها، إلى أحد موظفي الهيئة، ولا يمنع التفويض الرئيس من مباشرة الاختصاص المفوض.</p>
+              </content>
+            </paragraph>
+          </article>
+        </chapter>
+        <chapter eId="part_3__chp_2">
+          <num>2</num>
+          <heading>الفصل الثاني: السجل الوطني للتشريعات</heading>
+          <article eId="part_3__chp_2__art_14">
+            <num>14</num>
+            <heading>إنشاء السجل</heading>
+            <content>
+              <p eId="part_3__chp_2__art_14__p_1">تمسك هيئة النشر سجلاً وطنياً للتشريعات تقيّد فيه بيانات كل تشريع على النحو المبين في المادة التالية.</p>
+            </content>
+          </article>
+          <article eId="part_3__chp_2__art_15">
+            <num>15</num>
+            <heading>بيانات السجل</heading>
+            <intro>
+              <p eId="part_3__chp_2__art_15__intro__p_1">يقيّد في السجل بالنسبة لكل تشريع ما يلي:</p>
+            </intro>
+            <point eId="part_3__chp_2__art_15__point_a">
+              <num>(a)</num>
+              <content>
+                <p eId="part_3__chp_2__art_15__point_a__p_1">اسمه المختصر ورقمه وسنته؛</p>
+              </content>
+            </point>
+            <point eId="part_3__chp_2__art_15__point_b">
+              <num>(b)</num>
+              <content>
+                <p eId="part_3__chp_2__art_15__point_b__p_1">تاريخ إقراره وتاريخ بدء العمل به؛</p>
+              </content>
+            </point>
+            <point eId="part_3__chp_2__art_15__point_c">
+              <num>(c)</num>
+              <content>
+                <p eId="part_3__chp_2__art_15__point_c__p_1">كل تشريع معدِّل يمسه وتاريخ بدء العمل بكل تعديل؛</p>
+              </content>
+            </point>
+            <point eId="part_3__chp_2__art_15__point_d">
+              <num>(d)</num>
+              <content>
+                <p eId="part_3__chp_2__art_15__point_d__p_1">كل تصحيح مادي أُجري على نصه الرسمي وفق المادة (٧) من هذا القانون.</p>
+              </content>
+            </point>
+          </article>
+          <article eId="part_3__chp_2__art_16">
+            <num>16</num>
+            <heading>حق الاطلاع على السجل</heading>
+            <content>
+              <p eId="part_3__chp_2__art_16__p_1">يكون السجل مفتوحاً لاطلاع كل شخص دون مقابل في المواعيد الرسمية المقررة.</p>
+            </content>
+          </article>
+        </chapter>
+      </part>
+      <part eId="part_4">
+        <num>4</num>
+        <heading>الباب الرابع: الوصول والطعن والعقوبات وأحكام ختامية</heading>
+        <article eId="part_4__art_17">
+          <num>17</num>
+          <heading>حق الوصول المجاني</heading>
+          <paragraph eId="part_4__art_17__para_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_4__art_17__para_1__p_1">لكل شخص الحق في الوصول إلى النص الرسمي لأي تشريع نافذ في صورة كاملة ومحدّثة ودون مقابل.</p>
+            </content>
+          </paragraph>
+          <paragraph eId="part_4__art_17__para_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_4__art_17__para_2__p_1">لا يُتقاضى أي رسم عن الوصول إلى النص الرسمي في صورته الإلكترونية، ويجوز لهيئة النشر أن تتقاضى رسماً معقولاً لا يجاوز تكلفة الإنتاج مقابل تسليم نسخة ورقية مصدّقة.</p>
+            </content>
+          </paragraph>
+        </article>
+        <article eId="part_4__art_18">
+          <num>18</num>
+          <heading>التظلم والطعن</heading>
+          <paragraph eId="part_4__art_18__para_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_4__art_18__para_1__p_1">لكل ذي مصلحة أن يتظلم من قرار تصدره هيئة النشر بمقتضى هذا القانون خلال ثلاثين يوماً من تاريخ إخطاره به.</p>
+            </content>
+          </paragraph>
+          <paragraph eId="part_4__art_18__para_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_4__art_18__para_2__p_1">إذا رُفض التظلم أو انقضى ميعاد البت فيه دون رد، جاز لصاحب الشأن أن يطعن في القرار أمام المحكمة الإدارية المختصة خلال ستين يوماً.</p>
+            </content>
+          </paragraph>
+        </article>
+        <article eId="part_4__art_19">
+          <num>19</num>
+          <heading>العقوبات</heading>
+          <paragraph eId="part_4__art_19__para_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_4__art_19__para_1__p_1">يعاقب بالحبس مدة لا تجاوز ثلاث سنوات وبغرامة لا تجاوز خمسة آلاف دينار، أو بإحدى هاتين العقوبتين، كل من أدرج في السجل أو في النص الرسمي بياناً يعلم أنه غير صحيح في جزء جوهري.</p>
+            </content>
+          </paragraph>
+          <paragraph eId="part_4__art_19__para_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_4__art_19__para_2__p_1">يعاقب بالغرامة التي لا تجاوز ألف دينار كل من تعمّد إعاقة هيئة النشر أو أحد موظفيها عن أداء اختصاص مقرر بمقتضى هذا القانون.</p>
+            </content>
+          </paragraph>
+        </article>
+        <article eId="part_4__art_20">
+          <num>20</num>
+          <heading>اللائحة التنفيذية</heading>
+          <content>
+            <p eId="part_4__art_20__p_1">يصدر الوزير المختص اللائحة التنفيذية لهذا القانون خلال ستة أشهر من تاريخ العمل به، وتبين اللائحة على وجه الخصوص شكل النشر ومواعيد إصدار الجريدة الرسمية وإجراءات مسك السجل ورسوم النسخ المصدّقة.</p>
+          </content>
+        </article>
+        <article eId="part_4__art_21">
+          <num>21</num>
+          <heading>الإلغاءات</heading>
+          <content>
+            <p eId="part_4__art_21__p_1">يلغى كل حكم يخالف أحكام هذا القانون، وتلغى التشريعات المبينة في الملحق المرفق بالقدر المبين قرين كل منها.</p>
+          </content>
+        </article>
+        <article eId="part_4__art_22">
+          <num>22</num>
+          <heading>النشر والعمل</heading>
+          <content>
+            <p eId="part_4__art_22__p_1">ينشر هذا القانون في الجريدة الرسمية، ويعمل به وفقاً لأحكام المادة (١) منه.</p>
+          </content>
+        </article>
+      </part>
+    </body>
+    <attachments>
+      <attachment eId="att_1">
+        <heading>- ملحق: بيان التشريعات الملغاة</heading>
+        <doc name="schedule">
+          <meta>
+            <identification source="#cobalt">
+              <FRBRWork>
+                <FRBRthis value="/akn/xz/act/1994-03-21/4/!schedule_1"/>
+                <FRBRuri value="/akn/xz/act/1994-03-21/4"/>
+                <FRBRalias value="- ملحق: بيان التشريعات الملغاة" name="title"/>
+                <FRBRdate date="1994-03-21" name="Generation"/>
+                <FRBRauthor href=""/>
+                <FRBRcountry value="xz"/>
+                <FRBRnumber value="4"/>
+              </FRBRWork>
+              <FRBRExpression>
+                <FRBRthis value="/akn/xz/act/1994-03-21/4/ara/!schedule_1"/>
+                <FRBRuri value="/akn/xz/act/1994-03-21/4/ara"/>
+                <FRBRdate date="2026-08-24" name="Generation"/>
+                <FRBRauthor href=""/>
+                <FRBRlanguage language="ara"/>
+              </FRBRExpression>
+              <FRBRManifestation>
+                <FRBRthis value="/akn/xz/act/1994-03-21/4/ara/!schedule_1"/>
+                <FRBRuri value="/akn/xz/act/1994-03-21/4/ara"/>
+                <FRBRdate date="2026-08-24" name="Generation"/>
+                <FRBRauthor href=""/>
+              </FRBRManifestation>
+            </identification>
+          </meta>
+          <mainBody>
+            <p eId="att_1__p_1">تلغى التشريعات التالية بالقدر المبين قرين كل منها: أمر المطبعة الحكومية لسنة ١٩٣١ يلغى بالكامل؛ ونظام الوقائع الرسمية لسنة ١٩٥٨ يلغى فيما يتعلق بالمواد من الأولى إلى الخامسة منه؛ وقرار تنظيم النشر الرسمي لسنة ١٩٧٢ يلغى بالكامل.</p>
+          </mainBody>
+        </doc>
+      </attachment>
+    </attachments>
+  </act>
+</akomaNtoso>

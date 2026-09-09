@@ -1,0 +1,105 @@
+{
+  "code": "xq",
+  "name": "Quivira",
+  "name_en": "Republic of Quivira",
+  "note": "Fictional civil-law republic. Exists only as synthetic test material, and is the worked example in docs/jurisdictions/adding-a-jurisdiction.md: the smallest configuration that ingests, so a contributor can see which fields are load-bearing and which are refinements.",
+  "synthetic": true,
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["spa"],
+  "authoritative_language": "spa",
+  "tier": 5,
+  "status": "stub",
+  "default_document_class": "ley",
+  "document_classes": {
+    "ley": {
+      "label": "Ley (Law)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Título (Title)",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Artículo (Article)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Apartado (Paragraph)",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic"
+        }
+      ]
+    }
+  },
+  "frbr": {
+    "country_code": "xq",
+    "uri_patterns": {
+      "act": "/akn/xq/act/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Laws identified by calendar year and sequential number, e.g. Ley 4 de 2011. Keyed on `act` rather than `ley`: the doctype normalises to its AKN element before the URI is minted."
+  },
+  "numbering": {
+    "act_citation": "Ley {number} de {year}",
+    "insertion_style": "bis",
+    "note": "Inserted articles take bis/ter rather than a decimal."
+  },
+  "enacting_formulae": [
+    {
+      "text": "LA ASAMBLEA NACIONAL DE QUIVIRA DECRETA:",
+      "position": "preamble",
+      "document_class": "ley"
+    }
+  ],
+  "enacting_formula_markers": ["DECRETA:"],
+  "amendments": {
+    "style": "textual_civil",
+    "phrasing": "se modifica",
+    "cross_reference_format": "number_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "asamblea",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xq/asamblea",
+      "showAs": "La Asamblea Nacional de Quivira"
+    },
+    {
+      "eId": "gaceta",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xq/gaceta",
+      "showAs": "La Gaceta de Quivira"
+    }
+  ],
+  "display": {
+    "heading_type": "heading",
+    "heading_case": "sentence_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations and list numbering verbatim. Never emit structural keywords, the scaffold owns hierarchy."
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction and the guide's fixture. Three Bluebell-authored laws round-trip to schema-valid AKN."
+  },
+  "supranational_memberships": []
+}

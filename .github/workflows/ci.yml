@@ -1,0 +1,94 @@
+# The open repository's CI; the split carries it to the root.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # release.yml runs these same jobs against a tag before it publishes.
+  workflow_call:
+
+# The test job runs pull-request code.
+permissions:
+  contents: read
+
+# One job per signal: a red lint must not hide the state of the tests.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      # --config: in pyproject.toml these would govern the monorepo's copy too.
+      - run: uv run --frozen --with 'ruff==0.15.12' ruff check --config open-repo-ruff.toml .
+      - run: uv run --frozen --with 'ruff==0.15.12' ruff format --check --config open-repo-ruff.toml .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      - run: uv sync --frozen --group dev --extra migrations
+      # lxml is ignored rather than stubbed; lxml-stubs takes this to 127 errors.
+      - run: |
+          uv run --frozen --with 'mypy==2.1.0' --with 'types-PyYAML==6.0.12.20260408' \
+            --with 'types-regex==2026.5.9.20260518' --with 'types-cachetools==7.0.0.20260518' \
+            mypy --config-file open-repo-mypy.ini codify
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      - run: uv sync --frozen --group dev --extra migrations
+      # Check the included synthetic configuration before collecting tests.
+      - name: the source tree resolves its configs
+        run: |
+          uv run --frozen python -c "
+          from codify.jurisdictions import JURISDICTIONS_DIR, load_config
+          assert JURISDICTIONS_DIR.exists(), JURISDICTIONS_DIR
+          assert load_config('xa'), f'no config resolved from {JURISDICTIONS_DIR}'
+          "
+      # Closed port: a call escaping the fakes fails rather than reaching a provider.
+      - env:
+          LITELLM_BASE_URL: http://127.0.0.1:1
+          EMBEDDING_BASE_URL: http://127.0.0.1:1
+        run: uv run --frozen pytest tests -m "not integration and not live_llm" -q
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      # The wheel builds and carries its data.
+      - run: |
+          uv build
+          python scripts/check_distribution.py dist
+          # -I: without it this imports the source tree beside the wheel.
+          uv run --isolated --no-project --with dist/*.whl python -I -c "
+          import codify, pathlib
+          here = pathlib.Path(codify.__file__).parent
+          assert 'site-packages' in str(here), f'imported the source tree, not the wheel: {here}'
+          from codify.jurisdictions import JURISDICTIONS_DIR, load_config
+          assert JURISDICTIONS_DIR.exists(), JURISDICTIONS_DIR
+          assert load_config('xa'), 'the synthetic jurisdiction did not load from the wheel'
+          # frameworks is selected separately from the configs.
+          from codify.frameworks.acquis import FRAMEWORKS_DIR
+          assert (FRAMEWORKS_DIR / 'eu-acquis.yaml').is_file(), FRAMEWORKS_DIR
+          "

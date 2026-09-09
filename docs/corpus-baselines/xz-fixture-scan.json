@@ -1,0 +1,455 @@
+{
+  "corpus": {
+    "jurisdiction": "xz",
+    "root": "tests/fixtures/corpus",
+    "include_derived": false
+  },
+  "documents": 5,
+  "documents_excluded_as_our_own_export": 0,
+  "documents_unreadable": 0,
+  "documents_without_text_layer": 0,
+  "characters": 10849,
+  "anchors": 21,
+  "basic_units": 10,
+  "documents_measurable": 5,
+  "documents_without_basic_unit": 2,
+  "documents_with_units": 3,
+  "documents_with_units_and_no_container": 2,
+  "marker_lines": 11,
+  "marker_lines_claimed": 8,
+  "capture_rate": 0.7272727272727273,
+  "mangled_marker_lines": 1,
+  "honest_marker_lines": 12,
+  "honest_capture_rate": 0.6666666666666666,
+  "marker_forms": {
+    "balanced_parens": [
+      9,
+      6
+    ],
+    "dash": [
+      1,
+      1
+    ],
+    "unbalanced_close": [
+      1,
+      1
+    ]
+  },
+  "container_recall": {
+    "chapter": [
+      2,
+      2
+    ],
+    "part": [
+      1,
+      1
+    ]
+  },
+  "undeclared_grouping_lines": {},
+  "anchors_by_kind": {
+    "article": 10,
+    "chapter": 6,
+    "part": 5
+  },
+  "anchors_by_pass": {
+    "recover_misread_marker": 2,
+    "regex": 19
+  },
+  "spans_by_kind": {
+    "duplicate_number": 3,
+    "numbering_gap": 1,
+    "unmatched_marker": 12
+  },
+  "spans_by_reason": {
+    "marker_shaped_line_unclaimed": 3,
+    "read_as_prose_reference": 9,
+    "repeal": 1,
+    "toc_twin": 3
+  },
+  "spans_by_pass": {
+    "declare_numbering_gaps": 1,
+    "declare_unclaimed_markers": 3,
+    "drop_toc_duplicates": 3,
+    "regex": 9
+  },
+  "passes": {
+    "assign_eids": [
+      21,
+      4,
+      5
+    ],
+    "capture_container_headings": [
+      11,
+      2,
+      5
+    ],
+    "declare_numbering_gaps": [
+      1,
+      1,
+      5
+    ],
+    "declare_orphaned_drops": [
+      0,
+      0,
+      5
+    ],
+    "declare_out_of_order": [
+      0,
+      0,
+      5
+    ],
+    "declare_toc_without_body": [
+      0,
+      0,
+      5
+    ],
+    "declare_unclaimed_markers": [
+      3,
+      2,
+      5
+    ],
+    "declare_untwinned_tail": [
+      0,
+      0,
+      5
+    ],
+    "drop_embedded_schedule_captions": [
+      0,
+      0,
+      5
+    ],
+    "drop_lone_compilation_container": [
+      0,
+      0,
+      5
+    ],
+    "drop_orphan_children": [
+      0,
+      0,
+      5
+    ],
+    "drop_preamble_citation_articles": [
+      0,
+      0,
+      5
+    ],
+    "drop_toc_duplicates": [
+      -3,
+      1,
+      5
+    ],
+    "mark_amendment_items": [
+      0,
+      0,
+      5
+    ],
+    "mark_amendments_under_roman_host": [
+      0,
+      0,
+      5
+    ],
+    "mark_embedded_amendment_articles": [
+      0,
+      0,
+      5
+    ],
+    "mark_specimen_examples": [
+      0,
+      0,
+      5
+    ],
+    "numbered_heading_fallback": [
+      0,
+      0,
+      1
+    ],
+    "ordinal_list_fallback": [
+      0,
+      0,
+      1
+    ],
+    "promote_orphan_children": [
+      0,
+      0,
+      5
+    ],
+    "recover_misread_marker": [
+      2,
+      1,
+      5
+    ],
+    "regex": [
+      22,
+      4,
+      5
+    ],
+    "repair_article_digit_ocr": [
+      0,
+      0,
+      5
+    ],
+    "unnumbered_annex": [
+      0,
+      0,
+      5
+    ]
+  },
+  "passes_by_era": {
+    "assembly": {
+      "assign_eids": [
+        8,
+        1,
+        1
+      ],
+      "capture_container_headings": [
+        8,
+        1,
+        1
+      ],
+      "declare_numbering_gaps": [
+        0,
+        0,
+        1
+      ],
+      "declare_orphaned_drops": [
+        0,
+        0,
+        1
+      ],
+      "declare_out_of_order": [
+        0,
+        0,
+        1
+      ],
+      "declare_toc_without_body": [
+        0,
+        0,
+        1
+      ],
+      "declare_unclaimed_markers": [
+        0,
+        0,
+        1
+      ],
+      "declare_untwinned_tail": [
+        0,
+        0,
+        1
+      ],
+      "drop_embedded_schedule_captions": [
+        0,
+        0,
+        1
+      ],
+      "drop_lone_compilation_container": [
+        0,
+        0,
+        1
+      ],
+      "drop_orphan_children": [
+        0,
+        0,
+        1
+      ],
+      "drop_preamble_citation_articles": [
+        0,
+        0,
+        1
+      ],
+      "drop_toc_duplicates": [
+        0,
+        0,
+        1
+      ],
+      "mark_amendment_items": [
+        0,
+        0,
+        1
+      ],
+      "mark_amendments_under_roman_host": [
+        0,
+        0,
+        1
+      ],
+      "mark_embedded_amendment_articles": [
+        0,
+        0,
+        1
+      ],
+      "mark_specimen_examples": [
+        0,
+        0,
+        1
+      ],
+      "promote_orphan_children": [
+        0,
+        0,
+        1
+      ],
+      "recover_misread_marker": [
+        0,
+        0,
+        1
+      ],
+      "regex": [
+        8,
+        1,
+        1
+      ],
+      "repair_article_digit_ocr": [
+        0,
+        0,
+        1
+      ],
+      "unnumbered_annex": [
+        0,
+        0,
+        1
+      ]
+    },
+    "unknown": {
+      "assign_eids": [
+        13,
+        3,
+        4
+      ],
+      "capture_container_headings": [
+        3,
+        1,
+        4
+      ],
+      "declare_numbering_gaps": [
+        1,
+        1,
+        4
+      ],
+      "declare_orphaned_drops": [
+        0,
+        0,
+        4
+      ],
+      "declare_out_of_order": [
+        0,
+        0,
+        4
+      ],
+      "declare_toc_without_body": [
+        0,
+        0,
+        4
+      ],
+      "declare_unclaimed_markers": [
+        3,
+        2,
+        4
+      ],
+      "declare_untwinned_tail": [
+        0,
+        0,
+        4
+      ],
+      "drop_embedded_schedule_captions": [
+        0,
+        0,
+        4
+      ],
+      "drop_lone_compilation_container": [
+        0,
+        0,
+        4
+      ],
+      "drop_orphan_children": [
+        0,
+        0,
+        4
+      ],
+      "drop_preamble_citation_articles": [
+        0,
+        0,
+        4
+      ],
+      "drop_toc_duplicates": [
+        -3,
+        1,
+        4
+      ],
+      "mark_amendment_items": [
+        0,
+        0,
+        4
+      ],
+      "mark_amendments_under_roman_host": [
+        0,
+        0,
+        4
+      ],
+      "mark_embedded_amendment_articles": [
+        0,
+        0,
+        4
+      ],
+      "mark_specimen_examples": [
+        0,
+        0,
+        4
+      ],
+      "numbered_heading_fallback": [
+        0,
+        0,
+        1
+      ],
+      "ordinal_list_fallback": [
+        0,
+        0,
+        1
+      ],
+      "promote_orphan_children": [
+        0,
+        0,
+        4
+      ],
+      "recover_misread_marker": [
+        2,
+        1,
+        4
+      ],
+      "regex": [
+        14,
+        3,
+        4
+      ],
+      "repair_article_digit_ocr": [
+        0,
+        0,
+        4
+      ],
+      "unnumbered_annex": [
+        0,
+        0,
+        4
+      ]
+    }
+  },
+  "documents_blocked": 0,
+  "legibility_bands": {
+    "good": [
+      1,
+      1
+    ],
+    "illegible": [
+      1,
+      1
+    ]
+  },
+  "text_verdicts": {
+    "damaged": [
+      1,
+      1
+    ],
+    "prose": [
+      1,
+      1
+    ]
+  },
+  "documents_unjudged": 3
+}

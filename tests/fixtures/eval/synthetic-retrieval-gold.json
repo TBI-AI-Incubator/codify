@@ -1,0 +1,278 @@
+{
+  "about": "A labelled retrieval set over the synthetic corpora, so the eval runs on a clone with no corpus of your own and no provider key. Every law is invented; nothing here comes from a real statute book. Targets are named by work URI and eId, not by row id, because ids are minted at ingest and yours will differ from ours.",
+  "queries": [
+    {
+      "id": "xa-publish-duty",
+      "language": "eng",
+      "query": "duty to publish every law in electronic form",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_4"]
+    },
+    {
+      "id": "xa-gazette",
+      "language": "eng",
+      "query": "official gazette published by the authority",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_6"]
+    },
+    {
+      "id": "xa-evidence",
+      "language": "eng",
+      "query": "copy of the official text admissible as evidence",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_7"]
+    },
+    {
+      "id": "xa-register",
+      "language": "eng",
+      "query": "register of legislation kept by the publishing authority",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_8"]
+    },
+    {
+      "id": "xa-falsify",
+      "language": "eng",
+      "query": "falsifying an entry in the register offence",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_15"]
+    },
+    {
+      "id": "xa-body-corporate",
+      "language": "eng",
+      "query": "offence committed by a body corporate director liability",
+      "work_uri": "/akn/xa/act/1992/7",
+      "relevant": ["sec_16"]
+    },
+    {
+      "id": "xa-foi-refusal",
+      "language": "eng",
+      "query": "grounds on which a public authority may refuse a request",
+      "work_uri": "/akn/xa/act/2001/3",
+      "relevant": ["sec_4"]
+    },
+    {
+      "id": "xa-foi-appeal",
+      "language": "eng",
+      "query": "appeal to the tribunal against a decision",
+      "work_uri": "/akn/xa/act/2001/3",
+      "relevant": ["sec_5"]
+    },
+    {
+      "id": "xa-penalty-schedule",
+      "language": "eng",
+      "query": "maximum fine and term of imprisonment for each offence",
+      "work_uri": "/akn/xa/act/2003/4",
+      "relevant": ["sec_4"]
+    },
+    {
+      "id": "xa-amend-defer",
+      "language": "eng",
+      "query": "repeal of the power to defer publication",
+      "work_uri": "/akn/xa/act/2011/5",
+      "relevant": ["sec_3"]
+    },
+    {
+      "id": "xu-lawful-processing",
+      "language": "eng",
+      "query": "processing is lawful only with consent or legal obligation",
+      "work_uri": "/akn/xu/act/2004/12",
+      "relevant": ["chp_2__art_6"]
+    },
+    {
+      "id": "xu-special-categories",
+      "language": "eng",
+      "query": "special categories of personal data revealing racial or political opinions",
+      "work_uri": "/akn/xu/act/2004/12",
+      "relevant": ["chp_2__art_7"]
+    },
+    {
+      "id": "xu-breach-notification",
+      "language": "eng",
+      "query": "notification of a personal data breach",
+      "work_uri": "/akn/xu/act/2004/12",
+      "relevant": ["chp_2__art_15"]
+    },
+    {
+      "id": "xu-erasure",
+      "language": "eng",
+      "query": "right to rectification and erasure of inaccurate data",
+      "work_uri": "/akn/xu/act/2004/12",
+      "relevant": ["chp_2__art_10"]
+    },
+    {
+      "id": "xu-supervisory",
+      "language": "eng",
+      "query": "independent supervisory authority in each member state",
+      "work_uri": "/akn/xu/act/2004/12",
+      "relevant": ["chp_3__art_17"]
+    },
+    {
+      "id": "xu-rules-of-origin",
+      "language": "eng",
+      "query": "goods deemed to originate in the country of manufacture",
+      "work_uri": "/akn/xu/act/2006/3",
+      "relevant": ["chp_1__art_4"]
+    },
+    {
+      "id": "xu-tariff-schedule",
+      "language": "eng",
+      "query": "rates of conventional duty on imported goods",
+      "work_uri": "/akn/xu/act/2006/3",
+      "relevant": ["chp_1__art_3"]
+    },
+    {
+      "id": "xu-transposition",
+      "language": "eng",
+      "query": "member states shall bring into force the laws and regulations",
+      "work_uri": "/akn/xu/act/2011/8",
+      "relevant": ["art_5"]
+    },
+    {
+      "id": "xe-access-right",
+      "language": "rus",
+      "query": "право на доступ к правовой информации",
+      "work_uri": "/akn/xe/act/2003/27",
+      "relevant": ["chp_2__art_4"]
+    },
+    {
+      "id": "xe-refusal",
+      "language": "rus",
+      "query": "отказ в предоставлении правовой информации",
+      "work_uri": "/akn/xe/act/2003/27",
+      "relevant": ["chp_3__art_10"]
+    },
+    {
+      "id": "xe-deadline",
+      "language": "rus",
+      "query": "сроки предоставления информации по обращению",
+      "work_uri": "/akn/xe/act/2003/27",
+      "relevant": ["chp_3__art_11"]
+    },
+    {
+      "id": "xe-appeal",
+      "language": "rus",
+      "query": "обжалование отказа",
+      "work_uri": "/akn/xe/act/2003/27",
+      "relevant": ["chp_3__art_12"]
+    },
+    {
+      "id": "xl-hak-pemohon",
+      "language": "ind",
+      "query": "hak pemohon memperoleh informasi publik",
+      "work_uri": "/akn/xl/act/2018/14",
+      "relevant": ["chp_II__art_4"]
+    },
+    {
+      "id": "xl-kewajiban",
+      "language": "ind",
+      "query": "kewajiban badan publik menyediakan informasi",
+      "work_uri": "/akn/xl/act/2018/14",
+      "relevant": ["chp_II__art_6"]
+    },
+    {
+      "id": "xl-sistem-dokumentasi",
+      "language": "ind",
+      "query": "membangun sistem informasi dan dokumentasi",
+      "work_uri": "/akn/xl/act/2018/14",
+      "relevant": ["chp_II__art_7"]
+    },
+    {
+      "id": "xy-egalite",
+      "language": "fra",
+      "query": "liberté d'accès et égalité de traitement des candidats",
+      "work_uri": "/akn/xy/act/1998/14",
+      "relevant": ["book_Ier__title_II__art_4"]
+    },
+    {
+      "id": "xy-appel-offres",
+      "language": "fra",
+      "query": "procédure d'appel d'offres",
+      "work_uri": "/akn/xy/act/1998/14",
+      "relevant": ["book_II__title_Ier__chp_Ier__art_7"]
+    },
+    {
+      "id": "xy-transparence",
+      "language": "fra",
+      "query": "transparence des procédures de passation",
+      "work_uri": "/akn/xy/act/1998/14",
+      "relevant": ["book_Ier__title_II__art_5"]
+    },
+    {
+      "id": "xy-abrogation",
+      "language": "fra",
+      "query": "abrogation de l'article 9",
+      "work_uri": "/akn/xy/act/2011/9",
+      "relevant": ["art_3"]
+    },
+    {
+      "id": "xz-publication-duty",
+      "language": "ara",
+      "query": "واجب النشر هيئة النشر تشريع نافذ",
+      "work_uri": "/akn/xz/act/1994/4",
+      "relevant": ["part_2__chp_1__art_5"]
+    },
+    {
+      "id": "xz-publication-deadline",
+      "language": "ara",
+      "query": "ميعاد النشر ثلاثين يوماً",
+      "work_uri": "/akn/xz/act/1994/4",
+      "relevant": ["part_2__chp_1__art_6"]
+    },
+    {
+      "id": "xz-register-contents",
+      "language": "ara",
+      "query": "محتويات القيد في السجل الوطني",
+      "work_uri": "/akn/xz/act/1996/3",
+      "relevant": ["art_4"]
+    },
+    {
+      "id": "xz-register-inspection",
+      "language": "ara",
+      "query": "الاطلاع على السجل واستخراج الصور",
+      "work_uri": "/akn/xz/act/1996/3",
+      "relevant": ["art_8"]
+    },
+    {
+      "id": "xz-register-penalties",
+      "language": "ara",
+      "query": "العقوبات",
+      "work_uri": "/akn/xz/act/1996/3",
+      "relevant": ["art_11"]
+    },
+    {
+      "id": "xq-entrada-vigor",
+      "language": "spa",
+      "query": "entrada en vigor a los treinta días de la publicación",
+      "work_uri": "/akn/xq/act/2004/9",
+      "relevant": ["part_II__art_4"]
+    },
+    {
+      "id": "xq-publicacion",
+      "language": "spa",
+      "query": "publicación íntegra en la gaceta",
+      "work_uri": "/akn/xq/act/2004/9",
+      "relevant": ["part_II__art_3"]
+    },
+    {
+      "id": "xq-correccion",
+      "language": "spa",
+      "query": "corrección de errores materiales mediante nueva publicación",
+      "work_uri": "/akn/xq/act/2004/9",
+      "relevant": ["part_II__art_5"]
+    },
+    {
+      "id": "xq-conservacion",
+      "language": "spa",
+      "query": "deber de conservación de los archivos",
+      "work_uri": "/akn/xq/act/2011/4",
+      "relevant": ["part_I__art_2"]
+    },
+    {
+      "id": "xq-solicitud",
+      "language": "spa",
+      "query": "plazo para resolver la solicitud de consulta",
+      "work_uri": "/akn/xq/act/2011/4",
+      "relevant": ["part_II__art_4"]
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "_comment": "// GENERATED — do not edit by hand. Run `uv run python scripts/build_registry.py` after modifying per-jurisdiction configs.",
+  "jurisdictions": [
+    {
+      "code": "fi",
+      "name": "Finland",
+      "type": "national",
+      "tradition": [
+        "civil_law"
+      ],
+      "languages": [
+        "fin",
+        "swe"
+      ],
+      "calendar": "gregorian",
+      "tier": 1,
+      "status": "draft",
+      "effective_tier": 1,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
+      "code": "gb",
+      "name": "United Kingdom",
+      "type": "national",
+      "tradition": [
+        "common_law"
+      ],
+      "languages": [
+        "eng"
+      ],
+      "calendar": "gregorian",
+      "tier": 1,
+      "status": "draft",
+      "effective_tier": 1,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
+      "code": "ie",
+      "name": "Ireland",
+      "type": "national",
+      "tradition": [
+        "common_law"
+      ],
+      "languages": [
+        "eng",
+        "gle"
+      ],
+      "calendar": "gregorian",
+      "tier": 2,
+      "status": "draft",
+      "effective_tier": 2,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
+      "code": "it",
+      "name": "Italy",
+      "type": "national",
+      "tradition": [
+        "civil_law"
+      ],
+      "languages": [
+        "ita"
+      ],
+      "calendar": "gregorian",
+      "tier": 1,
+      "status": "production",
+      "effective_tier": 1,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
+      "code": "nz",
+      "name": "New Zealand",
+      "type": "national",
+      "tradition": [
+        "common_law",
+        "sui_generis"
+      ],
+      "languages": [
+        "eng",
+        "mri"
+      ],
+      "calendar": "gregorian",
+      "tier": 1,
+      "status": "draft",
+      "effective_tier": 1,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    }
+  ]
+}

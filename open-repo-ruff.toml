@@ -1,0 +1,17 @@
+# Ruff for the open repository. Not `ruff.toml`: discovery would apply it to the
+# monorepo's copy of these files too. Passed with --config; see the PR.
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I", "S"]
+# assert is an invariant check throughout; nothing runs under `python -O`.
+ignore = ["S101"]
+
+[lint.per-file-ignores]
+# Tests assert and spawn subprocesses; migrations and scripts build one-shot SQL.
+"**/tests/**/*.py" = ["S105", "S106", "S107", "S311", "S603", "S607", "S608"]
+"**/test_*.py" = ["S105", "S106", "S107", "S311", "S603", "S607", "S608"]
+"**/conftest.py" = ["S105", "S106", "S107"]
+"**/migrations/**/*.py" = ["S608"]
+"**/scripts/**/*.py" = ["S310", "S311", "S603", "S607", "S608"]

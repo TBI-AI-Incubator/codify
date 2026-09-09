@@ -1,0 +1,361 @@
+{
+  "code": "nz",
+  "name": "New Zealand",
+  "type": "national",
+  "tradition": ["common_law", "sui_generis"],
+  "calendar": "gregorian",
+  "languages": ["eng", "mri"],
+  "authoritative_language": "eng",
+  "note": "Māori (te reo Māori) is an official language under the Māori Language Act 1987 (Te Ture mō te Reo Māori 2016 as revised). English is the drafting language of legislation. Some Acts are enacted with Māori-language titles and preambles (e.g., Treaty of Waitangi legislation). NZ Sign Language is also an official language (NZ Sign Language Act 2006) but is not a written legislative language. The sui_generis tradition captures the constitutional status of the Treaty of Waitangi / Te Tiriti o Waitangi as a foundational instrument that influences statutory interpretation and administrative law, without constituting a written constitution.",
+  "document_classes": {
+    "act": {
+      "label": "Act of Parliament",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Subpart",
+          "akn_element": "subpart",
+          "level": "higher",
+          "bluebell_keyword": "SUBPART",
+          "numbering": "arabic",
+          "note": "NZ-distinctive mid-level grouping within a Part. Numbered continuously within the Part (e.g., Subpart 1, Subpart 2). Not all Acts use Subparts — some go PART > SECTION directly. Fully supported by Bluebell SUBPART keyword."
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Subsection",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "roman_lower_parenthesized"
+        },
+        {
+          "local_term": "Item",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_upper_parenthesized",
+          "note": "Used rarely, below subparagraph level in complex provisions (e.g., Tax legislation). Uppercase letters."
+        }
+      ],
+      "hcontainers": [
+        {
+          "local_term": "Proviso",
+          "name": "proviso",
+          "description": "Qualifying clause beginning 'Provided that...', used mainly in older legislation. Has legal force as a restriction or exception.",
+          "bluebell_proxy": "PROVISO",
+          "requires_postprocessing": false
+        }
+      ]
+    },
+    "legislative_instrument": {
+      "label": "Legislative Instrument",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Subpart",
+          "akn_element": "subpart",
+          "level": "higher",
+          "bluebell_keyword": "SUBPART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Regulation",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous",
+          "note": "Legislative instruments (regulations, orders in council) use 'regulation' or 'clause' as the basic unit term; maps to AKN section."
+        },
+        {
+          "local_term": "Subclause / Subsection",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "roman_lower_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Covers regulations, orders in council, and other instruments made under enabling Acts. Basic unit local term varies (regulation, clause, rule) but always maps to AKN section. Citation: LI {year}/{number}. Formerly called 'regulations' under the Regulations (Disallowance) Act 1989; reclassified under the Legislation Act 2019."
+    },
+    "bill": {
+      "label": "Bill",
+      "akn_element": "bill",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Subpart",
+          "akn_element": "subpart",
+          "level": "higher",
+          "bluebell_keyword": "SUBPART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Clause",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous",
+          "note": "Bills use 'clause' as the basic unit term (becomes 'section' on enactment). Maps to AKN section throughout."
+        },
+        {
+          "local_term": "Subclause",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Bills use 'clause' and 'subclause' terminology. On enactment, clauses become sections. Bills are numbered by parliament session and type: Government Bills (e.g., Employment Relations Amendment Bill), Member's Bills, Private Bills, Local Bills."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "nz",
+    "uri_patterns": {
+      "act_public": "/akn/nz/act/{year}/{number}",
+      "act_private": "/akn/nz/act/private/{year}/{number}",
+      "act_local": "/akn/nz/act/local/{year}/{number}",
+      "legislative_instrument": "/akn/nz/act/li/{year}/{number}",
+      "bill": "/akn/nz/bill/{year}/{slug}"
+    },
+    "sample_uris": {
+      "Companies Act 1993": "/akn/nz/act/1993/105",
+      "Treaty of Waitangi Act 1975": "/akn/nz/act/1975/114",
+      "Māori Language Act 2016": "/akn/nz/act/2016/17",
+      "Income Tax Act 2007": "/akn/nz/act/2007/97",
+      "Resource Management Act 1991": "/akn/nz/act/1991/69"
+    },
+    "date_calendar": "gregorian",
+    "number_format": "integer",
+    "notes": [
+      "Public Acts numbered sequentially within calendar year. Number corresponds to order of royal assent.",
+      "Private and Local Acts use separate sequential numbering series.",
+      "Legislative Instruments (regulations, orders in council) cited as LI {year}/{number}; FRBR URI uses 'li' prefix.",
+      "legislation.govt.nz uses year/act-number structure directly, e.g., /act/public/1993/105/latest."
+    ]
+  },
+  "numbering": {
+    "act_citation": "{Short Title} {year}",
+    "act_citation_alt": "{year} No {number}",
+    "act_citation_note": "NZ Acts are cited by short title and year. The formal number ('No N') is rarely used in citation but appears in official publications. Example: 'Companies Act 1993' or '1993 No 105'.",
+    "li_citation": "LI {year}/{number}",
+    "section_numbering": "arabic_continuous",
+    "subsection_numbering": "arabic_parenthesized",
+    "paragraph_numbering": "alpha_lower_parenthesized",
+    "subparagraph_numbering": "roman_lower_parenthesized",
+    "insertion_style": "alphanumeric",
+    "insertion_note": "Inserted sections use alphanumeric suffix: 12A, 12B. Inserted subsections: (1A), (1B). NZ does not re-enact consolidations — the Parliamentary Counsel Office publishes online consolidated versions showing current text with amendment history."
+  },
+  "enacting_formulae": [
+    {
+      "text": "The Parliament of New Zealand enacts as follows:",
+      "position": "preamble",
+      "era": "post-1986",
+      "from": "1986-01-01",
+      "note": "Standard formula since the Constitution Act 1986 reconstituted parliament as unicameral. No royal assent formula in the preamble — assent given by Governor-General separately."
+    },
+    {
+      "text": "Be it enacted by the General Assembly of New Zealand in Parliament assembled, and by the authority of the same, as follows:",
+      "position": "preamble",
+      "era": "pre-1987",
+      "to": "1986-12-31",
+      "note": "Pre-Constitution Act 1986 formula, referring to the General Assembly. Legislative Council (upper house) was abolished 1951; this formula was used 1951-1986 with bicameral language retained as convention."
+    }
+  ],
+  "amendments": {
+    "style": "textual_commonwealth",
+    "phrasing_patterns": [
+      "Section [N] of the principal Act is amended by...",
+      "After [section N], insert:",
+      "Repeal [section N].",
+      "In [section N], replace '[old text]' with '[new text]'.",
+      "In [section N(1)], after paragraph (a), insert:",
+      "The [Act] is amended by repealing [section N] and substituting..."
+    ],
+    "cross_reference_format": "short_title_year",
+    "cross_reference_example": "the Companies Act 1993",
+    "principal_act_convention": "Amendment Acts refer to the amended Act as 'the principal Act', defined in section 2 or by context."
+  },
+  "core_tlcs": [
+    {
+      "eId": "parliament",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/nz/parliament",
+      "showAs": "Parliament of New Zealand"
+    },
+    {
+      "eId": "houseOfRepresentatives",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/nz/house-of-representatives",
+      "showAs": "House of Representatives"
+    },
+    {
+      "eId": "governorGeneral",
+      "class": "TLCRole",
+      "href": "/ontology/role/nz/governor-general",
+      "showAs": "Governor-General"
+    },
+    {
+      "eId": "primeMinister",
+      "class": "TLCRole",
+      "href": "/ontology/role/nz/prime-minister",
+      "showAs": "Prime Minister"
+    },
+    {
+      "eId": "supremeCourt",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/nz/supreme-court",
+      "showAs": "Supreme Court of New Zealand"
+    },
+    {
+      "eId": "waitangiTribunal",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/nz/waitangi-tribunal",
+      "showAs": "Waitangi Tribunal"
+    },
+    {
+      "eId": "parliamentaryCounselOffice",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/nz/parliamentary-counsel-office",
+      "showAs": "Parliamentary Counsel Office"
+    },
+    {
+      "eId": "nzGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/nz/nz-gazette",
+      "showAs": "New Zealand Gazette"
+    },
+    {
+      "eId": "newZealand",
+      "class": "TLCLocation",
+      "href": "/ontology/place/nz",
+      "showAs": "New Zealand"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "New Zealand legislation uses PART > SUBPART (optional) > SECTION as the primary structural hierarchy. SUBPART is a distinctive NZ mid-level grouping within a Part; it is fully supported by the Bluebell SUBPART keyword (maps to AKN subpart). Not all Acts use Subparts — check whether the document has Subpart headings; if absent, structure is PART > SECTION directly. SECTION is the basic citable unit, numbered continuously in Arabic numerals throughout the Act (not restarting per Part or Subpart). Subsections use (1), (2); paragraphs use (a), (b); subparagraphs use (i), (ii). Bills use 'clause'/'subclause' terminology — map to SECTION/SUBSECTION. Acts drafted under the PCO's plain-language 'Purpose and principles' approach typically open with a purpose section (section 3 or 4) and an outline section before the substantive provisions. Treaty of Waitangi preambles and purpose sections are common in legislation affecting Māori rights — preserve these carefully as they carry significant interpretive weight and are frequently cited in courts. Some Acts have bilingual Māori/English titles (e.g., Te Ture mō te Reo Māori 2016 / Māori Language Act 2016) — capture the Māori title as an FRBRalias. The Waitangi Tribunal (established by Treaty of Waitangi Act 1975) is a permanent commission of inquiry with quasi-judicial status — it is distinct from the courts but its recommendations carry significant legal and political weight."
+  },
+  "supranational_memberships": [
+    {
+      "body": "un",
+      "direct_effect": "none",
+      "superseded_subjects": [],
+      "note": "UN obligations require domestic implementation legislation. NZ is a party to major UN human rights treaties."
+    },
+    {
+      "body": "commonwealth-of-nations",
+      "direct_effect": "none",
+      "superseded_subjects": [],
+      "note": "Commonwealth of Nations membership. NZ shares common law tradition and legislative drafting conventions with UK and Australian jurisdictions."
+    },
+    {
+      "body": "pacific-islands-forum",
+      "direct_effect": "none",
+      "superseded_subjects": [],
+      "note": "Pacific Islands Forum founding member. Regional trade and governance instruments."
+    },
+    {
+      "body": "apec",
+      "direct_effect": "none",
+      "superseded_subjects": [],
+      "note": "APEC member. Trade facilitation obligations implemented domestically."
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "display": {
+    "heading_type": "marginal_note",
+    "heading_case": "title_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif",
+    "special_chars_note": "Māori (te reo Māori) uses macrons (tohutō) over vowels: ā, ē, ī, ō, ū (and uppercase Ā, Ē, Ī, Ō, Ū). Official Māori titles and text must preserve macrons — failure to do so is linguistically incorrect and politically sensitive. Modern legislation.govt.nz correctly encodes macrons in UTF-8."
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 5,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 2,
+    "note": "Hierarchy and document types verified against Companies Act 1993, Resource Management Act 1991, Māori Language Act 2016, Treaty of Waitangi Act 1975, and Income Tax Act 2007. NZ already publishes structured XML via legislation.govt.nz (Parliamentary Counsel Office) — effectively Tier 1 digital access; direct XML integration preferred over PDF OCR pipeline for modern Acts. Unresolved: (1) Schedule structure — NZ Schedules sometimes contain their own Part/clause hierarchy distinct from the main body; (2) bilingual Acts (Māori/English) where both texts have been described as 'equally authoritative' (e.g., Treaty of Waitangi Act 1975 schedule) — legal status of Māori text requires case-by-case determination."
+  },
+  "tier": 1,
+  "status": "draft",
+  "public_reference": true
+}

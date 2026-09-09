@@ -1,0 +1,12 @@
+{
+  "purpose": "Historical evidence only; outside Alembic discovery. Not an automatic adoption bundle.",
+  "revision": "0017_annex_transcription",
+  "down_revision": "0016_delegated_powers",
+  "source_commit": "282d4b1bf8d8386e31fd3216ff0c609acf4be797",
+  "file": "0017_annex_transcription.py",
+  "sha256": "aa207bdd9715fe3d4260c19672094f6839ec61942e8c0b40c5ec4dbdf8fa45e8",
+  "unpublished_prerequisite_sources": {
+    "0015_xref_ledger": "b3d8611187cc74896a52ab8af5b4ae29cbf001a3",
+    "0016_delegated_powers": "b337cf4756d1d906a548f17ba7ed59bb15f6ca91"
+  }
+}

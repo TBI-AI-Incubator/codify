@@ -1,0 +1,137 @@
+{
+  "code": "xe",
+  "name": "Kitezh",
+  "name_en": "Republic of Kitezh",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["rus"],
+  "authoritative_language": "rus",
+  "note": "Fictional post-Soviet civil-law republic. Exists only as synthetic test material: a codified Soviet-successor legal system publishing in Russian (Cyrillic script), used to exercise the Razdel/Glava/Statya/chast hierarchy and amendment/citation tracking without shipping any real jurisdiction's law in the open test tree. Not a real place; carries no real legislation.",
+  "document_classes": {
+    "act": {
+      "label": "Закон",
+      "label_en": "Law",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Раздел",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Глава",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Статья",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Часть",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Пункт",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Приложение (sch)",
+          "akn_element": "hcontainer",
+          "eid_abbrev": "sch",
+          "akn_name": "schedule",
+          "level": "grouping",
+          "numbering": "arabic"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Standard codified statute. Razdel (title) and Glava (chapter) are higher divisions; Statya (article) is the basic citable unit numbered continuously through the whole Law. Chast (paragraph) and punkt (point) are the subdivisions within an article."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "xe",
+    "uri_patterns": {
+      "act": "/akn/xe/act/{year}/{number}",
+      "bill": "/akn/xe/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Laws identified by calendar year and law number, e.g. Law No. 12 of 1994."
+  },
+  "numbering": {
+    "act_citation": "{Short Title}",
+    "act_citation_alt": "Закон № {number} от {year} года",
+    "insertion_style": "alphanumeric",
+    "note": "Laws cited by short title (e.g. 'Закон о нормативных правовых актах') or by number and year. Inserted articles carry a hyphen suffix, e.g. статья 18-1 after статья 18."
+  },
+  "enacting_formulae": [
+    {
+      "text": "Настоящий Закон принят Собранием Китежа и промульгирован в соответствии с Основным Законом Республики Китеж.",
+      "position": "preamble",
+      "document_class": "act"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "phrasing": "изложить в следующей редакции... дополнить статьёй... признать утратившей силу...",
+    "cross_reference_format": "short_title_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "assembly",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xe/sobranie-kitezha",
+      "showAs": "Собрание Китежа"
+    },
+    {
+      "eId": "officialGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xe/vedomosti-kitezha",
+      "showAs": "Ведомости Китежа"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Never emit structural keywords; the scaffold owns hierarchy."
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "inline_heading",
+    "heading_case": "sentence_case",
+    "script": "cyrillic",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+  },
+  "tier": 5,
+  "status": "stub",
+  "synthetic": true
+}

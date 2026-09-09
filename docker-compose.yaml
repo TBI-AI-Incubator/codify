@@ -1,0 +1,38 @@
+# The one service the offline suite needs. At the root of the open repository,
+# where `docker compose up -d --wait postgres` is the whole setup step.
+
+# Named rather than inherited: this directory and the monorepo root are both
+# `codify`, so the default project would be the root stack's.
+name: codify-core
+
+services:
+  postgres:
+    # Built locally from the pinned Dockerfile.
+    image: codify-core-postgres:local
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    # pg_textsearch supplies the BM25 index access method and must be preloaded;
+    # without it the server refuses to start rather than serving unranked results.
+    command: postgres -c shared_preload_libraries=pg_textsearch
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-codify}
+      POSTGRES_USER: ${POSTGRES_USER:-codify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-codify}
+    # Loopback only: this is a local test service with predictable credentials.
+    # Changing the port means changing POSTGRES_URL to match; it defaults to 5432.
+    ports:
+      - '127.0.0.1:${CODIFY_PG_PORT:-5432}:5432'
+    # Mounted at the parent, not at data/: the Postgres 18 image keeps its data
+    # in a major-versioned subdirectory and refuses to start on the old path.
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-codify} -d ${POSTGRES_DB:-codify}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres-data:

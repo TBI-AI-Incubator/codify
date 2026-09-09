@@ -1,0 +1,4 @@
+H. Penyimpanan Contoh
+Kotak biru menampung lensa contoh.
+I. Pelaporan Contoh
+Catatan buatan memuat warna kotak.

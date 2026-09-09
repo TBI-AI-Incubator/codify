@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0" xmlns:ukm="https://publisher.test/namespaces/metadata" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <act name="xsi">
+    <meta>
+      <identification source="#">
+        <FRBRWork>
+          <FRBRthis value="https://publisher.test/id/xsi/1982/7"/>
+          <FRBRuri value="https://publisher.test/id/xsi/1982/7"/>
+          <FRBRdate date="1982-01-01" name="estimated"/>
+          <FRBRauthor href="https://publisher.test/id/government/xa"/>
+          <FRBRcountry value="XA"/>
+          <FRBRsubtype value="order"/>
+          <FRBRnumber value="7"/>
+          <FRBRname value="X.I. 1982/7"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="https://publisher.test/xsi/1982/7/made"/>
+          <FRBRuri value="https://publisher.test/xsi/1982/7/made"/>
+          <FRBRdate date="1982-01-01" name="estimated"/>
+          <FRBRauthor href="#"/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="https://publisher.test/xsi/1982/7/made/data.akn"/>
+          <FRBRuri value="https://publisher.test/xsi/1982/7/made/data.akn"/>
+          <FRBRdate date="2026-09-06" name="transform"/>
+          <FRBRauthor href="https://publisher.test"/>
+          <FRBRformat value="application/akn+xml"/>
+        </FRBRManifestation>
+      </identification>
+      <lifecycle source="#"/>
+      <analysis source="#"><otherAnalysis source=""/></analysis>
+      <references source="#"/>
+      <proprietary source="#">
+        <dc:identifier>https://publisher.test/xsi/1982/7/made</dc:identifier>
+        <dc:title>The Atlantis Persons Order 1982</dc:title>
+        <dc:language>en</dc:language>
+        <dc:modified>1982-11-12</dc:modified>
+        <ukm:SecondaryMetadata>
+          <ukm:DocumentClassification>
+            <ukm:DocumentCategory Value="secondary"/>
+            <ukm:DocumentStatus Value="final"/>
+          </ukm:DocumentClassification>
+          <ukm:Year Value="1982"/>
+          <ukm:Number Value="7"/>
+        </ukm:SecondaryMetadata>
+        <ukm:Alternatives>
+          <ukm:Alternative URI="https://publisher.test/xsi/1982/7/pdfs/xsi_19820007_en.pdf" Date="1982-11-12"/>
+        </ukm:Alternatives>
+      </proprietary>
+    </meta>
+  </act>
+</akomaNtoso>

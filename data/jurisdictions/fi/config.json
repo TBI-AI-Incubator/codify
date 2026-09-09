@@ -1,0 +1,415 @@
+{
+  "code": "fi",
+  "name": "Finland",
+  "name_local": "Suomi / Finland",
+  "type": "national",
+  "tradition": ["civil_law"],
+  "calendar": "gregorian",
+  "languages": ["fin", "swe"],
+  "authoritative_language": null,
+  "document_classes": {
+    "act": {
+      "label": "Act of Parliament (Laki / Lag)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Osa / Del",
+          "local_term_fi": "Osa",
+          "local_term_sv": "Del",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic",
+          "note": "Rare; used only in largest codes such as the Criminal Code"
+        },
+        {
+          "local_term": "Luku / Kapitel",
+          "local_term_fi": "Luku",
+          "local_term_sv": "Kapitel",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "§ / Pykälä / Paragraf",
+          "local_term_fi": "Pykälä",
+          "local_term_sv": "Paragraf",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "symbol": "§"
+        },
+        {
+          "local_term": "Momentti / Moment",
+          "local_term_fi": "Momentti",
+          "local_term_sv": "Moment",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Kohta / Punkt",
+          "local_term_fi": "Kohta",
+          "local_term_sv": "Punkt",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_closing_paren_or_alpha_closing_paren",
+          "note": "May be numeric (1), 2)) or alphabetic (a), b)) — detect per document. See unresolved ambiguity #1."
+        },
+        {
+          "local_term": "Alakohta / Underpunkt",
+          "local_term_fi": "Alakohta",
+          "local_term_sv": "Underpunkt",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "alpha_closing_paren"
+        }
+      ],
+      "hcontainers": []
+    },
+    "vna": {
+      "label": "Government Decree (Valtioneuvoston asetus / Statsrådets förordning)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Luku / Kapitel",
+          "local_term_fi": "Luku",
+          "local_term_sv": "Kapitel",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "§ / Pykälä / Paragraf",
+          "local_term_fi": "Pykälä",
+          "local_term_sv": "Paragraf",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "symbol": "§"
+        },
+        {
+          "local_term": "Momentti / Moment",
+          "local_term_fi": "Momentti",
+          "local_term_sv": "Moment",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Kohta / Punkt",
+          "local_term_fi": "Kohta",
+          "local_term_sv": "Punkt",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_closing_paren_or_alpha_closing_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Government Decrees use same structural hierarchy as acts. Identified by header 'Valtioneuvoston asetus' / 'Statsrådets förordning'."
+    },
+    "tpa": {
+      "label": "Presidential Decree (Tasavallan presidentin asetus / Republikens presidents förordning)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "§ / Pykälä / Paragraf",
+          "local_term_fi": "Pykälä",
+          "local_term_sv": "Paragraf",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "symbol": "§"
+        },
+        {
+          "local_term": "Momentti / Moment",
+          "local_term_fi": "Momentti",
+          "local_term_sv": "Moment",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Presidential Decrees are typically short; rarely have chapter divisions. Identified by header 'Tasavallan presidentin asetus'."
+    },
+    "constitution": {
+      "label": "Constitution (Suomen perustuslaki / Finlands grundlag)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Luku / Kapitel",
+          "local_term_fi": "Luku",
+          "local_term_sv": "Kapitel",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "§ / Pykälä / Paragraf",
+          "local_term_fi": "Pykälä",
+          "local_term_sv": "Paragraf",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "symbol": "§"
+        },
+        {
+          "local_term": "Momentti / Moment",
+          "local_term_fi": "Momentti",
+          "local_term_sv": "Moment",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Constitution 731/1999 has 13 chapters (luvut), 131 sections (pykälät)"
+    },
+    "ax_act": {
+      "label": "Åland Regional Act (Landskapslag / Maakuntalaki)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Kapitel",
+          "local_term_sv": "Kapitel",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "§ / Paragraf",
+          "local_term_sv": "Paragraf",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "symbol": "§"
+        },
+        {
+          "local_term": "Moment",
+          "local_term_sv": "Moment",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Åland regional acts enacted by the Lagting. Swedish only. Published in Ålands författningssamling (ÅFS). FRBR URI uses fi-ax country code."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "fi",
+    "uri_patterns": {
+      "act": "/akn/fi/act/{year}/{number}",
+      "vna": "/akn/fi/act/vna/{year}/{number}",
+      "tpa": "/akn/fi/act/tpa/{year}/{number}",
+      "bill": "/akn/fi/bill/{year}/{number}",
+      "constitution": "/akn/fi/act/constitution/1999/731",
+      "ax_act": "/akn/fi-ax/act/{year}/{number}"
+    },
+    "number_format": "sequential_within_year",
+    "number_note": "Number segment is the säädöskokoelma sequential number (no leading zeros). E.g., 731/1999 → year=1999, number=731",
+    "date_calendar": "gregorian"
+  },
+  "numbering": {
+    "act_citation": "{number}/{year}",
+    "act_citation_example": "731/1999",
+    "section_symbol": "§",
+    "section_citation": "{number} §",
+    "section_citation_example": "5 §",
+    "insertion_style": "alphanumeric_spaced",
+    "insertion_example": "5 a §",
+    "insertion_eid": "sec_5a",
+    "chapter_citation": "{number} luku",
+    "chapter_insertion_example": "1 a luku",
+    "chapter_insertion_eid": "chap_1a"
+  },
+  "enacting_formulae": [
+    {
+      "text": "Eduskunnan päätöksen mukaisesti säädetään:",
+      "language": "fin",
+      "translation": "In accordance with the decision of the Parliament, it is enacted:",
+      "position": "preamble",
+      "instrument_type": "act",
+      "era": "current"
+    },
+    {
+      "text": "I enlighet med riksdagens beslut föreskrivs:",
+      "language": "swe",
+      "translation": "In accordance with the decision of the Parliament, it is enacted:",
+      "position": "preamble",
+      "instrument_type": "act",
+      "era": "current"
+    },
+    {
+      "text": "Valtioneuvoston päätöksen mukaisesti, joka on tehty oikeusministeriön esittelystä, säädetään:",
+      "language": "fin",
+      "translation": "By decision of the Government, upon presentation by the Ministry of Justice, it is provided:",
+      "position": "preamble",
+      "instrument_type": "vna",
+      "era": "current"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "phrasing_fi": "muutetaan ... seuraavasti",
+    "phrasing_sv": "ändras ... som följer",
+    "addition_phrasing_fi": "lisätään ... uusi ... seuraavasti",
+    "repeal_phrasing_fi": "kumotaan",
+    "cross_reference_format": "number_slash_year",
+    "cross_reference_example": "sairausvakuutuslakia (1224/2004)"
+  },
+  "core_tlcs": [
+    {
+      "eId": "eduskunta",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/fi/eduskunta",
+      "showAs": "Eduskunta"
+    },
+    {
+      "eId": "president",
+      "class": "TLCRole",
+      "href": "/ontology/role/fi/president",
+      "showAs": "Tasavallan presidentti"
+    },
+    {
+      "eId": "valtioneuvosto",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/fi/valtioneuvosto",
+      "showAs": "Valtioneuvosto"
+    },
+    {
+      "eId": "oikeusministerio",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/fi/oikeusministerio",
+      "showAs": "Oikeusministeriö"
+    },
+    {
+      "eId": "saadoskokoelma",
+      "class": "TLCObject",
+      "href": "/ontology/obj/fi/saadoskokoelma",
+      "showAs": "Suomen säädöskokoelma"
+    },
+    {
+      "eId": "lagtinget",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/fi-ax/lagtinget",
+      "showAs": "Lagting"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Finland uses CHAPTER (luku) as the primary higher division, not PART. The basic unit is § (pykälä), rendered as SECTION. Many short acts have no chapter divisions at all — do not force a chapter wrapper. The enacting formula in Finnish is 'Eduskunnan päätöksen mukaisesti säädetään:' and in Swedish 'I enlighet med riksdagens beslut föreskrivs:'. Sections are numbered N § (number before symbol). Subsections (momentti) are numbered (1), (2), (3). Points (kohta) within subsections may be numbered 1), 2), 3) or a), b), c) — detect from context. Inserted sections use alphanumeric suffixing with a space: '5 a §' — normalise to SECTION 5a in Bluebell."
+  },
+  "bilingual": {
+    "model": "parallel_originals",
+    "languages": ["fin", "swe"],
+    "note": "Finnish and Swedish versions are equally authoritative originals, not translations. Model as separate FRBR expressions of the same work. Use FRBRtranslation only for unofficial English translations.",
+    "unofficial_translations": ["eng"],
+    "unofficial_translation_note": "English translations on Finlex are unofficial and not legally authoritative."
+  },
+  "sub_jurisdictions": [
+    {
+      "code": "fi-ax",
+      "name": "Åland Islands",
+      "name_local": "Åland / Ahvenanmaa",
+      "type": "autonomous_region",
+      "legislature": "Lagting (Ålands lagting)",
+      "gazette": "Ålands författningssamling (ÅFS)",
+      "language": ["swe"],
+      "note": "Constitutionally autonomous; own legislature and gazette. ISO 3166-1 alpha-2 for Åland: AX. See unresolved ambiguity #6 — consider whether to model as 'ax' rather than 'fi-ax'."
+    }
+  ],
+  "supranational_memberships": [
+    {
+      "body": "eu",
+      "direct_effect": "direct",
+      "member_since": "1995-01-01",
+      "superseded_subjects": [
+        "product_safety",
+        "competition",
+        "data_protection_gdpr",
+        "customs",
+        "financial_services"
+      ],
+      "profile_ref": "/akn/eu/"
+    },
+    {
+      "body": "council-of-europe",
+      "direct_effect": "none",
+      "superseded_subjects": []
+    },
+    {
+      "body": "nordic-council",
+      "direct_effect": "none",
+      "superseded_subjects": []
+    },
+    {
+      "body": "un",
+      "direct_effect": "none"
+    },
+    {
+      "body": "nato",
+      "direct_effect": "none"
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "display": {
+    "heading_type": "section_heading",
+    "heading_case": "sentence_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "sans_serif",
+    "section_symbol": "§",
+    "citation_format": "{number} §",
+    "chapter_label_fi": "luku",
+    "chapter_label_sv": "kapitel"
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 0,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 7,
+    "note": "Profile built from training knowledge of well-documented Nordic civil law jurisdiction. WebFetch unavailable during generation — direct document inspection against Finlex not performed. All [UNVERIFIED] items in profile.md require confirmation before promoting to production."
+  },
+  "tier": 1,
+  "status": "draft",
+  "public_reference": true
+}

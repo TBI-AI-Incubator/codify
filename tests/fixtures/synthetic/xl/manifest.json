@@ -1,0 +1,52 @@
+{
+  "jurisdiction": "xl",
+  "name": "Langkasuka",
+  "gazette": "LEMBARAN NEGARA LANGKASUKA",
+  "device": "crescent",
+  "script": "latin",
+  "authority_line": "Diterbitkan oleh Otoritas Negara",
+  "container_labels": {
+    "chapter": "BAB",
+    "part": "BAGIAN"
+  },
+  "laws": [
+    {
+      "file": "keterbukaan-informasi-2018.bluebell",
+      "doctype": "act",
+      "doctype_label": "Undang-Undang",
+      "date": "2018-09-12",
+      "number": "14",
+      "language": "ind",
+      "short_title": "Undang-Undang tentang Keterbukaan Informasi Publik",
+      "gazette_no": "No. 112",
+      "gazette_date": "12 September 2018",
+      "assent": "[Disahkan pada tanggal 12 September 2018]"
+    },
+    {
+      "file": "pelayanan-publik-2020.bluebell",
+      "doctype": "act",
+      "doctype_label": "Undang-Undang",
+      "date": "2020-07-03",
+      "number": "9",
+      "language": "ind",
+      "short_title": "Undang-Undang tentang Pelayanan Publik",
+      "gazette_no": "No. 61",
+      "gazette_date": "3 Juli 2020",
+      "assent": "[Disahkan pada tanggal 3 Juli 2020]",
+      "cites": ["/akn/xl/act/2018/14"]
+    },
+    {
+      "file": "keterbukaan-informasi-perubahan-2023.bluebell",
+      "doctype": "act",
+      "doctype_label": "Undang-Undang",
+      "date": "2023-04-27",
+      "number": "3",
+      "language": "ind",
+      "short_title": "Undang-Undang tentang Perubahan atas Undang-Undang Nomor 14 Tahun 2018 tentang Keterbukaan Informasi Publik",
+      "gazette_no": "No. 29",
+      "gazette_date": "27 April 2023",
+      "assent": "[Disahkan pada tanggal 27 April 2023]",
+      "amends": "/akn/xl/act/2018/14"
+    }
+  ]
+}

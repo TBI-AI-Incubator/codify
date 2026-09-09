@@ -1,0 +1,219 @@
+{
+  "code": "xu",
+  "name": "Hesperian Union",
+  "name_en": "Hesperian Union",
+  "type": "supranational",
+  "tradition": ["sui_generis"],
+  "calendar": "gregorian",
+  "languages": ["eng"],
+  "authoritative_language": "eng",
+  "note": "Fictional EU-style supranational union of western island-states (the Hesperides), sharing a common legal order of directives and regulations. Exists only as synthetic test material: it exercises the supranational Article-based hierarchy (Chapter/Article/Paragraph/Point) and the enacting/adopting register of directly-applicable regulations and transposed directives, so the corpus can stand in as the acquis side of a compliance-comparison pair. Not a real body; carries no real instruments and no real jurisdiction's law.",
+  "document_classes": {
+    "directive": {
+      "label": "Directive",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "direct_effect": false,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART"
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION"
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH"
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Requires transposition into the national law of member states."
+    },
+    "regulation": {
+      "label": "Regulation",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "direct_effect": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART"
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION"
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH"
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Directly applicable in all member states without transposition."
+    }
+  },
+  "default_document_class": "directive",
+  "frbr": {
+    "country_code": "xu",
+    "uri_patterns": {
+      "act": "/akn/xu/act/{year}/{number}",
+      "bill": "/akn/xu/bill/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "note": "Instruments identified by a running number and the year of adoption, e.g. Directive 12 of 2004 at /akn/xu/act/2004/12."
+  },
+  "numbering": {
+    "act_citation": "{doctype_label} {number} of {year}",
+    "act_citation_alt": "{doctype_label} No. {number} of {year}",
+    "insertion_style": "alphanumeric",
+    "note": "Directives and regulations cited by doctype, number and year (e.g. 'Directive 12 of 2004', 'Regulation 5 of 2009')."
+  },
+  "enacting_formulae": [
+    {
+      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS DIRECTIVE:",
+      "position": "preamble",
+      "document_class": "directive"
+    },
+    {
+      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS REGULATION:",
+      "position": "preamble",
+      "document_class": "regulation"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil",
+    "phrasing": "Article X is replaced by the following: / Article Y is deleted / the following Article is inserted:",
+    "cross_reference_format": "doctype_number_and_year"
+  },
+  "core_tlcs": [
+    {
+      "eId": "assembly",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xu/assembly",
+      "showAs": "The Assembly of the Hesperian Union"
+    },
+    {
+      "eId": "council",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xu/council",
+      "showAs": "The Hesperian Council"
+    },
+    {
+      "eId": "commission",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/xu/commission",
+      "showAs": "The Hesperian Commission"
+    },
+    {
+      "eId": "officialJournal",
+      "class": "TLCObject",
+      "href": "/ontology/obj/xu/official-journal",
+      "showAs": "Official Journal of the Hesperian Union"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Recitals appear as numbered paragraphs in the preamble before the adopting formula; ARTICLE is the basic unit and SECTION, where present, is a higher division above it. Never emit structural keywords: the scaffold owns hierarchy.",
+    "designation_rule": "eu_instrument"
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "centered",
+    "heading_case": "upper_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "stub",
+    "documents_examined": 3,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 0,
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored instruments (a framework directive, a directly-applicable regulation and an amending directive) round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN structured as numbered articles and paragraphs (experiments/synthetic_scans)."
+  },
+  "tier": 5,
+  "status": "stub",
+  "synthetic": true
+}

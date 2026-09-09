@@ -1,0 +1,407 @@
+{
+  "_comment": "Canonical registry of supranational bodies, treaty frameworks, and bilateral regimes. Referenced by JurisdictionConfig.supranational_memberships[].body and .binding_regimes[].code. Use `code` as the canonical identifier; `aliases` lists other forms Codify has previously accepted so the migration script can normalise them. `default_direct_effect` is the typical effect level the body's binding instruments have in its members — individual memberships may override.",
+  "bodies": [
+    {
+      "code": "un",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["UN", "united-nations"]
+    },
+    {
+      "code": "eu",
+      "kind": "supranational_config",
+      "config_ref": "eu",
+      "default_direct_effect": "direct",
+      "aliases": ["EU", "european-union"]
+    },
+    {
+      "code": "ohada",
+      "kind": "supranational_config",
+      "config_ref": "ohada",
+      "default_direct_effect": "override",
+      "aliases": ["OHADA"]
+    },
+    {
+      "code": "african-union",
+      "kind": "supranational_config",
+      "config_ref": "african-union",
+      "default_direct_effect": "advisory",
+      "aliases": ["au", "AU", "african_union"]
+    },
+    {
+      "code": "council-of-europe",
+      "kind": "supranational_config",
+      "config_ref": "council-of-europe",
+      "default_direct_effect": "indirect_transposition",
+      "aliases": ["coe", "council_of_europe", "CoE"]
+    },
+    {
+      "code": "eac",
+      "kind": "supranational_config",
+      "config_ref": "eac",
+      "default_direct_effect": "indirect_transposition"
+    },
+    {
+      "code": "ecowas",
+      "kind": "supranational_config",
+      "config_ref": "ecowas",
+      "default_direct_effect": "direct",
+      "aliases": ["CEDEAO"]
+    },
+    {
+      "code": "sadc",
+      "kind": "supranational_config",
+      "config_ref": "sadc",
+      "default_direct_effect": "advisory"
+    },
+    {
+      "code": "gcc",
+      "kind": "supranational_config",
+      "config_ref": "gcc",
+      "default_direct_effect": "advisory"
+    },
+    {
+      "code": "uemoa",
+      "kind": "supranational_config",
+      "config_ref": "uemoa",
+      "default_direct_effect": "direct",
+      "aliases": ["waemu"]
+    },
+    {
+      "code": "cemac",
+      "kind": "supranational_config",
+      "config_ref": "cemac",
+      "default_direct_effect": "direct"
+    },
+    {
+      "code": "caricom",
+      "kind": "supranational_config",
+      "config_ref": "caricom",
+      "default_direct_effect": "indirect_transposition"
+    },
+
+    {
+      "code": "arab-league",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["arab_league"]
+    },
+    {
+      "code": "wto",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["WTO"]
+    },
+    { "code": "oas", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "oic", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "asean", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "comesa", "kind": "international_organisation", "default_direct_effect": "advisory" },
+    {
+      "code": "commonwealth-of-nations",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["commonwealth", "commonwealth_of_nations"]
+    },
+    { "code": "osce", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "cis", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "pacific-islands-forum",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["pacific_islands_forum", "pif"]
+    },
+    { "code": "saarc", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "sica", "kind": "international_organisation", "default_direct_effect": "advisory" },
+    {
+      "code": "apec",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["APEC"]
+    },
+    {
+      "code": "eaeu",
+      "kind": "supranational_config",
+      "config_ref": null,
+      "default_direct_effect": "direct",
+      "aliases": ["eurasian_economic_union"]
+    },
+    {
+      "code": "mercosur",
+      "kind": "international_organisation",
+      "default_direct_effect": "indirect_transposition"
+    },
+    { "code": "nato", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "cefta",
+      "kind": "international_organisation",
+      "default_direct_effect": "indirect_transposition"
+    },
+    { "code": "alba", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "nordic-council",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory",
+      "aliases": ["nordic_council"]
+    },
+    { "code": "oecd", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "sco", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "can",
+      "kind": "international_organisation",
+      "default_direct_effect": "direct",
+      "aliases": ["comunidad-andina"]
+    },
+    { "code": "efta", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "eea", "kind": "treaty_framework", "default_direct_effect": "direct" },
+    {
+      "code": "schengen",
+      "kind": "treaty_framework",
+      "default_direct_effect": "procedural",
+      "aliases": ["schengen_de_facto"]
+    },
+    { "code": "oapi", "kind": "international_organisation", "default_direct_effect": "direct" },
+    {
+      "code": "francophonie",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["oif"]
+    },
+    { "code": "igad", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "iaea", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "celac", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "cplp", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "d8", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "g20", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "icao", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "icc", "kind": "international_organisation", "default_direct_effect": "direct" },
+    {
+      "code": "ilo",
+      "kind": "international_organisation",
+      "default_direct_effect": "indirect_transposition"
+    },
+    { "code": "imo", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "interpol",
+      "kind": "international_organisation",
+      "default_direct_effect": "procedural"
+    },
+    { "code": "nam", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "rcep",
+      "kind": "international_organisation",
+      "default_direct_effect": "indirect_transposition"
+    },
+    {
+      "code": "uncitral",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory"
+    },
+    {
+      "code": "venice-commission",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory"
+    },
+    { "code": "wipo", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "msg",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["melanesian_spearhead_group", "melanesian-spearhead-group"]
+    },
+    { "code": "csto", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "parlacen",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory"
+    },
+    {
+      "code": "pacific-community",
+      "kind": "international_organisation",
+      "default_direct_effect": "none"
+    },
+    { "code": "ccj", "kind": "international_organisation", "default_direct_effect": "direct" },
+    {
+      "code": "oecs",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["organisation-of-eastern-caribbean-states", "oecs-authority"]
+    },
+    { "code": "cima", "kind": "international_organisation", "default_direct_effect": "direct" },
+    {
+      "code": "pacer-plus",
+      "kind": "international_organisation",
+      "default_direct_effect": "indirect_transposition"
+    },
+    {
+      "code": "benelux",
+      "kind": "international_organisation",
+      "default_direct_effect": "procedural"
+    },
+    { "code": "brics", "kind": "international_organisation", "default_direct_effect": "none" },
+    { "code": "cacm", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "ceeac",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory",
+      "aliases": ["eccas"]
+    },
+    {
+      "code": "arab-maghreb-union",
+      "kind": "international_organisation",
+      "default_direct_effect": "none"
+    },
+    {
+      "code": "organisation-of-turkic-states",
+      "kind": "international_organisation",
+      "default_direct_effect": "none"
+    },
+    {
+      "code": "asean-plus-three",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["aseanplus3"]
+    },
+    {
+      "code": "osce-parliamentary-union",
+      "kind": "international_organisation",
+      "default_direct_effect": "advisory",
+      "aliases": ["osce_parliamentary_union"]
+    },
+    { "code": "aes", "kind": "international_organisation", "default_direct_effect": "none" },
+    {
+      "code": "unasur",
+      "kind": "international_organisation",
+      "default_direct_effect": "none",
+      "aliases": ["union-of-south-american-nations"]
+    },
+
+    { "code": "eu-candidate", "kind": "special_status", "default_direct_effect": "none" },
+    {
+      "code": "eu-association",
+      "kind": "special_status",
+      "default_direct_effect": "indirect_transposition"
+    },
+    {
+      "code": "eu-customs-union",
+      "kind": "treaty_framework",
+      "default_direct_effect": "direct",
+      "aliases": ["eu_customs_union"]
+    },
+    {
+      "code": "eu-customs-union-via-france",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "direct",
+      "aliases": ["eu_customs_union_via_france"]
+    },
+    {
+      "code": "eu-monetary-agreement",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "direct",
+      "aliases": ["eu_monetary_agreement"]
+    },
+    {
+      "code": "eurozone-informal",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "none",
+      "aliases": ["eurozone_informal"]
+    },
+    {
+      "code": "schengen-via-france",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "procedural",
+      "aliases": ["schengen_via_france"]
+    },
+
+    {
+      "code": "oslo-accords",
+      "kind": "treaty_framework",
+      "default_direct_effect": "procedural",
+      "aliases": ["oslo_accords", "oslo-i", "oslo-ii"]
+    },
+    {
+      "code": "dayton-framework",
+      "kind": "treaty_framework",
+      "default_direct_effect": "override",
+      "aliases": ["dayton_framework"]
+    },
+    { "code": "windsor-framework", "kind": "treaty_framework", "default_direct_effect": "direct" },
+    {
+      "code": "compact-of-free-association-us",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "direct",
+      "aliases": ["compact_of_free_association_us"]
+    },
+    {
+      "code": "lateran-concordat",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "direct",
+      "aliases": ["lateran_concordat_with_italy"]
+    },
+    {
+      "code": "uk-internal-market",
+      "kind": "treaty_framework",
+      "default_direct_effect": "direct",
+      "aliases": ["uk_internal", "uk_internal_market"]
+    },
+    {
+      "code": "union-state",
+      "kind": "treaty_framework",
+      "default_direct_effect": "advisory",
+      "aliases": ["union_state"]
+    },
+
+    {
+      "code": "usmca",
+      "kind": "treaty_framework",
+      "default_direct_effect": "indirect_transposition",
+      "aliases": ["cusma", "cafta-dr"]
+    },
+    {
+      "code": "kingdom-netherlands",
+      "kind": "international_organisation",
+      "default_direct_effect": "direct",
+      "aliases": ["koninkrijk-der-nederlanden", "kingdom-of-the-netherlands"]
+    },
+    {
+      "code": "us-territorial-clause",
+      "kind": "constitutional_annex",
+      "default_direct_effect": "override"
+    },
+    {
+      "code": "dk-selfgovernment-act-2009",
+      "kind": "bilateral_regime",
+      "default_direct_effect": "indirect_transposition"
+    },
+    {
+      "code": "eu-oct-association",
+      "kind": "treaty_framework",
+      "default_direct_effect": "none",
+      "aliases": ["eu-oct"]
+    },
+    {
+      "code": "dk-home-rule-act-1948",
+      "kind": "constitutional_annex",
+      "default_direct_effect": "override"
+    },
+    {
+      "code": "dk-faroe-takeover-act-2005",
+      "kind": "constitutional_annex",
+      "default_direct_effect": "override"
+    },
+    {
+      "code": "us-covenant-political-union",
+      "kind": "constitutional_annex",
+      "default_direct_effect": "override"
+    },
+    {
+      "code": "svalbard-treaty-1920",
+      "kind": "treaty_framework",
+      "default_direct_effect": "direct"
+    },
+    {
+      "code": "svalbard-act-1925",
+      "kind": "constitutional_annex",
+      "default_direct_effect": "override"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "jurisdiction": "xy",
+  "name": "Ys",
+  "gazette": "JOURNAL OFFICIEL D'YS",
+  "device": "fleuron",
+  "script": "latin",
+  "authority_line": "Publié par autorité de l'État",
+  "container_labels": {
+    "book": "LIVRE",
+    "title": "TITRE",
+    "chapter": "CHAPITRE"
+  },
+  "laws": [
+    {
+      "file": "commande-publique-1998.bluebell",
+      "doctype": "act",
+      "doctype_label": "Loi",
+      "date": "1998-03-03",
+      "number": "14",
+      "language": "fra",
+      "short_title": "Loi relative à la commande publique",
+      "gazette_no": "N° 231",
+      "gazette_date": "3 mars 1998",
+      "assent": "[Promulguée le 3 mars 1998]"
+    },
+    {
+      "file": "commande-publique-electronique-2004.bluebell",
+      "doctype": "act",
+      "doctype_label": "Loi",
+      "date": "2004-06-18",
+      "number": "6",
+      "language": "fra",
+      "short_title": "Loi relative à la commande publique électronique",
+      "gazette_no": "N° 412",
+      "gazette_date": "18 juin 2004",
+      "assent": "[Promulguée le 18 juin 2004]",
+      "cites": ["/akn/xy/act/1998/14"]
+    },
+    {
+      "file": "commande-publique-amendement-2011.bluebell",
+      "doctype": "act",
+      "doctype_label": "Loi",
+      "date": "2011-11-24",
+      "number": "9",
+      "language": "fra",
+      "short_title": "Loi modifiant la loi relative à la commande publique",
+      "gazette_no": "N° 688",
+      "gazette_date": "24 novembre 2011",
+      "assent": "[Promulguée le 24 novembre 2011]",
+      "amends": "/akn/xy/act/1998/14"
+    }
+  ]
+}

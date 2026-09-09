@@ -1,0 +1,44 @@
+{
+  "jurisdiction": "xq",
+  "name": "Quivira",
+  "gazette": "LA GACETA DE QUIVIRA",
+  "device": "sun",
+  "laws": [
+    {
+      "file": "publicacion-2004.bluebell",
+      "doctype": "ley",
+      "doctype_label": "Ley",
+      "date": "2004-03-11",
+      "number": "9",
+      "language": "spa",
+      "short_title": "Ley de Publicación de Normas",
+      "gazette_no": "No. 1204",
+      "gazette_date": "11 de marzo de 2004"
+    },
+    {
+      "file": "archivos-2011.bluebell",
+      "doctype": "ley",
+      "doctype_label": "Ley",
+      "date": "2011-09-02",
+      "number": "4",
+      "language": "spa",
+      "short_title": "Ley de Archivos Públicos",
+      "gazette_no": "No. 1877",
+      "gazette_date": "2 de septiembre de 2011",
+      "cites": ["/akn/xq/act/2004/9"]
+    },
+    {
+      "file": "archivos-reforma-2018.bluebell",
+      "doctype": "ley",
+      "doctype_label": "Ley",
+      "date": "2018-11-20",
+      "number": "12",
+      "language": "spa",
+      "short_title": "Ley de Reforma de la Ley de Archivos Públicos",
+      "gazette_no": "No. 2410",
+      "gazette_date": "20 de noviembre de 2018",
+      "cites": ["/akn/xq/act/2011/4"],
+      "amends": "/akn/xq/act/2011/4"
+    }
+  ]
+}

@@ -1,0 +1,506 @@
+# EU acquis — 35 negotiation chapters. Canonical store for Python + HTTP + SPA.
+# `classifier_priority` is the EUR-Lex classifier walk order (specific wins over general).
+# `threshold_confidence` gates ProvisionAlignment.needs_review per chapter (tune via #62 eval set).
+
+clusters:
+  - id: 1
+    name: Fundamentals
+  - id: 2
+    name: Internal market
+  - id: 3
+    name: Competitiveness and inclusive growth
+  - id: 4
+    name: Green agenda and sustainable connectivity
+  - id: 5
+    name: Resources, agriculture and cohesion
+  - id: 6
+    name: External relations
+  - id: null
+    name: Outside the clusters
+
+classifier_priority:
+  [
+    5,
+    7,
+    6,
+    8,
+    9,
+    10,
+    12,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    1,
+    2,
+    3,
+    4,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+  ]
+
+chapters:
+  - number: 1
+    title: Free movement of goods
+    description: Removal of barriers to trade in goods — mutual recognition, technical standards, and conformity assessment across the single market.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - free movement of goods
+      - approximation of laws
+      - chemicals
+      - industrial risk
+      - biotechnology
+      - technical and safety conditions
+      - technical harmonisation
+      - metrology
+      - proprietary medicinal products
+      - cosmetics
+      - electrical material
+      - fertilisers
+      - elimination of barriers to trade
+
+  - number: 2
+    title: Freedom of movement for workers
+    description: The right of EU citizens to work in any member state, with equal treatment and coordination of social-security entitlements.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - free movement of workers
+
+  - number: 3
+    title: Right of establishment and freedom to provide services
+    description: Freedom for businesses and professionals to set up and provide services cross-border, including recognition of qualifications.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - right of establishment
+      - freedom to provide services
+      - free movement of services
+
+  - number: 4
+    title: Free movement of capital
+    description: Free movement of capital and payments, anti-money-laundering rules, and the prudential framework for cross-border flows.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - free movement of capital
+
+  - number: 5
+    title: Public procurement
+    description: Rules ensuring open, transparent and non-discriminatory award of public contracts and concessions, with effective remedies.
+    cluster: 1
+    threshold_confidence: 0.70
+    classifier_labels:
+      - public procurement
+      - public contracts
+      - public supply contracts
+      - public works contracts
+
+  - number: 6
+    title: Company law
+    description: Harmonised rules on company formation, disclosure, accounting, mergers and corporate governance.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - company law
+
+  - number: 7
+    title: Intellectual property law
+    description: Protection and enforcement of copyright, trademarks, patents, designs and related rights.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - intellectual property
+
+  - number: 8
+    title: Competition policy
+    description: Antitrust, merger control and state-aid rules that keep the internal market fair and undistorted.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - competition
+      - state aid
+      - prohibited agreements
+
+  - number: 9
+    title: Financial services
+    description: Prudential regulation and supervision of banks, insurers, markets and payment services.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - banking
+      - banks
+      - insurance
+      - financial services
+      - free movement of capital and payments
+      - individual tax exemptions
+      - stock exchanges
+      - securities markets
+      - investment fund
+      - alternative investment
+      - settlement finality
+      - payment systems
+      - covered bonds
+      - crowdfunding
+      - consumer credit
+      - credit institutions
+      - deposit guarantee
+      - recovery and resolution
+      - bank recovery
+      - loss-absorbing capacity
+
+  - number: 10
+    title: Information society and media
+    description: Electronic communications, digital services, audiovisual media and e-commerce rules.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - audiovisual
+      - information society
+      - telecommunications
+      - electronic communications
+      - media
+      - leisure services
+
+  - number: 11
+    title: Agriculture and rural development
+    description: The Common Agricultural Policy — market organisation, direct payments and rural-development support.
+    cluster: 5
+    threshold_confidence: 0.70
+    classifier_labels:
+      - agriculture
+      - rural development
+      - fresh fruit
+      - vegetables
+      - seeds
+      - seedlings
+      - wine
+      - olive oil
+      - cereals
+      - eaggf
+      - market operation
+
+  - number: 12
+    title: Food safety, veterinary and phytosanitary policy
+    description: Food and feed safety, animal health and welfare, and plant-health controls along the supply chain.
+    cluster: 5
+    threshold_confidence: 0.70
+    classifier_labels:
+      - veterinary
+      - phytosanitary
+      - foodstuffs
+      - food safety
+      - animal feed
+      - animal health
+      - plant health
+      - protection of animals
+      - zootechnics
+      - eggs and poultry
+
+  - number: 13
+    title: Fisheries
+    description: The Common Fisheries Policy — conservation, fleet management, market organisation and controls.
+    cluster: 5
+    threshold_confidence: 0.70
+    classifier_labels:
+      - fisheries
+
+  - number: 14
+    title: Transport policy
+    description: Safety, market access and standards across road, rail, air, maritime and inland-waterway transport.
+    cluster: 4
+    threshold_confidence: 0.70
+    classifier_labels:
+      - transport
+      - safety at sea
+      - motor vehicles
+      - air traffic
+      - user tariffs
+      - market access
+      - shipping
+      - maritime
+
+  - number: 15
+    title: Energy
+    description: Security of supply, the internal energy market, renewables, energy efficiency and nuclear safety.
+    cluster: 4
+    threshold_confidence: 0.70
+    classifier_labels:
+      - energy
+      - supplies and stocks
+      - electricity
+      - gas market
+      - hydrogen
+
+  - number: 16
+    title: Taxation
+    description: Indirect taxation (VAT and excise), elements of direct taxation, and administrative cooperation against avoidance.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - taxation
+      - tax evasion
+      - tax avoidance
+      - vat
+      - turnover tax
+      - excise
+      - corporation tax
+      - income tax
+      - taxes on capital
+      - transactions in securities
+
+  - number: 17
+    title: Economic and monetary policy
+    description: Fiscal discipline, central-bank independence and the framework for eventual euro adoption.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - economic and monetary
+      - economic policy
+      - institutional economic provisions
+
+  - number: 18
+    title: Statistics
+    description: A reliable, independent national statistical system producing harmonised data to EU methodology.
+    cluster: 1
+    threshold_confidence: 0.70
+    classifier_labels:
+      - statistics
+
+  - number: 19
+    title: Social policy and employment
+    description: Labour law, health and safety at work, equal treatment, and social dialogue.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - social policy
+      - social protection
+      - social and structural measures
+      - social conditions
+      - social security
+      - social provisions
+      - employment
+      - labour
+      - health and safety at work
+      - safety at work
+      - gender equality
+      - wages
+      - working hours
+      - working time
+      - working conditions
+      - protection of workers
+      - freedom of movement for workers
+      - application to migrant workers
+      - industrial relations
+      - anti-discrimination
+      - self-employed
+      - medical and paramedical activities
+
+  - number: 20
+    title: Enterprise and industrial policy
+    description: A competitive business environment, support for SMEs, and industrial-policy instruments.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - industrial policy
+      - enterprise policy
+      - small and medium-sized
+      - business activities
+      - business procedures
+      - service activities
+      - principles and conditions
+
+  - number: 21
+    title: Trans-European networks
+    description: Development of cross-border transport, energy and telecommunications infrastructure networks.
+    cluster: 4
+    threshold_confidence: 0.70
+    classifier_labels:
+      - trans-european
+
+  - number: 22
+    title: Regional policy and coordination of structural instruments
+    description: The administrative and programming capacity to manage EU cohesion and structural funds.
+    cluster: 5
+    threshold_confidence: 0.70
+    classifier_labels:
+      - regional policy
+      - structural funds
+      - cohesion
+
+  - number: 23
+    title: Judiciary and fundamental rights
+    description: An independent, effective judiciary, the fight against corruption, and protection of fundamental rights.
+    cluster: 1
+    threshold_confidence: 0.70
+    classifier_labels:
+      - fundamental rights
+      - judicial cooperation
+      - data protection
+
+  - number: 24
+    title: Justice, freedom and security
+    description: Borders, migration and asylum, judicial and police cooperation, and the fight against organised crime.
+    cluster: 1
+    threshold_confidence: 0.70
+    classifier_labels:
+      - area of freedom, security and justice
+      - cooperation in the fields of justice and home affairs
+      - asylum
+      - immigration
+      - border control
+      - police cooperation
+      - free movement of persons
+      - european citizenship
+      - right of nationals of third countries
+
+  - number: 25
+    title: Science and research
+    description: Participation in EU research programmes and the capacity to absorb research funding.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - research
+      - technological development
+      - scientific research
+
+  - number: 26
+    title: Education and culture
+    description: Cooperation on education, training, youth and culture, largely a national competence with EU programmes.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - education and training
+      - educational
+      - higher education
+      - culture
+      - cultural
+      - youth
+      - vocational training
+
+  - number: 27
+    title: Environment and climate change
+    description: Air, water and waste, nature protection, industrial pollution and climate-action obligations.
+    cluster: 4
+    threshold_confidence: 0.70
+    classifier_labels:
+      - environment
+      - climate
+      - atmospheric pollution
+      - waste management
+      - clean technology
+      - monitoring of atmospheric
+      - water protection
+      - water management
+      - noise pollution
+      - pollution and nuisances
+      - nuclear safety
+      - radioactive waste
+      - dangerous substances
+
+  - number: 28
+    title: Consumer and health protection
+    description: Consumer-rights protection, product safety, and public-health and tobacco rules.
+    cluster: 2
+    threshold_confidence: 0.70
+    classifier_labels:
+      - consumer protection
+      - consumer information
+      - protection of economic interests
+      - public health
+      - health protection
+      - health
+
+  - number: 29
+    title: Customs union
+    description: The common customs code, tariff, and the controls and IT systems for a functioning customs union.
+    cluster: 3
+    threshold_confidence: 0.70
+    classifier_labels:
+      - customs union
+      - customs
+      - inward processing
+      - particular destinations
+      - national trading monopolies
+
+  - number: 30
+    title: External relations
+    description: Common commercial policy, trade agreements and development cooperation.
+    cluster: 6
+    threshold_confidence: 0.70
+    classifier_labels:
+      - external relations
+      - trade policy
+      - development cooperation
+
+  - number: 31
+    title: Foreign, security and defence policy
+    description: Alignment with the EU's common foreign, security and defence positions, sanctions and declarations.
+    cluster: 6
+    threshold_confidence: 0.70
+    classifier_labels:
+      - common foreign and security policy
+      - defence
+
+  - number: 32
+    title: Financial control
+    description: Public internal financial control and an independent external audit of public funds.
+    cluster: 1
+    threshold_confidence: 0.70
+    classifier_labels:
+      - financial control
+      - audit
+      - anti-fraud
+      - european public prosecutor
+
+  - number: 33
+    title: Financial and budgetary provisions
+    description: The rules and systems for contributing to, and managing, the EU budget (own resources).
+    cluster: 5
+    threshold_confidence: 0.70
+    classifier_labels:
+      - financial provisions
+      - budget
+      - own resources
+
+  - number: 34
+    title: Institutions
+    description: Institutional and constitutional adjustments tied to membership — settled at the political level.
+    cluster: null
+    threshold_confidence: 0.70
+    classifier_labels:
+      - institutions
+      - general provisions
+      - european citizenship
+      - principles
+      - objectives and tasks of the treaties
+
+  - number: 35
+    title: Other issues
+    description: Miscellaneous matters not falling under any other negotiating chapter.
+    cluster: null
+    threshold_confidence: 0.70
+    classifier_labels:
+      - other
+      - general
+      - programmes
+      - export guarantees

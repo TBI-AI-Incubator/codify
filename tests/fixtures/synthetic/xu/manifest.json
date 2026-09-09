@@ -1,0 +1,63 @@
+{
+  "jurisdiction": "xu",
+  "name": "Hesperian Union",
+  "gazette": "OFFICIAL JOURNAL OF THE HESPERIAN UNION",
+  "device": "seal",
+  "script": "latin",
+  "authority_line": "Published by authority of the Union",
+  "container_labels": {
+    "chapter": "CHAPTER"
+  },
+  "laws": [
+    {
+      "file": "directive-2004-12-data-protection.bluebell",
+      "doctype": "act",
+      "doctype_label": "Directive",
+      "date": "2004-11-18",
+      "number": "12",
+      "language": "eng",
+      "short_title": "Directive 12 of 2004 on the protection of personal data",
+      "gazette_no": "OJ HU No. L 284",
+      "gazette_date": "18th November, 2004",
+      "assent": "[Adopted 4th November, 2004]"
+    },
+    {
+      "file": "regulation-2009-5-data-protection-board.bluebell",
+      "doctype": "act",
+      "doctype_label": "Regulation",
+      "date": "2009-03-25",
+      "number": "5",
+      "language": "eng",
+      "short_title": "Regulation 5 of 2009 establishing the Hesperian Data Protection Board",
+      "gazette_no": "OJ HU No. L 61",
+      "gazette_date": "25th March, 2009",
+      "assent": "[Adopted 11th March, 2009]",
+      "cites": ["/akn/xu/act/2004/12"]
+    },
+    {
+      "file": "directive-2011-8-amending.bluebell",
+      "doctype": "act",
+      "doctype_label": "Amending Directive",
+      "date": "2011-09-14",
+      "number": "8",
+      "language": "eng",
+      "short_title": "Directive 8 of 2011 amending Directive 12 of 2004",
+      "gazette_no": "OJ HU No. L 233",
+      "gazette_date": "14th September, 2011",
+      "assent": "[Adopted 31st August, 2011]",
+      "amends": "/akn/xu/act/2004/12"
+    },
+    {
+      "file": "regulation-2006-3-customs-tariff.bluebell",
+      "doctype": "act",
+      "doctype_label": "Regulation",
+      "date": "2006-07-01",
+      "number": "3",
+      "language": "eng",
+      "short_title": "Regulation 3 of 2006 establishing a common customs tariff",
+      "gazette_no": "OJ HU No. L 157",
+      "gazette_date": "1st July, 2006",
+      "assent": "[Adopted 15th June, 2006]"
+    }
+  ]
+}

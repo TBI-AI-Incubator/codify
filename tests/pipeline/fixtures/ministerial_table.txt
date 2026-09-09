@@ -1,0 +1,5 @@
+| Year | Instrument | Stored units |
+|---|---|---|
+| 2016 | Blue lens | 17 |
+| 2022 | Copper dial | 29 |
+| 2031 | Silver prism | 43 |

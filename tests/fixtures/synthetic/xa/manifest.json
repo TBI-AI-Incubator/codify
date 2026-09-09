@@ -1,0 +1,58 @@
+{
+  "jurisdiction": "xa",
+  "name": "Atlantis",
+  "gazette": "THE ATLANTIS GAZETTE",
+  "device": "trident",
+  "laws": [
+    {
+      "file": "publication-1992.bluebell",
+      "doctype": "act",
+      "doctype_label": "Ordinance",
+      "date": "1992-05-14",
+      "number": "7",
+      "language": "eng",
+      "short_title": "Legislation Act, 1992",
+      "gazette_no": "No. 412",
+      "gazette_date": "14th May, 1992",
+      "assent": "[Assented to 2nd May, 1992]"
+    },
+    {
+      "file": "freedom-of-information-2001.bluebell",
+      "doctype": "act",
+      "doctype_label": "Act",
+      "date": "2001-06-29",
+      "number": "3",
+      "language": "eng",
+      "short_title": "Freedom of Information Act, 2001",
+      "gazette_no": "No. 631",
+      "gazette_date": "29th June, 2001",
+      "assent": "[Assented to 21st June, 2001]",
+      "cites": ["/akn/xa/act/1992/7"]
+    },
+    {
+      "file": "publication-amendment-2011.bluebell",
+      "doctype": "act",
+      "doctype_label": "Act",
+      "date": "2011-11-03",
+      "number": "5",
+      "language": "eng",
+      "short_title": "Legislation (Amendment) Act, 2011",
+      "gazette_no": "No. 998",
+      "gazette_date": "3rd November, 2011",
+      "assent": "[Assented to 28th October, 2011]",
+      "amends": "/akn/xa/act/1992/7"
+    },
+    {
+      "file": "penalties-2003.bluebell",
+      "doctype": "act",
+      "doctype_label": "Act",
+      "date": "2003-09-12",
+      "number": "4",
+      "language": "eng",
+      "short_title": "Penalties Act, 2003",
+      "gazette_no": "No. 712",
+      "gazette_date": "12th September, 2003",
+      "assent": "[Assented to 5th September, 2003]"
+    }
+  ]
+}
