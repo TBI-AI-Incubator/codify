@@ -7,7 +7,7 @@ both consume the same kind/keyword/rank tables without circular imports.
 from __future__ import annotations
 
 # The canonical spellings this code writes and matches on. The parser also takes
-# abbreviations, but CHP yields a generic hcontainer, not a chapter.
+# abbreviations listed in the installed grammar.
 BLUEBELL_HIER_KEYWORDS: frozenset[str] = frozenset(
     {
         "ALINEA",

@@ -1036,6 +1036,15 @@ def scan_anchors(
     ).anchors
 
 
+_DECIMAL_CONTINUATION_RE = re.compile(r"\.\d")
+
+
+def _partial_decimal_number(text: str, match: re.Match[str]) -> bool:
+    return bool(
+        match.groupdict().get("num") and _DECIMAL_CONTINUATION_RE.match(text, match.end("num"))
+    )
+
+
 def scan_anchors_with_ambiguity(
     text: str,
     regex: re.Pattern[str],
@@ -1056,6 +1065,18 @@ def scan_anchors_with_ambiguity(
     raw: list[StructuralAnchor] = []
     for match in regex.finditer(text):
         if match.start() < toc_end:
+            continue
+        # A keyword match must not turn a dotted number into its integer prefix.
+        if _partial_decimal_number(text, match):
+            spans.append(
+                AmbiguitySpan(
+                    kind="unmatched_marker",
+                    start=match.start(),
+                    end=match.end(),
+                    emitted_by="regex",
+                    detail={"reason": "partial_decimal_number", "text": match.group(0).strip()},
+                )
+            )
             continue
         # The match can begin on leading whitespace/newlines; quote state
         # belongs to the marker's first real character (a mask that resets
@@ -1800,6 +1821,110 @@ def _decimal_rank(number: str) -> tuple[int, ...]:
         return ()
 
 
+def _advancing_decimal_matches(
+    matches: Sequence[re.Match[str]], *, number_group: str = "num"
+) -> list[re.Match[str]]:
+    """Keep the longest advancing sequence, retaining the first equal-number match."""
+    tails: list[tuple[int, ...]] = []
+    ends: list[int] = []
+    previous = [-1] * len(matches)
+    for index, match in enumerate(matches):
+        rank = _decimal_rank(match.group(number_group))
+        position = bisect_left(tails, rank)
+        if position < len(tails) and tails[position] == rank:
+            continue
+        previous[index] = ends[position - 1] if position else -1
+        if position == len(tails):
+            tails.append(rank)
+            ends.append(index)
+        else:
+            tails[position] = rank
+            ends[position] = index
+    selected: list[re.Match[str]] = []
+    index = ends[-1] if ends else -1
+    while index >= 0:
+        selected.append(matches[index])
+        index = previous[index]
+    return list(reversed(selected))
+
+
+def _host_caption_sequence(
+    text: str, matches: Sequence[re.Match[str]], country: str = ""
+) -> list[re.Match[str]]:
+    """Prefer resumed host text, then the earliest maximal advancing caption sequence."""
+    if not matches:
+        return []
+    first_paragraph = next(
+        (
+            m
+            for m in _BRACKETED_DECIMAL_RE.finditer(text)
+            if _decimal_rank(m.group("num"))[0] == int(matches[0].group("secnum"))
+            and not _is_prose_reference(text, _probe_from(text, m.start()), country)
+        ),
+        None,
+    )
+    keys = [(m.group("secnum"), m.group("caption")) for m in matches]
+    if first_paragraph is not None:
+        for count in range(2, len(matches) // 2 + 1):
+            if (
+                matches[count].start() < first_paragraph.start() < matches[count + 1].start()
+                and _decimal_rank(first_paragraph.group("num"))[0] == int(keys[count][0])
+                and keys[:count] == keys[count : 2 * count]
+                and all(int(a[0]) < int(b[0]) for a, b in zip(keys[: count - 1], keys[1:count]))
+            ):
+                matches = matches[count:]
+                break
+    candidates: list[re.Match[str]] = []
+    for index in range(len(matches) - 1, -1, -1):
+        match = matches[index]
+        number = int(match.group("secnum"))
+        boundary = next((m for m in reversed(candidates) if int(m.group("secnum")) <= number), None)
+        host = next((m for m in reversed(matches[:index]) if int(m.group("secnum")) < number), None)
+        if boundary is not None and host is not None:
+            prefix = int(host.group("secnum"))
+            preceding = [
+                _decimal_rank(m.group("num"))
+                for m in _BRACKETED_DECIMAL_RE.finditer(text, host.end(), match.start())
+                if _decimal_rank(m.group("num"))[0] == prefix
+                and not _is_prose_reference(text, _probe_from(text, m.start()), country)
+            ]
+            earliest = min(preceding, default=(prefix, 0))
+            if any(
+                _decimal_rank(m.group("num"))[0] == prefix
+                and _decimal_rank(m.group("num")) > earliest
+                and _decimal_rank(m.group("num")) not in preceding
+                and not _is_prose_reference(text, _probe_from(text, m.start()), country)
+                for m in _BRACKETED_DECIMAL_RE.finditer(text, match.end(), boundary.start())
+            ):
+                # A resumed host interval also excludes intervening forward captions.
+                candidates = [m for m in candidates if m.start() >= boundary.start()]
+                continue
+        candidates.append(match)
+    candidates.reverse()
+    tails: list[int] = []
+    lengths = [0] * len(candidates)
+    for index in range(len(candidates) - 1, -1, -1):
+        rank = -int(candidates[index].group("secnum"))
+        position = bisect_left(tails, rank)
+        lengths[index] = position + 1
+        if position == len(tails):
+            tails.append(rank)
+        else:
+            tails[position] = rank
+    remaining = len(tails)
+    previous = -1
+    selected = []
+    for match, length in zip(candidates, lengths, strict=True):
+        number = int(match.group("secnum"))
+        if number > previous and length >= remaining:
+            selected.append(match)
+            previous = number
+            remaining -= 1
+            if not remaining:
+                break
+    return selected
+
+
 def _scan_declared_markers(
     text: str,
     toc_end: int,
@@ -1815,11 +1940,31 @@ def _scan_declared_markers(
     out: list[StructuralAnchor] = []
     masked: list[int] = []
     mask: Sequence[bool] | None = None
+    caption_matches = sorted(
+        {
+            m.start(): m
+            for entry in entries
+            if entry.marker_form == "caption"
+            for m in _caption_re(entry.captions).finditer(text)
+            if m.start() >= toc_end and m.group("secnum")
+        }.values(),
+        key=lambda m: m.start(),
+    )
+    selected_captions = _host_caption_sequence(text, caption_matches, country)
+    selected_caption_offsets = {m.start() for m in selected_captions}
+    numbered_captions = {m.group("caption") for m in selected_captions}
+    caption_starts = {int(m.group("secnum")): m.start() for m in selected_captions}
+    caption_boundaries = [(m.start(), int(m.group("secnum"))) for m in selected_captions]
+    caption_offsets = [offset for offset, _number in caption_boundaries]
     for entry in entries:
         if entry.marker_form == "caption":
             emitted = 0
             for m in _caption_re(entry.captions).finditer(text):
-                if m.start() < toc_end:
+                if (
+                    m.start() < toc_end
+                    or (m.group("secnum") and m.start() not in selected_caption_offsets)
+                    or (not m.group("secnum") and m.group("caption") in numbered_captions)
+                ):
                     continue
                 emitted += 1
                 out.append(
@@ -1871,20 +2016,58 @@ def _scan_declared_markers(
                     )
                 )
         elif entry.marker_form == "bracketed_decimal":
-            # A judgment numbers its paragraphs upward, so a marker that does not
-            # advance is a back-reference the source soft-wrapped onto its own
-            # line, not a boundary. Without this the citation wins the duplicate
-            # contest and takes the real paragraph's place.
-            highest: tuple[int, ...] = ()
+            # Forward citations must not suppress the following host sequence.
+            intervals: dict[int, list[re.Match[str]]] = {}
             for m in _BRACKETED_DECIMAL_RE.finditer(text):
                 if m.start() < toc_end or _is_prose_reference(
                     text, _probe_from(text, m.start()), country
                 ):
                     continue
                 rank = _decimal_rank(m.group("num"))
-                if rank and rank <= highest:
+                # A forward citation cannot start the later caption's sequence.
+                if rank and m.start() < caption_starts.get(rank[0], 0):
                     continue
-                highest = rank or highest
+                active_caption = bisect_left(caption_offsets, m.start()) - 1
+                # Quoted earlier prefixes cannot rewind an explicit numbered caption.
+                if rank and active_caption >= 0 and rank[0] < caption_boundaries[active_caption][1]:
+                    continue
+                # Only the final caption may extend into uncaptioned separate opinions.
+                if (
+                    rank
+                    and 0 <= active_caption < len(caption_boundaries) - 1
+                    and rank[0] != caption_boundaries[active_caption][1]
+                ):
+                    continue
+                intervals.setdefault(active_caption, []).append(m)
+            selected: list[re.Match[str]] = []
+            for interval, candidates in intervals.items():
+                if interval >= 0:
+                    prefix = caption_boundaries[interval][1]
+                    host = _advancing_decimal_matches(
+                        [m for m in candidates if _decimal_rank(m.group("num"))[0] == prefix]
+                    )
+                    selected.extend(host)
+                    if interval == len(caption_boundaries) - 1:
+                        host_end = host[-1].start() if host else caption_boundaries[interval][0]
+                        selected.extend(
+                            _advancing_decimal_matches(
+                                [
+                                    m
+                                    for m in candidates
+                                    if m.start() > host_end
+                                    and _decimal_rank(m.group("num"))[0] > prefix
+                                ]
+                            )
+                        )
+                    continue
+                # Before any numbered caption, retain the established monotonic policy.
+                last_rank: tuple[int, ...] = ()
+                for candidate in candidates:
+                    rank = _decimal_rank(candidate.group("num"))
+                    if rank > last_rank:
+                        selected.append(candidate)
+                        last_rank = rank
+            for m in selected:
                 out.append(
                     StructuralAnchor(
                         kind=entry.akn_element,
@@ -3574,13 +3757,13 @@ def _marker_numbers(
     # Keyword-less levels answer to their own scanner, not to keyword aliases,
     # so count what that scanner would find. Without this the denominator is
     # empty and the gate silently skips the very provisions that are citable.
-    declared = [e for e in doc_class.hierarchy if e.akn_element == kind and e.marker_form]
+    declared = [e for e in doc_class.hierarchy if e.marker_form]
     # Unioned, not returned alone: the scan counts both spellings, and one of
     # them alone scores a document against a fraction of what it captured.
     from_declared = {
         _normalise_number(a.number)
         for a in _scan_declared_markers(text, 0, declared, config.code)[0]
-        if a.number and _line_start(text, a.char_offset) not in exclude_starts
+        if a.kind == kind and a.number and _line_start(text, a.char_offset) not in exclude_starts
     }
     aliases: list[str] = []
     for entry in doc_class.hierarchy:
@@ -3606,6 +3789,8 @@ def _marker_numbers(
     # belong to the anchor-count and cover-reconciliation validators.
     distinct: set[str] = set()
     for m in pattern.finditer(text):
+        if _partial_decimal_number(text, m):
+            continue
         # The scanner's matches begin on the preceding newline, which is
         # what lets the prose window read a wrapped line's tail.
         probe = _probe_from(text, m.start())
