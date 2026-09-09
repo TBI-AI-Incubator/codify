@@ -17,10 +17,21 @@ from codify.pipeline.enrich.titles import long_title_lead_ins, opens_long_title
 
 logger = structlog.get_logger()
 
+# Bluebell hier_element_name aliases; emitter vocabulary deliberately excludes these.
+_PARSER_HIER_KEYWORDS = BLUEBELL_HIER_KEYWORDS | {
+    "ART",
+    "CHAP",
+    "PARA",
+    "SEC",
+    "SUBCHAP",
+    "SUBPARA",
+    "SUBSEC",
+}
+
 # Upper case only: Bluebell reads "SECTION 6" as structure and "Section 6 of
 # the same Act" as prose. Matching either way refused every amending act.
 _STRUCTURAL_LINE_RE = re.compile(
-    r"^\s*(" + "|".join(sorted(BLUEBELL_HIER_KEYWORDS, key=len, reverse=True)) + r")\b"
+    r"^\s*(" + "|".join(sorted(_PARSER_HIER_KEYWORDS, key=len, reverse=True)) + r")\b"
 )
 
 
@@ -29,13 +40,24 @@ class BodyBlock(BaseModel):
     heading: str | None = None
     lines: list[str] = Field(default_factory=list)
 
+    @field_validator("heading", mode="after")
+    @classmethod
+    def reject_structural_heading_continuations(cls, value: str | None) -> str | None:
+        for line in (value or "").splitlines()[1:]:
+            if _STRUCTURAL_LINE_RE.match(line):
+                raise ValueError(f"heading line begins with structural keyword: {line!r}")
+        if value is not None and len(value.splitlines()) > 1:
+            return " ".join(line.strip() for line in value.splitlines() if line.strip())
+        return value
+
     @field_validator("lines", mode="after")
     @classmethod
     def reject_structural_keywords(cls, value: list[str]) -> list[str]:
-        for line in value:
+        lines = [line for block in value for line in (block.splitlines() or [""])]
+        for line in lines:
             if _STRUCTURAL_LINE_RE.match(line):
                 raise ValueError(f"body line begins with structural keyword: {line!r}")
-        return value
+        return lines
 
 
 class BodyFillResponse(BaseModel):
@@ -53,10 +75,9 @@ def _schedule_rooted(anchors: Iterable[StructuralAnchor]) -> set[str]:
 
 
 def _header_indent(anchor: StructuralAnchor, schedule_rooted: set[str]) -> str:
-    """Bluebell parses SCHEDULE as an <attachment> only at column 0 after the
-    body (indented inside BODY it is silently dropped), and expects an annex's
-    children one level shallower than body anchors (the col-0 schedule takes
-    no indent level of its own)."""
+    """Schedule anchors open attachments at column zero; their children use one
+    fewer indentation level. Schedule text inside a section remains prose.
+    """
     if anchor.kind == "schedule":
         return ""
     level = anchor.depth if anchor.akn_eid in schedule_rooted else anchor.depth + 1
