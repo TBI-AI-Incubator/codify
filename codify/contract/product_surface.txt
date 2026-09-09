@@ -80,6 +80,7 @@ codify.frbr:build_frbr_expression_uri
 codify.frbr:build_frbr_work_uri
 codify.frbr:expression_uri_date
 codify.frbr:is_citable_work_uri
+codify.frbr:parse_source_ref
 codify.frbr:token_family
 codify.jurisdictions:JURISDICTIONS_DIR
 codify.jurisdictions:JurisdictionConfig
