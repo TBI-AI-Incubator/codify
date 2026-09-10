@@ -5,6 +5,7 @@ One resolver, not a list per caller: two such lists drifted apart.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 
@@ -13,6 +14,15 @@ def data_dir(module_file: str, leaf: str) -> Path:
 
     Anchored on the package directory, so a caller's own depth cannot drift.
     """
+    override = os.environ.get("CODIFY_DATA_ROOT")
+    if override is not None:
+        root = Path(override)
+        if not root.is_absolute() or not root.is_dir():
+            raise ValueError("CODIFY_DATA_ROOT must name an existing absolute directory")
+        selected = root.resolve() / leaf
+        if not selected.is_dir():
+            raise ValueError(f"CODIFY_DATA_ROOT is missing the {leaf!r} directory")
+        return selected
     package = next(p for p in Path(module_file).resolve().parents if p.name == "codify")
     # A `data/` inside the package settles it: only a build puts one there, and
     # where it is present no ancestor is a candidate whether or not it holds

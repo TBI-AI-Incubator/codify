@@ -51,9 +51,25 @@ Synthetic jurisdictions carry invented law in real legislative shapes, so the su
 assert against known-correct structure without redistributing anyone's corpus. Public
 reference configurations describe jurisdictions that publish their own law openly.
 
-`codify.jurisdictions` reads `data/jurisdictions` from the working tree in a checkout, and
-from inside the package once installed. The in-package copy is the last candidate, so an
-edit in a checkout stays live.
+By default, a source checkout reads its own `data/`; an installed package reads its
+bundled data and does not search neighbouring directories.
+
+Operators can explicitly select a different dataset before starting Python:
+
+```sh
+CODIFY_DATA_ROOT=/absolute/path/to/data uv run codify ingest-one input.txt --jurisdiction xa --out bundle/
+```
+
+The root must contain `jurisdictions/` and `frameworks/` for consumers of both datasets.
+Copy the bundled data into an operator-owned directory before adding or replacing profiles;
+retain the registry and supranational metadata beside the jurisdiction directories.
+A missing, relative or invalid root, or a missing requested dataset directory, raises an
+error. There is no fallback or merge with bundled data when the setting is present.
+Configuration files still undergo the normal schema validation when loaded.
+
+Set this environment variable before importing Codify: consumers keep data paths and
+loaded configurations in memory. Restart the process after changing it. The setting
+selects runtime data only; it does not change what the build hook distributes.
 
 To add one, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
