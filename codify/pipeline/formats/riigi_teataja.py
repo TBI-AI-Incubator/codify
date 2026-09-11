@@ -122,17 +122,17 @@ def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
         if isinstance(source, etree._Element):
             root = source
         elif isinstance(source, bytes):
-            root = parse_xml(source)
+            root = parse_xml(source, huge_tree=True)
         elif isinstance(source, Path):
-            root = parse_xml(source.read_bytes())
+            root = parse_xml(source.read_bytes(), huge_tree=True)
         elif isinstance(source, str):
             stripped = source.strip()
             if stripped.startswith("<"):
-                root = parse_xml(stripped.encode())
+                root = parse_xml(stripped.encode(), huge_tree=True)
             else:
                 p = Path(source)
                 if p.exists():
-                    root = parse_xml(p.read_bytes())
+                    root = parse_xml(p.read_bytes(), huge_tree=True)
                 else:
                     return False
         else:
@@ -754,7 +754,7 @@ def riigi_teataja_to_akn(
             "utf-8"
         ),
     )
-    unique_xml, _ = ensure_unique_eids(raw_xml_out)
+    unique_xml, _ = ensure_unique_eids(raw_xml_out, huge_tree=True)
 
     metadata: dict[str, Any] = {
         "title": title,
@@ -804,8 +804,11 @@ async def ingest(
         yield Parsed(akn_xml_len=len(akn_xml))
 
         # Schema validation (offloaded to CPU pool)
+        def _validate_huge(xml: str) -> None:
+            validate_akn(xml, huge_tree=True)
+
         try:
-            await _on_the_cpu_pool(validate_akn, akn_xml)
+            await _on_the_cpu_pool(_validate_huge, akn_xml)
         except Exception as exc:
             logger.warning("akn_schema_validation_failed", error=str(exc))
             yield Failed(stage="schema_validation", error=f"{type(exc).__name__}: {exc}")
@@ -820,7 +823,7 @@ async def ingest(
             yield Failed(stage="validator", error=f"{type(exc).__name__}: {exc}")
             return
 
-        doc: Document = parse_akn(akn_xml)
+        doc: Document = parse_akn(akn_xml, huge_tree=True)
 
         logger.info(
             "riigi_teataja_ingested",

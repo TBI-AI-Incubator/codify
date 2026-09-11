@@ -68,8 +68,8 @@ def _akn_findall(parent: etree._Element, name: str) -> list[etree._Element]:
     return list(parent.findall(f"{{{AKN_NS}}}{name}"))
 
 
-def parse_document(xml: str | bytes) -> Document:
-    root = parse_xml(xml)
+def parse_document(xml: str | bytes, *, huge_tree: bool = False) -> Document:
+    root = parse_xml(xml, huge_tree=huge_tree)
     if _local(root) != "akomaNtoso":
         raise ValueError(f"Expected <akomaNtoso> root, got <{_local(root)}>")
 

@@ -260,6 +260,36 @@ async def test_dispatch_routes_by_oigusakt_root(tmp_path: Path) -> None:
     assert meta_ev.metadata["title"] == "Äriregistri seadus"
 
 
+def test_oversized_riigi_teataja_document(tmp_path: Path) -> None:
+    # A large text node > 10MB exceeds standard libxml2 limit without huge_tree
+    big_text = "A" * 10000005
+    big_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt id="test-big-1" xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Riigikogu</valjaandja>
+		<dokumentLiik>seadus</dokumentLiik>
+		<vastuvoetud><aktikuupaev>2024-01-01</aktikuupaev></vastuvoetud>
+	</metaandmed>
+	<aktinimi><nimi><pealkiri>Suur Seadus</pealkiri></nimi></aktinimi>
+	<sisu>
+		<paragrahv id="para1">
+			<paragrahvNr>1</paragrahvNr>
+			<kuvatavNr>§ 1.</kuvatavNr>
+			<loige id="p1l1">
+				<sisuTekst><tavatekst>{big_text}</tavatekst></sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>"""
+    src = tmp_path / "big-akt.xml"
+    src.write_text(big_xml, encoding="utf-8")
+
+    assert is_riigi_teataja(src)
+    akn_xml, meta = riigi_teataja_to_akn(src.read_bytes())
+    assert meta["title"] == "Suur Seadus"
+    assert "<article" in akn_xml
+
+
 def test_riigi_teataja_constitution_mapping() -> None:
     ps_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <oigusakt id="test-ps-1" xmlns="Juurakt">
