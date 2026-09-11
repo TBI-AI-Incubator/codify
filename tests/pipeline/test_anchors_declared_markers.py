@@ -788,3 +788,69 @@ def test_the_reported_unclosed_count_is_taken_under_the_same_country() -> None:
     coverage = anchor_coverage(text, anchors, config, "act", "article", with_masked=True)
 
     assert coverage.unclosed == _unclosed_quote_spans(text, "id")
+
+
+def test_outline_markers_tolerate_markdown_bold() -> None:
+    from codify.pipeline.enrich.anchors import _OUTLINE_RES
+
+    rx = _OUTLINE_RES["arabic_period"]
+    m1 = rx.search("**1.** First section")
+    assert m1 is not None and m1.group("num") == "1"
+
+    m2 = rx.search("**2**. Second section")
+    assert m2 is not None and m2.group("num") == "2"
+
+    m3 = rx.search("3. Third section")
+    assert m3 is not None and m3.group("num") == "3"
+
+
+def test_line_anchored_boundary_rejects_midline_part_in_amendment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codify.jurisdictions import HierarchyEntry, JurisdictionConfig, StructuringConfig
+    from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors
+
+    cfg = JurisdictionConfig(
+        code="xe",
+        name="Synthetic",
+        tradition=["common_law"],
+        languages=["eng"],
+        authoritative_language="eng",
+        default_document_class="act",
+        document_classes={
+            "act": {
+                "label": "Act",
+                "akn_element": "act",
+                "basic_unit": "section",
+                "hierarchy": [
+                    HierarchyEntry(
+                        local_term="Part",
+                        akn_element="part",
+                        level="higher",
+                        bluebell_keyword="PART",
+                        numbering="roman",
+                    ),
+                    HierarchyEntry(
+                        local_term="Section",
+                        akn_element="section",
+                        level="basic",
+                        bluebell_keyword="SECTION",
+                        numbering="arabic_continuous",
+                        marker_form="arabic_period",
+                    ),
+                ],
+            }
+        },
+        structuring=StructuringConfig(marker_boundary="line_anchored"),
+    )
+    monkeypatch.setattr("codify.pipeline.enrich.anchors.load_config", lambda _c: cfg)
+    rx = build_anchor_regex(cfg, "act")
+    text = (
+        "1. Citation.\n"
+        "This Order may be cited as Order 2022.\n\n"
+        "2. Amendment.\n"
+        "(1) Part C of the Schedule is amended.\n"
+    )
+    anchors = scan_anchors(text, rx, country="xe", doctype="act")
+    assert [a.kind for a in anchors] == ["section", "section"]
+    assert [a.number for a in anchors] == ["1", "2"]

@@ -187,6 +187,10 @@ def gregorian_year(
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     if not candidate:
+        title = str(metadata.get("title") or "").strip()
+        if title:
+            candidate = sole_year_token(title)
+    if not candidate:
         return None
     if cal and cal != "gregorian":
         converted = year_from_calendar(candidate, cal, country)
