@@ -420,7 +420,7 @@ def riigi_teataja_to_akn(
 
     Returns (akn_xml, metadata).
     """
-    root = parse_xml(source_xml)
+    root = parse_xml(source_xml, huge_tree=True)
     meta = root.find("{*}metaandmed")
 
     title = root.findtext(".//{*}pealkiri") or root.findtext(".//{*}aktinimi") or "Seadus"
