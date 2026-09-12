@@ -338,6 +338,33 @@ def _run_index_datadump(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_index_ee_archive(args: argparse.Namespace) -> int:
+    """Build index of active statutes from Estonian Riigi Teataja bulk XML zip."""
+    from codify.acquisition.adapters.ee.datadump import build_ee_index
+    from codify.acquisition.index import index_path
+
+    archive = Path(args.archive)
+    if not archive.exists():
+        print(f"archive not found: {archive}", file=sys.stderr)
+        return 2
+
+    def progress(scanned: int, total: int, indexed: int) -> None:
+        print(f"  scanned {scanned}/{total}, indexed {indexed}", file=sys.stderr)
+
+    payload = build_ee_index(
+        archive,
+        principal_only=args.principal_only,
+        max_files=args.max_files,
+        on_progress=None if args.quiet else progress,
+    )
+    out = Path(args.out or index_path("ee"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    stats = payload["stats"]
+    print(f"Wrote index to {out}: {stats}", file=sys.stderr)
+    return 0
+
+
 def _run_index_legislation_gov_uk(args: argparse.Namespace) -> int:
     """Walk the publisher's feeds for every type token the jurisdiction declares."""
     from codify.acquisition import selected_adapter
@@ -590,6 +617,23 @@ def main(argv: list[str] | None = None) -> int:
     idx.add_argument("--max-files", type=int, default=None, help="stop after N members")
     idx.add_argument("--quiet", action="store_true", help="suppress progress")
     idx.set_defaults(func=_run_index_datadump)
+
+    ee_idx = sub.add_parser(
+        "index-ee-archive",
+        help="build index of active statutes from Estonian Riigi Teataja bulk XML zip",
+    )
+    ee_idx.add_argument("archive", help="path to Estonian XML zip archive (e.g. xml.2026.zip)")
+    ee_idx.add_argument(
+        "--out",
+        default=None,
+        help="index JSON to write (default: <ACQUISITION_INDEX_DIR>/ee/index.json)",
+    )
+    ee_idx.add_argument(
+        "--principal-only", action="store_true", help="only index principal acts and codes"
+    )
+    ee_idx.add_argument("--max-files", type=int, default=None, help="stop after N members")
+    ee_idx.add_argument("--quiet", action="store_true", help="suppress progress")
+    ee_idx.set_defaults(func=_run_index_ee_archive)
 
     leg = sub.add_parser(
         "index-legislation-gov-uk",

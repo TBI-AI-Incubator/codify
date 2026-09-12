@@ -14,6 +14,7 @@ _LANGUAGE_NAMES: dict[str, str] = {
     "el-GR": "Greek",
     "it-IT": "Italian",
     "ar": "Modern Standard Arabic",
+    "et-EE": "Estonian",
 }
 
 _PREFIX_MAP: dict[str, str] = {full.split("-", 1)[0].lower(): full for full in _LANGUAGE_NAMES}
