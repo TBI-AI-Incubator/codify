@@ -15,7 +15,7 @@ from lxml import etree
 from codify.akn._schema import safe_parser
 
 
-def ensure_unique_eids(xml: str | bytes, *, huge_tree: bool = True) -> tuple[str, int]:
+def ensure_unique_eids(xml: str | bytes, *, huge_tree: bool = False) -> tuple[str, int]:
     """Return (xml with unique eIds, number of eIds renamed)."""
     # Hardened parser: this runs on publisher-supplied XML and its output is
     # persisted as the canonical document, so entity resolution here would
