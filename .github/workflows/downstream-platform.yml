@@ -1,0 +1,56 @@
+# Platform pins this repository at a commit and verifies the installed package
+# with its own contract tests. Running those tests here, against the change
+# under review, makes a Core change that would break Platform red before it
+# merges rather than at the next pin bump.
+name: downstream platform
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PLATFORM_READ_TOKEN: ${{ secrets.PLATFORM_READ_TOKEN }}
+    steps:
+      - name: skip without a Platform read token
+        if: env.PLATFORM_READ_TOKEN == ''
+        run: echo "::notice ::PLATFORM_READ_TOKEN is not set; the downstream contract check did not run"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.PLATFORM_READ_TOKEN != ''
+        with:
+          repository: TBI-AI-Incubator/codify-platform
+          ref: main
+          token: ${{ secrets.PLATFORM_READ_TOKEN }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        if: env.PLATFORM_READ_TOKEN != ''
+        with:
+          python-version: '3.12'
+      - name: pin Platform at the change under review and install
+        if: env.PLATFORM_READ_TOKEN != ''
+        env:
+          # Platform's helper answers Git's credential prompt for this repository only.
+          CODIFY_CORE_READ_TOKEN: ${{ github.token }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+          GIT_CONFIG_COUNT: '3'
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: ''
+          GIT_CONFIG_KEY_1: credential.https://github.com.helper
+          GIT_CONFIG_VALUE_1: ${{ github.workspace }}/docker/core-credential-helper
+          GIT_CONFIG_KEY_2: credential.useHttpPath
+          GIT_CONFIG_VALUE_2: 'true'
+        run: |
+          current=$(python3 -I -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["tool"]["uv"]["sources"]["codify-core"]["rev"])')
+          sed -i "s/$current/$REVIEW_SHA/" pyproject.toml
+          uv lock
+          uv sync --frozen
+      - name: Platform's contract tests against this Core
+        if: env.PLATFORM_READ_TOKEN != ''
+        env:
+          CODIFY_DATA_ROOT: ${{ github.workspace }}/data
+        run: uv run --frozen pytest apps/api/tests/test_product_surface_manifest.py -q -p no:cacheprovider
