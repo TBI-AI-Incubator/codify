@@ -415,7 +415,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "bluebell-akn", specifier = ">=3.1" },
-    { name = "certifi", specifier = ">=2026.7" },
+    { name = "certifi", specifier = ">=2026.4" },
     { name = "cobalt", specifier = ">=9.0" },
     { name = "convertdate", specifier = ">=2.4.0" },
     { name = "cryptography", specifier = ">=50.0.0" },
