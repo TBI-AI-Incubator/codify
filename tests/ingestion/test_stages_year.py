@@ -23,6 +23,18 @@ def test_title_year_is_always_gregorian_even_when_calendar_is_local() -> None:
     assert gregorian_year(metadata, "", title="2023-Tariff-Schedule") == 2023
 
 
+def test_title_token_that_is_the_document_number_is_not_a_year() -> None:
+    meta = {"title": "Act No. 2010", "number": "2010"}
+    assert resolve_year(meta, "xe", title="Act No. 2010") == ""
+    assert gregorian_year(meta, "xe") is None
+
+
+def test_title_year_survives_a_different_document_number() -> None:
+    meta = {"title": "Finance Act 2010", "number": "12"}
+    assert resolve_year(meta, "xe", title="Finance Act 2010") == "2010"
+    assert gregorian_year(meta, "xe") == 2010
+
+
 def test_resolve_year_prefers_explicit_year() -> None:
     meta = {"year": "2021"}
     assert resolve_year(meta, "xe", title="2023-Tariff-Schedule") == "2021"

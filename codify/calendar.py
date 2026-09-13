@@ -252,6 +252,15 @@ def sole_year_token(raw: str) -> str:
     return runs[0] if len(runs) == 1 else ""
 
 
+def title_year_token(title: str, number: object = "") -> str:
+    """The title's one whole year run, or "" when the same digits are the
+    document number: "Act No. 2010" numbered 2010 names no year."""
+    token = sole_year_token(title)
+    if not reads_as_a_gregorian_year(token) or token == str(number or "").strip():
+        return ""
+    return token
+
+
 def reads_as_a_gregorian_year(value: str | int) -> bool:
     """A four-digit year in a range no era reaches. Japanese eras count to about
     64, so a number this size is a Gregorian year the model mislabelled, and

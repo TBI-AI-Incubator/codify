@@ -14,6 +14,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    title_year_token,
     year_from_calendar,
 )
 from codify.core.llm import LLMClient
@@ -192,8 +193,8 @@ def gregorian_year(
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     from_title = str(metadata.get("title") or "").strip() or title.strip()
     if not candidate and from_title:
-        title_year = sole_year_token(from_title)
-        if reads_as_a_gregorian_year(title_year):
+        title_year = title_year_token(from_title, metadata.get("number"))
+        if title_year:
             return int(title_year)
     if not candidate:
         return None

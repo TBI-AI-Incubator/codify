@@ -16,6 +16,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    title_year_token,
     to_gregorian_year,
     year_from_calendar,
 )
@@ -84,9 +85,7 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
         if "-" in raw_date:
             return raw_date.split("-")[0]
     if title:
-        candidate_from_title = sole_year_token(title)
-        if candidate_from_title and reads_as_a_gregorian_year(candidate_from_title):
-            return candidate_from_title
+        return title_year_token(title, metadata.get("number"))
     return ""
 
 
