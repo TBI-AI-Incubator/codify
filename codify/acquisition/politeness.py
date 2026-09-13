@@ -216,6 +216,8 @@ def client_tls_context() -> ssl.SSLContext:
     ctx = _NoAlpnContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.options |= default.options
     ctx.verify_flags = default.verify_flags
+    if default.keylog_filename:
+        ctx.keylog_filename = default.keylog_filename
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
