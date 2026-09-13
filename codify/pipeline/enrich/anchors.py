@@ -2153,7 +2153,13 @@ def _attachment_roman_markers(
     entry = next((e for e in levels if e.marker_form == "upper_roman_period"), None)
     if entry is None:
         return []
-    markers = list(re.finditer(r"(?m)^[^\S\n]{0,12}(?P<num>[A-Z]+)\.[^\S\n]+(?=\S)", text))
+    markers = list(
+        re.finditer(
+            r"(?m)^[^\S\n]{0,12}(?:\*\*)?(?P<num>[A-Z]+)(?:\*\*)?\."
+            r"(?:\*\*)?[^\S\n]+(?=\S)",
+            text,
+        )
+    )
     mask = _quote_mask(text, country)
     candidates = [m for m in markers if m.start() >= toc_end and not mask[m.start()]]
     barriers = [a.char_offset for a in known if a.kind == entry.akn_element]

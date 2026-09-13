@@ -175,7 +175,11 @@ def number_from_title(title: str) -> str:
 
 
 def gregorian_year(
-    metadata: dict[str, Any], country: str = "", *, legacy: bool = False
+    metadata: dict[str, Any],
+    country: str = "",
+    *,
+    legacy: bool = False,
+    title: str = "",
 ) -> int | None:
     """Best-effort Gregorian year from an `extract_metadata` result. Honours
     the detected `calendar` field; falls back to the raw year for Gregorian
@@ -186,10 +190,11 @@ def gregorian_year(
     raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
-    if not candidate:
-        title = str(metadata.get("title") or "").strip()
-        if title:
-            candidate = sole_year_token(title)
+    from_title = str(metadata.get("title") or "").strip() or title.strip()
+    if not candidate and from_title:
+        title_year = sole_year_token(from_title)
+        if reads_as_a_gregorian_year(title_year):
+            return int(title_year)
     if not candidate:
         return None
     if cal and cal != "gregorian":

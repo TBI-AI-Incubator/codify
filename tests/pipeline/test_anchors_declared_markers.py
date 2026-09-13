@@ -804,6 +804,24 @@ def test_outline_markers_tolerate_markdown_bold() -> None:
     assert m3 is not None and m3.group("num") == "3"
 
 
+def test_roman_outline_markers_tolerate_markdown_bold() -> None:
+    from codify.jurisdictions import HierarchyEntry
+    from codify.pipeline.enrich.anchors import _attachment_roman_markers
+
+    level = HierarchyEntry(
+        local_term="Unit",
+        akn_element="article",
+        level="basic",
+        bluebell_keyword="ARTICLE",
+        numbering="roman",
+        marker_form="upper_roman_period",
+    )
+    text = "**I.** First item\n**II**. Second item\n"
+    anchors = _attachment_roman_markers(text, [level], 0, "", [])
+
+    assert [anchor.number for anchor in anchors] == ["I", "II"]
+
+
 def test_line_anchored_boundary_rejects_midline_part_in_amendment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
