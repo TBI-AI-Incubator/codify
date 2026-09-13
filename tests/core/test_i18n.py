@@ -16,6 +16,8 @@ from codify.core.i18n import language_name_for, with_response_language
         ("ar", "Modern Standard Arabic"),
         ("ar-EG", "Modern Standard Arabic"),
         ("sr-Latn-RS", "Serbian in Latin script (never Cyrillic)"),
+        ("et-EE", "Estonian"),
+        ("et", "Estonian"),
         ("en-GB", None),
         ("en", None),
         ("xx-YY", None),

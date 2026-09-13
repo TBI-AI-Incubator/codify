@@ -561,7 +561,7 @@ def test_the_flagged_set_is_small_and_deliberate() -> None:
 
     registry = json.loads((JURISDICTIONS_DIR / "registry.json").read_text())
     flagged = sorted(j["code"] for j in registry["jurisdictions"] if j.get("public_reference"))
-    assert flagged == ["fi", "gb", "ie", "it", "nz"]
+    assert flagged == ["ee", "fi", "gb", "ie", "it", "nz"]
 
 
 def test_the_export_carries_a_filtered_registry(tmp_path, monkeypatch) -> None:
