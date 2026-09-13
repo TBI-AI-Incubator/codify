@@ -1,8 +1,8 @@
 """Synthetic regressions for Estonia acquisition and formatting."""
 
+import zipfile
 from datetime import date, timedelta
 from pathlib import Path
-import zipfile
 
 import pytest
 from lxml import etree
@@ -32,9 +32,7 @@ def archive(tmp_path: Path, xml: str) -> Path:
 @pytest.mark.parametrize("offset,expected", [(-1, 0), (0, 1), (1, 1)])
 def test_end_date_inclusive(tmp_path: Path, offset: int, expected: int) -> None:
     end = (date.today() + timedelta(days=offset)).isoformat()
-    result = build_ee_index(
-        archive(tmp_path, source(f"<kehtivuseLopp>{end}</kehtivuseLopp>"))
-    )
+    result = build_ee_index(archive(tmp_path, source(f"<kehtivuseLopp>{end}</kehtivuseLopp>")))
     assert len(result["entries"]) == expected
 
 
@@ -60,7 +58,10 @@ def test_normal_acquisition_loads_bundled_config() -> None:
 
 def test_nested_inline_text_and_tails() -> None:
     xml = source(
-        body="<paragrahv><paragrahvNr>1</paragrahvNr><sisuTekst><tavatekst>Start <b>bold <i>nested</i> tail</b> end</tavatekst></sisuTekst></paragrahv>"
+        body=(
+            "<paragrahv><paragrahvNr>1</paragrahvNr><sisuTekst><tavatekst>"
+            "Start <b>bold <i>nested</i> tail</b> end</tavatekst></sisuTekst></paragrahv>"
+        )
     )
     akn, _ = riigi_teataja_to_akn(xml)
     root = etree.fromstring(akn.encode())
@@ -79,7 +80,8 @@ def test_generation_date_comes_from_source() -> None:
 
 def test_constitution_chapter_identity() -> None:
     body = "".join(
-        f"<jagu><jaguNr>{n}</jaguNr><jaguPealkiri>Chapter {n}</jaguPealkiri><paragrahv><paragrahvNr>{n}</paragrahvNr></paragrahv></jagu>"
+        f"<jagu><jaguNr>{n}</jaguNr><jaguPealkiri>Chapter {n}</jaguPealkiri>"
+        f"<paragrahv><paragrahvNr>{n}</paragrahvNr></paragrahv></jagu>"
         for n in (1, 2)
     )
     akn, _ = riigi_teataja_to_akn(source(title="Synthetic põhiseadus", body=body))

@@ -2,6 +2,24 @@
   "_comment": "// GENERATED — do not edit by hand. Run `uv run python scripts/build_registry.py` after modifying per-jurisdiction configs.",
   "jurisdictions": [
     {
+      "code": "ee",
+      "name": "Estonia",
+      "type": "national",
+      "tradition": [
+        "civil_law"
+      ],
+      "languages": [
+        "est"
+      ],
+      "calendar": "gregorian",
+      "tier": 2,
+      "status": "draft",
+      "effective_tier": 2,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
       "code": "fi",
       "name": "Finland",
       "type": "national",
