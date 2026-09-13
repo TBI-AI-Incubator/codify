@@ -132,6 +132,26 @@ def test_standalone_builds_distinct_document_frequency(temp_db: str) -> None:
         engine.dispose()
 
 
+def test_backfill_uses_runtime_byte_limit(temp_db: str) -> None:
+    _prepare_pre_0019(temp_db)
+    accepted = ["a" * 128, "é" * 64]
+    long_token = "".join(uuid.uuid5(uuid.NAMESPACE_URL, str(i)).hex for i in range(256))
+    oversized = ["b" * 129, "é" * 65, long_token]
+    engine = create_engine(_sync(temp_db))
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("INSERT INTO public.provisions VALUES (:id, :tokens)"),
+                {"id": uuid.uuid4(), "tokens": " ".join([*accepted, *oversized])},
+            )
+        _run(temp_db, command.upgrade, _LEXICON)
+        with engine.connect() as conn:
+            terms = set(conn.execute(text("SELECT term FROM public.search_terms")).scalars())
+            assert terms == set(accepted)
+    finally:
+        engine.dispose()
+
+
 def test_product_before_0129_is_refused_without_advancing_core(temp_db: str) -> None:
     _prepare_pre_0019(temp_db)
     engine = create_engine(_sync(temp_db))

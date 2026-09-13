@@ -71,7 +71,7 @@ def upgrade() -> None:
         "INSERT INTO public.search_terms (term, ndoc) "
         "SELECT t.term, count(DISTINCT p.id) FROM public.provisions p, "
         "LATERAL unnest(string_to_array(p.search_tokens, ' ')) AS t(term) "
-        "WHERE p.search_tokens IS NOT NULL GROUP BY t.term"
+        "WHERE p.search_tokens IS NOT NULL AND octet_length(t.term) <= 128 GROUP BY t.term"
     )
 
 
