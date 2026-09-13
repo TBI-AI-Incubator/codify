@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import ssl
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -14,7 +15,7 @@ from cryptography.x509.oid import NameOID
 from codify.acquisition.politeness import client_tls_context
 
 
-def _server_context(tmp_path) -> ssl.SSLContext:  # type: ignore[no-untyped-def]
+def _self_signed_pem(tmp_path) -> Path:  # type: ignore[no-untyped-def]
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
     now = dt.datetime.now(dt.UTC)
@@ -26,6 +27,7 @@ def _server_context(tmp_path) -> ssl.SSLContext:  # type: ignore[no-untyped-def]
         .serial_number(x509.random_serial_number())
         .not_valid_before(now - dt.timedelta(minutes=1))
         .not_valid_after(now + dt.timedelta(hours=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
         .sign(key, hashes.SHA256())
     )
     pem = tmp_path / "srv.pem"
@@ -37,8 +39,12 @@ def _server_context(tmp_path) -> ssl.SSLContext:  # type: ignore[no-untyped-def]
         )
         + cert.public_bytes(serialization.Encoding.PEM)
     )
+    return pem
+
+
+def _server_context(tmp_path) -> ssl.SSLContext:  # type: ignore[no-untyped-def]
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ctx.load_cert_chain(pem)
+    ctx.load_cert_chain(_self_signed_pem(tmp_path))
     ctx.set_alpn_protocols(["h2", "http/1.1"])
     return ctx
 
@@ -80,3 +86,19 @@ def test_plain_context_control_offers_alpn(tmp_path) -> None:  # type: ignore[no
     client.verify_mode = ssl.CERT_NONE
     client.set_alpn_protocols(["http/1.1"])
     assert _handshake(server, client) == "http/1.1"
+
+
+def test_environment_trust_roots_are_honoured(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    pem = _self_signed_pem(tmp_path)
+    monkeypatch.setenv("SSL_CERT_FILE", str(pem))
+    monkeypatch.delenv("SSL_CERT_DIR", raising=False)
+    subjects = [c["subject"] for c in client_tls_context().get_ca_certs()]
+    assert ((("commonName", "localhost"),),) in subjects
+
+
+def test_default_trust_roots_are_certifi(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    monkeypatch.delenv("SSL_CERT_DIR", raising=False)
+    subjects = [c["subject"] for c in client_tls_context().get_ca_certs()]
+    assert ((("commonName", "localhost"),),) not in subjects
+    assert subjects

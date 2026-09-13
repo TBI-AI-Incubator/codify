@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import ssl
 import time
@@ -66,9 +67,7 @@ class _HostBucket:
     async def acquire(self) -> None:
         async with self._lock_for_loop():
             # Re-read after every sleep: a refusal on another request moves the deadline.
-            while (
-                wait := self.last_request_at + self.interval_s - time.monotonic()
-            ) > 0:
+            while (wait := self.last_request_at + self.interval_s - time.monotonic()) > 0:
                 await asyncio.sleep(wait)
             self.last_request_at = time.monotonic()
 
@@ -85,9 +84,7 @@ class _HostBucket:
         if retry_after is not None:
             self.interval_s = min(_MAX_INTERVAL_S, max(self.floor_s, retry_after))
         else:
-            self.interval_s = min(
-                _MAX_INTERVAL_S, self.interval_s * _BACKOFF_FACTOR + 0.5
-            )
+            self.interval_s = min(_MAX_INTERVAL_S, self.interval_s * _BACKOFF_FACTOR + 0.5)
         # The wait counts from the refusal, not from the request that drew it.
         self.last_request_at = time.monotonic()
         return self.interval_s
@@ -144,9 +141,7 @@ class _RobotsCache:
     def is_fresh(self, host: str) -> bool:
         """True when `allowed` would answer from the cache without a fetch."""
         cached = self.entries.get(host)
-        return (
-            cached is not None and (time.monotonic() - cached.cached_at) < cached.ttl_s
-        )
+        return cached is not None and (time.monotonic() - cached.cached_at) < cached.ttl_s
 
     async def allowed(self, client: httpx.AsyncClient, url: str, ua: str) -> bool:
         parsed = urlparse(url)
@@ -169,9 +164,7 @@ class _RobotsCache:
             return False
         return entry.parser.can_fetch(ua, url)
 
-    async def _fetch(
-        self, client: httpx.AsyncClient, scheme: str, host: str
-    ) -> _RobotsCacheEntry:
+    async def _fetch(self, client: httpx.AsyncClient, scheme: str, host: str) -> _RobotsCacheEntry:
         rp = robotparser.RobotFileParser()
         robots_url = f"{scheme}://{host}/robots.txt"
         now = time.monotonic()
@@ -223,7 +216,12 @@ def client_tls_context() -> ssl.SSLContext:
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.load_verify_locations(certifi.where())
+    # Same trust roots httpx would pick: the environment's, else certifi's.
+    cafile, capath = os.environ.get("SSL_CERT_FILE"), os.environ.get("SSL_CERT_DIR")
+    if cafile or capath:
+        ctx.load_verify_locations(cafile=cafile or None, capath=capath or None)
+    else:
+        ctx.load_verify_locations(cafile=certifi.where())
     return ctx
 
 
@@ -299,9 +297,7 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             raise failed
         return response
 
-    async def _send_pinned(
-        self, request: httpx.Request, address: str, host: str
-    ) -> httpx.Response:
+    async def _send_pinned(self, request: httpx.Request, address: str, host: str) -> httpx.Response:
         # A copy, so the caller's request keeps its hostname for its own retries.
         literal = f"[{address}]" if ":" in address else address
         pinned = httpx.Request(
@@ -311,9 +307,7 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             stream=request.stream,
             extensions={**request.extensions, "sni_hostname": host},
         )
-        pinned.headers["host"] = (
-            f"{host}:{request.url.port}" if request.url.port else host
-        )
+        pinned.headers["host"] = f"{host}:{request.url.port}" if request.url.port else host
         return await self._inner.handle_async_request(pinned)
 
     def _resolve(self, url: str) -> list[str]:
@@ -378,9 +372,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 # its turn in the bucket rather than riding ahead of the fetch.
                 if bucket is not None and not self._robots.is_fresh(host):
                     await bucket.acquire()
-                allowed = await self._robots.allowed(
-                    self._probe, url_str, self.profile.user_agent
-                )
+                allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
                 if not allowed:
                     # Explicit reason: a bare sentinel reads as a remote error.
                     return httpx.Response(
