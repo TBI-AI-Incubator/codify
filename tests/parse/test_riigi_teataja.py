@@ -323,6 +323,11 @@ def test_detector_does_not_relax_limits_for_unconfirmed_xml(source: bytes) -> No
     assert not is_riigi_teataja(source)
 
 
+def test_detector_bounds_an_oversized_xml_string_before_encoding() -> None:
+    source = "  <oigusakt xmlns='Juurakt'>" + "x" * 10_000_005
+    assert is_riigi_teataja(source)
+
+
 def test_riigi_teataja_constitution_mapping() -> None:
     ps_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <oigusakt id="test-ps-1" xmlns="Juurakt">

@@ -127,10 +127,12 @@ def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
             with source.open("rb") as stream:
                 prefix = stream.read(65536)
         elif isinstance(source, str):
-            stripped = source.strip()
-            if stripped.startswith("<"):
-                prefix = stripped.encode()[:65536]
+            prefix_text = source[:65536].lstrip()
+            if prefix_text.startswith("<"):
+                prefix = prefix_text.encode()
             else:
+                if len(source) > 4096 or "\n" in source or "\0" in source:
+                    return False
                 p = Path(source)
                 if p.exists():
                     with p.open("rb") as stream:
