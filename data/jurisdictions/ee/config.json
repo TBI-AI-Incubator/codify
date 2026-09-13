@@ -1,0 +1,336 @@
+{
+  "code": "ee",
+  "name": "Estonia",
+  "type": "national",
+  "tradition": [
+    "civil_law"
+  ],
+  "calendar": "gregorian",
+  "languages": [
+    "est"
+  ],
+  "authoritative_language": "est",
+  "document_classes": {
+    "act": {
+      "label": "Seadus (Act of the Riigikogu)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Osa",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic_period",
+          "note": "Highest division in large codes; '1. osa', '2. osa'. Not present in short acts."
+        },
+        {
+          "local_term": "Peatükk",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_period",
+          "note": "Primary grouping in most acts; '1. peatükk', '2. peatükk'"
+        },
+        {
+          "local_term": "Jagu",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_period",
+          "note": "Division below peatükk; '1. jagu'. Used in complex codes only. Maps to AKN section-as-higher-div."
+        },
+        {
+          "local_term": "Alljaotus / Alajagu",
+          "akn_element": "subsection",
+          "level": "higher",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_period",
+          "note": "Rare; subdivision of jagu in the most complex codes."
+        },
+        {
+          "local_term": "§ (Paragrahv)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "note": "Basic citable unit. Cited as '§ 5'. Continuous without restart per chapter. Insertion: § 51, § 52 (superscript in display)."
+        },
+        {
+          "local_term": "Lõige",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized",
+          "note": "Subdivisions of §. (1), (2), (3). Cited as '§ 5 lõige 1' or '§ 5 lg 1'."
+        },
+        {
+          "local_term": "Punkt",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "arabic_closing_paren",
+          "note": "Numbered items within lõige. 1), 2), 3). Cited as 'punkt 1' or 'p 1'."
+        },
+        {
+          "local_term": "Alapunkt",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "alpha_lower_closing_paren",
+          "note": "Lettered sub-items within punkt. a), b), c). Cited as 'alapunkt a'."
+        }
+      ],
+      "hcontainers": [],
+      "note": "Estonian § (paragrahv) maps to AKN article per German-tradition convention (same as LegalDocML.de). Jagu maps to AKN section used as a higher division, not the basic unit."
+    },
+    "constitution": {
+      "label": "Põhiseadus (Constitution)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Jagu (Constitutional chapter)",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman",
+          "note": "The Constitution uses 'jagu' (I–XV) where ordinary acts use 'peatükk'. Map to chapter here."
+        },
+        {
+          "local_term": "§ (Paragrahv)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous",
+          "note": "§ 1 through § 168, continuous without restart per chapter."
+        },
+        {
+          "local_term": "Lõige",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Punkt",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "arabic_closing_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Constitution uses 'jagu' (Roman-numbered) at the top level instead of 'peatükk'. Map to chapter. No osa or peatükk present."
+    },
+    "maarrus": {
+      "label": "Määrus (Government or Ministerial Regulation)",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Peatükk",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "arabic_period"
+        },
+        {
+          "local_term": "§ (Paragrahv)",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Lõige",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Punkt",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "arabic_closing_paren"
+        },
+        {
+          "local_term": "Alapunkt",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "numbering": "alpha_lower_closing_paren"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Government and ministerial regulations follow the same § convention. Issued under enabling provisions of parent acts."
+    }
+  },
+  "default_document_class": "act",
+  "frbr": {
+    "country_code": "ee",
+    "uri_patterns": {
+      "act": "/akn/ee/act/{year}/{number}",
+      "maarrus": "/akn/ee/act/maarrus/{year}/{number}",
+      "bill": "/akn/ee/bill/{year}/{number}",
+      "constitution": "/akn/ee/act/1992/pohiseadus"
+    },
+    "slug_convention": "estonian_short_title_romanised",
+    "romanisation": {
+      "ä": "a",
+      "ö": "o",
+      "ü": "u",
+      "õ": "o"
+    },
+    "date_calendar": "gregorian",
+    "rt_citation_format": "RT I, {DD.MM.YYYY}, {N}"
+  },
+  "numbering": {
+    "act_citation": "RT I, {date}, {number}",
+    "act_citation_alt": "{abbreviation}",
+    "insertion_style": "superscript_numeric",
+    "insertion_eid_style": "suffix_numeric",
+    "note": "No sequential act numbers. RT publication date + number is the formal identifier. Official abbreviations (TsÜS, KarS, TLS) used for practical citation."
+  },
+  "enacting_formulae": [
+    {
+      "text": "Vastu võetud {date}",
+      "position": "header_metadata",
+      "era": "current",
+      "from": "1992-06-28",
+      "note": "Adoption notice appears in Riigi Teataja header, not in body text. No body-text enacting formula in Estonian acts."
+    },
+    {
+      "text": "Vabariigi President kuulutab välja järgmise Riigikogu poolt vastu võetud seaduse:",
+      "position": "preamble",
+      "era": "current",
+      "from": "1992-06-28",
+      "note": "Presidential proclamation formula; may appear in formal document header but not in body. Omit from AKN body unless explicitly present in source."
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil_law",
+    "phrasing": "muudetakse ja sõnastatakse järgmiselt... täiendatakse §-ga... tunnistatakse kehtetuks",
+    "cross_reference_format": "short_title_and_rt",
+    "consolidation": "riigi_teataja_realtime",
+    "consolidation_url": "https://www.riigiteataja.ee/akt/{identifier}",
+    "note": "Riigi Teataja provides real-time consolidated versions. Each consolidation date maps to a FRBR Expression version. Amendment phrasing follows German model: replace text quoted in full."
+  },
+  "core_tlcs": [
+    {
+      "eId": "riigikogu",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/ee/riigikogu",
+      "showAs": "Riigikogu"
+    },
+    {
+      "eId": "valitsus",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/ee/vabariigi-valitsus",
+      "showAs": "Vabariigi Valitsus"
+    },
+    {
+      "eId": "president",
+      "class": "TLCRole",
+      "href": "/ontology/role/ee/president",
+      "showAs": "Vabariigi President"
+    },
+    {
+      "eId": "peaminister",
+      "class": "TLCRole",
+      "href": "/ontology/role/ee/peaminister",
+      "showAs": "Peaminister"
+    },
+    {
+      "eId": "minister",
+      "class": "TLCRole",
+      "href": "/ontology/role/ee/minister",
+      "showAs": "Minister"
+    },
+    {
+      "eId": "riigikohus",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/ee/riigikohus",
+      "showAs": "Riigikohus"
+    },
+    {
+      "eId": "oiguskantsler",
+      "class": "TLCRole",
+      "href": "/ontology/role/ee/oiguskantsler",
+      "showAs": "Õiguskantsler"
+    },
+    {
+      "eId": "riigiTeataja",
+      "class": "TLCObject",
+      "href": "/ontology/obj/ee/riigi-teataja",
+      "showAs": "Riigi Teataja"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_variant": null,
+    "prompt_additions": "Estonian § (paragrahv) maps to AKN article (same as German tradition). Lõige maps to AKN paragraph. Punkt maps to AKN point. Alapunkt maps to AKN indent. Peatükk maps to AKN chapter. Jagu maps to AKN section used as higher division. Estonian acts have NO body-text enacting formula — do not invent one. Begin the BODY directly with the first CHAPTER or ARTICLE. Insertion numbering for §§ uses plain numeric suffix: § 51 renders as art_51 in eIds."
+  },
+  "supranational_memberships": [
+    {
+      "body": "eu",
+      "direct_effect": "direct",
+      "superseded_subjects": [],
+      "note": "EU member since 2004. Regulations directly effective. Directives transposed. Use eu/ profile for EU instruments; link transposing ee/ acts to their Directive via <references>."
+    },
+    {
+      "body": "council-of-europe",
+      "direct_effect": "none",
+      "superseded_subjects": [],
+      "note": "ECHR applies. ECtHR judgments binding. No direct AKN scope impact."
+    },
+    {
+      "body": "un",
+      "direct_effect": "none"
+    },
+    {
+      "body": "nato",
+      "direct_effect": "none"
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "display": {
+    "heading_type": "inline",
+    "heading_case": "sentence_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "sans_serif",
+    "note": "Estonian headings use sentence case (first word capitalised only). Riigi Teataja renders headings inline with the § number. § symbol must be preserved in display."
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 0,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 0,
+    "note": "Public reference profile; synthetic XML controls do not certify corpus coverage."
+  },
+  "source_adapters": [
+    {
+      "name": "riigi_teataja_archive",
+      "kind": "bulk_xml_archive",
+      "url_template": "https://www.riigiteataja.ee/akt/{number}.xml",
+      "licence": "open_government"
+    }
+  ],
+  "tier": 2,
+  "status": "draft",
+  "public_reference": true
+}

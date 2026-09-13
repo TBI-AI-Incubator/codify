@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import zipfile
+from datetime import date
+from html import unescape
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -75,7 +77,9 @@ class EeDatadumpAcquirer(BaseAcquirer):
         super().__init__(adapter)
         env_archive = os.environ.get("EE_DATADUMP_ZIP")
         self._index_path = index_path or acquisition_index_path(self.JURISDICTION)
-        self._archive_path = archive_path or (Path(env_archive) if env_archive else None)
+        self._archive_path = archive_path or (
+            Path(env_archive) if env_archive else None
+        )
         self._index: dict[str, Any] | None = None
         self._zf: zipfile.ZipFile | None = None
 
@@ -83,7 +87,9 @@ class EeDatadumpAcquirer(BaseAcquirer):
         if self._index is not None:
             return self._index
         if not self._index_path.exists():
-            raise EeDatadumpIndexMissing(f"Estonian datadump index missing at {self._index_path}")
+            raise EeDatadumpIndexMissing(
+                f"Estonian datadump index missing at {self._index_path}"
+            )
         key = str(self._index_path)
         payload = _INDEX_CACHE.get(key)
         if payload is None:
@@ -113,7 +119,9 @@ class EeDatadumpAcquirer(BaseAcquirer):
             zf = _ZIP_CACHE.get(key)
             if zf is None:
                 if not self._archive_path.exists():
-                    raise FileNotFoundError(f"Estonian archive not found at {self._archive_path}")
+                    raise FileNotFoundError(
+                        f"Estonian archive not found at {self._archive_path}"
+                    )
                 zf = zipfile.ZipFile(self._archive_path)
                 _ZIP_CACHE[key] = zf
             self._zf = zf
@@ -131,14 +139,18 @@ class EeDatadumpAcquirer(BaseAcquirer):
             else:
                 wanted_title = ref.extra.get("title")
                 for k, v in entries.items():
-                    if isinstance(v, dict) and (v.get("title") == wanted_title or k == doc_id):
+                    if isinstance(v, dict) and (
+                        v.get("title") == wanted_title or k == doc_id
+                    ):
                         member = v.get("member")
                         doc_id = k
                         entry = v
                         break
 
         if not member:
-            raise EeDocNotInDump(f"Statute {ref.number!r} not in Estonian datadump index")
+            raise EeDocNotInDump(
+                f"Statute {ref.number!r} not in Estonian datadump index"
+            )
 
         archive = self._zip()
         try:
@@ -153,7 +165,11 @@ class EeDatadumpAcquirer(BaseAcquirer):
         if not slug and isinstance(entry, dict):
             slug = entry.get("slug")
         if not slug:
-            title = entry.get("title") if isinstance(entry, dict) else ref.extra.get("title") or ""
+            title = (
+                entry.get("title")
+                if isinstance(entry, dict)
+                else ref.extra.get("title") or ""
+            )
             slug = _romanise(title) if title else str(ref.number)
 
         doctype = ref.doctype
@@ -185,6 +201,7 @@ def build_ee_index(
     from datetime import UTC, datetime
 
     archive_path = Path(archive)
+    today = date.today()
     entries: dict[str, Any] = {}
     scanned = 0
     skipped = 0
@@ -201,34 +218,41 @@ def build_ee_index(
                     head = f.read(3000).decode("utf-8", errors="ignore")
 
                     m_liik = re.search(r"<dokumentLiik>(.*?)</dokumentLiik>", head)
-                    liik = m_liik.group(1).strip().lower() if m_liik else ""
+                    liik = unescape(m_liik.group(1)).strip().lower() if m_liik else ""
                     if liik not in ("seadus", "määrus", "põhiseadus"):
                         skipped += 1
                         continue
 
                     m_valj = re.search(r"<valjaandja>(.*?)</valjaandja>", head)
-                    valj = m_valj.group(1).strip() if m_valj else ""
+                    valj = unescape(m_valj.group(1)).strip() if m_valj else ""
                     if "volikogu" in valj.lower():
                         skipped += 1
                         continue
 
                     m_lopp = re.search(r"<kehtivuseLopp>(.*?)</kehtivuseLopp>", head)
-                    if m_lopp is not None:
+                    if (
+                        m_lopp is not None
+                        and date.fromisoformat(m_lopp.group(1).strip()[:10]) < today
+                    ):
                         skipped += 1
                         continue
 
                     m_title = re.search(r"<pealkiri>(.*?)</pealkiri>", head)
-                    title = m_title.group(1).strip() if m_title else ""
+                    title = unescape(m_title.group(1)).strip() if m_title else ""
                     if not title:
                         skipped += 1
                         continue
 
                     m_lyhend = re.search(r"<lyhend>(.*?)</lyhend>", head)
-                    lyhend = m_lyhend.group(1).strip() if m_lyhend else ""
+                    lyhend = unescape(m_lyhend.group(1)).strip() if m_lyhend else ""
                     slug = _romanise(lyhend or title)
 
                     m_id = re.search(r"<globaalID>(.*?)</globaalID>", head)
-                    doc_id = m_id.group(1).strip() if m_id else n.replace(".xml", "")
+                    doc_id = (
+                        unescape(m_id.group(1)).strip()
+                        if m_id
+                        else n.replace(".xml", "")
+                    )
 
                     m_date = re.search(
                         r"<(?:aktikuupaev|avaldamineKuupaev)>(\d{4}-\d{2}-\d{2})", head
@@ -273,9 +297,14 @@ def build_ee_index(
             if on_progress is not None and scanned % 10000 == 0:
                 on_progress(scanned, total, len(entries))
 
+    try:
+        portable_archive = str(archive_path.absolute().relative_to(Path.cwd()))
+    except ValueError:
+        portable_archive = str(archive_path)
+
     return {
         "generated_at": datetime.now(UTC).isoformat(),
-        "archive": str(archive_path),
+        "archive": portable_archive,
         "language": "est",
         "stats": {
             "files_scanned": scanned,
