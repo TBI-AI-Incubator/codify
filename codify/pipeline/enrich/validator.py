@@ -44,6 +44,7 @@ logger = structlog.get_logger()
 def validate_akn(
     akn_xml: str,
     *,
+    huge_tree: bool = False,
     expected_anchor_summary: dict[str, int] | None = None,
     expected_cover_article_numbers: list[int] | None = None,
     source_text: str | None = None,
@@ -71,7 +72,7 @@ def validate_akn(
     with no provision to hold it. ``container_coverage`` the guarded heading-vs-container
     probe ({present, found}); below-floor means the structurer flattened a grouping level.
     """
-    root = parse_xml(akn_xml)
+    root = parse_xml(akn_xml, huge_tree=huge_tree)
     issues: list[dict[str, Any]] = []
 
     issues.extend(_check_eid_uniqueness(root))

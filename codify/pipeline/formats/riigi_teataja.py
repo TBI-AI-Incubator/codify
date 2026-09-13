@@ -122,22 +122,33 @@ def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
         if isinstance(source, etree._Element):
             root = source
         elif isinstance(source, bytes):
-            root = parse_xml(source, huge_tree=True)
+            prefix = source[:65536]
         elif isinstance(source, Path):
-            root = parse_xml(source.read_bytes(), huge_tree=True)
+            with source.open("rb") as stream:
+                prefix = stream.read(65536)
         elif isinstance(source, str):
             stripped = source.strip()
             if stripped.startswith("<"):
-                root = parse_xml(stripped.encode(), huge_tree=True)
+                prefix = stripped.encode()[:65536]
             else:
                 p = Path(source)
                 if p.exists():
-                    root = parse_xml(p.read_bytes(), huge_tree=True)
+                    with p.open("rb") as stream:
+                        prefix = stream.read(65536)
                 else:
                     return False
         else:
             return False
-        return bool(etree.QName(root).localname == "oigusakt")
+        if not isinstance(source, etree._Element):
+            if b"<!doctype" in prefix.lower():
+                return False
+            parser = etree.XMLPullParser(
+                events=("start",), resolve_entities=False, load_dtd=False, no_network=True
+            )
+            parser.feed(prefix)
+            _event, root = next(parser.read_events())
+        name = etree.QName(root)
+        return bool(name.localname == "oigusakt" and name.namespace == "Juurakt")
     except Exception:
         return False
 
@@ -815,8 +826,11 @@ async def ingest(
             return
 
         # Pipeline validator findings
+        def _run_validator_huge(xml: str) -> list[dict[str, Any]]:
+            return run_validator(xml, huge_tree=True)
+
         try:
-            for issue in await _on_the_cpu_pool(run_validator, akn_xml):
+            for issue in await _on_the_cpu_pool(_run_validator_huge, akn_xml):
                 yield ValidationIssued(issue=issue)
         except Exception as exc:
             logger.warning("validator_failed", error=str(exc))
