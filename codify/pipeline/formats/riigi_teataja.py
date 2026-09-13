@@ -205,9 +205,7 @@ def _serialize_inline(src_node: etree._Element, parent_akn: etree._Element) -> N
                 _append_text(parent_akn, _clean_tail(child.tail))
 
 
-def _convert_paragrahv(
-    p_src: etree._Element, parent_akn: etree._Element, parent_eid: str
-) -> None:
+def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
     p_nr = _extract_number(p_src.find("{*}paragrahvNr"))
     p_eid = f"{parent_eid}__art_{p_nr}" if parent_eid else f"art_{p_nr}"
     art = etree.SubElement(parent_akn, _q("article"), eId=p_eid, wId=p_eid)
@@ -243,9 +241,7 @@ def _convert_paragrahv(
         return
 
     # Single unnumbered loige: collapse only if it has NO sub-items (alampunkt)
-    single_unnumbered = (
-        len(loiked) == 1 and not (loiked[0].findtext("{*}loigeNr") or "").strip()
-    )
+    single_unnumbered = len(loiked) == 1 and not (loiked[0].findtext("{*}loigeNr") or "").strip()
     single_has_points = single_unnumbered and bool(loiked[0].findall("{*}alampunkt"))
 
     if single_unnumbered and not single_has_points:
@@ -261,11 +257,7 @@ def _convert_paragrahv(
 
     for l_idx, loige_el in enumerate(loiked, start=1):
         raw_l_nr = loige_el.find("{*}loigeNr")
-        l_nr = (
-            _extract_number(raw_l_nr, default=str(l_idx))
-            if not single_unnumbered
-            else "1"
-        )
+        l_nr = _extract_number(raw_l_nr, default=str(l_idx)) if not single_unnumbered else "1"
         l_eid = f"{p_eid}__para_{l_nr}"
         para = etree.SubElement(art, _q("paragraph"), eId=l_eid, wId=l_eid)
 
@@ -309,9 +301,7 @@ def _convert_paragrahv(
                     p.text = _clean_text(st)
 
 
-def _convert_jaotis(
-    jt_src: etree._Element, parent_akn: etree._Element, parent_eid: str
-) -> None:
+def _convert_jaotis(jt_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
     raw_nr = jt_src.find("{*}jaotisNr")
     if raw_nr is None:
         raw_nr = jt_src.find("{*}alljaotisNr")
@@ -337,9 +327,7 @@ def _convert_jaotis(
             _convert_jaotis(child, subsec, jt_eid)
 
 
-def _convert_jagu(
-    j_src: etree._Element, parent_akn: etree._Element, parent_eid: str
-) -> None:
+def _convert_jagu(j_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
     raw_nr = j_src.find("{*}jaguNr")
     j_nr = _extract_number(raw_nr)
     j_eid = f"{parent_eid}__sec_{j_nr}" if parent_eid else f"sec_{j_nr}"
@@ -394,9 +382,7 @@ def _convert_peatykk(
     return chp, c_eid
 
 
-def _convert_osa(
-    o_src: etree._Element, parent_akn: etree._Element
-) -> tuple[etree._Element, str]:
+def _convert_osa(o_src: etree._Element, parent_akn: etree._Element) -> tuple[etree._Element, str]:
     raw_nr = o_src.find("{*}osaNr")
     o_nr = _extract_number(raw_nr)
     o_eid = f"part_{o_nr}"
@@ -437,14 +423,10 @@ def riigi_teataja_to_akn(
     root = parse_xml(source_xml)
     meta = root.find("{*}metaandmed")
 
-    title = (
-        root.findtext(".//{*}pealkiri") or root.findtext(".//{*}aktinimi") or "Seadus"
-    )
+    title = root.findtext(".//{*}pealkiri") or root.findtext(".//{*}aktinimi") or "Seadus"
     title = " ".join(title.split())
 
-    d_type_raw = (
-        meta.findtext("{*}dokumentLiik") if meta is not None else ""
-    ) or "seadus"
+    d_type_raw = (meta.findtext("{*}dokumentLiik") if meta is not None else "") or "seadus"
     d_type_raw = d_type_raw.lower().strip()
 
     short_title = (meta.findtext("{*}lyhend") if meta is not None else "") or title
@@ -453,10 +435,7 @@ def riigi_teataja_to_akn(
     is_constitution = (
         d_type_raw == "põhiseadus"
         or "põhiseadus" in title.lower()
-        or (
-            meta is not None
-            and (meta.findtext("{*}lyhend") or "").strip().lower() == "ps"
-        )
+        or (meta is not None and (meta.findtext("{*}lyhend") or "").strip().lower() == "ps")
     )
     if is_constitution:
         doctype = "constitution"
@@ -540,9 +519,7 @@ def riigi_teataja_to_akn(
     f_work = etree.SubElement(ident, _q("FRBRWork"))
     etree.SubElement(f_work, _q("FRBRthis"), value=work_uri)
     etree.SubElement(f_work, _q("FRBRuri"), value=work_uri)
-    etree.SubElement(
-        f_work, _q("FRBRdate"), date=enactment_date or primary_date, name="enacted"
-    )
+    etree.SubElement(f_work, _q("FRBRdate"), date=enactment_date or primary_date, name="enacted")
     etree.SubElement(f_work, _q("FRBRauthor"), href=f"#{author_id}")
     etree.SubElement(f_work, _q("FRBRcountry"), value="ee")
 
@@ -632,9 +609,7 @@ def riigi_teataja_to_akn(
             elif ctag == "peatykk":
                 current_osa_akn = None
                 current_osa_eid = ""
-                current_peatykk_akn, current_peatykk_eid = _convert_peatykk(
-                    child, body, ""
-                )
+                current_peatykk_akn, current_peatykk_eid = _convert_peatykk(child, body, "")
             elif ctag == "jagu":
                 target_parent = (
                     current_peatykk_akn
@@ -701,14 +676,8 @@ def riigi_teataja_to_akn(
                 )
                 direct_st_counts[target_eid] += 1
                 st_count = direct_st_counts[target_eid]
-                p_eid = (
-                    f"{target_eid}__para_{st_count}"
-                    if target_eid
-                    else f"para_{st_count}"
-                )
-                para = etree.SubElement(
-                    target_parent, _q("paragraph"), eId=p_eid, wId=p_eid
-                )
+                p_eid = f"{target_eid}__para_{st_count}" if target_eid else f"para_{st_count}"
+                para = etree.SubElement(target_parent, _q("paragraph"), eId=p_eid, wId=p_eid)
                 c_el = etree.SubElement(para, _q("content"))
                 p_el = etree.SubElement(c_el, _q("p"), eId=f"{p_eid}__p_1")
                 if ctag == "sisuTekst":
@@ -717,9 +686,7 @@ def riigi_teataja_to_akn(
                         p_el.text = _clean_text(child)
                 else:
                     raw_html = child.text or ""
-                    p_el.text = " ".join(
-                        re.sub(r"<[^>]+>", " ", unescape(raw_html)).split()
-                    )
+                    p_el.text = " ".join(re.sub(r"<[^>]+>", " ", unescape(raw_html)).split())
 
     # Attachments
     lisad = root.findall(".//{*}lisaViide") + root.findall(".//{*}lisa")
@@ -734,18 +701,14 @@ def riigi_teataja_to_akn(
             lisa_title = _clean_text(lp_el) if lp_el is not None else ""
             if not lisa_title:
                 fn_el = lisa.find(".//{*}fail")
-                lisa_title = (
-                    fn_el.get("failNimi") if fn_el is not None else ""
-                ) or f"Lisa {l_idx}"
+                lisa_title = (fn_el.get("failNimi") if fn_el is not None else "") or f"Lisa {l_idx}"
             heading_el = etree.SubElement(att, _q("heading"))
             heading_el.text = lisa_title
 
             doc_att = etree.SubElement(att, _q("doc"), name=f"lisa_{l_idx}")
 
             doc_meta = etree.SubElement(doc_att, _q("meta"))
-            doc_ident = etree.SubElement(
-                doc_meta, _q("identification"), source="#codify"
-            )
+            doc_ident = etree.SubElement(doc_meta, _q("identification"), source="#codify")
             f_w = etree.SubElement(doc_ident, _q("FRBRWork"))
             etree.SubElement(f_w, _q("FRBRthis"), value=f"{work_uri}/!{att_eid}")
             etree.SubElement(f_w, _q("FRBRuri"), value=work_uri)
@@ -779,9 +742,7 @@ def riigi_teataja_to_akn(
             fail_el = lisa.find(".//{*}fail")
             fail_nimi = fail_el.get("failNimi") if fail_el is not None else None
             if fail_nimi and akt_viide:
-                ref_link = (
-                    f"https://www.riigiteataja.ee/aktilisa/{akt_viide}/{fail_nimi}"
-                )
+                ref_link = f"https://www.riigiteataja.ee/aktilisa/{akt_viide}/{fail_nimi}"
                 ref = etree.SubElement(lisa_p, _q("ref"), href=ref_link)
                 ref.text = f"{lisa_title} ({fail_nimi})"
             else:
@@ -789,9 +750,9 @@ def riigi_teataja_to_akn(
 
     raw_xml_out = cast(
         str,
-        etree.tostring(
-            akn_root, pretty_print=True, xml_declaration=True, encoding="utf-8"
-        ).decode("utf-8"),
+        etree.tostring(akn_root, pretty_print=True, xml_declaration=True, encoding="utf-8").decode(
+            "utf-8"
+        ),
     )
     unique_xml, _ = ensure_unique_eids(raw_xml_out)
 
@@ -808,9 +769,7 @@ def riigi_teataja_to_akn(
             "name": rt_osa or "RT I",
             "date": publication_date or primary_date,
             "number": rt_art or number,
-            "year": int(publication_date.split("-")[0])
-            if publication_date
-            else int(year),
+            "year": int(publication_date.split("-")[0]) if publication_date else int(year),
         },
     }
 
@@ -849,9 +808,7 @@ async def ingest(
             await _on_the_cpu_pool(validate_akn, akn_xml)
         except Exception as exc:
             logger.warning("akn_schema_validation_failed", error=str(exc))
-            yield Failed(
-                stage="schema_validation", error=f"{type(exc).__name__}: {exc}"
-            )
+            yield Failed(stage="schema_validation", error=f"{type(exc).__name__}: {exc}")
             return
 
         # Pipeline validator findings
