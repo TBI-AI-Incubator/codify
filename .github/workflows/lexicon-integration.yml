@@ -1,0 +1,37 @@
+name: Lexicon integration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lexicon-integration.yml'
+      - 'codify/migrations/**'
+      - 'tests/test_core_migration_0019_lexicon.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lexicon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTGRES_URL: postgresql://codify:codify@localhost:5432/codify
+      REQUIRE_DB: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      - run: uv sync --frozen --group dev --extra migrations
+      - name: start disposable database
+        run: docker compose up --build -d --wait postgres
+      - name: migrate database
+        run: uv run --frozen alembic -c alembic.ini upgrade head
+      - name: test lexicon ownership and backfill
+        run: uv run --frozen pytest tests/test_core_migration_0019_lexicon.py -q
+      - name: stop disposable database
+        if: always()
+        run: docker compose down --volumes
