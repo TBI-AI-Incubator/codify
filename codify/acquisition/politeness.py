@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
+import ssl
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -13,6 +15,7 @@ from email.utils import parsedate_to_datetime
 from urllib import robotparser
 from urllib.parse import urlparse
 
+import certifi
 import httpx
 import structlog
 
@@ -197,6 +200,37 @@ def _replayable(request: httpx.Request) -> bool:
     return "transfer-encoding" not in request.headers
 
 
+class _NoAlpnContext(ssl.SSLContext):
+    """A client context whose handshake never offers ALPN.
+
+    A library-shaped ALPN offer is a bot signature some edges refuse outright;
+    with no offer the server serves HTTP/1.1 as it does to any plain client.
+    """
+
+    def set_alpn_protocols(self, alpn_protocols: object) -> None:
+        return None
+
+
+def client_tls_context() -> ssl.SSLContext:
+    default = ssl.create_default_context()
+    ctx = _NoAlpnContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.options |= default.options
+    ctx.verify_flags = default.verify_flags
+    if default.keylog_filename:
+        ctx.keylog_filename = default.keylog_filename
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    # Same trust roots httpx would pick: SSL_CERT_FILE, else SSL_CERT_DIR, else certifi.
+    if cafile := os.environ.get("SSL_CERT_FILE"):
+        ctx.load_verify_locations(cafile=cafile)
+    elif capath := os.environ.get("SSL_CERT_DIR"):
+        ctx.load_verify_locations(capath=capath)
+    else:
+        ctx.load_verify_locations(cafile=certifi.where())
+    return ctx
+
+
 class GuardedTransport(httpx.AsyncBaseTransport):
     """Resolve once, refuse private addresses, connect to the address checked.
 
@@ -242,7 +276,10 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
                 failed = exc
                 logger.warning(
-                    "guard_connect_failed", host=host, address=address, error=str(exc)[:120]
+                    "guard_connect_failed",
+                    host=host,
+                    address=address,
+                    error=str(exc)[:120],
                 )
                 if index < last:
                     logger.warning(
@@ -307,7 +344,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         # Guarded at the transport seam so the robots probe, the redirect
         # hops and the main request all share one check.
         self._inner = GuardedTransport(
-            inner or httpx.AsyncHTTPTransport(),
+            inner or httpx.AsyncHTTPTransport(verify=client_tls_context()),
             resolver=resolver,
             before_retry=self._take_token,
         )
@@ -377,7 +414,10 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 if bucket is None:
                     # No configured pace to adapt: exponential with full jitter.
                     jitter = random.uniform(0, 2**attempt)  # noqa: S311
-                    wait = min(retry_after if retry_after is not None else jitter, _MAX_BACKOFF_S)
+                    wait = min(
+                        retry_after if retry_after is not None else jitter,
+                        _MAX_BACKOFF_S,
+                    )
                 else:
                     wait = bucket.record_backoff(retry_after)
                 logger.warning(
@@ -448,6 +488,7 @@ def make_polite_client(
 
 __all__ = [
     "EtagLookup",
+    "client_tls_context",
     "PoliteTransport",
     "SSRFBlocked",
     "host_bucket",
