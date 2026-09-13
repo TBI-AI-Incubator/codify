@@ -14,43 +14,61 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      PLATFORM_READ_TOKEN: ${{ secrets.PLATFORM_READ_TOKEN }}
     steps:
-      - name: skip without a Platform read token
-        if: env.PLATFORM_READ_TOKEN == ''
-        run: echo "::notice ::PLATFORM_READ_TOKEN is not set; the downstream contract check did not run"
+      # The secret is read here only; the steps that build and import the
+      # reviewed code run with no credential in their environment.
+      - name: gate on the Platform read token
+        id: gate
+        env:
+          TOKEN: ${{ secrets.PLATFORM_READ_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice ::PLATFORM_READ_TOKEN is not set; the downstream contract check did not run"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.PLATFORM_READ_TOKEN != ''
+        if: steps.gate.outputs.run == 'true'
         with:
           repository: TBI-AI-Incubator/codify-platform
           ref: main
           token: ${{ secrets.PLATFORM_READ_TOKEN }}
           persist-credentials: false
+      # The reviewed revision is fetched by a trusted step and served to uv from
+      # a local bare mirror, so the resolver needs no credential at all.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.run == 'true'
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: core-src
+          persist-credentials: false
+      - name: serve the reviewed revision from a local mirror
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mirror=$(mktemp -d "$RUNNER_TEMP/core-source.XXXXXX")
+          git clone -q --bare core-src "$mirror"
+          rm -rf core-src
+          {
+            echo 'GIT_CONFIG_COUNT=1'
+            echo "GIT_CONFIG_KEY_0=url.file://$mirror.insteadOf"
+            echo 'GIT_CONFIG_VALUE_0=https://github.com/TBI-AI-Incubator/codify.git'
+          } >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        if: env.PLATFORM_READ_TOKEN != ''
+        if: steps.gate.outputs.run == 'true'
         with:
           python-version: '3.12'
-      - name: pin Platform at the change under review and install
-        if: env.PLATFORM_READ_TOKEN != ''
+      - name: pin Platform at the reviewed revision and install
+        if: steps.gate.outputs.run == 'true'
         env:
-          # Platform's helper answers Git's credential prompt for this repository only.
-          CODIFY_CORE_READ_TOKEN: ${{ github.token }}
           REVIEW_SHA: ${{ github.event.pull_request.head.sha }}
-          GIT_CONFIG_COUNT: '3'
-          GIT_CONFIG_KEY_0: credential.helper
-          GIT_CONFIG_VALUE_0: ''
-          GIT_CONFIG_KEY_1: credential.https://github.com.helper
-          GIT_CONFIG_VALUE_1: ${{ github.workspace }}/docker/core-credential-helper
-          GIT_CONFIG_KEY_2: credential.useHttpPath
-          GIT_CONFIG_VALUE_2: 'true'
         run: |
           current=$(python3 -I -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["tool"]["uv"]["sources"]["codify-core"]["rev"])')
           sed -i "s/$current/$REVIEW_SHA/" pyproject.toml
           uv lock
           uv sync --frozen
       - name: Platform's contract tests against this Core
-        if: env.PLATFORM_READ_TOKEN != ''
+        if: steps.gate.outputs.run == 'true'
         env:
           CODIFY_DATA_ROOT: ${{ github.workspace }}/data
         run: uv run --frozen pytest apps/api/tests/test_product_surface_manifest.py -q -p no:cacheprovider
