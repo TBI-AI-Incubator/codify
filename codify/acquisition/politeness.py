@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+import ssl
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -13,6 +14,7 @@ from email.utils import parsedate_to_datetime
 from urllib import robotparser
 from urllib.parse import urlparse
 
+import certifi
 import httpx
 import structlog
 
@@ -64,7 +66,9 @@ class _HostBucket:
     async def acquire(self) -> None:
         async with self._lock_for_loop():
             # Re-read after every sleep: a refusal on another request moves the deadline.
-            while (wait := self.last_request_at + self.interval_s - time.monotonic()) > 0:
+            while (
+                wait := self.last_request_at + self.interval_s - time.monotonic()
+            ) > 0:
                 await asyncio.sleep(wait)
             self.last_request_at = time.monotonic()
 
@@ -81,7 +85,9 @@ class _HostBucket:
         if retry_after is not None:
             self.interval_s = min(_MAX_INTERVAL_S, max(self.floor_s, retry_after))
         else:
-            self.interval_s = min(_MAX_INTERVAL_S, self.interval_s * _BACKOFF_FACTOR + 0.5)
+            self.interval_s = min(
+                _MAX_INTERVAL_S, self.interval_s * _BACKOFF_FACTOR + 0.5
+            )
         # The wait counts from the refusal, not from the request that drew it.
         self.last_request_at = time.monotonic()
         return self.interval_s
@@ -138,7 +144,9 @@ class _RobotsCache:
     def is_fresh(self, host: str) -> bool:
         """True when `allowed` would answer from the cache without a fetch."""
         cached = self.entries.get(host)
-        return cached is not None and (time.monotonic() - cached.cached_at) < cached.ttl_s
+        return (
+            cached is not None and (time.monotonic() - cached.cached_at) < cached.ttl_s
+        )
 
     async def allowed(self, client: httpx.AsyncClient, url: str, ua: str) -> bool:
         parsed = urlparse(url)
@@ -161,7 +169,9 @@ class _RobotsCache:
             return False
         return entry.parser.can_fetch(ua, url)
 
-    async def _fetch(self, client: httpx.AsyncClient, scheme: str, host: str) -> _RobotsCacheEntry:
+    async def _fetch(
+        self, client: httpx.AsyncClient, scheme: str, host: str
+    ) -> _RobotsCacheEntry:
         rp = robotparser.RobotFileParser()
         robots_url = f"{scheme}://{host}/robots.txt"
         now = time.monotonic()
@@ -195,6 +205,26 @@ def _replayable(request: httpx.Request) -> bool:
     if request.headers.get("content-length", "0") != "0":
         return False
     return "transfer-encoding" not in request.headers
+
+
+class _NoAlpnContext(ssl.SSLContext):
+    """A client context whose handshake never offers ALPN.
+
+    A library-shaped ALPN offer is a bot signature some edges refuse outright;
+    with no offer the server serves HTTP/1.1 as it does to any plain client.
+    """
+
+    def set_alpn_protocols(self, alpn_protocols: object) -> None:
+        return None
+
+
+def client_tls_context() -> ssl.SSLContext:
+    ctx = _NoAlpnContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.check_hostname = True
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx.load_verify_locations(certifi.where())
+    return ctx
 
 
 class GuardedTransport(httpx.AsyncBaseTransport):
@@ -242,7 +272,10 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
                 failed = exc
                 logger.warning(
-                    "guard_connect_failed", host=host, address=address, error=str(exc)[:120]
+                    "guard_connect_failed",
+                    host=host,
+                    address=address,
+                    error=str(exc)[:120],
                 )
                 if index < last:
                     logger.warning(
@@ -266,7 +299,9 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             raise failed
         return response
 
-    async def _send_pinned(self, request: httpx.Request, address: str, host: str) -> httpx.Response:
+    async def _send_pinned(
+        self, request: httpx.Request, address: str, host: str
+    ) -> httpx.Response:
         # A copy, so the caller's request keeps its hostname for its own retries.
         literal = f"[{address}]" if ":" in address else address
         pinned = httpx.Request(
@@ -276,7 +311,9 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             stream=request.stream,
             extensions={**request.extensions, "sni_hostname": host},
         )
-        pinned.headers["host"] = f"{host}:{request.url.port}" if request.url.port else host
+        pinned.headers["host"] = (
+            f"{host}:{request.url.port}" if request.url.port else host
+        )
         return await self._inner.handle_async_request(pinned)
 
     def _resolve(self, url: str) -> list[str]:
@@ -307,7 +344,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         # Guarded at the transport seam so the robots probe, the redirect
         # hops and the main request all share one check.
         self._inner = GuardedTransport(
-            inner or httpx.AsyncHTTPTransport(),
+            inner or httpx.AsyncHTTPTransport(verify=client_tls_context()),
             resolver=resolver,
             before_retry=self._take_token,
         )
@@ -341,7 +378,9 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 # its turn in the bucket rather than riding ahead of the fetch.
                 if bucket is not None and not self._robots.is_fresh(host):
                     await bucket.acquire()
-                allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
+                allowed = await self._robots.allowed(
+                    self._probe, url_str, self.profile.user_agent
+                )
                 if not allowed:
                     # Explicit reason: a bare sentinel reads as a remote error.
                     return httpx.Response(
@@ -377,7 +416,10 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 if bucket is None:
                     # No configured pace to adapt: exponential with full jitter.
                     jitter = random.uniform(0, 2**attempt)  # noqa: S311
-                    wait = min(retry_after if retry_after is not None else jitter, _MAX_BACKOFF_S)
+                    wait = min(
+                        retry_after if retry_after is not None else jitter,
+                        _MAX_BACKOFF_S,
+                    )
                 else:
                     wait = bucket.record_backoff(retry_after)
                 logger.warning(
@@ -448,6 +490,7 @@ def make_polite_client(
 
 __all__ = [
     "EtagLookup",
+    "client_tls_context",
     "PoliteTransport",
     "SSRFBlocked",
     "host_bucket",
