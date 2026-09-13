@@ -48,6 +48,7 @@ CORE_TABLES = frozenset(
         "page_reads",
         "sections",
         "provisions",
+        "search_terms",
         "cross_references",
         "goods_code_references",
         "annex_rows",
