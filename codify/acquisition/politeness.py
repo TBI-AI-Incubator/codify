@@ -212,14 +212,18 @@ class _NoAlpnContext(ssl.SSLContext):
 
 
 def client_tls_context() -> ssl.SSLContext:
+    default = ssl.create_default_context()
     ctx = _NoAlpnContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.options |= default.options
+    ctx.verify_flags = default.verify_flags
     ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
-    # Same trust roots httpx would pick: the environment's, else certifi's.
-    cafile, capath = os.environ.get("SSL_CERT_FILE"), os.environ.get("SSL_CERT_DIR")
-    if cafile or capath:
-        ctx.load_verify_locations(cafile=cafile or None, capath=capath or None)
+    # Same trust roots httpx would pick: SSL_CERT_FILE, else SSL_CERT_DIR, else certifi.
+    if cafile := os.environ.get("SSL_CERT_FILE"):
+        ctx.load_verify_locations(cafile=cafile)
+    elif capath := os.environ.get("SSL_CERT_DIR"):
+        ctx.load_verify_locations(capath=capath)
     else:
         ctx.load_verify_locations(cafile=certifi.where())
     return ctx

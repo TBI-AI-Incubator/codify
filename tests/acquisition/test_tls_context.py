@@ -102,3 +102,19 @@ def test_default_trust_roots_are_certifi(monkeypatch) -> None:  # type: ignore[n
     subjects = [c["subject"] for c in client_tls_context().get_ca_certs()]
     assert ((("commonName", "localhost"),),) not in subjects
     assert subjects
+
+
+def test_verification_matches_the_runtime_default() -> None:
+    default = ssl.create_default_context()
+    ctx = client_tls_context()
+    assert ctx.verify_flags == default.verify_flags
+    assert ctx.options & default.options == default.options
+    assert (ctx.check_hostname, ctx.verify_mode) == (True, ssl.CERT_REQUIRED)
+
+
+def test_cert_file_wins_over_cert_dir(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    pem = _self_signed_pem(tmp_path)
+    monkeypatch.setenv("SSL_CERT_FILE", str(pem))
+    monkeypatch.setenv("SSL_CERT_DIR", str(tmp_path))
+    subjects = [c["subject"] for c in client_tls_context().get_ca_certs()]
+    assert subjects == [((("commonName", "localhost"),),)]
