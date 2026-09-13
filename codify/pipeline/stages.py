@@ -16,6 +16,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    title_year_token,
     to_gregorian_year,
     year_from_calendar,
 )
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-def resolve_year(metadata: dict[str, Any], country: str) -> str:
+def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> str:
     """Resolve a Gregorian year for FRBR URI use. Converts non-Gregorian
     years when the metadata's `calendar` field flags one."""
     raw_year = str(metadata.get("year") or "")
@@ -83,6 +84,8 @@ def resolve_year(metadata: dict[str, Any], country: str) -> str:
                 pass
         if "-" in raw_date:
             return raw_date.split("-")[0]
+    if title:
+        return title_year_token(title, metadata.get("number"))
     return ""
 
 
@@ -308,7 +311,7 @@ def resolve_descriptors(
     title = model_title or fallback_stem
     raw_date = str(metadata.get("date", "") or "")
     number = str(metadata.get("number") or "")
-    year = resolve_year(metadata, jurisdiction_code)
+    year = resolve_year(metadata, jurisdiction_code, title=title)
     # Non-Gregorian raw dates stay in the local calendar; the FRBR URI year
     # must be Gregorian, so blank the date and rely on the resolved year.
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"

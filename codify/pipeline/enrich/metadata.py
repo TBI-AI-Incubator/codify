@@ -14,6 +14,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    title_year_token,
     year_from_calendar,
 )
 from codify.core.llm import LLMClient
@@ -175,7 +176,11 @@ def number_from_title(title: str) -> str:
 
 
 def gregorian_year(
-    metadata: dict[str, Any], country: str = "", *, legacy: bool = False
+    metadata: dict[str, Any],
+    country: str = "",
+    *,
+    legacy: bool = False,
+    title: str = "",
 ) -> int | None:
     """Best-effort Gregorian year from an `extract_metadata` result. Honours
     the detected `calendar` field; falls back to the raw year for Gregorian
@@ -186,6 +191,11 @@ def gregorian_year(
     raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
+    from_title = str(metadata.get("title") or "").strip() or title.strip()
+    if not candidate and from_title:
+        title_year = title_year_token(from_title, metadata.get("number"))
+        if title_year:
+            return int(title_year)
     if not candidate:
         return None
     if cal and cal != "gregorian":
