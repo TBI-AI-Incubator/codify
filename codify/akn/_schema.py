@@ -8,7 +8,7 @@ NSMAP = {None: AKN_NS}
 NS = {"akn": AKN_NS}
 
 
-def safe_parser(*, huge_tree: bool = True) -> etree.XMLParser:
+def safe_parser(*, huge_tree: bool = False) -> etree.XMLParser:
     """XML parser hardened against XXE / entity-expansion / network attacks.
 
     Every path that reads publisher- or reader-supplied AKN goes through this
@@ -20,7 +20,7 @@ def safe_parser(*, huge_tree: bool = True) -> etree.XMLParser:
     )
 
 
-def parse_xml(xml: str | bytes, *, huge_tree: bool = True) -> etree._Element:
+def parse_xml(xml: str | bytes, *, huge_tree: bool = False) -> etree._Element:
     """Parse document XML with a hardened parser, and refuse a DOCTYPE.
 
     What actually stops an entity being resolved is `safe_parser`: no entity
