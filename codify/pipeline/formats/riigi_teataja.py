@@ -122,22 +122,35 @@ def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
         if isinstance(source, etree._Element):
             root = source
         elif isinstance(source, bytes):
-            root = parse_xml(source)
+            prefix = source[:65536]
         elif isinstance(source, Path):
-            root = parse_xml(source.read_bytes())
+            with source.open("rb") as stream:
+                prefix = stream.read(65536)
         elif isinstance(source, str):
-            stripped = source.strip()
-            if stripped.startswith("<"):
-                root = parse_xml(stripped.encode())
+            prefix_text = source[:65536].lstrip()
+            if prefix_text.startswith("<"):
+                prefix = prefix_text.encode()
             else:
+                if len(source) > 4096 or "\n" in source or "\0" in source:
+                    return False
                 p = Path(source)
                 if p.exists():
-                    root = parse_xml(p.read_bytes())
+                    with p.open("rb") as stream:
+                        prefix = stream.read(65536)
                 else:
                     return False
         else:
             return False
-        return bool(etree.QName(root).localname == "oigusakt")
+        if not isinstance(source, etree._Element):
+            if b"<!doctype" in prefix.lower():
+                return False
+            parser = etree.XMLPullParser(
+                events=("start",), resolve_entities=False, load_dtd=False, no_network=True
+            )
+            parser.feed(prefix)
+            _event, root = next(parser.read_events())
+        name = etree.QName(root)
+        return bool(name.localname == "oigusakt" and name.namespace == "Juurakt")
     except Exception:
         return False
 
@@ -420,7 +433,7 @@ def riigi_teataja_to_akn(
 
     Returns (akn_xml, metadata).
     """
-    root = parse_xml(source_xml)
+    root = parse_xml(source_xml, huge_tree=True)
     meta = root.find("{*}metaandmed")
 
     title = root.findtext(".//{*}pealkiri") or root.findtext(".//{*}aktinimi") or "Seadus"
@@ -754,7 +767,7 @@ def riigi_teataja_to_akn(
             "utf-8"
         ),
     )
-    unique_xml, _ = ensure_unique_eids(raw_xml_out)
+    unique_xml, _ = ensure_unique_eids(raw_xml_out, huge_tree=True)
 
     metadata: dict[str, Any] = {
         "title": title,
@@ -804,23 +817,29 @@ async def ingest(
         yield Parsed(akn_xml_len=len(akn_xml))
 
         # Schema validation (offloaded to CPU pool)
+        def _validate_huge(xml: str) -> None:
+            validate_akn(xml, huge_tree=True)
+
         try:
-            await _on_the_cpu_pool(validate_akn, akn_xml)
+            await _on_the_cpu_pool(_validate_huge, akn_xml)
         except Exception as exc:
             logger.warning("akn_schema_validation_failed", error=str(exc))
             yield Failed(stage="schema_validation", error=f"{type(exc).__name__}: {exc}")
             return
 
         # Pipeline validator findings
+        def _run_validator_huge(xml: str) -> list[dict[str, Any]]:
+            return run_validator(xml, huge_tree=True)
+
         try:
-            for issue in await _on_the_cpu_pool(run_validator, akn_xml):
+            for issue in await _on_the_cpu_pool(_run_validator_huge, akn_xml):
                 yield ValidationIssued(issue=issue)
         except Exception as exc:
             logger.warning("validator_failed", error=str(exc))
             yield Failed(stage="validator", error=f"{type(exc).__name__}: {exc}")
             return
 
-        doc: Document = parse_akn(akn_xml)
+        doc: Document = parse_akn(akn_xml, huge_tree=True)
 
         logger.info(
             "riigi_teataja_ingested",

@@ -260,6 +260,74 @@ async def test_dispatch_routes_by_oigusakt_root(tmp_path: Path) -> None:
     assert meta_ev.metadata["title"] == "Äriregistri seadus"
 
 
+async def test_oversized_riigi_teataja_document(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A large text node > 10MB exceeds standard libxml2 limit without huge_tree
+    big_text = "A" * 10000005
+    big_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt id="test-big-1" xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Riigikogu</valjaandja>
+		<dokumentLiik>seadus</dokumentLiik>
+		<vastuvoetud><aktikuupaev>2024-01-01</aktikuupaev></vastuvoetud>
+	</metaandmed>
+	<aktinimi><nimi><pealkiri>Suur Seadus</pealkiri></nimi></aktinimi>
+	<sisu>
+		<paragrahv id="para1">
+			<paragrahvNr>1</paragrahvNr>
+			<kuvatavNr>§ 1.</kuvatavNr>
+			<loige id="p1l1">
+				<sisuTekst><tavatekst>{big_text}</tavatekst></sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>"""
+    src = tmp_path / "big-akt.xml"
+    src.write_text(big_xml, encoding="utf-8")
+
+    assert is_riigi_teataja(src)
+    akn_xml, meta = riigi_teataja_to_akn(src.read_bytes())
+    assert meta["title"] == "Suur Seadus"
+    assert "<article" in akn_xml
+
+    from codify.akn._schema import parse_xml
+
+    validator_flags: list[bool] = []
+
+    def parse_for_validator(
+        xml: str, *, huge_tree: bool = False, **_kwargs: object
+    ) -> list[dict[str, object]]:
+        validator_flags.append(huge_tree)
+        parse_xml(xml, huge_tree=huge_tree)
+        return []
+
+    monkeypatch.setattr("codify.pipeline.enrich.validator.validate_akn", parse_for_validator)
+    events = [event async for event in ingest_document(src, "ee")]
+    assert any(isinstance(event, Complete) for event in events)
+    assert validator_flags == [True]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        b"<!DOCTYPE oigusakt><oigusakt xmlns='Juurakt'/>",
+        b"<oigusakt xmlns='Elsewhere'/>",
+        b"<!--" + b"x" * 70_000 + b"--><oigusakt xmlns='Juurakt'/>",
+        b"<akomaNtoso xmlns='http://docs.oasis-open.org/legaldocml/ns/akn/3.0'>"
+        + b"x" * 10_000_005
+        + b"</akomaNtoso>",
+    ],
+)
+def test_detector_does_not_relax_limits_for_unconfirmed_xml(source: bytes) -> None:
+    assert not is_riigi_teataja(source)
+
+
+def test_detector_bounds_an_oversized_xml_string_before_encoding() -> None:
+    source = "  <oigusakt xmlns='Juurakt'>" + "x" * 10_000_005
+    assert is_riigi_teataja(source)
+
+
 def test_riigi_teataja_constitution_mapping() -> None:
     ps_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <oigusakt id="test-ps-1" xmlns="Juurakt">

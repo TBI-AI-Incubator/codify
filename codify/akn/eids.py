@@ -15,13 +15,16 @@ from lxml import etree
 from codify.akn._schema import safe_parser
 
 
-def ensure_unique_eids(xml: str | bytes) -> tuple[str, int]:
+def ensure_unique_eids(xml: str | bytes, *, huge_tree: bool = False) -> tuple[str, int]:
     """Return (xml with unique eIds, number of eIds renamed)."""
     # Hardened parser: this runs on publisher-supplied XML and its output is
     # persisted as the canonical document, so entity resolution here would
     # outlive the request that carried it.
     tree = etree.ElementTree(
-        etree.fromstring(xml.encode() if isinstance(xml, str) else xml, parser=safe_parser())
+        etree.fromstring(
+            xml.encode() if isinstance(xml, str) else xml,
+            parser=safe_parser(huge_tree=huge_tree),
+        )
     )
     # A declared entity survives the hardened parse as an unresolved reference,
     # and serialising drops the DOCTYPE that defined it, so the stored document

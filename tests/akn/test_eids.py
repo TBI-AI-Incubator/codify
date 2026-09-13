@@ -48,3 +48,14 @@ def test_a_doctype_entity_is_not_resolved() -> None:
     # would store a reference nothing can resolve.
     with pytest.raises(ValueError, match="DOCTYPE"):
         ensure_unique_eids(payload)
+
+
+def test_large_tree_parsing_requires_an_explicit_opt_in() -> None:
+    oversized = f"<akomaNtoso><doc><p>{'A' * 10_000_005}</p></doc></akomaNtoso>"
+
+    with pytest.raises(etree.XMLSyntaxError, match="Resource limit exceeded"):
+        ensure_unique_eids(oversized)
+
+    output, renamed = ensure_unique_eids(oversized, huge_tree=True)
+    assert renamed == 0
+    assert "A" * 100 in output

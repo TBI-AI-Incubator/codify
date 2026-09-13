@@ -8,17 +8,19 @@ NSMAP = {None: AKN_NS}
 NS = {"akn": AKN_NS}
 
 
-def safe_parser() -> etree.XMLParser:
+def safe_parser(*, huge_tree: bool = False) -> etree.XMLParser:
     """XML parser hardened against XXE / entity-expansion / network attacks.
 
     Every path that reads publisher- or reader-supplied AKN goes through this
     or `parse_xml`. Prefer `parse_xml`: it adds the DOCTYPE refusal, and this
     on its own accepts a DOCTYPE-bearing document (inertly, but it accepts it).
     """
-    return etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True, huge_tree=False)
+    return etree.XMLParser(
+        resolve_entities=False, load_dtd=False, no_network=True, huge_tree=huge_tree
+    )
 
 
-def parse_xml(xml: str | bytes) -> etree._Element:
+def parse_xml(xml: str | bytes, *, huge_tree: bool = False) -> etree._Element:
     """Parse document XML with a hardened parser, and refuse a DOCTYPE.
 
     What actually stops an entity being resolved is `safe_parser`: no entity
@@ -43,7 +45,7 @@ def parse_xml(xml: str | bytes) -> etree._Element:
     """
     if isinstance(xml, str):
         xml = xml.encode("utf-8")
-    root = etree.fromstring(xml, parser=safe_parser())
+    root = etree.fromstring(xml, parser=safe_parser(huge_tree=huge_tree))
     info = root.getroottree().docinfo
     if info.internalDTD is not None or info.doctype:
         raise etree.XMLSyntaxError("XML declares a DOCTYPE; refusing to parse it", None, 0, 0)
@@ -54,9 +56,11 @@ def akn_schema(strict: bool = False) -> etree.XMLSchema:
     return get_schema(AKN_NS, strict=strict)
 
 
-def validate_akn(xml: str | bytes | etree._Element, strict: bool = False) -> None:
+def validate_akn(
+    xml: str | bytes | etree._Element, strict: bool = False, *, huge_tree: bool = False
+) -> None:
     """Validate AKN-XML against the OASIS schema. Raises DocumentInvalid on failure."""
-    root = xml if isinstance(xml, etree._Element) else parse_xml(xml)
+    root = xml if isinstance(xml, etree._Element) else parse_xml(xml, huge_tree=huge_tree)
     valid, errors = validate_xml(root, akn_schema(strict))
     if not valid:
         raise etree.DocumentInvalid("\n".join(str(e) for e in errors))
