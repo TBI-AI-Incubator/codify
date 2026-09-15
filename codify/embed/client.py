@@ -19,8 +19,9 @@ from typing import Literal
 import openai
 import structlog
 from openai import AsyncOpenAI
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import RetryCallState, retry, retry_if_exception_type, wait_exponential
 
+from codify.core.retry_after import parse_retry_after
 from codify.core.tracing import direct_observation, record_usage
 from codify.settings import EMBEDDING_BATCH_SIZE
 
@@ -38,6 +39,36 @@ _LENGTH_HINTS = ("token", "too long", "too large", "maximum context", "exceed", 
 
 class EmbeddingError(RuntimeError):
     """Raised when embedding generation fails (after retries)."""
+
+
+class EmbeddingRateLimited(EmbeddingError):
+    """The provider refused for quota; `retry_after` is its own hint in seconds, if given."""
+
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+_burst_wait = wait_exponential(min=1, max=30)
+
+
+def _wait_past_the_quota_window(retry_state: RetryCallState) -> float:
+    """A quota refusal lasts the rest of the minute; a burst fault does not."""
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    if isinstance(exc, EmbeddingRateLimited):
+        return min(65.0, max(exc.retry_after or 0.0, 20.0 * retry_state.attempt_number))
+    return float(_burst_wait(retry_state))
+
+
+def _stop_by_fault_class(retry_state: RetryCallState) -> bool:
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    limit = 6 if isinstance(exc, EmbeddingRateLimited) else 3
+    return retry_state.attempt_number >= limit
+
+
+def _retry_after_seconds(exc: openai.OpenAIError) -> float | None:
+    response = getattr(exc, "response", None)
+    return parse_retry_after(response.headers.get("retry-after")) if response is not None else None
 
 
 def _normalise(vec: list[float]) -> list[float]:
@@ -115,8 +146,8 @@ class EmbeddingClient:
 
     @retry(
         retry=retry_if_exception_type(EmbeddingError),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(min=1, max=30),
+        stop=_stop_by_fault_class,
+        wait=_wait_past_the_quota_window,
         reraise=True,
     )
     async def _call(self, inputs: list[str]) -> list[list[float]]:
@@ -138,6 +169,11 @@ class EmbeddingClient:
                 )
             except openai.BadRequestError:
                 raise  # length / malformed, handled by the caller, not retried
+            except openai.RateLimitError as exc:
+                logger.warning("embed_rate_limited", batch_size=len(inputs))
+                raise EmbeddingRateLimited(
+                    "embeddings call refused for quota", _retry_after_seconds(exc)
+                ) from exc
             except openai.OpenAIError as exc:
                 logger.warning(
                     "embed_call_failed", error_type=type(exc).__name__, batch_size=len(inputs)

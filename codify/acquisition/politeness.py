@@ -10,8 +10,6 @@ import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from email.utils import parsedate_to_datetime
 from urllib import robotparser
 from urllib.parse import urlparse
 
@@ -20,6 +18,7 @@ import httpx
 import structlog
 
 from codify.acquisition.base import PolitenessProfile
+from codify.core.retry_after import parse_retry_after as _parse_retry_after
 from codify.core.security import Resolver, SSRFBlocked, safe_addresses, ssrf_guard
 from codify.jurisdictions import SourceAdapter
 
@@ -448,21 +447,6 @@ class PoliteTransport(httpx.AsyncBaseTransport):
     async def aclose(self) -> None:
         await self._probe.aclose()
         await self._inner.aclose()
-
-
-def _parse_retry_after(value: str | None) -> float | None:
-    """Seconds from a Retry-After header, delay-seconds or HTTP-date form."""
-    if not value:
-        return None
-    try:
-        return max(0.0, float(value))
-    except ValueError:
-        pass
-    try:
-        when = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
-        return None
-    return max(0.0, (when - datetime.now(UTC)).total_seconds())
 
 
 def make_polite_client(
