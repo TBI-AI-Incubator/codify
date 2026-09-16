@@ -143,6 +143,11 @@ def resolve_language(metadata: dict[str, Any], cfg: Any) -> str:
     return "eng"
 
 
+def _year_int(year: str) -> int | None:
+    """The year as a URI segment carries it, or None when it never resolved."""
+    return int(year) if year.isascii() and year.isdecimal() else None
+
+
 def draft_number(source: bytes | str) -> str:
     """Content-addressed FRBR number for un-numbered documents (drafts):
     deterministic across re-ingests so expression_uri idempotency holds.
@@ -325,21 +330,34 @@ def resolve_descriptors(
     if cal != "gregorian":
         raw_date = ""
     cfg = load_config(jurisdiction_code)
-    if not raw_date and declares_local_date_grammar(jurisdiction_code):
+    # The extracted text, never the source bytes: on the scanned route those are
+    # a PDF, whose decoded bytes hold markup and no provision text at all.
+    source_text = classification_text if classification_text is not None else source_bytes
+    if (
+        not raw_date
+        and isinstance(source_text, str)
+        and declares_local_date_grammar(jurisdiction_code)
+    ):
         # The day a local-calendar document states it was made on. Deterministic
         # and ahead of the model, which reports the year and drops the day.
-        source_text = (
-            source_bytes.decode("utf-8", "ignore")
-            if isinstance(source_bytes, bytes)
-            else source_bytes
-        )
         stated = local_date_from_text(source_text, jurisdiction_code)
         if stated is not None:
             raw_date = stated.isoformat()
+            if year and stated.year != _year_int(year):
+                # Both are evidence: the title states the citation year and the
+                # signature block the day. Downstream keeps the citation.
+                logger.info(
+                    "source_date_year_differs_from_resolved_year",
+                    country=jurisdiction_code,
+                    stated=raw_date,
+                    year=year,
+                )
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
     identity = identity_from_title(model_title, title_rule) if title_rule else None
-    if identity is not None and not year and identity.year:
+    # A year that is not an ASCII run never resolved: a native-digit local year
+    # is truthy and would reach the URI unconverted.
+    if identity is not None and _year_int(year) is None and identity.year:
         converted = year_from_calendar(identity.year, cfg.calendar, jurisdiction_code)
         year = str(converted) if converted is not None else year
     doctype = resolve_doctype(

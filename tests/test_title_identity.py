@@ -127,3 +127,28 @@ def test_the_title_patterns_are_bounded_on_adversarial_input() -> None:
         subprocess.run([sys.executable, "-c", script], timeout=10, check=True)
     except subprocess.TimeoutExpired:
         pytest.fail("a title pattern did not return within 10s on 40k repeats")
+
+
+@pytest.mark.parametrize("invisible", ["​", "‏", "‎", "­"])
+def test_an_invisible_character_does_not_fork_the_identity(invisible: str) -> None:
+    """A format character is endemic in scanned and model-produced text and
+    cannot be seen in the title, so it must not change the stored URI."""
+    plain = "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2534"
+    marked = f"{invisible}พระราชบัญญัติเครื่อง{invisible}หมายการค้า พ.ศ. 2534"
+    assert identity_from_title(marked, RULE) == identity_from_title(plain, RULE)
+
+
+def test_two_titles_sharing_a_long_prefix_keep_separate_identities() -> None:
+    """Truncation would merge two works onto one URI."""
+    rule = RULE.model_copy(update={"max_length": 24})
+    a = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + "ข พ.ศ. 2534", rule)
+    b = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + "ค พ.ศ. 2534", rule)
+    assert a.slug != b.slug
+    assert len(a.slug) <= 24 and len(b.slug) <= 24
+
+
+def test_the_cap_covers_the_edition_suffix_too() -> None:
+    rule = RULE.model_copy(update={"max_length": 20})
+    result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2534", rule)
+    assert result.edition == "3"
+    assert len(result.slug) <= 20

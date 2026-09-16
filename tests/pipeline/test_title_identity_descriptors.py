@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-import codify.calendar as calendar_module
 from codify.frbr import build_frbr_work_uri, is_citable_work_uri
 from codify.jurisdictions import try_load_config
 from codify.pipeline import stages
@@ -26,7 +25,8 @@ MONTHS = [
     "ธันวาคม",
 ]
 TITLE = "พระราชบัญญัติเครื่องหมายการค้า (ฉบับที่ ๓) พ.ศ. ๒๕๕๙"
-SOURCE = f"{TITLE}\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙\n".encode()
+SOURCE_TEXT = f"{TITLE}\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙\n"
+SOURCE = SOURCE_TEXT.encode()
 
 
 @pytest.fixture
@@ -37,6 +37,7 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "kind": "buddhist",
         "epoch_year": -543,
         "month_names": MONTHS,
+        "month_day_is_gregorian": True,
         "date_cues": ["ให้ไว้ ณ วันที่"],
         "year_particles": ["พ.ศ."],
     }
@@ -62,9 +63,7 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         tmp_path / "jurisdictions",
         {"xn": build(with_identity=True), "xm": build(with_identity=False)},
     ):
-        calendar_module._rule_and_patterns.cache_clear()
         yield
-    calendar_module._rule_and_patterns.cache_clear()
 
 
 def _descriptors(code: str) -> stages.Descriptors:
@@ -81,6 +80,7 @@ def _descriptors(code: str) -> stages.Descriptors:
         jurisdiction_code=code,
         source_bytes=SOURCE,
         fallback_stem="source",
+        classification_text=SOURCE_TEXT,
     )
 
 
@@ -102,6 +102,19 @@ def test_the_source_supplies_the_day_the_model_did_not(configs: None) -> None:
     assert _descriptors("xn").raw_date == "2016-04-26"
 
 
+def test_a_route_that_extracted_no_text_reads_no_date(configs: None) -> None:
+    """Control: on the scanned route `source_bytes` is the file itself, whose
+    decoded bytes carry markup rather than the document's own dated line."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": TITLE, "number": "", "year": "๒๕๕๙", "date": "", "calendar": "buddhist"},
+        jurisdiction_code="xn",
+        source_bytes=SOURCE,
+        fallback_stem="source",
+    )
+    assert desc.raw_date == ""
+
+
 def test_a_numbered_instrument_keeps_its_number(configs: None) -> None:
     """The title grammar is a fallback, not a replacement for a stated number."""
     try_load_config.cache_clear()
@@ -110,5 +123,20 @@ def test_a_numbered_instrument_keeps_its_number(configs: None) -> None:
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
+        classification_text=SOURCE_TEXT,
     )
     assert desc.number == "17"
+
+
+def test_a_native_digit_year_is_not_a_resolved_year(configs: None) -> None:
+    """A local year in its own script is truthy and would reach the URI
+    unconverted, so the title's year must still be consulted."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": TITLE, "number": "", "year": "๒๕๕๙", "date": ""},
+        jurisdiction_code="xn",
+        source_bytes=SOURCE,
+        fallback_stem="source",
+        classification_text=SOURCE_TEXT,
+    )
+    assert desc.year == "2016"

@@ -7,6 +7,7 @@ expression URIs add language and date segments. Parsing lives in
 
 from __future__ import annotations
 
+import hashlib
 import re
 import unicodedata
 from collections.abc import Iterable
@@ -93,13 +94,28 @@ class TitleDerivedIdentity(NamedTuple):
 
 
 # Letters, numbers and combining marks. `\w` drops the vowel and tone marks that
-# an abugida writes a word with, so a slug built on it is not the title.
+# an abugida writes a word with, so a slug built on it is not the title. Format
+# characters are gone by here, dropped before anything matched.
 def _slug_char(ch: str) -> str:
     return ch if unicodedata.category(ch)[0] in "LNM" else "-"
 
 
 def _slugify(text: str) -> str:
     return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").lower()
+
+
+def _capped(slug: str, limit: int) -> str:
+    """`slug` within `limit` characters, cut on a separator and marked.
+
+    Two titles sharing a long prefix would otherwise truncate onto one identity,
+    silently merging two works; the digest of the whole slug separates them and
+    is a pure function of it.
+    """
+    if len(slug) <= limit:
+        return slug
+    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:6]
+    head = slug[: max(0, limit - len(digest) - 1)].rsplit("-", 1)[0]
+    return f"{head}-{digest}" if head else digest
 
 
 def _alternation(words: Iterable[str]) -> str:
@@ -122,7 +138,12 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     states is the last one it states: an earlier one belongs to the instrument
     being amended.
     """
-    text = " ".join(normalise_digits(unicodedata.normalize("NFC", title)).split())
+    # Format characters go before anything matches: one leading invisible defeats
+    # the kind-word test, and one mid-word forks the slug.
+    folded = "".join(
+        c for c in unicodedata.normalize("NFC", title) if unicodedata.category(c) != "Cf"
+    )
+    text = " ".join(normalise_digits(folded).split())
     edition_re = (
         re.compile(rf"\(\s*(?:{_alternation(rule.edition_markers)})\s*([0-9]+)\s*\)")
         if rule.edition_markers
@@ -163,10 +184,11 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         if body.startswith(prefix):
             body = body[len(prefix) :].strip()
             break
-    slug = _slugify(body)[: rule.max_length].rstrip("-")
-    if slug and edition:
-        slug = f"{slug}-{_slugify(rule.edition_markers[0])}-{edition}"
-    return TitleDerivedIdentity(slug=slug, edition=edition, year=year)
+    suffix = f"-{_slugify(rule.edition_markers[0])}-{edition}" if edition else ""
+    # The cap covers the whole segment, suffix included: capping the base first
+    # let the edition push a slug past the limit it declares.
+    slug = _capped(_slugify(body), max(1, rule.max_length - len(suffix))).rstrip("-")
+    return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
 
 
 def law_number_token(value: object) -> str:

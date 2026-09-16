@@ -8,9 +8,14 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-import codify.calendar as calendar_module
-from codify.calendar import local_date_from_text
+from codify.calendar import (
+    _DATE_WINDOW_CHARS,
+    compile_local_date_patterns,
+    local_date_from_text,
+)
+from codify.jurisdictions import CalendarConversion
 
 MONTHS = [
     "มกราคม",
@@ -37,6 +42,7 @@ def date_grammar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "kind": "buddhist",
         "epoch_year": -543,
         "month_names": MONTHS,
+        "month_day_is_gregorian": True,
         "date_cues": ["ให้ไว้ ณ วันที่", "ตราไว้ ณ วันที่"],
         "year_particles": ["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."],
         "new_year_month": 4,
@@ -56,9 +62,7 @@ def date_grammar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         },
     }
     with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
-        calendar_module._rule_and_patterns.cache_clear()
         yield
-    calendar_module._rule_and_patterns.cache_clear()
 
 
 @pytest.mark.parametrize(
@@ -116,12 +120,13 @@ from tests.test_local_date_from_text import MONTHS
 rule = CalendarConversion(
     kind="buddhist",
     month_names=MONTHS,
+    month_day_is_gregorian=True,
     date_cues=["A B C"],
     year_particles=["\u0e1e\u0e23\u0e30\u0e1e\u0e38\u0e17\u0e18\u0e28\u0e31\u0e01\u0e23\u0e32\u0e0a",
                     "\u0e1e\u0e38\u0e17\u0e18\u0e28\u0e31\u0e01\u0e23\u0e32\u0e0a"],
 )
 patterns = compile_local_date_patterns(rule)
-patterns.date.search("1 " * 40000)
+patterns.date.search("1 \u0e21\u0e01\u0e23\u0e32\u0e04\u0e21" + " " * 40000 + "x")
 patterns.cue.search("A " * 40000)
 """
 
@@ -134,3 +139,39 @@ def test_the_shipped_patterns_are_bounded_on_a_long_non_matching_repeat() -> Non
         subprocess.run([sys.executable, "-c", script], timeout=10, check=True)
     except subprocess.TimeoutExpired:
         pytest.fail("a date pattern did not return within 10s on 40k repeats")
+
+
+def test_a_calendar_with_its_own_month_grid_reads_nothing() -> None:
+    """The year converts; the month and day do not. Composing a Gregorian date
+    from a local month would be wrong by months, so the rule refuses."""
+    rule = CalendarConversion(kind="hijri_lunar", month_names=MONTHS, date_cues=["ให้ไว้ ณ วันที่"])
+    assert compile_local_date_patterns(rule) is None
+
+
+def test_a_year_straddling_the_window_edge_is_read_whole() -> None:
+    """Bounding the match's start, not the string: an `endpos` cutting through
+    the year would match its first three digits and date the document to 2016
+    minus a millennium."""
+    cue = "ให้ไว้ ณ วันที่"
+    prefix = f"{cue} ๒๖ เมษายน พ.ศ. "
+    filler = "ก" * (_DATE_WINDOW_CHARS - len(prefix) - len(cue) + 12)
+    text = f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙"
+    found = local_date_from_text(text, "xn")
+    assert found == date(2016, 4, 26)
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"month_names": ["", *MONTHS], "date_cues": ["c"]},
+        {"month_names": [MONTHS[0], *MONTHS], "date_cues": ["c"]},
+        {"month_names": MONTHS, "date_cues": ["", " "]},
+    ],
+)
+def test_a_grammar_that_would_read_a_wrong_date_is_refused_at_load(
+    broken: dict[str, list[str]],
+) -> None:
+    """A blank month renumbers the calendar and a blank cue matches every
+    document at offset zero; both produce a valid, wrong date."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(kind="buddhist", month_day_is_gregorian=True, **broken)

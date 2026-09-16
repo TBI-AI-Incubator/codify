@@ -319,6 +319,11 @@ class CalendarConversion(BaseModel):
     # Month names in the local calendar's own order, index 0 = month 1. Present
     # only where a dated line is read off the source text.
     month_names: list[str] = Field(default_factory=list)
+    # Whether this calendar's months and days coincide with the Gregorian ones,
+    # so a stated day and month need only the year converting. False for every
+    # calendar with a grid of its own, where composing a date from a converted
+    # year and a local month is wrong by months.
+    month_day_is_gregorian: bool = False
     # Phrases that introduce the date a document was made. A dated line elsewhere
     # in the text is some other instrument's.
     date_cues: list[str] = Field(default_factory=list)
@@ -329,6 +334,20 @@ class CalendarConversion(BaseModel):
     # number and the epoch offset understates it by one.
     new_year_reform_year: int | None = None
     note: str = ""
+
+    @model_validator(mode="after")
+    def _date_grammar_is_usable(self) -> "CalendarConversion":
+        """A grammar that reads a date must name every month exactly once and
+        carry a cue. A blank entry silently renumbers the months, and a blank
+        cue compiles to a pattern matching the start of every document."""
+        names = [n.strip() for n in self.month_names]
+        if self.month_names and (not all(names) or len(set(names)) != len(names)):
+            raise ValueError("month_names must be non-blank and distinct")
+        if self.date_cues and not any(c.strip() for c in self.date_cues):
+            raise ValueError("date_cues must carry at least one non-blank cue")
+        if self.month_day_is_gregorian and not self.month_names:
+            raise ValueError("month_day_is_gregorian needs month_names")
+        return self
 
 
 class TitleIdentity(BaseModel):
@@ -344,6 +363,21 @@ class TitleIdentity(BaseModel):
     strip_prefixes: list[str] = Field(default_factory=list)
     # Words marking the year that follows as the instrument's own.
     year_particles: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _literals_are_not_blank(self) -> "TitleIdentity":
+        """A blank particle or marker matches everywhere, so the grammar would
+        read any run of digits as the year and any parenthetical as an edition."""
+        for name in (
+            "strip_prefixes",
+            "year_particles",
+            "edition_markers",
+            "consolidation_markers",
+        ):
+            if any(not v.strip() for v in getattr(self, name)):
+                raise ValueError(f"{name} must not carry a blank entry")
+        return self
+
     # Words inside a parenthetical naming this instrument's edition number,
     # spelling variants included. The first is the canonical one and is what a
     # slug carries, so a reform of the orthography does not fork an identity.
