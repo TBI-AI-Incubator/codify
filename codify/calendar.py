@@ -210,7 +210,10 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     optional_particle = rf"(?:(?:{particles})\s*)?" if particles else ""
     # Declared with single spaces and met with line breaks, a signature block
     # wrapping wherever the column ran out.
-    cues = "|".join(_CUE_GAP.join(map(re.escape, c.split())) for c in rule.date_cues if c.strip())
+    # Longest first, so a shorter cue listed earlier cannot win at the same
+    # offset and spend the reach allowance on the rest of the longer one.
+    ordered = sorted({c for c in rule.date_cues if c.strip()}, key=lambda c: (-len(c), c))
+    cues = "|".join(_CUE_GAP.join(map(re.escape, c.split())) for c in ordered)
     return _LocalDatePatterns(
         re.compile(cues),
         re.compile(
@@ -300,18 +303,37 @@ def declares_this_calendar(label: str, country: str) -> bool:
     return normalise_calendar(cfg.calendar) in (named, f"{named}_era")
 
 
-def labelled_year_as_gregorian(token: str, label: str, country: str) -> int | None:
+def month_stating_this_year(metadata: dict[str, Any], token: str) -> int | None:
+    """The month of a metadata date whose year run is `token`, or None. A year
+    that began mid-year needs one to settle, and every year path must read it."""
+    raw = normalise_digits(str(metadata.get("date") or ""))
+    found = re.match(r"^([0-9]{1,4})-([0-9]{2})-[0-9]{2}(?![0-9])", raw)
+    if found is None or found.group(1) != token:
+        return None
+    month = int(found.group(2))
+    return month if 1 <= month <= 12 else None
+
+
+def labelled_year_as_gregorian(
+    token: str, label: str, country: str, month: int | None = None
+) -> int | None:
     """A local year in Gregorian: the jurisdiction's rule where the label names
-    its calendar, or the generic conversion for that label."""
+    its calendar, or the generic conversion for that label. The month settles a
+    year that began mid-year."""
     # Never for an era-named calendar: a bare number there is part of a year,
     # not one, and the generic path refuses it on purpose.
     if normalise_calendar(label) not in ERA_NAMED_CALENDARS and declares_this_calendar(
         label, country
     ):
         try:
-            return to_gregorian_year(token, country)
+            converted = to_gregorian_year(token, country, month=month)
         except (CalendarConversionError, LookupError):
             return None
+        cfg = try_load_config(country)
+        rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+        if rule is not None and month is not None:
+            converted += reform_shift(rule, int(normalise_digits(token) or 0), month)
+        return converted
     return year_from_calendar(token, label, country)
 
 

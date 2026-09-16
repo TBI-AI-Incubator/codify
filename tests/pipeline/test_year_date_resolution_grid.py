@@ -162,7 +162,9 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "xo",
         {"title": PRE, "date": "2478-02-20", "calendar": "buddhist"},
         "",
-        "1935",
+        # The month settles the year even where its grid is not the Gregorian
+        # one; only the day cannot be carried across.
+        "1936",
         "",
     ),
     # --- the model states a local date and calls it Gregorian ----------------
@@ -250,6 +252,16 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1968",
         "",
     ),
+    (
+        # The date names a year the title does not. Its own year converts; it is
+        # never rebuilt on the title's, which would invent a date neither states.
+        "a labelled date naming another year keeps its own",
+        "xg",
+        {"title": PRE, "date": "2481-05-20", "calendar": "buddhist"},
+        "",
+        "1938",
+        "1938-05-20",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -278,6 +290,43 @@ def test_year_and_date_resolution(
 ) -> None:
     desc = _resolve(code, metadata, source)
     assert (desc.year, desc.raw_date) == (expected_year, expected_date), case
+
+
+@pytest.mark.parametrize(
+    ("case", "code", "metadata", "source", "expected_year", "expected_date"),
+    GRID,
+    ids=[row[0] for row in GRID],
+)
+def test_every_year_path_answers_the_same(
+    case: str,
+    code: str,
+    metadata: dict[str, object],
+    source: str,
+    expected_year: str,
+    expected_date: str,
+) -> None:
+    """Three callers read a year from one metadata: the URI path, `resolve_year`
+    and the stored-year helper. They must not disagree about the same document.
+    """
+    from codify.pipeline.enrich.metadata import gregorian_year
+
+    try_load_config.cache_clear()
+    title = str(metadata.get("title") or "")
+    resolved = stages.resolve_year(dict(metadata), code, title=title)
+    stored = gregorian_year(dict(metadata), code, title=title)
+    # These two read the same metadata and must never differ; three rounds of
+    # review found them disagreeing about one document.
+    assert resolved == (str(stored) if stored is not None else ""), case
+    if source:
+        # The descriptor refines the year with a month only the source states.
+        return
+    # Against the twin declaring no title grammar, where the descriptor knows
+    # nothing the other two do not.
+    twin = WITHOUT_IDENTITY[code]
+    try_load_config.cache_clear()
+    assert _resolve(twin, metadata, source).year == stages.resolve_year(
+        dict(metadata), twin, title=title
+    ), case
 
 
 #: Each jurisdiction of the grid paired with its twin declaring no title grammar,

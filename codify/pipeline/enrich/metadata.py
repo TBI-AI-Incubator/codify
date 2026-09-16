@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
     labelled_year_as_gregorian,
+    month_stating_this_year,
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
@@ -19,6 +20,7 @@ from codify.calendar import (
     title_year_token,
 )
 from codify.core.llm import LLMClient
+from codify.lang import normalise_digits
 
 logger = structlog.get_logger()
 
@@ -192,6 +194,11 @@ def gregorian_year(
     raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
+    # A date field holding no year run states none, and treating it as a
+    # candidate kept this path from the title fallback the URI path takes. A
+    # year field is left alone: an era name lives there and is read below.
+    if not raw_year and not sole_year_token(normalise_digits(candidate)):
+        candidate = ""
     from_title = str(metadata.get("title") or "").strip() or title.strip()
     if not candidate and from_title:
         title_year = title_year_token(from_title, metadata.get("number"))
@@ -203,7 +210,9 @@ def gregorian_year(
     if not candidate:
         return None
     if cal and cal != "gregorian":
-        converted = labelled_year_as_gregorian(candidate, cal, country)
+        converted = labelled_year_as_gregorian(
+            candidate, cal, country, month_stating_this_year(metadata, candidate)
+        )
         if converted is not None:
             return converted
         if not legacy and cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):

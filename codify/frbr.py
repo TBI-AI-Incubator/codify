@@ -142,6 +142,18 @@ def _alternation(words: Iterable[str]) -> str:
 _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
+def _opens_with_prefix(body: str, prefix: str) -> bool:
+    """A kind word opens the title, and a Latin one ends on a word boundary:
+    without that "Act" matches inside "Action". A script written without spaces
+    has no boundary to test."""
+    if not body.startswith(prefix):
+        return False
+    rest = body[len(prefix) :]
+    if not (prefix.isascii() and prefix[-1:].isalnum()):
+        return True
+    return not rest[:1].isalnum()
+
+
 def _particle_alternation(words: Iterable[str]) -> str:
     """`_alternation`, with a word boundary on any particle that is a Latin word:
     without one "of" matches inside "proof" and takes the digits after it."""
@@ -212,7 +224,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         body = body[: years[-1].start()]
     body = body.strip()
     for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
-        if body.startswith(prefix):
+        if _opens_with_prefix(body, prefix):
             body = body[len(prefix) :].strip()
             break
     # The suffix is data and can consume the whole cap; neither it nor the

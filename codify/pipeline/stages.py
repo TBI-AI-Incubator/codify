@@ -17,6 +17,7 @@ from codify.calendar import (
     declares_local_date_grammar,
     labelled_year_as_gregorian,
     local_date_from_text,
+    month_stating_this_year,
     normalise_calendar,
     reads_as_a_gregorian_year,
     reform_shift,
@@ -71,7 +72,9 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     if candidate and cal and cal != "gregorian":
-        converted = labelled_year_as_gregorian(candidate, cal, country)
+        converted = labelled_year_as_gregorian(
+            candidate, cal, country, month_stating_this_year(metadata, candidate)
+        )
         if converted is not None:
             return str(converted)
         if cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):
@@ -410,6 +413,10 @@ def resolve_descriptors(
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
     keeps_month_day = _grid_is_gregorian(cfg)
     local_month_day = _month_day(raw_date) if cal != "gregorian" and keeps_month_day else None
+    # Carried only where the date and the title name one year. A date stating
+    # another year is about another document, and rebuilding it on the title's
+    # year would invent a date neither states.
+    local_date_year = sole_year_token(normalise_digits(raw_date))
     if cal != "gregorian":
         raw_date = ""
     # The extracted text, never the source bytes: on the scanned route those are
@@ -463,9 +470,11 @@ def resolve_descriptors(
     ):
         # The month of whichever date the document gave, the source's or the
         # model's, since a year that began mid-year needs one to settle.
+        # The month of whichever date the document gave. A local month settles
+        # the conversion whether or not its grid matches the Gregorian one.
         month = stated_month
         if month is None:
-            month = local_month_day[0] if local_month_day else _month_of(raw_date)
+            month = month_stating_this_year(metadata, identity.year) or _month_of(raw_date)
         converted = _local_year_to_gregorian(
             identity.year,
             cfg,
@@ -479,7 +488,7 @@ def resolve_descriptors(
         converted_from_title = bool(year)
         # Never over a date read off the document itself, which is exact.
         if source_date is None and year:
-            if local_month_day is not None:
+            if local_month_day is not None and local_date_year == identity.year:
                 # Local by its own label; only its year needed converting.
                 raw_date = _built_date(int(year), local_month_day)
             elif date_echoes_title:
