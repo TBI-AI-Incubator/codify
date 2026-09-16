@@ -114,7 +114,10 @@ def _capped(slug: str, limit: int) -> str:
     if len(slug) <= limit:
         return slug
     digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:6]
-    head = slug[: max(0, limit - len(digest) - 1)].rsplit("-", 1)[0]
+    if limit < len(digest):
+        # No room for a head: the digest alone still separates two titles.
+        return digest
+    head = slug[: limit - len(digest) - 1].rsplit("-", 1)[0] if limit > len(digest) else ""
     return f"{head}-{digest}" if head else digest
 
 
@@ -168,7 +171,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
         )
     year_re = (
-        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})")
+        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
         if rule.year_particles
         else None
     )
@@ -186,8 +189,10 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             break
     suffix = f"-{_slugify(rule.edition_markers[0])}-{edition}" if edition else ""
     # The cap covers the whole segment, suffix included: capping the base first
-    # let the edition push a slug past the limit it declares.
-    slug = _capped(_slugify(body), max(1, rule.max_length - len(suffix))).rstrip("-")
+    # let the edition push a slug past the limit it declares. A limit with no
+    # room for both keeps the edition, which is what separates an amendment from
+    # the act it amends, and lets the assembled segment run to the suffix.
+    slug = _capped(_slugify(body), rule.max_length - len(suffix)).rstrip("-")
     return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
 
 

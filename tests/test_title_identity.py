@@ -152,3 +152,19 @@ def test_the_cap_covers_the_edition_suffix_too() -> None:
     result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2534", rule)
     assert result.edition == "3"
     assert len(result.slug) <= 20
+
+
+def test_a_longer_digit_run_is_not_the_titles_year() -> None:
+    """A prefix of a longer run is not a year, as `sole_year_token` also holds."""
+    assert identity_from_title("พระราชบัญญัติภาพยนตร์ พ.ศ. 25340", RULE).year == ""
+
+
+@pytest.mark.parametrize("limit", [1, 5, 6, 7, 12, 20])
+def test_the_declared_limit_holds_however_little_room_the_edition_leaves(limit: int) -> None:
+    """A suffix longer than the limit still yields a segment that carries the
+    edition, which is what separates an amendment from the act it amends."""
+    rule = RULE.model_copy(update={"max_length": limit})
+    result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2534", rule)
+    assert result.edition == "3"
+    assert result.slug.endswith("-ฉบับที่-3")
+    assert len(result.slug) <= max(limit, len("-ฉบับที่-3") + 6)

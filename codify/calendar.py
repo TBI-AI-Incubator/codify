@@ -208,7 +208,7 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
         re.compile(cues),
         re.compile(
             rf"(?P<day>[0-9]{{1,2}})\s*(?P<month>{months})\s*"
-            rf"{optional_particle}(?P<year>[0-9]{{3,4}})"
+            rf"{optional_particle}(?P<year>[0-9]{{3,4}})(?![0-9])"
         ),
         index,
     )
@@ -262,13 +262,17 @@ def local_date_from_text(text: str, country: str) -> date | None:
         return None
     rule, patterns = found_rule
     folded = normalise_digits(text)
-    cue = patterns.cue.search(folded)
-    if cue is None:
-        return None
+    # Every cue, not the first: a document may name the cue before the signature
+    # block that carries the date, and one barren cue would end the search.
     # Searched unbounded and rejected by distance: an `endpos` shortens the
     # string, so a year straddling the bound matches as its first three digits.
-    found = patterns.date.search(folded, cue.start())
-    if found is None or found.start() - cue.start() >= _DATE_WINDOW_CHARS:
+    found = None
+    for cue in patterns.cue.finditer(folded):
+        candidate = patterns.date.search(folded, cue.start())
+        if candidate is not None and candidate.start() - cue.start() < _DATE_WINDOW_CHARS:
+            found = candidate
+            break
+    if found is None:
         return None
     month = patterns.month_index[found.group("month")]
     local_year = int(found.group("year"))

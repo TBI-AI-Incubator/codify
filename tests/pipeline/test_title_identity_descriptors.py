@@ -140,3 +140,18 @@ def test_a_native_digit_year_is_not_a_resolved_year(configs: None) -> None:
         classification_text=SOURCE_TEXT,
     )
     assert desc.year == "2016"
+
+
+def test_a_stated_date_supplies_a_year_the_metadata_omitted(configs: None) -> None:
+    """Without this the URI takes the unknown-year placeholder while the
+    document carries its own date."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "Untitled", "number": "", "year": "", "date": ""},
+        jurisdiction_code="xn",
+        source_bytes=SOURCE,
+        fallback_stem="source",
+        classification_text=SOURCE_TEXT,
+    )
+    assert desc.raw_date == "2016-04-26"
+    assert desc.year == "2016"

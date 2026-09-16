@@ -360,6 +360,11 @@ def resolve_descriptors(
     if identity is not None and _year_int(year) is None and identity.year:
         converted = year_from_calendar(identity.year, cfg.calendar, jurisdiction_code)
         year = str(converted) if converted is not None else year
+    if _year_int(year) is None and raw_date:
+        # The date read off the source is Gregorian and states a year; without
+        # this the URI takes the unknown-year placeholder while the document
+        # carries its own date.
+        year = raw_date[:4] if _year_int(raw_date[:4]) is not None else year
     doctype = resolve_doctype(
         cfg,
         title=title,

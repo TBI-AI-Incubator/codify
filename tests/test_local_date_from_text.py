@@ -175,3 +175,31 @@ def test_a_grammar_that_would_read_a_wrong_date_is_refused_at_load(
     document at offset zero; both produce a valid, wrong date."""
     with pytest.raises(ValidationError):
         CalendarConversion(kind="buddhist", month_day_is_gregorian=True, **broken)
+
+
+def test_a_longer_digit_run_is_not_a_year() -> None:
+    """`[0-9]{3,4}` would take the first four digits of a longer run."""
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙๐", "xn") is None
+
+
+def test_a_cue_introducing_no_date_does_not_end_the_search() -> None:
+    """A document may name the cue before the signature block that carries the
+    date; stopping at the first occurrence reads no date at all."""
+    barren = "ให้ไว้ ณ วันที่" + "ก" * 400
+    assert local_date_from_text(f"{barren}\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") == date(
+        2016, 4, 26
+    )
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"month_names": MONTHS[:11], "month_day_is_gregorian": True},
+        {"month_names": MONTHS, "month_day_is_gregorian": True, "new_year_reform_year": 2484},
+    ],
+)
+def test_a_grammar_whose_declaration_cannot_hold_is_refused(broken: dict[str, object]) -> None:
+    """Eleven months renumber the calendar; a reform year with no new-year month
+    can never fire, so the field reads as set and does nothing."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(kind="buddhist", date_cues=["c"], **broken)  # type: ignore[arg-type]

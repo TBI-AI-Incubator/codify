@@ -345,8 +345,15 @@ class CalendarConversion(BaseModel):
             raise ValueError("month_names must be non-blank and distinct")
         if self.date_cues and not any(c.strip() for c in self.date_cues):
             raise ValueError("date_cues must carry at least one non-blank cue")
-        if self.month_day_is_gregorian and not self.month_names:
-            raise ValueError("month_day_is_gregorian needs month_names")
+        if self.month_day_is_gregorian and len(self.month_names) != 12:
+            # A Gregorian grid has twelve months; any other count renumbers them
+            # or leaves one unreadable, and both produce a valid wrong date.
+            raise ValueError("month_day_is_gregorian needs exactly 12 month_names")
+        if self.new_year_reform_year is not None and not self.new_year_month:
+            # The reform shift compares the month against the local new year;
+            # with none declared it can never fire, so the field reads as set
+            # and does nothing.
+            raise ValueError("new_year_reform_year needs new_year_month")
         return self
 
 
