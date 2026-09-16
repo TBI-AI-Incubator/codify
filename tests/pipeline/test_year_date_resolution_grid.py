@@ -285,6 +285,14 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1936-02-29",
     ),
     (
+        "a labelled local date in native digits",
+        "xg",
+        {"title": PRE, "date": "๒๔๗๘-๐๒-๒๙", "calendar": "buddhist"},
+        "",
+        "1936",
+        "1936-02-29",
+    ),
+    (
         "a decorated labelled year",
         "xg",
         {"title": PRE, "year": "B.E. 2478", "date": "2478-01-31", "calendar": "buddhist"},
