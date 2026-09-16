@@ -276,3 +276,16 @@ def test_the_escape_is_reserved_too_so_it_cannot_merge_two_titles() -> None:
 
 def test_an_ordinary_title_is_not_escaped() -> None:
     assert identity_from_title("Act normal rules of 1991", _ESCAPE_RULE).slug == "normal-rules"
+
+
+def test_a_cited_edition_stays_in_the_base_and_the_last_one_is_this_acts() -> None:
+    """A title citing the instrument it amends states two editions; taking the
+    first and stripping both would give two amendments one identity."""
+    rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"], edition_markers=["No."])
+    third = identity_from_title("Act amending Foo (No. 2) of 1980 (No. 3) of 1990", rule)
+    fourth = identity_from_title("Act amending Foo (No. 2) of 1980 (No. 4) of 1990", rule)
+    assert (third.edition, fourth.edition) == ("3", "4")
+    assert third.slug != fourth.slug
+    # The cited edition is what tells the two apart from a sibling amending
+    # another instrument, so it stays in the base.
+    assert "2" in third.slug

@@ -167,6 +167,23 @@ def _local_year_to_gregorian(
     )
 
 
+def _month_of(raw_date: str) -> int | None:
+    """The month a full ISO date names, or None."""
+    try:
+        return date.fromisoformat(normalise_digits(raw_date)[:10]).month
+    except ValueError:
+        return None
+
+
+def _rebased_date(raw_date: str, gregorian_year: int) -> str:
+    """`raw_date` on `gregorian_year`, or unchanged when it is not a full date."""
+    try:
+        stated = date.fromisoformat(normalise_digits(raw_date)[:10])
+        return stated.replace(year=gregorian_year).isoformat()
+    except ValueError:
+        return raw_date
+
+
 def _year_int(year: str) -> int | None:
     """The year as a URI segment carries it, or None. Four ASCII digits exactly,
     the two sentinels `is_citable_work_uri` refuses excluded."""
@@ -382,23 +399,41 @@ def resolve_descriptors(
     # script its digits are in.
     stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
     # A model year whose run equals the title's is that local year read twice.
-    # Compared on the run, since a model decorates the field with the era.
-    echoes_title = (
-        identity is not None
-        and sole_year_token(normalise_digits(str(metadata.get("year") or ""))) == identity.year
+    # Compared on the run, since a model decorates the field with the era, and on
+    # the date too: a model dating a document in the local calendar while calling
+    # it Gregorian states the same local year in another field.
+    model_runs = {
+        sole_year_token(normalise_digits(str(metadata.get(field) or "")))
+        for field in ("year", "date")
+    }
+    local_year = identity.year if identity is not None else ""
+    echoes_title = bool(local_year) and local_year in model_runs
+    date_echoes_title = (
+        echoes_title
+        and sole_year_token(normalise_digits(str(metadata.get("date") or ""))) == local_year
     )
     if (
         identity is not None
         and identity.year
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
+        # The month of whichever date the document gave, the source's or the
+        # model's, since a year that began mid-year needs one to settle.
+        month = stated_month if stated_month is not None else _month_of(raw_date)
         converted = _local_year_to_gregorian(
-            identity.year, cfg, jurisdiction_code, month=stated_month
+            identity.year,
+            cfg,
+            jurisdiction_code,
+            month=month if date_echoes_title else stated_month,
         )
         # Through the gate the metadata year passes: a three-digit local year,
         # or a larger offset, gives a number no URI can carry. Cleared when it
         # does not, or the unconverted local value stays and reaches the URI.
         year = str(converted) if converted is not None and _year_int(str(converted)) else ""
+        if date_echoes_title and year:
+            # The whole date was local, not just its year; its month settled the
+            # conversion, so the day converts with it.
+            raw_date = _rebased_date(raw_date, int(year))
     if _year_int(year) is None and raw_date:
         # Without this the URI takes the unknown-year placeholder while the
         # document carries its own date.

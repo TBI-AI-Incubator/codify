@@ -329,3 +329,24 @@ def test_an_echoed_year_that_cannot_convert_is_cleared_not_kept(configs: None) -
         classification_text="",
     )
     assert desc.year == ""
+
+
+def test_a_date_field_echoing_the_title_is_local_too(configs: None) -> None:
+    """A model dating a document in the local calendar while calling it
+    Gregorian states the same local year in another field; the whole date is
+    local, not only its year."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {
+            "title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511",
+            "number": "",
+            "date": "2511-09-09",
+            "calendar": "",
+        },
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "1968"
+    assert desc.raw_date == "1968-09-09"

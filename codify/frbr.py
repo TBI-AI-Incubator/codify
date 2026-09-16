@@ -171,18 +171,21 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         else None
     )
     edition = ""
+    own = None
     if edition_re is not None:
-        found = edition_re.search(text)
         # Only inside a parenthetical, as the removal below is: the marker word
-        # can be part of a substantive title.
+        # can be part of a substantive title. An edition after a re-publication
+        # marker is the edition folded into it, not this document's own.
         marker = _first_consolidation_paren(text, consolidation_re)
-        # An edition number after a re-publication marker is the edition folded
-        # into it, not this document's own.
-        if found is not None and (marker is None or marker > found.start()):
+        eligible = [m for m in edition_re.finditer(text) if marker is None or marker > m.start()]
+        if eligible:
+            # The last, as the year is: an earlier one belongs to the instrument
+            # being amended and stays in the base, telling two amendments apart.
+            own = eligible[-1]
             # "03" and "3" are one edition. Stripped as text, so a number too
             # long for an int is unharmed.
-            edition = found.group(1).lstrip("0") or "0"
-    body = edition_re.sub(" ", text) if edition_re else text
+            edition = own.group(1).lstrip("0") or "0"
+    body = text[: own.start()] + " " + text[own.end() :] if own is not None else text
     if consolidation_re is not None:
         body = _PARENTHETICAL.sub(
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
