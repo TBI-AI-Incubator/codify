@@ -139,6 +139,15 @@ def _alternation(words: Iterable[str]) -> str:
 _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
+def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int | None:
+    """Offset of the first parenthetical carrying a re-publication marker."""
+    if marker is None:
+        return None
+    return next(
+        (m.start() for m in _PARENTHETICAL.finditer(text) if marker.search(m.group(0))), None
+    )
+
+
 def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity:
     """A citable identity derived from a title alone, for instruments that carry
     no number.
@@ -167,10 +176,13 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     edition = ""
     if edition_re is not None:
         found = edition_re.search(text)
-        marker = consolidation_re.search(text) if consolidation_re else None
+        # Only inside a parenthetical, as the removal below is: a marker word can
+        # be part of a substantive title, and reading one there would strip the
+        # edition that separates an amendment from the act it amends.
+        marker = _first_consolidation_paren(text, consolidation_re)
         # An edition number after a re-publication marker is the edition folded
         # into it, not this document's own.
-        if found is not None and (marker is None or marker.start() > found.start()):
+        if found is not None and (marker is None or marker > found.start()):
             edition = found.group(1)
     body = edition_re.sub(" ", text) if edition_re else text
     if consolidation_re is not None:

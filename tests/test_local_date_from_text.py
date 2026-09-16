@@ -232,3 +232,24 @@ def test_an_impossible_date_does_not_hide_a_valid_later_one() -> None:
 def test_a_longer_digit_run_is_not_a_day() -> None:
     """Without a leading boundary "126 เมษายน" reads as the 26th."""
     assert local_date_from_text("ให้ไว้ ณ วันที่ ๑๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"new_year_month": 0, "new_year_reform_year": 2484},
+        {"new_year_month": 13, "new_year_reform_year": 2484},
+        {"new_year_month": 4, "new_year_reform_year": 0},
+        {"new_year_month": 4, "new_year_reform_year": -1},
+    ],
+)
+def test_a_reform_declared_out_of_range_is_refused(broken: dict[str, int]) -> None:
+    """A month outside 1-12 and a year below one cannot describe a new year."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(
+            kind="buddhist",
+            month_names=MONTHS,
+            month_day_is_gregorian=True,
+            date_cues=["c"],
+            **broken,
+        )

@@ -144,8 +144,13 @@ def resolve_language(metadata: dict[str, Any], cfg: Any) -> str:
 
 
 def _year_int(year: str) -> int | None:
-    """The year as a URI segment carries it, or None when it never resolved."""
-    return int(year) if year.isascii() and year.isdecimal() else None
+    """The year as a URI segment carries it, or None when it never resolved.
+
+    Four ASCII digits exactly, the shape `frbr._URI_YEAR_SEGMENT` accepts: a
+    five-digit local year converts to another five-digit value, which is not a
+    year and must not pass as one.
+    """
+    return int(year) if len(year) == 4 and year.isascii() and year.isdecimal() else None
 
 
 def draft_number(source: bytes | str) -> str:
@@ -355,9 +360,11 @@ def resolve_descriptors(
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
     identity = identity_from_title(model_title, title_rule) if title_rule else None
-    # A year that is not an ASCII run never resolved: a native-digit local year
-    # is truthy and would reach the URI unconverted.
-    if identity is not None and _year_int(year) is None and identity.year:
+    # A year the model never stated came from the title, so it is in the local
+    # calendar whatever script its digits are in; converting it is not optional
+    # just because it happens to read as four ASCII digits.
+    stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
+    if identity is not None and identity.year and (_year_int(year) is None or not stated_by_model):
         converted = year_from_calendar(identity.year, cfg.calendar, jurisdiction_code)
         year = str(converted) if converted is not None else year
     if _year_int(year) is None and raw_date:

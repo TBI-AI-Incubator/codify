@@ -349,6 +349,12 @@ class CalendarConversion(BaseModel):
             # A Gregorian grid has twelve months; any other count renumbers them
             # or leaves one unreadable, and both produce a valid wrong date.
             raise ValueError("month_day_is_gregorian needs exactly 12 month_names")
+        if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
+            raise ValueError("new_year_month must be a month, 1 to 12")
+        if self.new_year_reform_year is not None and self.new_year_reform_year < 1:
+            # Every calendar here counts from one, and the reform compares a
+            # local year against it.
+            raise ValueError("new_year_reform_year must be a year")
         if self.new_year_reform_year is not None and not self.new_year_month:
             # The reform shift compares the month against the local new year;
             # with none declared it can never fire, so the field reads as set

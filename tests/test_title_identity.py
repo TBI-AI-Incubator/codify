@@ -203,3 +203,12 @@ def test_a_limit_too_short_to_hold_an_identity_is_refused(limit: int) -> None:
         RULE.model_copy(update={"max_length": limit}).model_validate(
             RULE.model_dump() | {"max_length": limit}
         )
+
+
+def test_a_marker_word_in_a_substantive_title_is_not_a_republication() -> None:
+    """The marker is a parenthetical, not a word: read anywhere it would strip
+    the edition and collide the amendment with its principal."""
+    principal = identity_from_title("พระราชบัญญัติUpdate Services พ.ศ. 2534", RULE)
+    amendment = identity_from_title("พระราชบัญญัติUpdate Services (ฉบับที่ 2) พ.ศ. 2534", RULE)
+    assert amendment.edition == "2"
+    assert amendment.slug != principal.slug

@@ -155,3 +155,30 @@ def test_a_stated_date_supplies_a_year_the_metadata_omitted(configs: None) -> No
     )
     assert desc.raw_date == "2016-04-26"
     assert desc.year == "2016"
+
+
+def test_a_title_only_year_is_local_whatever_its_digits(configs: None) -> None:
+    """A year the model never stated came from the title, so it is in the local
+    calendar even when it happens to read as four ASCII digits."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": ""},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "2016"
+
+
+def test_a_five_digit_year_does_not_pass_as_a_resolved_one(configs: None) -> None:
+    """It converts to another five-digit value, which is not a year."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": TITLE, "number": "", "year": "25590", "date": ""},
+        jurisdiction_code="xn",
+        source_bytes=SOURCE,
+        fallback_stem="source",
+        classification_text=SOURCE_TEXT,
+    )
+    assert desc.year == "2016"
