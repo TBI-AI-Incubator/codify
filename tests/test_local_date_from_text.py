@@ -298,3 +298,11 @@ def test_a_barren_cue_does_not_reach_into_the_next_paragraph() -> None:
     # Control: one line break is a wrap, not a paragraph, and still reaches.
     wrapped = "ให้ไว้ ณ วันที่\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
     assert local_date_from_text(wrapped, "xn") == date(1937, 8, 4)
+
+
+def test_a_cue_does_not_assemble_across_a_blank_line() -> None:
+    """A separator inside a cue that swallows a paragraph break puts the break
+    inside the cue, where the reach check can no longer see it."""
+    assert local_date_from_text("ให้ไว้ ณ\n\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+    # Control: a single wrap inside the cue still assembles.
+    assert local_date_from_text("ให้ไว้ ณ\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") == date(2016, 4, 26)

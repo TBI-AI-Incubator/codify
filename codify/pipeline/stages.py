@@ -114,7 +114,7 @@ def _title_year_as_gregorian(token: str, country: str) -> str:
     cfg = try_load_config(country) if country else None
     if cfg is None or cfg.calendar == "gregorian":
         return token
-    converted = year_from_calendar(token, cfg.calendar, country)
+    converted = _local_year_to_gregorian(token, cfg, country)
     return str(converted) if converted is not None else ""
 
 
@@ -502,6 +502,18 @@ def resolve_descriptors(
                 # Local without saying so. On any other month grid the parts name
                 # days of that grid, so there is nothing to rebase.
                 raw_date = _rebased_date(raw_date, int(year)) if keeps_month_day else ""
+    if local_month_day is not None and not converted_from_title and source_date is None:
+        # A date the model labelled local states its own year, and nothing else
+        # converts it where no title grammar is declared.
+        stated_local = sole_year_token(normalise_digits(str(metadata.get("date") or "")))
+        converted = (
+            _local_year_to_gregorian(stated_local, cfg, jurisdiction_code, local_month_day[0])
+            if stated_local
+            else None
+        )
+        if converted is not None and _year_int(str(converted)):
+            year = str(converted)
+            raw_date = _built_date(int(year), local_month_day)
     if source_date is not None and not converted_from_title:
         # An exact date off the document settles the year nothing else converted.
         year = str(source_date.year)

@@ -179,6 +179,10 @@ _MONTH_SENSITIVE_KINDS = frozenset({"bikram_samvat", "ethiopian"})
 # A blank line, which ends the paragraph a cue introduces.
 _PARAGRAPH_BREAK = re.compile(r"\n[^\S\n]*\n")
 
+# Between the words of a cue: whitespace crossing at most one line break. `\s+`
+# swallows a blank line, putting the break inside the cue where nothing sees it.
+_CUE_GAP = r"(?:[^\S\n]+\n?[^\S\n]*|[^\S\n]*\n[^\S\n]*)"
+
 # How much text after a cue may hold the date it introduces; beyond it the date
 # belongs to the next paragraph.
 _DATE_WINDOW_CHARS = 200
@@ -206,7 +210,7 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     optional_particle = rf"(?:(?:{particles})\s*)?" if particles else ""
     # Declared with single spaces and met with line breaks, a signature block
     # wrapping wherever the column ran out.
-    cues = "|".join(r"\s+".join(map(re.escape, c.split())) for c in rule.date_cues if c.strip())
+    cues = "|".join(_CUE_GAP.join(map(re.escape, c.split())) for c in rule.date_cues if c.strip())
     return _LocalDatePatterns(
         re.compile(cues),
         re.compile(

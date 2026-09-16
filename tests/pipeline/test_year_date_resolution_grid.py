@@ -44,10 +44,12 @@ SOURCE_PRE = "ให้ไว้ ณ วันที่ ๓๑ มกราค�
 SOURCE_POST = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๕๑๑\n"
 
 
-def _conversion(*, gregorian_grid: bool = True, reform: bool = True) -> dict[str, object]:
+def _conversion(
+    *, gregorian_grid: bool = True, reform: bool = True, epoch_year: int = -543
+) -> dict[str, object]:
     rule: dict[str, object] = {
         "kind": "buddhist",
-        "epoch_year": -543,
+        "epoch_year": epoch_year,
         "month_names": MONTHS,
         "month_day_is_gregorian": gregorian_grid,
         "date_cues": ["ให้ไว้ ณ วันที่"],
@@ -64,6 +66,12 @@ JURISDICTIONS = {
     "xn": (True, True, False),
     "xo": (True, False, True),
     "xs": (False, True, True),
+    # A declared epoch the calendar's name does not imply, and no title grammar.
+    "xe": (False, True, True),
+    # The same three, with no title grammar declared.
+    "xg2": (False, True, True),
+    "xn2": (False, True, False),
+    "xo2": (False, False, True),
 }
 
 
@@ -76,7 +84,9 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         frbr: dict[str, object] = {
             "country_code": code,
             "uri_patterns": {"act": f"/akn/{code}/act/{{year}}/{{number}}"},
-            "calendar_conversion": _conversion(gregorian_grid=grid, reform=reform),
+            "calendar_conversion": _conversion(
+                gregorian_grid=grid, reform=reform, epoch_year=-200 if code == "xe" else -543
+            ),
         }
         if identity:
             frbr["title_identity"] = IDENTITY
@@ -175,6 +185,16 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1968",
         "1968-09-09",
     ),
+    # --- the configured rule, not a generic offset --------------------------
+    ("custom epoch, title only", "xe", {"title": PRE}, "", "2278", ""),
+    (
+        "no identity, labelled local date",
+        "xs",
+        {"title": PRE, "date": "2478-02-29", "calendar": "buddhist"},
+        "",
+        "1936",
+        "1936-02-29",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -203,3 +223,42 @@ def test_year_and_date_resolution(
 ) -> None:
     desc = _resolve(code, metadata, source)
     assert (desc.year, desc.raw_date) == (expected_year, expected_date), case
+
+
+#: Each jurisdiction of the grid paired with its twin declaring no title grammar,
+#: so every cell runs on both sides of that axis.
+WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe"}
+
+#: Cells whose local-ness is visible only by echoing the title. With no title
+#: grammar there is nothing to echo, the model called the date Gregorian, and
+#: taking it at its word is the only reading left.
+UNECHOED = {
+    "unlabelled local date echoing the title": ("2511", "2511-09-09"),
+    "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
+}
+
+
+@pytest.mark.parametrize(
+    ("case", "code", "metadata", "source", "expected_year", "expected_date"),
+    GRID,
+    ids=[row[0] for row in GRID],
+)
+def test_the_same_grid_without_a_title_grammar(
+    case: str,
+    code: str,
+    metadata: dict[str, object],
+    source: str,
+    expected_year: str,
+    expected_date: str,
+) -> None:
+    """The date resolution is the title grammar's business only where the title
+    states the year. Everything a date settles must settle the same either way.
+    """
+    twin = _resolve(WITHOUT_IDENTITY[code], metadata, source)
+    stated = str(metadata.get("date") or "") or source
+    if not stated:
+        # Nothing but the title carries a year, so the two sides may differ only
+        # in that the twin reads it through the generic fallback.
+        assert twin.raw_date == ""
+        return
+    assert (twin.year, twin.raw_date) == UNECHOED.get(case, (expected_year, expected_date)), case
