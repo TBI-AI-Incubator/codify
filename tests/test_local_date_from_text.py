@@ -284,6 +284,7 @@ def test_a_long_cue_does_not_spend_the_window_on_itself() -> None:
     """Measured from the cue's end: a cue is a phrase, and one of any length
     would otherwise consume the allowance meant for the text after it."""
     cue = "ประกาศ ณ วันที่"
-    filler = "ก" * (_DATE_WINDOW_CHARS - 20)
+    # Inside the window from the cue's end, outside it from the cue's start.
+    filler = "ก" * (_DATE_WINDOW_CHARS - 10)
     found = local_date_from_text(f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn")
     assert found == date(2016, 4, 26)
