@@ -260,3 +260,29 @@ def test_a_decorated_model_year_still_echoes_the_title(configs: None) -> None:
         classification_text="",
     )
     assert desc.year == "2016"
+
+
+def _escape_rule_descriptors(metadata: dict[str, object]) -> stages.Descriptors:
+    try_load_config.cache_clear()
+    return stages.resolve_descriptors(
+        metadata,
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+
+
+def test_a_declared_identity_supersedes_the_generic_title_number(configs: None) -> None:
+    """The generic inference reads only the number inside a title, so every
+    second edition of a numberless series would resolve to the same segment."""
+    two = _escape_rule_descriptors({"title": "พระราชบัญญัติแอลฟา (ฉบับที่ 2) พ.ศ. 2534", "number": ""})
+    three = _escape_rule_descriptors({"title": "พระราชบัญญัติแอลฟา (ฉบับที่ 3) พ.ศ. 2534", "number": ""})
+    assert two.number not in ("2", "3")
+    assert two.number != three.number
+
+
+def test_a_stated_number_still_wins_over_the_title(configs: None) -> None:
+    """Control: the skip is of the inference, not of evidence about the document."""
+    desc = _escape_rule_descriptors({"title": "พระราชบัญญัติแอลฟา (ฉบับที่ 2) พ.ศ. 2534", "number": "17"})
+    assert desc.number == "17"

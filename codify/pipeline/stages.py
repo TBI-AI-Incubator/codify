@@ -431,7 +431,15 @@ def resolve_descriptors(
     # The title is a second source, as `date` is for the year, but only a title the
     # model actually read qualifies: a filename stem is not evidence of a number, and
     # an amending act's short title states the number of the act it amends.
-    from_title = "" if metadata.get("is_amendment") else number_from_title(title_for_number)
+    # A jurisdiction declaring a title identity has a grammar for its whole
+    # title, and the generic inference reads only the number inside it: every
+    # second edition of a numberless series would resolve to "2" and collide.
+    # A number the model states still wins, being evidence about the document.
+    from_title = (
+        ""
+        if metadata.get("is_amendment") or identity is not None
+        else number_from_title(title_for_number)
+    )
     number = citable_number(number) or citable_number(from_title)
     # `4/2016` is a fine citation and a bad path segment: as the document's own
     # number it would split the FRBR path in two. A cited number keeps its
