@@ -43,10 +43,8 @@ UNKNOWN_YEAR = "0001"
 #: number opening with it, so nothing derived may take the same form.
 DRAFT_PREFIX = "draft-"
 
-#: What a title-derived slug wears when it would otherwise open the reserved
-#: namespace above. Short, since it is spent out of the slug's own cap, and
-#: reserved in its own right: escaping a slug that already opens with it is what
-#: keeps the escape injective, so no two titles can arrive at one identity.
+#: Worn by a slug that would open the namespace above. Reserved itself, or two
+#: titles reach one identity; short, being spent out of the slug's own cap.
 TITLE_ESCAPE_PREFIX = "t-"
 
 
@@ -101,21 +99,16 @@ def series_number(value: object) -> str:
 
 
 class TitleDerivedIdentity(NamedTuple):
-    """What a title states about the document's own identity.
-
-    `slug` is empty when the title carries nothing to name it by; `year` is the
-    local-calendar year the title states, and `edition` the ordinal that
-    separates an amending instrument from the one it amends.
-    """
+    """What a title states about its own identity. `slug` is empty when the title
+    names it by nothing; `year` is local, `edition` separates an amendment."""
 
     slug: str
     edition: str
     year: str
 
 
-# Letters, numbers and combining marks. `\w` drops the vowel and tone marks that
-# an abugida writes a word with, so a slug built on it is not the title. Format
-# characters are gone by here, dropped before anything matched.
+# Letters, numbers and combining marks: `\w` drops the vowel and tone marks an
+# abugida writes a word with. Format characters are gone before this runs.
 def _slug_char(ch: str) -> str:
     return ch if unicodedata.category(ch)[0] in "LNM" else "-"
 
@@ -125,19 +118,14 @@ def _slugify(text: str) -> str:
 
 
 def _capped(slug: str, limit: int) -> str:
-    """`slug` within `limit` characters, cut on a separator and marked.
-
-    Two titles sharing a long prefix would otherwise truncate onto one identity,
-    silently merging two works; the digest of the whole slug separates them and
-    is a pure function of it.
-    """
+    """`slug` within `limit` characters, cut on a separator and digest-marked, or
+    two titles sharing a long prefix truncate onto one identity."""
     if len(slug) <= limit:
         return slug
     digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:SLUG_DIGEST_CHARS]
     if limit <= len(digest):
-        # No room for a head. The digest is never shortened to fit: it is the
-        # only thing separating two titles that share a prefix, and a stored
-        # work URI lives longer than the limit that produced it.
+        # Never shortened to fit: the digest is all that separates two titles
+        # sharing a prefix, and the URI outlives the limit that produced it.
         return digest
     head = slug[: limit - len(digest) - 1].rsplit("-", 1)[0]
     return f"{head}-{digest}" if head else digest
@@ -164,17 +152,10 @@ def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int
 
 
 def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity:
-    """A citable identity derived from a title alone, for instruments that carry
-    no number.
-
-    A pure function of the title, so re-ingesting the same document mints the
-    same work URI. Native digits fold to ASCII first, and the year the title
-    states is the last one it states: an earlier one belongs to the instrument
-    being amended.
-    """
-    # Format characters go before the composition, not after: an invisible
-    # between a base letter and its combining mark blocks the two from composing,
-    # so removing it later leaves a different string from the same word.
+    """A citable identity from a title alone, for instruments carrying no number.
+    Pure, so a re-ingest mints the same URI; the year is the last one stated."""
+    # Stripped before the composition: an invisible between a letter and its
+    # mark blocks the two, so removing it after leaves a different string.
     folded = unicodedata.normalize(
         "NFC", "".join(c for c in title if unicodedata.category(c) != "Cf")
     )
@@ -192,16 +173,14 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     edition = ""
     if edition_re is not None:
         found = edition_re.search(text)
-        # Only inside a parenthetical, as the removal below is: a marker word can
-        # be part of a substantive title, and reading one there would strip the
-        # edition that separates an amendment from the act it amends.
+        # Only inside a parenthetical, as the removal below is: the marker word
+        # can be part of a substantive title.
         marker = _first_consolidation_paren(text, consolidation_re)
         # An edition number after a re-publication marker is the edition folded
         # into it, not this document's own.
         if found is not None and (marker is None or marker > found.start()):
-            # Canonical digits, not the title's typography: "03" and "3" are one
-            # edition, and a URI minted from each would fork one work. Stripped
-            # as text, so a number too long for an int is unharmed.
+            # "03" and "3" are one edition. Stripped as text, so a number too
+            # long for an int is unharmed.
             edition = found.group(1).lstrip("0") or "0"
     body = edition_re.sub(" ", text) if edition_re else text
     if consolidation_re is not None:
@@ -216,28 +195,23 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     years = list(year_re.finditer(body)) if year_re else []
     year = years[-1].group(1) if years else ""
     if years:
-        # Everything from the last particle on is this document's own date, which
-        # the URI carries in its year segment; an earlier one names another
-        # instrument and stays, being what tells two amendments apart.
+        # From the last particle on is this document's own date; an earlier one
+        # names another instrument and stays, telling two amendments apart.
         body = body[: years[-1].start()]
     body = body.strip()
     for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
         if body.startswith(prefix):
             body = body[len(prefix) :].strip()
             break
-    # The suffix is data: a long edition marker can consume the whole cap. The
-    # digest and the edition are both kept, so the segment is at least their
-    # combined length however tight the limit is.
+    # The suffix is data and can consume the whole cap; neither it nor the
+    # digest is dropped, so the segment is at least their combined length.
     suffix = f"-{_slugify(rule.edition_markers[0])}-{edition}" if edition else ""
-    # The cap covers the whole segment, suffix included: capping the base first
-    # let the edition push a slug past the limit it declares. A limit with no
-    # room for both keeps the edition, which is what separates an amendment from
-    # the act it amends, and lets the assembled segment run to the suffix.
+    # The cap covers the whole segment: capping the base alone let the edition
+    # push a slug past the declared limit.
     limit = rule.max_length - len(suffix)
     slug = _capped(_slugify(body), limit).rstrip("-")
-    # Tested on the assembled segment, which is what a URI carries: a base of
-    # "draft" and an edition suffix open the content-address namespace between
-    # them, and `draft-` there reads as an unresolved identity.
+    # Tested on the assembled segment: a base and a suffix can open the
+    # content-address namespace between them.
     if _opens_a_reserved_namespace(f"{slug}{suffix}"):
         escaped = _capped(_slugify(body), limit - len(TITLE_ESCAPE_PREFIX)).rstrip("-")
         slug = f"{TITLE_ESCAPE_PREFIX}{escaped}"

@@ -2386,9 +2386,8 @@ def _opens_reversed(text: str, at: int, boundary: re.Pattern[str] | None) -> boo
     return boundary is None or not boundary.search(text, at, nxt)
 
 
-# cp1252 bytes 0x93/0x94 are the curly double quotes; text extracted as Latin-1
-# carries them as the C1 control codepoints, which no legible document uses.
-# Folding is length-preserving, so every offset in the mask still holds.
+# The curly quotes a Latin-1 read of cp1252 leaves as C1 codepoints, which no
+# legible document uses. Length-preserving, so every mask offset still holds.
 _MOJIBAKE_QUOTES = str.maketrans({0x93: "“", 0x94: "”"})
 
 

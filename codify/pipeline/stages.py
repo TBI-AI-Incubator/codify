@@ -146,12 +146,8 @@ def resolve_language(metadata: dict[str, Any], cfg: Any) -> str:
 
 
 def _local_year_to_gregorian(local_year: str, cfg: Any, country: str) -> int | None:
-    """A local-calendar year as Gregorian, by the jurisdiction's own rule first.
-
-    The generic conversion reads the calendar's name and its usual epoch; a
-    config declaring `calendar_conversion` may name another, and the source-date
-    path already honours it. Two paths on one year must not disagree.
-    """
+    """A local-calendar year as Gregorian, by the jurisdiction's own rule first:
+    a config may declare an epoch the calendar's name does not imply."""
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if rule is not None:
         try:
@@ -163,14 +159,8 @@ def _local_year_to_gregorian(local_year: str, cfg: Any, country: str) -> int | N
 
 
 def _year_int(year: str) -> int | None:
-    """The year as a URI segment carries it, or None when it never resolved.
-
-    Four ASCII digits exactly, the shape `frbr._URI_YEAR_SEGMENT` accepts: a
-    five-digit local year converts to another five-digit value, which is not a
-    year and must not pass as one. The two sentinels `is_citable_work_uri`
-    refuses are excluded too, or a recovered source date never replaces the
-    placeholder standing in for it.
-    """
+    """The year as a URI segment carries it, or None. Four ASCII digits exactly,
+    the two sentinels `is_citable_work_uri` refuses excluded."""
     if len(year) != 4 or not year.isascii() or not year.isdecimal():
         return None
     return None if year in (UNKNOWN_YEAR, "0000") else int(year)
@@ -359,21 +349,20 @@ def resolve_descriptors(
         raw_date = ""
     cfg = load_config(jurisdiction_code)
     # The extracted text, never the source bytes: on the scanned route those are
-    # a PDF, whose decoded bytes hold markup and no provision text at all.
+    # the PDF file.
     source_text = classification_text if classification_text is not None else source_bytes
     if (
         not raw_date
         and isinstance(source_text, str)
         and declares_local_date_grammar(jurisdiction_code)
     ):
-        # The day a local-calendar document states it was made on. Deterministic
-        # and ahead of the model, which reports the year and drops the day.
+        # Deterministic, and ahead of the model, which reports the year and
+        # drops the day.
         stated = local_date_from_text(source_text, jurisdiction_code)
         if stated is not None:
             raw_date = stated.isoformat()
             if year and stated.year != _year_int(year):
-                # Both are evidence: the title states the citation year and the
-                # signature block the day. Downstream keeps the citation.
+                # Both are evidence; downstream keeps the citation year.
                 logger.info(
                     "source_date_year_differs_from_resolved_year",
                     country=jurisdiction_code,
@@ -383,13 +372,11 @@ def resolve_descriptors(
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
     identity = identity_from_title(model_title, title_rule) if title_rule else None
-    # A year the model never stated came from the title, so it is in the local
-    # calendar whatever script its digits are in; converting it is not optional
-    # just because it happens to read as four ASCII digits.
+    # A year the model never stated came from the title, so it is local whatever
+    # script its digits are in.
     stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
-    # A model year whose one year run equals the title's is that local year read
-    # twice, not independent Gregorian evidence. Compared on the run rather than
-    # the whole field, which a model decorates with the era it just read.
+    # A model year whose run equals the title's is that local year read twice.
+    # Compared on the run, since a model decorates the field with the era.
     echoes_title = (
         identity is not None
         and sole_year_token(normalise_digits(str(metadata.get("year") or ""))) == identity.year
@@ -400,14 +387,13 @@ def resolve_descriptors(
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
         converted = _local_year_to_gregorian(identity.year, cfg, jurisdiction_code)
-        # Through the same gate the metadata year passes: a three-digit local
-        # year, or an offset larger than it, gives a number no URI can carry.
+        # Through the gate the metadata year passes: a three-digit local year,
+        # or a larger offset, gives a number no URI can carry.
         if converted is not None and _year_int(str(converted)) is not None:
             year = str(converted)
     if _year_int(year) is None and raw_date:
-        # The date read off the source is Gregorian and states a year; without
-        # this the URI takes the unknown-year placeholder while the document
-        # carries its own date.
+        # Without this the URI takes the unknown-year placeholder while the
+        # document carries its own date.
         year = raw_date[:4] if _year_int(raw_date[:4]) is not None else year
     doctype = resolve_doctype(
         cfg,
@@ -431,10 +417,8 @@ def resolve_descriptors(
     # The title is a second source, as `date` is for the year, but only a title the
     # model actually read qualifies: a filename stem is not evidence of a number, and
     # an amending act's short title states the number of the act it amends.
-    # A jurisdiction declaring a title identity has a grammar for its whole
-    # title, and the generic inference reads only the number inside it: every
-    # second edition of a numberless series would resolve to "2" and collide.
-    # A number the model states still wins, being evidence about the document.
+    # The generic inference reads only the number inside a title, so every second
+    # edition of a numberless series would collide. A stated number still wins.
     from_title = (
         ""
         if metadata.get("is_amendment") or identity is not None

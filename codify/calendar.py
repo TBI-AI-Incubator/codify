@@ -176,8 +176,8 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
 # Conversion kinds whose `_apply_rule` arm already branches on the month.
 _MONTH_SENSITIVE_KINDS = frozenset({"bikram_samvat", "ethiopian"})
 
-# How much text after a date cue may hold the date it introduces. A signature
-# block puts the two together; anything further on is the next paragraph.
+# How much text after a cue may hold the date it introduces; beyond it the date
+# belongs to the next paragraph.
 _DATE_WINDOW_CHARS = 200
 
 
@@ -189,8 +189,8 @@ class _LocalDatePatterns(NamedTuple):
 
 def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns | None:
     """Cue and date patterns for a calendar that names its months, else None."""
-    # Composing a date needs the months and days to be Gregorian already: this
-    # converts the year, and nothing here maps a local month grid onto another.
+    # Only the year converts here, so a calendar with a month grid of its own
+    # cannot have a date composed from it.
     if not rule.month_names or not rule.date_cues or not rule.month_day_is_gregorian:
         return None
     index = {name: i for i, name in enumerate(rule.month_names, start=1) if name}
@@ -201,8 +201,8 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     # The particle carries the separator that follows it, so the pattern holds
     # one whitespace run rather than two around an optional group.
     optional_particle = rf"(?:(?:{particles})\s*)?" if particles else ""
-    # A cue is declared with single spaces and met with line breaks: a signature
-    # block wraps wherever the column ran out.
+    # Declared with single spaces and met with line breaks, a signature block
+    # wrapping wherever the column ran out.
     cues = "|".join(r"\s+".join(map(re.escape, c.split())) for c in rule.date_cues if c.strip())
     return _LocalDatePatterns(
         re.compile(cues),
@@ -215,9 +215,8 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
 
 
 class _GrammarKey(NamedTuple):
-    """The fields the compiled patterns are built from. `eras` is deliberately
-    absent: it holds dicts, which no cache key may carry, and no pattern reads
-    it."""
+    """The fields the patterns are built from. `eras` is absent: it holds dicts,
+    which no cache key may carry."""
 
     kind: str
     month_names: tuple[str, ...]
@@ -242,18 +241,14 @@ def _cached_patterns(key: _GrammarKey) -> _LocalDatePatterns | None:
 def _rule_and_patterns(
     country: str,
 ) -> tuple[CalendarConversion, _LocalDatePatterns] | None:
-    """The rule and its compiled patterns, or None.
-
-    Keyed on the rule's own fields rather than on the country: a country key
-    outlives `try_load_config.cache_clear()` and would answer from the config
-    that was loaded before it.
-    """
+    """The rule and its compiled patterns, or None. Keyed on the rule's fields:
+    a country key outlives `try_load_config.cache_clear()`."""
     cfg = try_load_config(country) if country else None
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if rule is None:
         return None
-    # Before the key is built: a rule that declares no grammar has nothing to
-    # compile, and its other fields need not be hashable to say so.
+    # Before the key is built: a rule declaring no grammar need not be hashable
+    # to say so.
     if not rule.month_names or not rule.date_cues or not rule.month_day_is_gregorian:
         return None
     patterns = _cached_patterns(_grammar_key(rule))
@@ -272,21 +267,13 @@ def _grammar_key(rule: CalendarConversion) -> _GrammarKey:
 
 def declares_local_date_grammar(country: str) -> bool:
     """Whether this jurisdiction names the months a dated line is written in.
-
-    Read before decoding a source, so a jurisdiction that declares no grammar
-    costs nothing.
-    """
+    Read before decoding a source, so declaring none costs nothing."""
     return _rule_and_patterns(country) is not None
 
 
 def local_date_from_text(text: str, country: str) -> date | None:
     """The Gregorian date a source states its document was made on, or None.
-
-    Cue-anchored: the first dated line of a document is often one it amends, so a
-    date is read only where a declared cue introduces it. Native digits fold to
-    ASCII, and a calendar whose year began mid-year before a reform is offset
-    accordingly, or every date in its first months lands a year early.
-    """
+    Cue-anchored: an unintroduced dated line is usually one the document amends."""
     found_rule = _rule_and_patterns(country)
     if found_rule is None:
         return None
@@ -301,16 +288,10 @@ def _first_stated_date(
     rule: CalendarConversion,
     country: str,
 ) -> date | None:
-    """The first date a declared cue introduces, or None.
-
-    Separate so a caller can bound it without a jurisdiction to load.
-    """
-    # One pass over each: a fresh search per cue re-reads the rest of the
-    # document, so a date-free document full of cue phrases is quadratic. Both
-    # sequences are in order, so a cursor over the cues finds the nearest one
-    # preceding each date. Searched unbounded and rejected by distance: an
-    # `endpos` shortens the string, so a year straddling the bound would match
-    # as its first three digits.
+    """The first date a declared cue introduces, or None. Separate so a caller
+    can bound it without a jurisdiction to load."""
+    # One pass over each, both being in order: a fresh search per cue is
+    # quadratic. Rejected by distance, since an `endpos` would cut a year short.
     cues = [m.start() for m in patterns.cue.finditer(folded)]
     if not cues:
         return None
@@ -320,8 +301,8 @@ def _first_stated_date(
             nearest += 1
         if candidate.start() - cues[nearest] >= _DATE_WINDOW_CHARS:
             continue
-        # Validated here, not after the walk: a syntactic match that is not a
-        # real date (31 April) would otherwise hide a valid later cue.
+        # Validated inside the walk, or a syntactic non-date (31 April) hides a
+        # valid later cue.
         stated = _compose(candidate, patterns, rule, country)
         if stated is not None:
             return stated
@@ -340,8 +321,8 @@ def _compose(
     try:
         gregorian_year = _apply_rule(local_year, rule, month=month)
     except CalendarConversionError as exc:
-        # A misconfigured rule reads to the caller as "this document states no
-        # date", which is the same answer a whole corpus would give.
+        # A misconfigured rule otherwise reads as "this document states no
+        # date", the same answer a whole corpus would give.
         logger.warning("local_date_conversion_failed", country=country, error=str(exc)[:160])
         return None
     reform = rule.new_year_reform_year

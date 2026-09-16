@@ -319,66 +319,55 @@ class CalendarConversion(BaseModel):
     # Month names in the local calendar's own order, index 0 = month 1. Present
     # only where a dated line is read off the source text.
     month_names: list[str] = Field(default_factory=list)
-    # Whether this calendar's months and days coincide with the Gregorian ones,
-    # so a stated day and month need only the year converting. False for every
-    # calendar with a grid of its own, where composing a date from a converted
-    # year and a local month is wrong by months.
+    # Whether the months and days coincide with the Gregorian ones, so only the
+    # year converts. False for any calendar with a grid of its own.
     month_day_is_gregorian: bool = False
     # Phrases that introduce the date a document was made. A dated line elsewhere
     # in the text is some other instrument's.
     date_cues: list[str] = Field(default_factory=list)
     # Words marking a year as belonging to this calendar ("B.E.", "A.H.").
     year_particles: list[str] = Field(default_factory=list)
-    # The local year began in this month before `new_year_reform_year`, so a
-    # date earlier in the Gregorian year carries the previous local year's
-    # number and the epoch offset understates it by one.
+    # The local year began in this month before `new_year_reform_year`, so an
+    # earlier date carries the previous year's number and the offset is short.
     new_year_reform_year: int | None = None
     note: str = ""
 
     @model_validator(mode="after")
     def _date_grammar_is_usable(self) -> "CalendarConversion":
-        """A grammar that reads a date must name every month exactly once and
-        carry a cue. A blank entry silently renumbers the months, and a blank
-        cue compiles to a pattern matching the start of every document."""
+        """A blank month renumbers the calendar and a blank cue compiles to a
+        pattern matching the start of every document."""
         names = [n.strip() for n in self.month_names]
         if self.month_names and (not all(names) or len(set(names)) != len(names)):
             raise ValueError("month_names must be non-blank and distinct")
         if self.date_cues and not any(c.strip() for c in self.date_cues):
             raise ValueError("date_cues must carry at least one non-blank cue")
         if self.month_day_is_gregorian and len(self.month_names) != 12:
-            # A Gregorian grid has twelve months; any other count renumbers them
-            # or leaves one unreadable, and both produce a valid wrong date.
+            # Any other count renumbers the months or leaves one unreadable.
             raise ValueError("month_day_is_gregorian needs exactly 12 month_names")
         if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
             raise ValueError("new_year_month must be a month, 1 to 12")
         if self.new_year_reform_year is not None and self.new_year_reform_year < 1:
-            # Every calendar here counts from one, and the reform compares a
-            # local year against it.
+            # Every calendar here counts from one.
             raise ValueError("new_year_reform_year must be a year")
         if self.new_year_reform_year is not None and not self.new_year_month:
-            # The reform shift compares the month against the local new year;
-            # with none declared it can never fire, so the field reads as set
+            # Without one the shift can never fire, so the field reads as set
             # and does nothing.
             raise ValueError("new_year_reform_year needs new_year_month")
         return self
 
 
-#: Hex characters of the digest a truncated slug carries. Six (2^24) collided on
-#: ordinary titles; this is the width a persistent work URI needs.
+#: Hex characters of the digest a truncated slug carries; six (2^24) collided on
+#: ordinary titles.
 SLUG_DIGEST_CHARS = 12
 
-#: Shortest `TitleIdentity.max_length` that can hold a truncation digest and a
-#: short edition suffix. `codify.frbr` reads both back when it caps a slug. A
-#: longer edition marker is data and can still push a segment past the limit.
+#: Shortest `max_length` holding a digest and a short edition suffix. A longer
+#: marker is data and can still push a segment past the limit.
 SLUG_FLOOR = SLUG_DIGEST_CHARS + 10
 
 
 class TitleIdentity(BaseModel):
     """How a jurisdiction that numbers nothing derives an identity from a title.
-
-    Every field is a literal the title grammar uses; the mechanism reading them
-    is `codify.frbr.identity_from_title`.
-    """
+    Every field is a literal `codify.frbr.identity_from_title` reads."""
 
     model_config = _STRICT
 
@@ -389,8 +378,8 @@ class TitleIdentity(BaseModel):
 
     @model_validator(mode="after")
     def _literals_are_not_blank(self) -> "TitleIdentity":
-        """A blank particle or marker matches everywhere, so the grammar would
-        read any run of digits as the year and any parenthetical as an edition."""
+        """A blank particle matches everywhere, so any run of digits would read
+        as the year and any parenthetical as an edition."""
         for name in (
             "strip_prefixes",
             "year_particles",
@@ -401,18 +390,14 @@ class TitleIdentity(BaseModel):
                 raise ValueError(f"{name} must not carry a blank entry")
         return self
 
-    # Words inside a parenthetical naming this instrument's edition number,
-    # spelling variants included. The first is the canonical one and is what a
-    # slug carries, so a reform of the orthography does not fork an identity.
+    # Words inside a parenthetical naming this instrument's edition, spelling
+    # variants included; the first is canonical and is what a slug carries.
     edition_markers: list[str] = Field(default_factory=list)
-    # Parenthetical words marking a re-publication of an earlier work rather
-    # than the work itself; an edition number after one is the edition the
-    # publisher folded in, not this document's.
+    # Parenthetical words marking a re-publication; an edition number after one
+    # is the edition folded in, not this document's.
     consolidation_markers: list[str] = Field(default_factory=list)
-    # Longest slug kept, in characters. Floored: a segment carries the edition
-    # ordinal and, where it was truncated, a digest, and dropping either merges
-    # two works onto one URI. A limit below the floor cannot hold both, so it is
-    # refused rather than silently exceeded.
+    # Longest slug kept. Floored, since a limit holding neither the edition nor
+    # a digest would merge two works onto one URI.
     max_length: int = Field(default=100, ge=SLUG_FLOOR)
 
 
