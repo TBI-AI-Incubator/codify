@@ -294,7 +294,10 @@ def declares_this_calendar(label: str, country: str) -> bool:
     cfg = try_load_config(country) if country else None
     if cfg is None:
         return False
-    return normalise_calendar(cfg.calendar) in (normalise_calendar(label), f"{label}_era")
+    # Both forms from the normalised label: the era alias built from the raw
+    # string misses a padded or upper-cased one, which a model answer may be.
+    named = normalise_calendar(label)
+    return normalise_calendar(cfg.calendar) in (named, f"{named}_era")
 
 
 def labelled_year_as_gregorian(token: str, label: str, country: str) -> int | None:

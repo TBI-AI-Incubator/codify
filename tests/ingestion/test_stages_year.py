@@ -1,5 +1,7 @@
 """resolve_year and gregorian_year extract year from metadata or fallback title."""
 
+import pytest
+
 from codify.pipeline.enrich.metadata import gregorian_year
 from codify.pipeline.stages import resolve_year
 
@@ -69,3 +71,31 @@ def test_the_stored_year_matches_the_uri_year_on_a_title_only_year(tmp_path, mon
         labelled = {"year": "2511", "calendar": "buddhist"}
         assert resolve_year(labelled, "xc") == "2311"
         assert gregorian_year(labelled, "xc") == 2311
+
+
+@pytest.mark.parametrize("label", ["buddhist", " buddhist ", "BUDDHIST", " Buddhist_Era "])
+def test_a_padded_or_cased_label_still_names_the_configured_calendar(
+    label: str, tmp_path, monkeypatch
+) -> None:
+    """The label is a model answer, so its spacing and case vary; a comparison
+    form built from the raw string misses the rule and takes the generic offset.
+    """
+    from tests.config_fixtures import isolated_configs
+
+    configs = {
+        "xc": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xc",
+                "calendar_conversion": {"kind": "buddhist", "epoch_year": -200},
+            },
+        }
+    }
+    from codify.calendar import declares_this_calendar, labelled_year_as_gregorian
+
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        # Through the callers, which normalise, and at the helper, which is
+        # where a caller passing a raw label would otherwise lose the rule.
+        assert gregorian_year({"year": "2511", "calendar": label}, "xc") == 2311
+        assert declares_this_calendar(label, "xc")
+        assert labelled_year_as_gregorian("2511", label, "xc") == 2311
