@@ -403,9 +403,8 @@ def test_every_year_path_answers_the_same(
 #: so every cell runs on both sides of that axis.
 WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe", "xei": "xe"}
 
-#: Cells whose local-ness is visible only by echoing the title. With no title
-#: grammar there is nothing to echo, the model called the date Gregorian, and
-#: taking it at its word is the only reading left.
+#: Cells whose local-ness shows only by echoing the title. With no grammar
+#: there is nothing to echo, so the model's word is the only reading left.
 UNECHOED = {
     "unlabelled local date echoing the title": ("2511", "2511-09-09"),
     "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
@@ -416,9 +415,8 @@ UNECHOED = {
     # Nothing converts it and nothing clears it, but three digits cannot form a
     # URI year segment either way, so both sides end uncitable.
     "year the conversion cannot carry": ("999", ""),
-    # With no title to conflict with, the date is simply the date the model
-    # stated, converted on its own year; only the document's year is decided
-    # elsewhere, and both sides agree on that.
+    # With no title to conflict with, the date is the one the model stated,
+    # converted on its own year; both sides agree on the document's.
     "an echoed year with a date naming another year": ("1935", "1938-05-20"),
     # No grammar, so the bare local year is read as written; the same title with
     # two year runs names no single one, and nothing else states it.

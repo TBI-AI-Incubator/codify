@@ -208,10 +208,10 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     # The particle carries the separator that follows it, so the pattern holds
     # one whitespace run rather than two around an optional group.
     optional_particle = rf"(?:(?:{particles})\s*)?" if particles else ""
-    # Declared with single spaces and met with line breaks, a signature block
-    # wrapping wherever the column ran out.
-    # Longest first, so a shorter cue listed earlier cannot win at the same
-    # offset and spend the reach allowance on the rest of the longer one.
+    # A cue declared with single spaces meets a signature block's line breaks.
+
+    # Longest first, or a shorter cue wins at the same offset and spends the
+    # reach on the rest of the longer one.
     ordered = sorted({c for c in rule.date_cues if c.strip()}, key=lambda c: (-len(c), c))
     cues = "|".join(_CUE_GAP.join(map(re.escape, c.split())) for c in ordered)
     return _LocalDatePatterns(
@@ -367,9 +367,8 @@ def _first_stated_date(
 ) -> date | None:
     """The first date a declared cue introduces, or None. Separate so a caller
     can bound it without a jurisdiction to load."""
-    # One pass over each, both being in order: a fresh search per cue is
-    # quadratic. Rejected by distance, since an `endpos` would cut a year short.
-    # Ends, not starts: a long cue would otherwise spend the window on itself.
+    # One pass over each, both in order: a fresh search per cue is quadratic.
+    # Cue ends, not starts, or a long cue spends the window on itself.
     cues = [m.end() for m in patterns.cue.finditer(folded)]
     if not cues:
         return None

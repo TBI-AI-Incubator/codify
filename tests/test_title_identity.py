@@ -12,8 +12,7 @@ from pydantic import ValidationError
 from codify.frbr import DRAFT_PREFIX, identity_from_title, is_citable_work_uri
 from codify.jurisdictions import SLUG_DIGEST_CHARS, SLUG_FLOOR, TitleIdentity
 
-# Every title here is fabricated: the script exercises the grammar, and no
-# statute of any of these names exists. Thai vowel and tone marks are separate
+# Every title here is fabricated. Thai vowel and tone marks are separate
 # codepoints, which is the property the combining-mark case turns on.
 RULE = TitleIdentity(
     strip_prefixes=["พระราชบัญญัติประกอบรัฐธรรมนูญ", "พระราชบัญญัติ"],

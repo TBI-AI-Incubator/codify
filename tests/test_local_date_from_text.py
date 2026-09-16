@@ -320,9 +320,8 @@ def test_a_longer_cue_wins_over_a_shorter_one_it_contains() -> None:
     )
     patterns = compile_local_date_patterns(rule)
     assert patterns is not None
-    # The date sits just inside the window from the longer cue's end, and so
-    # outside it from the shorter cue's, which ends earlier.
-    # Digits ASCII: this calls the walk directly, below the fold the reader does.
+    # Just inside the window from the longer cue's end, and outside it from the
+    # shorter cue's. ASCII digits: this calls the walk below the fold.
     long_cue, stated = "ให้ไว้ ณ วันที่", " 26 เมษายน พ.ศ. 2559"
     filler = "ก" * (_DATE_WINDOW_CHARS - 2)
     assert len(filler) + 1 > _DATE_WINDOW_CHARS - len(" ณ วันที่")

@@ -146,9 +146,8 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
         )
         return digits
     if raw_date:
-        # Converted only where the model said the date is local. A date it called
-        # Gregorian, or left unlabelled, is taken as written: converting one
-        # again puts a year no document states in the URI.
+        # Converted only where the model called the date local. Converting one
+        # it called Gregorian puts a year no document states in the URI.
         if cal and cal != "gregorian":
             try:
                 return str(to_gregorian_year(raw_date.split("-")[0], country))
@@ -176,17 +175,14 @@ def resolve_dating(
     cfg = try_load_config(country) if country else None
     year = _year_from_fields(metadata, country, model_title or title)
     raw_date = canonical_year_and_date(metadata)[1]
-    # Non-Gregorian raw dates stay in the local calendar; the FRBR URI year
-    # must be Gregorian, so blank the date and rely on the resolved year. The
-    # month and day carry over only where the calendar declares its grid is the
-    # Gregorian one; on any other grid they name days of that grid.
+    # A local date is blanked, the URI year being Gregorian. Its month and day
+    # carry over only where the calendar declares the Gregorian grid.
     stated_date = raw_date
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
     keeps_month_day = _grid_is_gregorian(cfg)
     local_month_day = _month_day(raw_date) if cal != "gregorian" and keeps_month_day else None
-    # Carried only where the date and the title name one year. A date stating
-    # another year is about another document, and rebuilding it on the title's
-    # year would invent a date neither states.
+    # Carried only where date and title name one year: rebuilding a date
+    # stating another on the title's would invent one neither states.
     local_date_year = sole_year_token(normalise_digits(raw_date))
     if cal != "gregorian":
         raw_date = ""
@@ -201,9 +197,8 @@ def resolve_dating(
         if stated is not None:
             source_date = stated
             raw_date = stated.isoformat()
-            # The month the document states, kept for the year conversion: a
-            # local year that began mid-year straddles two Gregorian ones, and a
-            # work date disagreeing with the URI year is dropped downstream.
+            # Kept for the conversion: a year that began mid-year straddles two
+            # Gregorian ones.
             stated_month = stated.month
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg is not None and cfg.frbr is not None else None
@@ -214,10 +209,8 @@ def resolve_dating(
         sole_year_token(normalise_digits(str(metadata.get(field) or "")))
         for field in ("year", "date")
     )
-    # A model year whose run equals the title's is that local year read twice.
-    # Compared on the run, since a model decorates the field with the era, and on
-    # the date too: a model dating a document in the local calendar while calling
-    # it Gregorian states the same local year in another field.
+    # A field whose year run equals the title's is that local year read twice.
+    # On the run, since a model decorates the field, and on the date as well.
     model_runs = {
         sole_year_token(normalise_digits(str(metadata.get(field) or "")))
         for field in ("year", "date")
@@ -231,10 +224,8 @@ def resolve_dating(
         and identity.year
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
-        # The month of whichever date the document gave. A local month settles
-        # the conversion whether or not its grid matches the Gregorian one.
-        # Only where converting with it lands on the date the source states:
-        # a cue date naming another year dates another document.
+        # The source's month, but only where converting with it lands on the
+        # date the source states: a cue date naming another year is another's.
         source_month = stated_month
         if source_date is not None and stated_month is not None:
             with_month = _local_year_to_gregorian(identity.year, cfg, country, month=stated_month)
@@ -245,9 +236,8 @@ def resolve_dating(
         converted = _local_year_to_gregorian(
             identity.year, cfg, country, month=month if date_echoes_title else source_month
         )
-        # Through the gate the metadata year passes: a three-digit local year,
-        # or a larger offset, gives a number no URI can carry. Cleared when it
-        # does not, or the unconverted local value stays and reaches the URI.
+        # Through the gate the metadata year passes, or the unconverted local
+        # value stays and reaches the URI.
         year = str(converted) if converted is not None and _year_int(str(converted)) else ""
         converted_from_title = bool(year)
         # Never over a date read off the document itself, which is exact.

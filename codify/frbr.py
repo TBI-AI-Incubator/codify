@@ -193,9 +193,8 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     edition = ""
     own = None
     if edition_re is not None:
-        # Only inside a parenthetical, as the removal below is: the marker word
-        # can be part of a substantive title. An edition after a re-publication
-        # marker is the edition folded into it, not this document's own.
+        # Inside a parenthetical only: the word can be part of a title. An
+        # edition after a republication marker is the one folded into it.
         marker = _first_consolidation_paren(text, consolidation_re)
         eligible = [m for m in edition_re.finditer(text) if marker is None or marker > m.start()]
         if eligible:

@@ -25,9 +25,8 @@ MONTHS = [
     "พฤศจิกายน",
     "ธันวาคม",
 ]
-# Fabricated: a title of this shape exists in no statute book. It carries the
-# grammar under test — kind prefix, combining marks, edition parenthetical,
-# year particle, native digits — and nothing else.
+# Fabricated: it carries the grammar under test — kind prefix, combining marks,
+# edition parenthetical, year particle, native digits — and nothing else.
 TITLE = "พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ ๓) พ.ศ. ๒๕๑๑"
 SOURCE_TEXT = f"{TITLE}\nให้ไว้ ณ วันที่ ๙ กันยายน พ.ศ. ๒๕๑๑\n"
 SOURCE = SOURCE_TEXT.encode()
