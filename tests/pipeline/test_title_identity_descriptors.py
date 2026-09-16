@@ -25,8 +25,11 @@ MONTHS = [
     "พฤศจิกายน",
     "ธันวาคม",
 ]
-TITLE = "พระราชบัญญัติเครื่องหมายการค้า (ฉบับที่ ๓) พ.ศ. ๒๕๕๙"
-SOURCE_TEXT = f"{TITLE}\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙\n"
+# Fabricated: a title of this shape exists in no statute book. It carries the
+# grammar under test — kind prefix, combining marks, edition parenthetical,
+# year particle, native digits — and nothing else.
+TITLE = "พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ ๓) พ.ศ. ๒๕๑๑"
+SOURCE_TEXT = f"{TITLE}\nให้ไว้ ณ วันที่ ๙ กันยายน พ.ศ. ๒๕๑๑\n"
 SOURCE = SOURCE_TEXT.encode()
 
 
@@ -78,7 +81,7 @@ def _descriptors(code: str) -> stages.Descriptors:
         {
             "title": TITLE,
             "number": "",
-            "year": "๒๕๕๙",
+            "year": "๒๕๑๑",
             "date": "",
             "calendar": "buddhist",
             "is_amendment": True,
@@ -93,7 +96,7 @@ def _descriptors(code: str) -> stages.Descriptors:
 def test_a_declared_title_grammar_mints_a_citable_work_uri(configs: None) -> None:
     desc = _descriptors("xn")
     uri = build_frbr_work_uri("xn", desc.doctype, desc.year, desc.number)
-    assert uri == "/akn/xn/act/2016/เครื่องหมายการค้า-ฉบับที่-3"
+    assert uri == "/akn/xn/act/1968/เครื่องร่อนสุริยะ-ฉบับที่-3"
     assert is_citable_work_uri(uri)
 
 
@@ -105,7 +108,7 @@ def test_without_one_the_identity_is_the_content_address(configs: None) -> None:
 
 
 def test_the_source_supplies_the_day_the_model_did_not(configs: None) -> None:
-    assert _descriptors("xn").raw_date == "2016-04-26"
+    assert _descriptors("xn").raw_date == "1968-09-09"
 
 
 def test_a_route_that_extracted_no_text_reads_no_date(configs: None) -> None:
@@ -113,7 +116,7 @@ def test_a_route_that_extracted_no_text_reads_no_date(configs: None) -> None:
     decoded bytes carry markup rather than the document's own dated line."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": TITLE, "number": "", "year": "๒๕๕๙", "date": "", "calendar": "buddhist"},
+        {"title": TITLE, "number": "", "year": "๒๕๑๑", "date": "", "calendar": "buddhist"},
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
@@ -125,7 +128,7 @@ def test_a_numbered_instrument_keeps_its_number(configs: None) -> None:
     """The title grammar is a fallback, not a replacement for a stated number."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": TITLE, "number": "17", "year": "๒๕๕๙", "calendar": "buddhist"},
+        {"title": TITLE, "number": "17", "year": "๒๕๑๑", "calendar": "buddhist"},
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
@@ -139,13 +142,13 @@ def test_a_native_digit_year_is_not_a_resolved_year(configs: None) -> None:
     unconverted, so the title's year must still be consulted."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": TITLE, "number": "", "year": "๒๕๕๙", "date": ""},
+        {"title": TITLE, "number": "", "year": "๒๕๑๑", "date": ""},
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
         classification_text=SOURCE_TEXT,
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def test_a_stated_date_supplies_a_year_the_metadata_omitted(configs: None) -> None:
@@ -159,8 +162,8 @@ def test_a_stated_date_supplies_a_year_the_metadata_omitted(configs: None) -> No
         fallback_stem="source",
         classification_text=SOURCE_TEXT,
     )
-    assert desc.raw_date == "2016-04-26"
-    assert desc.year == "2016"
+    assert desc.raw_date == "1968-09-09"
+    assert desc.year == "1968"
 
 
 def test_a_title_only_year_is_local_whatever_its_digits(configs: None) -> None:
@@ -168,26 +171,26 @@ def test_a_title_only_year_is_local_whatever_its_digits(configs: None) -> None:
     calendar even when it happens to read as four ASCII digits."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": ""},
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "number": ""},
         jurisdiction_code="xn",
         source_bytes=b"",
         fallback_stem="source",
         classification_text="",
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def test_a_five_digit_year_does_not_pass_as_a_resolved_one(configs: None) -> None:
     """It converts to another five-digit value, which is not a year."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": TITLE, "number": "", "year": "25590", "date": "", "calendar": "buddhist"},
+        {"title": TITLE, "number": "", "year": "25110", "date": "", "calendar": "buddhist"},
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
         classification_text=SOURCE_TEXT,
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def test_a_model_year_echoing_the_title_is_the_same_local_year(configs: None) -> None:
@@ -195,13 +198,13 @@ def test_a_model_year_echoing_the_title_is_the_same_local_year(configs: None) ->
     Gregorian evidence, however it labelled the calendar."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": "", "year": "2559"},
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "number": "", "year": "2511"},
         jurisdiction_code="xn",
         source_bytes=b"",
         fallback_stem="source",
         classification_text="",
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def test_the_configured_conversion_rule_wins_over_the_generic_one(configs: None) -> None:
@@ -209,13 +212,13 @@ def test_the_configured_conversion_rule_wins_over_the_generic_one(configs: None)
     source-date path already honours it, so this one must agree."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": ""},
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "number": ""},
         jurisdiction_code="xk",
         source_bytes=b"",
         fallback_stem="source",
         classification_text="",
     )
-    assert desc.year == "2359"
+    assert desc.year == "2311"
 
 
 def test_the_unknown_year_sentinel_gives_way_to_a_recovered_date(configs: None) -> None:
@@ -229,14 +232,14 @@ def test_the_unknown_year_sentinel_gives_way_to_a_recovered_date(configs: None) 
         fallback_stem="source",
         classification_text=SOURCE_TEXT,
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None) -> None:
     """A three-digit local year converts to a number no URI segment can carry."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 999", "number": ""},
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999", "number": ""},
         jurisdiction_code="xn",
         source_bytes=b"",
         fallback_stem="source",
@@ -253,13 +256,13 @@ def test_a_decorated_model_year_still_echoes_the_title(configs: None) -> None:
     year run inside it is the same local year the title states."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": "", "year": "B.E. 2559"},
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "number": "", "year": "B.E. 2511"},
         jurisdiction_code="xn",
         source_bytes=b"",
         fallback_stem="source",
         classification_text="",
     )
-    assert desc.year == "2016"
+    assert desc.year == "1968"
 
 
 def _escape_rule_descriptors(metadata: dict[str, object]) -> stages.Descriptors:
