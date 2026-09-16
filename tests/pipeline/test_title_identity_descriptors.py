@@ -175,7 +175,7 @@ def test_a_five_digit_year_does_not_pass_as_a_resolved_one(configs: None) -> Non
     """It converts to another five-digit value, which is not a year."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
-        {"title": TITLE, "number": "", "year": "25590", "date": ""},
+        {"title": TITLE, "number": "", "year": "25590", "date": "", "calendar": "buddhist"},
         jurisdiction_code="xn",
         source_bytes=SOURCE,
         fallback_stem="source",
