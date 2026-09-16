@@ -9,6 +9,7 @@ import pytest
 from codify.frbr import build_frbr_work_uri, is_citable_work_uri
 from codify.jurisdictions import try_load_config
 from codify.pipeline import stages
+from codify.pipeline.stages import _year_int
 
 MONTHS = [
     "มกราคม",
@@ -215,3 +216,30 @@ def test_the_configured_conversion_rule_wins_over_the_generic_one(configs: None)
         classification_text="",
     )
     assert desc.year == "2359"
+
+
+def test_the_unknown_year_sentinel_gives_way_to_a_recovered_date(configs: None) -> None:
+    """The placeholder stands in for a year nobody read; a source that states
+    one must replace it, not be refused by it."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "Untitled", "number": "", "year": "0001", "date": ""},
+        jurisdiction_code="xn",
+        source_bytes=SOURCE,
+        fallback_stem="source",
+        classification_text=SOURCE_TEXT,
+    )
+    assert desc.year == "2016"
+
+
+def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None) -> None:
+    """A three-digit local year converts to a number no URI segment can carry."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 999", "number": ""},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert _year_int(desc.year) is None

@@ -24,6 +24,7 @@ from codify.calendar import (
     year_from_calendar,
 )
 from codify.frbr import (
+    UNKNOWN_YEAR,
     UncitableFrbrUri,
     identity_from_title,
     law_number_token,
@@ -166,9 +167,13 @@ def _year_int(year: str) -> int | None:
 
     Four ASCII digits exactly, the shape `frbr._URI_YEAR_SEGMENT` accepts: a
     five-digit local year converts to another five-digit value, which is not a
-    year and must not pass as one.
+    year and must not pass as one. The two sentinels `is_citable_work_uri`
+    refuses are excluded too, or a recovered source date never replaces the
+    placeholder standing in for it.
     """
-    return int(year) if len(year) == 4 and year.isascii() and year.isdecimal() else None
+    if len(year) != 4 or not year.isascii() or not year.isdecimal():
+        return None
+    return None if year in (UNKNOWN_YEAR, "0000") else int(year)
 
 
 def draft_number(source: bytes | str) -> str:
@@ -394,7 +399,10 @@ def resolve_descriptors(
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
         converted = _local_year_to_gregorian(identity.year, cfg, jurisdiction_code)
-        year = str(converted) if converted is not None else year
+        # Through the same gate the metadata year passes: a three-digit local
+        # year, or an offset larger than it, gives a number no URI can carry.
+        if converted is not None and _year_int(str(converted)) is not None:
+            year = str(converted)
     if _year_int(year) is None and raw_date:
         # The date read off the source is Gregorian and states a year; without
         # this the URI takes the unknown-year placeholder while the document
