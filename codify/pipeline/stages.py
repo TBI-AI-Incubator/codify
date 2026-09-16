@@ -396,9 +396,9 @@ def resolve_descriptors(
             identity.year, cfg, jurisdiction_code, month=stated_month
         )
         # Through the gate the metadata year passes: a three-digit local year,
-        # or a larger offset, gives a number no URI can carry.
-        if converted is not None and _year_int(str(converted)) is not None:
-            year = str(converted)
+        # or a larger offset, gives a number no URI can carry. Cleared when it
+        # does not, or the unconverted local value stays and reaches the URI.
+        year = str(converted) if converted is not None and _year_int(str(converted)) else ""
     if _year_int(year) is None and raw_date:
         # Without this the URI takes the unknown-year placeholder while the
         # document carries its own date.

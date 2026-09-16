@@ -315,3 +315,17 @@ def test_a_year_straddling_two_gregorian_ones_follows_the_stated_date(configs: N
     )
     assert desc.raw_date == "1936-01-31"
     assert desc.year == "1936"
+
+
+def test_an_echoed_year_that_cannot_convert_is_cleared_not_kept(configs: None) -> None:
+    """The local value is not a Gregorian year; leaving it in place would put it
+    in the URI instead of the unknown-year placeholder."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999", "number": "", "year": "999"},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == ""
