@@ -52,11 +52,17 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "consolidation_markers": ["Update"],
     }
 
-    def build(*, with_identity: bool, epoch_year: int = -543) -> dict[str, object]:
+    def build(
+        *, with_identity: bool, epoch_year: int = -543, reform: bool = False
+    ) -> dict[str, object]:
         frbr: dict[str, object] = {
             "country_code": "xn",
             "uri_patterns": {"act": "/akn/xn/act/{year}/{number}"},
-            "calendar_conversion": {**conversion, "epoch_year": epoch_year},
+            "calendar_conversion": {
+                **conversion,
+                "epoch_year": epoch_year,
+                **({"new_year_month": 4, "new_year_reform_year": 2484} if reform else {}),
+            },
         }
         if with_identity:
             frbr["title_identity"] = identity
@@ -70,6 +76,8 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "xm": build(with_identity=False),
             # A declared epoch the calendar's name does not imply.
             "xk": build(with_identity=True, epoch_year=-200),
+            # A year that began mid-year before a reform.
+            "xr": build(with_identity=True, reform=True),
         },
     ):
         yield
@@ -289,3 +297,21 @@ def test_a_stated_number_still_wins_over_the_title(configs: None) -> None:
     """Control: the skip is of the inference, not of evidence about the document."""
     desc = _escape_rule_descriptors({"title": "Act Alpha (No. 2) of 1991", "number": "17"})
     assert desc.number == "17"
+
+
+def test_a_year_straddling_two_gregorian_ones_follows_the_stated_date(configs: None) -> None:
+    """Before the reform the local year began mid-year, so converting it with a
+    month and without gives different years; the work date would then disagree
+    with the URI year and be dropped."""
+    try_load_config.cache_clear()
+    title = "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. ๒๔๗๘"
+    text = f"{title}\nให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๔๗๘\n"
+    desc = stages.resolve_descriptors(
+        {"title": title, "number": ""},
+        jurisdiction_code="xr",
+        source_bytes=text.encode(),
+        fallback_stem="source",
+        classification_text=text,
+    )
+    assert desc.raw_date == "1936-01-31"
+    assert desc.year == "1936"

@@ -44,7 +44,7 @@ def date_grammar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "epoch_year": -543,
         "month_names": MONTHS,
         "month_day_is_gregorian": True,
-        "date_cues": ["ให้ไว้ ณ วันที่", "ตราไว้ ณ วันที่"],
+        "date_cues": ["ให้ไว้ ณ วันที่", "ตราไว้ ณ วันที่", "ประกาศ ณ วันที่"],
         "year_particles": ["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."],
         "new_year_month": 4,
         "new_year_reform_year": 2484,
@@ -278,3 +278,12 @@ def test_a_document_full_of_cues_and_no_date_is_read_once() -> None:
         subprocess.run([sys.executable, "-c", script], timeout=15, check=True)
     except subprocess.TimeoutExpired:
         pytest.fail("the cue walk did not finish within 15s on 20k date-free cues")
+
+
+def test_a_long_cue_does_not_spend_the_window_on_itself() -> None:
+    """Measured from the cue's end: a cue is a phrase, and one of any length
+    would otherwise consume the allowance meant for the text after it."""
+    cue = "ประกาศ ณ วันที่"
+    filler = "ก" * (_DATE_WINDOW_CHARS - 20)
+    found = local_date_from_text(f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn")
+    assert found == date(2016, 4, 26)

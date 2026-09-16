@@ -292,7 +292,8 @@ def _first_stated_date(
     can bound it without a jurisdiction to load."""
     # One pass over each, both being in order: a fresh search per cue is
     # quadratic. Rejected by distance, since an `endpos` would cut a year short.
-    cues = [m.start() for m in patterns.cue.finditer(folded)]
+    # Ends, not starts: a long cue would otherwise spend the window on itself.
+    cues = [m.end() for m in patterns.cue.finditer(folded)]
     if not cues:
         return None
     nearest = 0
@@ -307,6 +308,16 @@ def _first_stated_date(
         if stated is not None:
             return stated
     return None
+
+
+def reform_shift(rule: CalendarConversion, local_year: int, month: int) -> int:
+    """1 where a local year that began mid-year puts this month in the next
+    Gregorian year, else 0. Kinds whose own arm reads the month are already
+    shifted and must not be twice."""
+    reform = rule.new_year_reform_year
+    if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS:
+        return 0
+    return 1 if local_year < reform and month < (rule.new_year_month or 1) else 0
 
 
 def _compose(
@@ -325,12 +336,7 @@ def _compose(
         # date", the same answer a whole corpus would give.
         logger.warning("local_date_conversion_failed", country=country, error=str(exc)[:160])
         return None
-    reform = rule.new_year_reform_year
-    # Kinds whose own arm already reads the month must not be shifted twice.
-    if rule.kind in _MONTH_SENSITIVE_KINDS:
-        reform = None
-    if reform is not None and local_year < reform and month < (rule.new_year_month or 1):
-        gregorian_year += 1
+    gregorian_year += reform_shift(rule, local_year, month)
     try:
         return date(gregorian_year, month, int(found.group("day")))
     except ValueError:

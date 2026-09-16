@@ -18,6 +18,7 @@ from codify.calendar import (
     local_date_from_text,
     normalise_calendar,
     reads_as_a_gregorian_year,
+    reform_shift,
     sole_year_token,
     title_year_token,
     to_gregorian_year,
@@ -145,17 +146,25 @@ def resolve_language(metadata: dict[str, Any], cfg: Any) -> str:
     return "eng"
 
 
-def _local_year_to_gregorian(local_year: str, cfg: Any, country: str) -> int | None:
+def _local_year_to_gregorian(
+    local_year: str, cfg: Any, country: str, month: int | None = None
+) -> int | None:
     """A local-calendar year as Gregorian, by the jurisdiction's own rule first:
-    a config may declare an epoch the calendar's name does not imply."""
+    a config may declare an epoch the calendar's name does not imply. The month
+    settles a year that began mid-year and so straddles two Gregorian ones."""
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
-    if rule is not None:
-        try:
-            return to_gregorian_year(local_year, country)
-        except (CalendarConversionError, LookupError):
-            logger.warning("local_year_unconverted", country=country, raw=local_year)
-            return None
-    return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
+    if rule is None:
+        return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
+    try:
+        converted = to_gregorian_year(local_year, country, month=month)
+    except (CalendarConversionError, LookupError):
+        logger.warning("local_year_unconverted", country=country, raw=local_year)
+        return None
+    if month is None:
+        return converted
+    return converted + reform_shift(
+        rule, int(sole_year_token(normalise_digits(local_year)) or 0), month
+    )
 
 
 def _year_int(year: str) -> int | None:
@@ -351,6 +360,7 @@ def resolve_descriptors(
     # The extracted text, never the source bytes: on the scanned route those are
     # the PDF file.
     source_text = classification_text if classification_text is not None else source_bytes
+    stated_month: int | None = None
     if (
         not raw_date
         and isinstance(source_text, str)
@@ -361,14 +371,10 @@ def resolve_descriptors(
         stated = local_date_from_text(source_text, jurisdiction_code)
         if stated is not None:
             raw_date = stated.isoformat()
-            if year and stated.year != _year_int(year):
-                # Both are evidence; downstream keeps the citation year.
-                logger.info(
-                    "source_date_year_differs_from_resolved_year",
-                    country=jurisdiction_code,
-                    stated=raw_date,
-                    year=year,
-                )
+            # The month the document states, kept for the year conversion: a
+            # local year that began mid-year straddles two Gregorian ones, and a
+            # work date disagreeing with the URI year is dropped downstream.
+            stated_month = stated.month
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
     identity = identity_from_title(model_title, title_rule) if title_rule else None
@@ -386,7 +392,9 @@ def resolve_descriptors(
         and identity.year
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
-        converted = _local_year_to_gregorian(identity.year, cfg, jurisdiction_code)
+        converted = _local_year_to_gregorian(
+            identity.year, cfg, jurisdiction_code, month=stated_month
+        )
         # Through the gate the metadata year passes: a three-digit local year,
         # or a larger offset, gives a number no URI can carry.
         if converted is not None and _year_int(str(converted)) is not None:
