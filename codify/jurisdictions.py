@@ -357,9 +357,14 @@ class CalendarConversion(BaseModel):
         return self
 
 
+#: Hex characters of the digest a truncated slug carries. Six (2^24) collided on
+#: ordinary titles; this is the width a persistent work URI needs.
+SLUG_DIGEST_CHARS = 12
+
 #: Shortest `TitleIdentity.max_length` that can hold a truncation digest and a
-#: short edition suffix. `codify.frbr` reads it back when it caps a slug.
-SLUG_FLOOR = 16
+#: short edition suffix. `codify.frbr` reads both back when it caps a slug. A
+#: longer edition marker is data and can still push a segment past the limit.
+SLUG_FLOOR = SLUG_DIGEST_CHARS + 10
 
 
 class TitleIdentity(BaseModel):

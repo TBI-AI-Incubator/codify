@@ -207,16 +207,36 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     return _LocalDatePatterns(
         re.compile(cues),
         re.compile(
-            rf"(?P<day>[0-9]{{1,2}})\s*(?P<month>{months})\s*"
+            rf"(?<![0-9])(?P<day>[0-9]{{1,2}})\s*(?P<month>{months})\s*"
             rf"{optional_particle}(?P<year>[0-9]{{3,4}})(?![0-9])"
         ),
         index,
     )
 
 
+class _GrammarKey(NamedTuple):
+    """The fields the compiled patterns are built from. `eras` is deliberately
+    absent: it holds dicts, which no cache key may carry, and no pattern reads
+    it."""
+
+    kind: str
+    month_names: tuple[str, ...]
+    date_cues: tuple[str, ...]
+    year_particles: tuple[str, ...]
+    month_day_is_gregorian: bool
+
+
 @lru_cache(maxsize=32)
-def _cached_patterns(key: tuple[object, ...]) -> _LocalDatePatterns | None:
-    return compile_local_date_patterns(CalendarConversion.model_validate(dict(key)))  # type: ignore[arg-type]
+def _cached_patterns(key: _GrammarKey) -> _LocalDatePatterns | None:
+    return compile_local_date_patterns(
+        CalendarConversion(
+            kind=key.kind,  # type: ignore[arg-type]
+            month_names=list(key.month_names),
+            date_cues=list(key.date_cues),
+            year_particles=list(key.year_particles),
+            month_day_is_gregorian=key.month_day_is_gregorian,
+        )
+    )
 
 
 def _rule_and_patterns(
@@ -232,12 +252,22 @@ def _rule_and_patterns(
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if rule is None:
         return None
-    patterns = _cached_patterns(tuple(sorted(_hashable(rule.model_dump()).items())))
+    # Before the key is built: a rule that declares no grammar has nothing to
+    # compile, and its other fields need not be hashable to say so.
+    if not rule.month_names or not rule.date_cues or not rule.month_day_is_gregorian:
+        return None
+    patterns = _cached_patterns(_grammar_key(rule))
     return None if patterns is None else (rule, patterns)
 
 
-def _hashable(value: dict[str, Any]) -> dict[str, object]:
-    return {k: tuple(v) if isinstance(v, list) else v for k, v in value.items()}
+def _grammar_key(rule: CalendarConversion) -> _GrammarKey:
+    return _GrammarKey(
+        rule.kind,
+        tuple(rule.month_names),
+        tuple(rule.date_cues),
+        tuple(rule.year_particles),
+        rule.month_day_is_gregorian,
+    )
 
 
 def declares_local_date_grammar(country: str) -> bool:
@@ -266,14 +296,25 @@ def local_date_from_text(text: str, country: str) -> date | None:
     # block that carries the date, and one barren cue would end the search.
     # Searched unbounded and rejected by distance: an `endpos` shortens the
     # string, so a year straddling the bound matches as its first three digits.
-    found = None
     for cue in patterns.cue.finditer(folded):
         candidate = patterns.date.search(folded, cue.start())
-        if candidate is not None and candidate.start() - cue.start() < _DATE_WINDOW_CHARS:
-            found = candidate
-            break
-    if found is None:
-        return None
+        if candidate is None or candidate.start() - cue.start() >= _DATE_WINDOW_CHARS:
+            continue
+        # Validated here, not after the loop: a syntactic match that is not a
+        # real date (31 April) would otherwise hide a valid later cue.
+        stated = _compose(candidate, patterns, rule, country)
+        if stated is not None:
+            return stated
+    return None
+
+
+def _compose(
+    found: re.Match[str],
+    patterns: _LocalDatePatterns,
+    rule: CalendarConversion,
+    country: str,
+) -> date | None:
+    """The Gregorian date a matched line states, or None when it states none."""
     month = patterns.month_index[found.group("month")]
     local_year = int(found.group("year"))
     try:

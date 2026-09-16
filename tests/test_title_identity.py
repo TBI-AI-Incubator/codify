@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from codify.frbr import identity_from_title
-from codify.jurisdictions import SLUG_FLOOR, TitleIdentity
+from codify.jurisdictions import SLUG_DIGEST_CHARS, SLUG_FLOOR, TitleIdentity
 
 # An abugida whose vowel and tone marks are separate codepoints, so a slug built
 # on `\w` loses them. Used as script data; no corpus is implied.
@@ -149,10 +149,34 @@ def test_two_titles_sharing_a_long_prefix_keep_separate_identities() -> None:
 
 
 def test_the_cap_covers_the_edition_suffix_too() -> None:
-    rule = RULE.model_copy(update={"max_length": 20})
+    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR})
     result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2534", rule)
     assert result.edition == "3"
-    assert len(result.slug) <= 20
+    assert len(result.slug) <= SLUG_FLOOR
+
+
+def test_two_long_titles_differing_late_do_not_share_a_digest() -> None:
+    """Six hex characters collide on ordinary titles: these two do."""
+    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR})
+    made = [
+        identity_from_title(f"พระราชบัญญัติ{'a' * 120}{tail} พ.ศ. 2534", rule).slug
+        for tail in ("889", "5838")
+    ]
+    assert made[0] != made[1]
+
+
+def test_a_suffix_that_consumes_the_whole_cap_keeps_both_parts() -> None:
+    """The edition separates an amendment from the act it amends and the digest
+    separates two long titles, so a limit too tight for both is exceeded rather
+    than either being dropped."""
+    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR, "edition_markers": ["ฉ" * SLUG_FLOOR]})
+    result = identity_from_title(
+        "พระราชบัญญัติ" + "ก" * 60 + f" ({'ฉ' * SLUG_FLOOR} 3) พ.ศ. 2534", rule
+    )
+    assert result.edition == "3"
+    assert result.slug.endswith(f"-{'ฉ' * SLUG_FLOOR}-3")
+    assert result.slug[:SLUG_DIGEST_CHARS].isalnum()
+    assert len(result.slug) == SLUG_DIGEST_CHARS + len(f"-{'ฉ' * SLUG_FLOOR}-3")
 
 
 def test_a_longer_digit_run_is_not_the_titles_year() -> None:
@@ -160,7 +184,7 @@ def test_a_longer_digit_run_is_not_the_titles_year() -> None:
     assert identity_from_title("พระราชบัญญัติภาพยนตร์ พ.ศ. 25340", RULE).year == ""
 
 
-@pytest.mark.parametrize("limit", [SLUG_FLOOR, 20, 24, 100])
+@pytest.mark.parametrize("limit", [SLUG_FLOOR, SLUG_FLOOR + 4, 40, 100])
 def test_the_declared_limit_covers_the_edition_suffix(limit: int) -> None:
     """The whole segment fits the limit, and it still carries the edition, which
     is what separates an amendment from the act it amends."""

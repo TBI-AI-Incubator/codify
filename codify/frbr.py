@@ -16,7 +16,12 @@ from typing import NamedTuple
 
 import structlog
 
-from codify.jurisdictions import TitleIdentity, resolve_frbr_country, try_load_config
+from codify.jurisdictions import (
+    SLUG_DIGEST_CHARS,
+    TitleIdentity,
+    resolve_frbr_country,
+    try_load_config,
+)
 from codify.lang import normalise_digits
 
 logger = structlog.get_logger()
@@ -113,11 +118,13 @@ def _capped(slug: str, limit: int) -> str:
     """
     if len(slug) <= limit:
         return slug
-    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:6]
-    if limit < len(digest):
-        # No room for a head: the digest alone still separates two titles.
+    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:SLUG_DIGEST_CHARS]
+    if limit <= len(digest):
+        # No room for a head. The digest is never shortened to fit: it is the
+        # only thing separating two titles that share a prefix, and a stored
+        # work URI lives longer than the limit that produced it.
         return digest
-    head = slug[: limit - len(digest) - 1].rsplit("-", 1)[0] if limit > len(digest) else ""
+    head = slug[: limit - len(digest) - 1].rsplit("-", 1)[0]
     return f"{head}-{digest}" if head else digest
 
 
@@ -187,6 +194,9 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         if body.startswith(prefix):
             body = body[len(prefix) :].strip()
             break
+    # The suffix is data: a long edition marker can consume the whole cap. The
+    # digest and the edition are both kept, so the segment is at least their
+    # combined length however tight the limit is.
     suffix = f"-{_slugify(rule.edition_markers[0])}-{edition}" if edition else ""
     # The cap covers the whole segment, suffix included: capping the base first
     # let the edition push a slug past the limit it declares. A limit with no

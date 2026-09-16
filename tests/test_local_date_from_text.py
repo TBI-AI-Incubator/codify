@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from codify.calendar import (
     _DATE_WINDOW_CHARS,
     compile_local_date_patterns,
+    declares_local_date_grammar,
     local_date_from_text,
 )
 from codify.jurisdictions import CalendarConversion
@@ -52,6 +53,16 @@ def date_grammar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "xn": {
             "calendar": "buddhist_era",
             "frbr": {"country_code": "xn", "calendar_conversion": named},
+        },
+        # An era-table rule, whose `eras` hold dicts no cache key may carry.
+        "xj": {
+            "frbr": {
+                "country_code": "xj",
+                "calendar_conversion": {
+                    "kind": "era_table",
+                    "eras": [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}],
+                },
+            }
         },
         "xm": {
             "calendar": "buddhist_era",
@@ -203,3 +214,21 @@ def test_a_grammar_whose_declaration_cannot_hold_is_refused(broken: dict[str, ob
     can never fire, so the field reads as set and does nothing."""
     with pytest.raises(ValidationError):
         CalendarConversion(kind="buddhist", date_cues=["c"], **broken)  # type: ignore[arg-type]
+
+
+def test_a_calendar_whose_rule_holds_dicts_is_asked_without_crashing() -> None:
+    """`eras` hold dicts, which no cache key may carry. Every ingest asks this of
+    every jurisdiction, so an era-table config must answer, not raise."""
+    assert declares_local_date_grammar("xj") is False
+    assert local_date_from_text("令和6年 ให้ไว้ ณ วันที่", "xj") is None
+
+
+def test_an_impossible_date_does_not_hide_a_valid_later_one() -> None:
+    """A syntactic match that is not a date must not end the cue walk."""
+    text = "ให้ไว้ ณ วันที่ ๓๑ เมษายน พ.ศ. ๒๕๕๙\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙"
+    assert local_date_from_text(text, "xn") == date(2016, 4, 26)
+
+
+def test_a_longer_digit_run_is_not_a_day() -> None:
+    """Without a leading boundary "126 เมษายน" reads as the 26th."""
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๑๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
