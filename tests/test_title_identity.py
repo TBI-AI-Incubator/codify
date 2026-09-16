@@ -174,9 +174,8 @@ def test_two_long_titles_differing_late_do_not_share_a_digest() -> None:
 
 
 def test_a_suffix_that_consumes_the_whole_cap_keeps_both_parts() -> None:
-    """The edition separates an amendment from the act it amends and the digest
-    separates two long titles, so a limit too tight for both is exceeded rather
-    than either being dropped."""
+    """The edition separates an amendment from what it amends and the digest two
+    long titles, so a limit too tight for both is exceeded, not either dropped."""
     rule = RULE.model_copy(update={"max_length": SLUG_FLOOR, "edition_markers": ["ฉ" * SLUG_FLOOR]})
     result = identity_from_title(
         "พระราชบัญญัติ" + "ก" * 60 + f" ({'ฉ' * SLUG_FLOOR} 3) พ.ศ. 2511", rule

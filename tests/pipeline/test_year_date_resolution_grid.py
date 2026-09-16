@@ -1,10 +1,5 @@
-"""Every cell of the year/date resolution grid, asserted through the caller.
-
-The axes: the model's calendar label, whether the calendar declares its month
-grid is the Gregorian one, whether the source states a date, whether the model's
-date echoes the title's year, either side of a mid-year reform, and whether a
-title identity is declared. Titles are fabricated.
-"""
+"""Every cell of the year/date resolution grid, asserted through each caller.
+Axes: calendar label, month grid, stated date, echo, reform, title grammar."""
 
 from __future__ import annotations
 

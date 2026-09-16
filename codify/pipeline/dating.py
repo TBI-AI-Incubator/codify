@@ -111,8 +111,8 @@ def _year_int(year: str) -> int | None:
 
 
 def _stored(uri_year: str) -> int | None:
-    """The URI year as a number, or None. A whole digit run only: what no URI
-    can carry, no column should hold either."""
+    """The URI year as a number, or None where it is not a whole run of ASCII
+    digits: an unconverted local year reaches here as the text that it is."""
     return int(uri_year) if uri_year.isascii() and uri_year.isdecimal() else None
 
 

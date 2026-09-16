@@ -161,9 +161,8 @@ def test_a_calendar_with_its_own_month_grid_reads_nothing() -> None:
 
 
 def test_a_year_straddling_the_window_edge_is_read_whole() -> None:
-    """Bounding the match's start, not the string: an `endpos` cutting through
-    the year would match its first three digits and date the document to 2016
-    minus a millennium."""
+    """Bounding the match's start, not the string: an `endpos` cutting the year
+    would match its first three digits and date the document a millennium off."""
     cue = "ให้ไว้ ณ วันที่"
     prefix = f"{cue} ๒๖ เมษายน พ.ศ. "
     filler = "ก" * (_DATE_WINDOW_CHARS - len(prefix) - len(cue) + 12)

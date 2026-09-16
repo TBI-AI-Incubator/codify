@@ -300,9 +300,8 @@ def test_a_stated_number_still_wins_over_the_title(configs: None) -> None:
 
 
 def test_a_year_straddling_two_gregorian_ones_follows_the_stated_date(configs: None) -> None:
-    """Before the reform the local year began mid-year, so converting it with a
-    month and without gives different years; the work date would then disagree
-    with the URI year and be dropped."""
+    """Before the reform the year began mid-year, so converting it with a month
+    and without gives different years and the work date would then be dropped."""
     try_load_config.cache_clear()
     title = "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. ๒๔๗๘"
     text = f"{title}\nให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๔๗๘\n"
@@ -332,9 +331,8 @@ def test_an_echoed_year_that_cannot_convert_is_cleared_not_kept(configs: None) -
 
 
 def test_a_date_field_echoing_the_title_is_local_too(configs: None) -> None:
-    """A model dating a document in the local calendar while calling it
-    Gregorian states the same local year in another field; the whole date is
-    local, not only its year."""
+    """A model dating in the local calendar while calling it Gregorian states the
+    same local year twice; the whole date is local, not only its year."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
         {

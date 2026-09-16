@@ -175,7 +175,7 @@ def number_from_title(title: str) -> str:
 
 def _legacy_year(metadata: dict[str, Any], country: str, title: str) -> int | None:
     """What the shipped run stored: the generic conversion and the old coercion,
-    the title year uncoverted. A replay reproduces it rather than improves it."""
+    the title year unconverted. A replay reproduces it rather than improves it."""
     raw_year = str(metadata.get("year") or "").strip()
     raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
@@ -204,8 +204,8 @@ def gregorian_year(
     legacy: bool = False,
     title: str = "",
 ) -> int | None:
-    """One reading of the shared resolution, so the stored year and the year the
-    document is filed under cannot differ. Pass the country, or neither is read."""
+    """One reading of the shared resolution, so the stored and filed years cannot
+    differ. A jurisdiction's own rules need its code; a plain year does not."""
     if legacy:
         return _legacy_year(metadata, country, title)
     return resolve_dating(metadata, country=country, title=title).stored_year
