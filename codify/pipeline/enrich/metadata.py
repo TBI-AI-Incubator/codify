@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
+    canonical_year_and_date,
     labelled_year_as_gregorian,
     month_stating_this_year,
     normalise_calendar,
@@ -190,8 +191,7 @@ def gregorian_year(
     or empty calendars. Pass the country for a calendar whose conversion needs
     the jurisdiction's own table, or the stored year will disagree with the URI
     `resolve_year` builds from the same metadata."""
-    raw_year = str(metadata.get("year") or "").strip()
-    raw_date = str(metadata.get("date") or "").strip()
+    raw_year, raw_date = canonical_year_and_date(metadata)
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     # A date field holding no year run states none, and treating it as a

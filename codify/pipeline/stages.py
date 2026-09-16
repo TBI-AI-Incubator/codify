@@ -14,6 +14,7 @@ import structlog
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
     CalendarConversionError,
+    canonical_year_and_date,
     declares_local_date_grammar,
     labelled_year_as_gregorian,
     local_date_from_text,
@@ -67,8 +68,7 @@ logger = structlog.get_logger()
 def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> str:
     """Resolve a Gregorian year for FRBR URI use. Converts non-Gregorian
     years when the metadata's `calendar` field flags one."""
-    raw_year = str(metadata.get("year") or "")
-    raw_date = str(metadata.get("date") or "")
+    raw_year, raw_date = canonical_year_and_date(metadata)
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     if candidate and cal and cal != "gregorian":
@@ -402,7 +402,10 @@ def resolve_descriptors(
 ) -> Descriptors:
     model_title = str(metadata.get("title", "") or "")
     title = model_title or fallback_stem
-    raw_date = str(metadata.get("date", "") or "")
+    # Canonical at entry: every match below reads a padded or native-digit
+    # field as the model wrote it otherwise.
+    stated_date = canonical_year_and_date(metadata)[1]
+    raw_date = stated_date
     number = str(metadata.get("number") or "")
     year = resolve_year(metadata, jurisdiction_code, title=title)
     cfg = load_config(jurisdiction_code)
@@ -459,10 +462,7 @@ def resolve_descriptors(
     converted_from_title = False
     local_year = identity.year if identity is not None else ""
     echoes_title = bool(local_year) and local_year in model_runs
-    date_echoes_title = (
-        echoes_title
-        and sole_year_token(normalise_digits(str(metadata.get("date") or ""))) == local_year
-    )
+    date_echoes_title = echoes_title and sole_year_token(stated_date) == local_year
     if (
         identity is not None
         and identity.year
@@ -472,14 +472,22 @@ def resolve_descriptors(
         # model's, since a year that began mid-year needs one to settle.
         # The month of whichever date the document gave. A local month settles
         # the conversion whether or not its grid matches the Gregorian one.
-        month = stated_month
+        # Only where converting with it lands on the date the source states:
+        # a cue date naming another year dates another document.
+        source_month = stated_month
+        if source_date is not None and stated_month is not None:
+            with_month = _local_year_to_gregorian(
+                identity.year, cfg, jurisdiction_code, month=stated_month
+            )
+            source_month = stated_month if with_month == source_date.year else None
+        month = source_month
         if month is None:
             month = month_stating_this_year(metadata, identity.year) or _month_of(raw_date)
         converted = _local_year_to_gregorian(
             identity.year,
             cfg,
             jurisdiction_code,
-            month=month if date_echoes_title else stated_month,
+            month=month if date_echoes_title else source_month,
         )
         # Through the gate the metadata year passes: a three-digit local year,
         # or a larger offset, gives a number no URI can carry. Cleared when it
@@ -498,7 +506,7 @@ def resolve_descriptors(
     if local_month_day is not None and not converted_from_title and source_date is None:
         # A date the model labelled local states its own year, and nothing else
         # converts it where no title grammar is declared.
-        stated_local = sole_year_token(normalise_digits(str(metadata.get("date") or "")))
+        stated_local = sole_year_token(stated_date)
         converted = (
             _local_year_to_gregorian(stated_local, cfg, jurisdiction_code, local_month_day[0])
             if stated_local

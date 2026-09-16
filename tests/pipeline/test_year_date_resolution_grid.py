@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from codify.calendar import labelled_year_as_gregorian, month_stating_this_year
 from codify.jurisdictions import try_load_config
 from codify.pipeline import stages
 
@@ -42,6 +43,8 @@ POST = "พระราชบัญญัติเครื่องร่อน
 #: A first-quarter date, so the reform shift is visible where it applies.
 SOURCE_PRE = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๔๗๘\n"
 SOURCE_POST = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๕๑๑\n"
+#: A cue date naming the year after the one PRE's title states.
+SOURCE_OTHER = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๔๗๙\n"
 
 
 def _conversion(
@@ -272,6 +275,33 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1935",
         "",
     ),
+    # --- padded and decorated fields --------------------------------------
+    (
+        "a padded labelled local date",
+        "xg",
+        {"title": PRE, "date": " 2478-02-29 ", "calendar": "buddhist"},
+        "",
+        "1936",
+        "1936-02-29",
+    ),
+    (
+        "a decorated labelled year",
+        "xg",
+        {"title": PRE, "year": "B.E. 2478", "date": "2478-01-31", "calendar": "buddhist"},
+        "",
+        "1936",
+        "1936-01-31",
+    ),
+    (
+        # The cue date names a year the title does not, so it dates another
+        # document: it stands as found, and its month settles nothing here.
+        "a source date naming another local year",
+        "xg",
+        {"title": PRE},
+        SOURCE_OTHER,
+        "1935",
+        "1937-01-31",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -360,7 +390,23 @@ UNECHOED = {
     # stated, converted on its own year; only the document's year is decided
     # elsewhere, and both sides agree on that.
     "an echoed year with a date naming another year": ("1935", "1938-05-20"),
+    # No title year to disagree with, so the date off the document is the
+    # document's own and states the year.
+    "a source date naming another local year": ("1937", "1937-01-31"),
 }
+
+
+def test_a_padded_date_still_states_its_month() -> None:
+    """A model pads the field. The month lookup matches on the canonical value,
+    not on whatever whitespace came with it."""
+    assert month_stating_this_year({"date": " 2478-02-29 "}, "2478") == 2
+
+
+def test_a_decorated_year_converts_with_a_month() -> None:
+    """The era written beside the year reaches the reform shift, which must read
+    the same number the conversion did rather than the decorated string."""
+    try_load_config.cache_clear()
+    assert labelled_year_as_gregorian("B.E. 2478", "buddhist", "xg", 1) == 1936
 
 
 @pytest.mark.parametrize(

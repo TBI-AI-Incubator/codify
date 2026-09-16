@@ -303,12 +303,21 @@ def declares_this_calendar(label: str, country: str) -> bool:
     return normalise_calendar(cfg.calendar) in (named, f"{named}_era")
 
 
+def canonical_year_and_date(metadata: dict[str, Any]) -> tuple[str, str]:
+    """The year and date fields as every match downstream expects them: trimmed
+    and in ASCII digits. A model pads both fields and decorates the year."""
+    fields = (str(metadata.get("year") or ""), str(metadata.get("date") or ""))
+    return (normalise_digits(fields[0]).strip(), normalise_digits(fields[1]).strip())
+
+
 def month_stating_this_year(metadata: dict[str, Any], token: str) -> int | None:
     """The month of a metadata date whose year run is `token`, or None. A year
     that began mid-year needs one to settle, and every year path must read it."""
-    raw = normalise_digits(str(metadata.get("date") or ""))
+    _, raw = canonical_year_and_date(metadata)
     found = re.match(r"^([0-9]{1,4})-([0-9]{2})-[0-9]{2}(?![0-9])", raw)
-    if found is None or found.group(1) != token:
+    # On the year the token states, not the string carrying it: a model writes
+    # the era beside the number.
+    if found is None or found.group(1) != sole_year_token(normalise_digits(token)):
         return None
     month = int(found.group(2))
     return month if 1 <= month <= 12 else None
@@ -327,12 +336,15 @@ def labelled_year_as_gregorian(
     ):
         try:
             converted = to_gregorian_year(token, country, month=month)
+            # The same coercion the conversion made, or a decorated year the
+            # conversion accepted raises here instead of shifting.
+            local = _coerce_int(token)
         except (CalendarConversionError, LookupError):
             return None
         cfg = try_load_config(country)
         rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
         if rule is not None and month is not None:
-            converted += reform_shift(rule, int(normalise_digits(token) or 0), month)
+            converted += reform_shift(rule, local, month)
         return converted
     return year_from_calendar(token, label, country)
 
