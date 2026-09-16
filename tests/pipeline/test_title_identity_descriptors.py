@@ -48,11 +48,11 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "consolidation_markers": ["Update"],
     }
 
-    def build(*, with_identity: bool) -> dict[str, object]:
+    def build(*, with_identity: bool, epoch_year: int = -543) -> dict[str, object]:
         frbr: dict[str, object] = {
             "country_code": "xn",
             "uri_patterns": {"act": "/akn/xn/act/{year}/{number}"},
-            "calendar_conversion": conversion,
+            "calendar_conversion": {**conversion, "epoch_year": epoch_year},
         }
         if with_identity:
             frbr["title_identity"] = identity
@@ -61,7 +61,12 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     with isolated_configs(
         monkeypatch,
         tmp_path / "jurisdictions",
-        {"xn": build(with_identity=True), "xm": build(with_identity=False)},
+        {
+            "xn": build(with_identity=True),
+            "xm": build(with_identity=False),
+            # A declared epoch the calendar's name does not imply.
+            "xk": build(with_identity=True, epoch_year=-200),
+        },
     ):
         yield
 
@@ -182,3 +187,31 @@ def test_a_five_digit_year_does_not_pass_as_a_resolved_one(configs: None) -> Non
         classification_text=SOURCE_TEXT,
     )
     assert desc.year == "2016"
+
+
+def test_a_model_year_echoing_the_title_is_the_same_local_year(configs: None) -> None:
+    """The model repeating what the title says is one reading, not independent
+    Gregorian evidence, however it labelled the calendar."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": "", "year": "2559"},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "2016"
+
+
+def test_the_configured_conversion_rule_wins_over_the_generic_one(configs: None) -> None:
+    """A config may declare an epoch the calendar's name does not imply; the
+    source-date path already honours it, so this one must agree."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": ""},
+        jurisdiction_code="xk",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "2359"

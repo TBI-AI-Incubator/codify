@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from codify.frbr import identity_from_title
+from codify.frbr import DRAFT_PREFIX, identity_from_title, is_citable_work_uri
 from codify.jurisdictions import SLUG_DIGEST_CHARS, SLUG_FLOOR, TitleIdentity
 
 # An abugida whose vowel and tone marks are separate codepoints, so a slug built
@@ -114,7 +114,7 @@ _ADVERSARIAL = """
 import sys
 sys.path.insert(0, {root!r})
 from tests.test_title_identity import RULE
-from codify.frbr import identity_from_title
+from codify.frbr import DRAFT_PREFIX, identity_from_title, is_citable_work_uri
 identity_from_title("(" * 40000, RULE)
 identity_from_title("พ.ศ. " * 40000, RULE)
 identity_from_title("(ฉบับที่ " * 40000, RULE)
@@ -212,3 +212,24 @@ def test_a_marker_word_in_a_substantive_title_is_not_a_republication() -> None:
     amendment = identity_from_title("พระราชบัญญัติUpdate Services (ฉบับที่ 2) พ.ศ. 2534", RULE)
     assert amendment.edition == "2"
     assert amendment.slug != principal.slug
+
+
+@pytest.mark.parametrize("written", ["3", "03", "003"])
+def test_an_edition_is_its_number_not_its_typography(written: str) -> None:
+    """A padded ordinal and a bare one are one edition; two URIs would fork it."""
+    result = identity_from_title(f"พระราชบัญญัติภาพยนตร์ (ฉบับที่ {written}) พ.ศ. 2479", RULE)
+    assert result.edition == "3"
+    assert result.slug == "ภาพยนตร์-ฉบับที่-3"
+
+
+def test_a_lone_zero_edition_survives_canonicalisation() -> None:
+    assert identity_from_title("พระราชบัญญัติภาพยนตร์ (ฉบับที่ 0) พ.ศ. 2479", RULE).edition == "0"
+
+
+def test_a_title_reducing_to_the_draft_namespace_is_moved_out_of_it() -> None:
+    """`draft-` names a content address; an identity that reads as one would be
+    refused as uncitable."""
+    rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"], edition_markers=["No."])
+    slug = identity_from_title("Act draft rules of 1991", rule).slug
+    assert not slug.startswith(DRAFT_PREFIX)
+    assert is_citable_work_uri(f"/akn/xa/act/1991/{slug}")

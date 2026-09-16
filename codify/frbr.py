@@ -39,6 +39,14 @@ _UNCITABLE_SEGMENT = re.compile(r"//|/$")
 # has no year zero, so `0001` keeps the resulting FRBR date schema-valid.
 UNKNOWN_YEAR = "0001"
 
+#: Namespace of a content-addressed identity. `is_citable_work_uri` refuses a
+#: number opening with it, so nothing derived may take the same form.
+DRAFT_PREFIX = "draft-"
+
+#: What a title-derived slug wears when it would otherwise open the reserved
+#: namespace above. Short, since it is spent out of the slug's own cap.
+TITLE_ESCAPE_PREFIX = "t-"
+
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
 
 
@@ -59,7 +67,7 @@ def is_citable_work_uri(uri: str) -> bool:
         _URI_YEAR_SEGMENT.fullmatch(year) is not None
         and year not in (UNKNOWN_YEAR, "0000")
         and bool(number)
-        and not number.startswith("draft-")
+        and not number.startswith(DRAFT_PREFIX)
     )
 
 
@@ -183,7 +191,10 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         # An edition number after a re-publication marker is the edition folded
         # into it, not this document's own.
         if found is not None and (marker is None or marker > found.start()):
-            edition = found.group(1)
+            # Canonical digits, not the title's typography: "03" and "3" are one
+            # edition, and a URI minted from each would fork one work. Stripped
+            # as text, so a number too long for an int is unharmed.
+            edition = found.group(1).lstrip("0") or "0"
     body = edition_re.sub(" ", text) if edition_re else text
     if consolidation_re is not None:
         body = _PARENTHETICAL.sub(
@@ -215,6 +226,10 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     # room for both keeps the edition, which is what separates an amendment from
     # the act it amends, and lets the assembled segment run to the suffix.
     slug = _capped(_slugify(body), rule.max_length - len(suffix)).rstrip("-")
+    if slug.startswith(DRAFT_PREFIX):
+        # `draft-` is the content-address namespace: a title reducing to it would
+        # read as an unresolved identity and be refused as uncitable.
+        slug = _capped(f"{TITLE_ESCAPE_PREFIX}{slug}", rule.max_length - len(suffix)).rstrip("-")
     return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
 
 

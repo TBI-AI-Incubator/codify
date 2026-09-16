@@ -13,6 +13,7 @@ import structlog
 
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
+    CalendarConversionError,
     declares_local_date_grammar,
     local_date_from_text,
     normalise_calendar,
@@ -29,7 +30,7 @@ from codify.frbr import (
     series_number,
 )
 from codify.jurisdictions import JurisdictionConfig, load_config, placeholder_statuses_for_code
-from codify.lang import to_iso639_3
+from codify.lang import normalise_digits, to_iso639_3
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta
 from codify.pipeline.enrich.amendments import lift_amendment_markup
 from codify.pipeline.enrich.asides import emit_marginal_notes
@@ -141,6 +142,23 @@ def resolve_language(metadata: dict[str, Any], cfg: Any) -> str:
                 "language_unresolved_defaulting_eng", jurisdiction_languages=cfg.languages
             )
     return "eng"
+
+
+def _local_year_to_gregorian(local_year: str, cfg: Any, country: str) -> int | None:
+    """A local-calendar year as Gregorian, by the jurisdiction's own rule first.
+
+    The generic conversion reads the calendar's name and its usual epoch; a
+    config declaring `calendar_conversion` may name another, and the source-date
+    path already honours it. Two paths on one year must not disagree.
+    """
+    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+    if rule is not None:
+        try:
+            return to_gregorian_year(local_year, country)
+        except (CalendarConversionError, LookupError):
+            logger.warning("local_year_unconverted", country=country, raw=local_year)
+            return None
+    return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
 
 
 def _year_int(year: str) -> int | None:
@@ -364,8 +382,18 @@ def resolve_descriptors(
     # calendar whatever script its digits are in; converting it is not optional
     # just because it happens to read as four ASCII digits.
     stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
-    if identity is not None and identity.year and (_year_int(year) is None or not stated_by_model):
-        converted = year_from_calendar(identity.year, cfg.calendar, jurisdiction_code)
+    # A model year equal to the one the title states is the same local year read
+    # twice, not independent Gregorian evidence, however the model labelled it.
+    echoes_title = (
+        identity is not None
+        and normalise_digits(str(metadata.get("year") or "").strip()) == identity.year
+    )
+    if (
+        identity is not None
+        and identity.year
+        and (_year_int(year) is None or not stated_by_model or echoes_title)
+    ):
+        converted = _local_year_to_gregorian(identity.year, cfg, jurisdiction_code)
         year = str(converted) if converted is not None else year
     if _year_int(year) is None and raw_date:
         # The date read off the source is Gregorian and states a year; without
