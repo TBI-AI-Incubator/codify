@@ -142,6 +142,15 @@ def _alternation(words: Iterable[str]) -> str:
 _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
+def _particle_alternation(words: Iterable[str]) -> str:
+    """`_alternation`, with a word boundary on any particle that is a Latin word:
+    without one "of" matches inside "proof" and takes the digits after it."""
+    ordered = sorted({w for w in words if w}, key=lambda w: (-len(w), w))
+    return "|".join(
+        rf"\b{re.escape(w)}" if w.isascii() and w[0].isalpha() else re.escape(w) for w in ordered
+    )
+
+
 def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int | None:
     """Offset of the first parenthetical carrying a re-publication marker."""
     if marker is None:
@@ -191,7 +200,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
         )
     year_re = (
-        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
+        re.compile(rf"(?:{_particle_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
         if rule.year_particles
         else None
     )

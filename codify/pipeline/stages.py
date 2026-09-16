@@ -31,7 +31,12 @@ from codify.frbr import (
     law_number_token,
     series_number,
 )
-from codify.jurisdictions import JurisdictionConfig, load_config, placeholder_statuses_for_code
+from codify.jurisdictions import (
+    JurisdictionConfig,
+    load_config,
+    placeholder_statuses_for_code,
+    try_load_config,
+)
 from codify.lang import normalise_digits, to_iso639_3
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta
 from codify.pipeline.enrich.amendments import lift_amendment_markup
@@ -86,8 +91,10 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
         )
         return digits
     if raw_date:
-        cfg = load_config(country)
-        if cfg.calendar != "gregorian":
+        # Converted only where the model said the date is local. A date it called
+        # Gregorian, or left unlabelled, is taken as written: converting one
+        # again puts a year no document states in the URI.
+        if cal and cal != "gregorian":
             try:
                 return str(to_gregorian_year(raw_date.split("-")[0], country))
             except Exception:  # noqa: BLE001, S110
@@ -95,8 +102,20 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
         if "-" in raw_date:
             return raw_date.split("-")[0]
     if title:
-        return title_year_token(title, metadata.get("number"))
+        # The title of a document in a local calendar states a local year.
+        token = title_year_token(title, metadata.get("number"))
+        return _title_year_as_gregorian(token, country) if token else token
     return ""
+
+
+def _title_year_as_gregorian(token: str, country: str) -> str:
+    """A year a title states, in Gregorian. A jurisdiction dating in another
+    calendar states a local year there, and nothing else converts it."""
+    cfg = try_load_config(country) if country else None
+    if cfg is None or cfg.calendar == "gregorian":
+        return token
+    converted = year_from_calendar(token, cfg.calendar, country)
+    return str(converted) if converted is not None else ""
 
 
 def _fold_language(raw: str | None, source: str, jurisdiction: str | None) -> str | None:
@@ -168,6 +187,13 @@ def _local_year_to_gregorian(
 
 
 _ISO_DATE = re.compile(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})")
+
+
+def _grid_is_gregorian(cfg: Any) -> bool:
+    """Whether the jurisdiction declares its months and days are the Gregorian
+    ones, so only a year needs converting."""
+    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+    return bool(rule is not None and rule.month_day_is_gregorian)
 
 
 def _month_day(raw_date: str) -> tuple[int, int] | None:
@@ -390,18 +416,20 @@ def resolve_descriptors(
     raw_date = str(metadata.get("date", "") or "")
     number = str(metadata.get("number") or "")
     year = resolve_year(metadata, jurisdiction_code, title=title)
+    cfg = load_config(jurisdiction_code)
     # Non-Gregorian raw dates stay in the local calendar; the FRBR URI year
     # must be Gregorian, so blank the date and rely on the resolved year. The
-    # month and day are kept: they are calendar-independent and settle the
-    # conversion the year alone cannot.
+    # month and day carry over only where the calendar declares its grid is the
+    # Gregorian one; on any other grid they name days of that grid.
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
-    local_month_day = _month_day(raw_date) if cal != "gregorian" else None
+    keeps_month_day = _grid_is_gregorian(cfg)
+    local_month_day = _month_day(raw_date) if cal != "gregorian" and keeps_month_day else None
     if cal != "gregorian":
         raw_date = ""
-    cfg = load_config(jurisdiction_code)
     # The extracted text, never the source bytes: on the scanned route those are
     # the PDF file.
     source_text = classification_text if classification_text is not None else source_bytes
+    source_date: date | None = None
     stated_month: int | None = None
     if (
         not raw_date
@@ -412,6 +440,7 @@ def resolve_descriptors(
         # drops the day.
         stated = local_date_from_text(source_text, jurisdiction_code)
         if stated is not None:
+            source_date = stated
             raw_date = stated.isoformat()
             # The month the document states, kept for the year conversion: a
             # local year that began mid-year straddles two Gregorian ones, and a
@@ -436,6 +465,7 @@ def resolve_descriptors(
         sole_year_token(normalise_digits(str(metadata.get(field) or "")))
         for field in ("year", "date")
     }
+    converted_from_title = False
     local_year = identity.year if identity is not None else ""
     echoes_title = bool(local_year) and local_year in model_runs
     date_echoes_title = (
@@ -462,13 +492,19 @@ def resolve_descriptors(
         # or a larger offset, gives a number no URI can carry. Cleared when it
         # does not, or the unconverted local value stays and reaches the URI.
         year = str(converted) if converted is not None and _year_int(str(converted)) else ""
-        if year and local_month_day is not None:
-            # The date was local by its own label; only its year needed
-            # converting, and the month that settled it is calendar-independent.
-            raw_date = _built_date(int(year), local_month_day)
-        elif year and date_echoes_title:
-            # Local without saying so: the same conversion, read off the field.
-            raw_date = _rebased_date(raw_date, int(year))
+        converted_from_title = bool(year)
+        # Never over a date read off the document itself, which is exact.
+        if source_date is None and year:
+            if local_month_day is not None:
+                # Local by its own label; only its year needed converting.
+                raw_date = _built_date(int(year), local_month_day)
+            elif date_echoes_title:
+                # Local without saying so. On any other month grid the parts name
+                # days of that grid, so there is nothing to rebase.
+                raw_date = _rebased_date(raw_date, int(year)) if keeps_month_day else ""
+    if source_date is not None and not converted_from_title:
+        # An exact date off the document settles the year nothing else converted.
+        year = str(source_date.year)
     if _year_int(year) is None and raw_date:
         # Without this the URI takes the unknown-year placeholder while the
         # document carries its own date.
