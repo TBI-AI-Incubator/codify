@@ -8,9 +8,16 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any, cast
+from datetime import date
+from functools import lru_cache
+from typing import Any, NamedTuple, cast
+
+import structlog
 
 from .jurisdictions import CalendarConversion, load_config, try_load_config
+from .lang import normalise_digits
+
+logger = structlog.get_logger()
 
 
 class CalendarConversionError(ValueError):
@@ -164,6 +171,87 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
     if cal in ("buddhist", "buddhist_era", "thai"):
         return n - 543
     return None
+
+
+# How much text after a date cue may hold the date it introduces. A signature
+# block puts the two together; anything further on is the next paragraph.
+_DATE_WINDOW_CHARS = 200
+
+
+class _LocalDatePatterns(NamedTuple):
+    cue: re.Pattern[str]
+    date: re.Pattern[str]
+    month_index: dict[str, int]
+
+
+def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns | None:
+    """Cue and date patterns for a calendar that names its months, else None."""
+    if not rule.month_names or not rule.date_cues:
+        return None
+    index = {name: i for i, name in enumerate(rule.month_names, start=1) if name}
+    months = "|".join(re.escape(m) for m in sorted(index, key=lambda m: (-len(m), m)))
+    particles = "|".join(
+        re.escape(p) for p in sorted(rule.year_particles, key=lambda p: (-len(p), p)) if p
+    )
+    optional_particle = rf"(?:{particles})?" if particles else ""
+    # A cue is declared with single spaces and met with line breaks: a signature
+    # block wraps wherever the column ran out.
+    cues = "|".join(r"\s+".join(map(re.escape, c.split())) for c in rule.date_cues if c.strip())
+    return _LocalDatePatterns(
+        re.compile(cues),
+        re.compile(
+            rf"(?P<day>[0-9]{{1,2}})\s*(?P<month>{months})\s*"
+            rf"{optional_particle}\s*(?P<year>[0-9]{{3,4}})"
+        ),
+        index,
+    )
+
+
+@lru_cache(maxsize=32)
+def _rule_and_patterns(
+    country: str,
+) -> tuple[CalendarConversion, _LocalDatePatterns] | None:
+    cfg = try_load_config(country) if country else None
+    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+    if rule is None:
+        return None
+    patterns = compile_local_date_patterns(rule)
+    return None if patterns is None else (rule, patterns)
+
+
+def local_date_from_text(text: str, country: str) -> date | None:
+    """The Gregorian date a source states its document was made on, or None.
+
+    Cue-anchored: the first dated line of a document is often one it amends, so a
+    date is read only where a declared cue introduces it. Native digits fold to
+    ASCII, and a calendar whose year began mid-year before a reform is offset
+    accordingly, or every date in its first months lands a year early.
+    """
+    found_rule = _rule_and_patterns(country)
+    if found_rule is None:
+        return None
+    rule, patterns = found_rule
+    folded = normalise_digits(text)
+    cue = patterns.cue.search(folded)
+    if cue is None:
+        return None
+    found = patterns.date.search(folded, cue.start(), cue.start() + _DATE_WINDOW_CHARS)
+    if found is None:
+        return None
+    month = patterns.month_index[found.group("month")]
+    local_year = int(found.group("year"))
+    try:
+        gregorian_year = _apply_rule(local_year, rule, month=month)
+    except CalendarConversionError:
+        return None
+    reform = rule.new_year_reform_year
+    if reform is not None and local_year < reform and month < (rule.new_year_month or 1):
+        gregorian_year += 1
+    try:
+        return date(gregorian_year, month, int(found.group("day")))
+    except ValueError:
+        logger.warning("local_date_out_of_range", country=country, raw=found.group(0)[:40])
+        return None
 
 
 def _convert_hijri_lunar(hijri_year: int) -> int:

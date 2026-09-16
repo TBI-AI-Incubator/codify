@@ -2386,8 +2386,14 @@ def _opens_reversed(text: str, at: int, boundary: re.Pattern[str] | None) -> boo
     return boundary is None or not boundary.search(text, at, nxt)
 
 
+# cp1252 bytes 0x93/0x94 are the curly double quotes; text extracted as Latin-1
+# carries them as the C1 control codepoints, which no legible document uses.
+# Folding is length-preserving, so every offset in the mask still holds.
+_MOJIBAKE_QUOTES = str.maketrans({0x93: "“", 0x94: "”"})
+
+
 @lru_cache(maxsize=1)
-def _walk_quotes(text: str, country: str = "") -> tuple[tuple[bool, ...], tuple[bool, ...]]:
+def _walk_quotes(raw: str, country: str = "") -> tuple[tuple[bool, ...], tuple[bool, ...]]:
     """The quoted mask, and the part of it inside spans nothing closes.
 
     A marker inside a closed quote is quoted and leaves both sides of a
@@ -2398,6 +2404,7 @@ def _walk_quotes(text: str, country: str = "") -> tuple[tuple[bool, ...], tuple[
     Limit: a dropped opener immediately before an amendment's own quote reads
     as that quote opening, so the text between them is not reported.
     """
+    text = raw.translate(_MOJIBAKE_QUOTES)
     # A document that has closed a left curly with a right one has shown its
     # orientation, and a later right curly there is a dropped opener's closer
     # rather than an opener of its own. One amendment inside it may still be

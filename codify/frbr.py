@@ -8,11 +8,14 @@ expression URIs add language and date segments. Parsing lives in
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections.abc import Iterable
 from datetime import date
+from typing import NamedTuple
 
 import structlog
 
-from codify.jurisdictions import resolve_frbr_country, try_load_config
+from codify.jurisdictions import TitleIdentity, resolve_frbr_country, try_load_config
 from codify.lang import normalise_digits
 
 logger = structlog.get_logger()
@@ -74,6 +77,94 @@ def series_number(value: object) -> str:
     token = normalise_digits(str(value if value is not None else "")).strip()
     match = _SERIES_CITATION.fullmatch(token)
     return match.group(1) if match else ""
+
+
+class TitleDerivedIdentity(NamedTuple):
+    """What a title states about the document's own identity.
+
+    `slug` is empty when the title carries nothing to name it by; `year` is the
+    local-calendar year the title states, and `edition` the ordinal that
+    separates an amending instrument from the one it amends.
+    """
+
+    slug: str
+    edition: str
+    year: str
+
+
+# Letters, numbers and combining marks. `\w` drops the vowel and tone marks that
+# an abugida writes a word with, so a slug built on it is not the title.
+def _slug_char(ch: str) -> str:
+    return ch if unicodedata.category(ch)[0] in "LNM" else "-"
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").lower()
+
+
+def _alternation(words: Iterable[str]) -> str:
+    """Longest first, so a particle that prefixes another matches whole."""
+    ordered = sorted({w for w in words if w}, key=lambda w: (-len(w), w))
+    return "|".join(re.escape(w) for w in ordered)
+
+
+_PARENTHETICAL = re.compile(r"\(([^)]*)\)")
+
+
+def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity:
+    """A citable identity derived from a title alone, for instruments that carry
+    no number.
+
+    A pure function of the title, so re-ingesting the same document mints the
+    same work URI. Native digits fold to ASCII first, and the year the title
+    states is the last one it states: an earlier one belongs to the instrument
+    being amended.
+    """
+    text = " ".join(normalise_digits(unicodedata.normalize("NFC", title)).split())
+    edition_re = (
+        re.compile(rf"\(\s*{re.escape(rule.edition_marker)}\s*([0-9]+)\s*\)")
+        if rule.edition_marker
+        else None
+    )
+    consolidation_re = (
+        re.compile(_alternation(rule.consolidation_markers), re.IGNORECASE)
+        if rule.consolidation_markers
+        else None
+    )
+    edition = ""
+    if edition_re is not None:
+        found = edition_re.search(text)
+        marker = consolidation_re.search(text) if consolidation_re else None
+        # An edition number after a re-publication marker is the edition folded
+        # into it, not this document's own.
+        if found is not None and (marker is None or marker.start() > found.start()):
+            edition = found.group(1)
+    body = edition_re.sub(" ", text) if edition_re else text
+    if consolidation_re is not None:
+        body = _PARENTHETICAL.sub(
+            lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
+        )
+    year_re = (
+        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})")
+        if rule.year_particles
+        else None
+    )
+    years = list(year_re.finditer(body)) if year_re else []
+    year = years[-1].group(1) if years else ""
+    if years:
+        # Everything from the last particle on is this document's own date, which
+        # the URI carries in its year segment; an earlier one names another
+        # instrument and stays, being what tells two amendments apart.
+        body = body[: years[-1].start()]
+    body = body.strip()
+    for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
+        if body.startswith(prefix):
+            body = body[len(prefix) :].strip()
+            break
+    slug = _slugify(body)[: rule.max_length].rstrip("-")
+    if slug and edition:
+        slug = f"{slug}-{_slugify(rule.edition_marker)}-{edition}"
+    return TitleDerivedIdentity(slug=slug, edition=edition, year=year)
 
 
 def law_number_token(value: object) -> str:

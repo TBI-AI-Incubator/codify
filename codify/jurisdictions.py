@@ -316,13 +316,50 @@ class CalendarConversion(BaseModel):
     # Offset variant for month-sensitive: subtract `offset` from local year
     # before the new-year day, otherwise `offset + 1`.
     offset: int | None = None
+    # Month names in the local calendar's own order, index 0 = month 1. Present
+    # only where a dated line is read off the source text.
+    month_names: list[str] = Field(default_factory=list)
+    # Phrases that introduce the date a document was made. A dated line elsewhere
+    # in the text is some other instrument's.
+    date_cues: list[str] = Field(default_factory=list)
+    # Words marking a year as belonging to this calendar ("B.E.", "A.H.").
+    year_particles: list[str] = Field(default_factory=list)
+    # The local year began in this month before `new_year_reform_year`, so a
+    # date earlier in the Gregorian year carries the previous local year's
+    # number and the epoch offset understates it by one.
+    new_year_reform_year: int | None = None
     note: str = ""
+
+
+class TitleIdentity(BaseModel):
+    """How a jurisdiction that numbers nothing derives an identity from a title.
+
+    Every field is a literal the title grammar uses; the mechanism reading them
+    is `codify.frbr.identity_from_title`.
+    """
+
+    model_config = _STRICT
+
+    # Document-kind words opening a short title, longest first.
+    strip_prefixes: list[str] = Field(default_factory=list)
+    # Words marking the year that follows as the instrument's own.
+    year_particles: list[str] = Field(default_factory=list)
+    # The word inside a parenthetical naming this instrument's edition number.
+    edition_marker: str = ""
+    # Parenthetical words marking a re-publication of an earlier work rather
+    # than the work itself; an edition number after one is the edition the
+    # publisher folded in, not this document's.
+    consolidation_markers: list[str] = Field(default_factory=list)
+    # Longest slug kept, in characters.
+    max_length: int = 100
 
 
 class FrbrConfig(BaseModel):
     model_config = _LOOSE
 
     country_code: str
+    # Declared where instruments carry no number and the title is the identity.
+    title_identity: TitleIdentity | None = None
     uri_patterns: dict[str, str] = Field(default_factory=dict)
     date_calendar: Calendar = "gregorian"
     date_calendar_note: str | None = None

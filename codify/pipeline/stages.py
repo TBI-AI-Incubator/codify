@@ -13,6 +13,7 @@ import structlog
 
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
+    local_date_from_text,
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
@@ -20,7 +21,12 @@ from codify.calendar import (
     to_gregorian_year,
     year_from_calendar,
 )
-from codify.frbr import UncitableFrbrUri, law_number_token, series_number
+from codify.frbr import (
+    UncitableFrbrUri,
+    identity_from_title,
+    law_number_token,
+    series_number,
+)
 from codify.jurisdictions import JurisdictionConfig, load_config, placeholder_statuses_for_code
 from codify.lang import to_iso639_3
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta
@@ -318,6 +324,23 @@ def resolve_descriptors(
     if cal != "gregorian":
         raw_date = ""
     cfg = load_config(jurisdiction_code)
+    if not raw_date:
+        # The day a local-calendar document states it was made on. Deterministic
+        # and ahead of the model, which reports the year and drops the day.
+        source_text = (
+            source_bytes.decode("utf-8", "ignore")
+            if isinstance(source_bytes, bytes)
+            else source_bytes
+        )
+        stated = local_date_from_text(source_text, jurisdiction_code)
+        if stated is not None:
+            raw_date = stated.isoformat()
+    # An instrument series that numbers nothing states its identity in its title.
+    title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
+    identity = identity_from_title(model_title, title_rule) if title_rule else None
+    if identity is not None and not year and identity.year:
+        converted = year_from_calendar(identity.year, cfg.calendar, jurisdiction_code)
+        year = str(converted) if converted is not None else year
     doctype = resolve_doctype(
         cfg,
         title=title,
@@ -346,6 +369,8 @@ def resolve_descriptors(
     # number it would split the FRBR path in two. A cited number keeps its
     # slash; this one cannot.
     number = number.replace("/", "-")
+    if not number and identity is not None:
+        number = identity.slug
     if not number:
         number = draft_number(source_bytes)
     if document_class and document_class.number_has_year_prefix:
