@@ -262,6 +262,16 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1938",
         "1938-05-20",
     ),
+    (
+        # The model echoes the title's year and dates the document in another.
+        # The echoed year converts; the conflicting date is not rebuilt on it.
+        "an echoed year with a date naming another year",
+        "xg",
+        {"title": PRE, "year": "2478", "date": "2481-05-20", "calendar": "buddhist"},
+        "",
+        "1935",
+        "",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -346,6 +356,10 @@ UNECHOED = {
     # Nothing converts it and nothing clears it, but three digits cannot form a
     # URI year segment either way, so both sides end uncitable.
     "year the conversion cannot carry": ("999", ""),
+    # With no title to conflict with, the date is simply the date the model
+    # stated, converted on its own year; only the document's year is decided
+    # elsewhere, and both sides agree on that.
+    "an echoed year with a date naming another year": ("1935", "1938-05-20"),
 }
 
 

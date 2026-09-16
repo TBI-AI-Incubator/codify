@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from codify.calendar import (
     _DATE_WINDOW_CHARS,
+    _first_stated_date,
     compile_local_date_patterns,
     declares_local_date_grammar,
     local_date_from_text,
@@ -306,3 +307,25 @@ def test_a_cue_does_not_assemble_across_a_blank_line() -> None:
     assert local_date_from_text("ให้ไว้ ณ\n\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
     # Control: a single wrap inside the cue still assembles.
     assert local_date_from_text("ให้ไว้ ณ\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") == date(2016, 4, 26)
+
+
+def test_a_longer_cue_wins_over_a_shorter_one_it_contains() -> None:
+    """Configuration order must not decide: the shorter cue ends earlier, so it
+    spends the reach allowance on the rest of the longer one."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["ให้ไว้", "ให้ไว้ ณ วันที่"],
+        year_particles=["พ.ศ."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    # The date sits just inside the window from the longer cue's end, and so
+    # outside it from the shorter cue's, which ends earlier.
+    # Digits ASCII: this calls the walk directly, below the fold the reader does.
+    long_cue, stated = "ให้ไว้ ณ วันที่", " 26 เมษายน พ.ศ. 2559"
+    filler = "ก" * (_DATE_WINDOW_CHARS - 2)
+    assert len(filler) + 1 > _DATE_WINDOW_CHARS - len(" ณ วันที่")
+    text = long_cue + filler + stated
+    assert _first_stated_date(text, patterns, rule, "xn") == date(2016, 4, 26)

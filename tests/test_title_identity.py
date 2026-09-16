@@ -304,3 +304,11 @@ def test_a_non_latin_particle_keeps_matching_without_a_space() -> None:
     boundary rule meant for Latin words."""
     rule = TitleIdentity(strip_prefixes=["พระราชบัญญัติ"], year_particles=["พ.ศ."])
     assert identity_from_title("พระราชบัญญัติเครื่องร่อนสุริยะพ.ศ.2511", rule).year == "2511"
+
+
+def test_a_latin_kind_prefix_ends_on_a_word_boundary() -> None:
+    """Without one "Act" strips itself out of "Action" and two different titles
+    reduce to the same slug."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
+    assert identity_from_title("Action of 1991", rule).slug == "action"
+    assert identity_from_title("Act ion of 1991", rule).slug == "ion"

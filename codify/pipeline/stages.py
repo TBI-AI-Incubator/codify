@@ -505,8 +505,11 @@ def resolve_descriptors(
             else None
         )
         if converted is not None and _year_int(str(converted)):
-            year = str(converted)
-            raw_date = _built_date(int(year), local_month_day)
+            # The date's own year names the date. It names the document only
+            # where no field already did, or one metadata would answer twice.
+            raw_date = _built_date(converted, local_month_day)
+            if _year_int(year) is None:
+                year = str(converted)
     if source_date is not None and not converted_from_title:
         # An exact date off the document settles the year nothing else converted.
         year = str(source_date.year)
