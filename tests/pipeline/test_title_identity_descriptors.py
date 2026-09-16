@@ -242,4 +242,7 @@ def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None
         fallback_stem="source",
         classification_text="",
     )
+    # Not merely unusable: unresolved, so the URI takes the placeholder rather
+    # than the three-digit number the offset produced.
+    assert desc.year == ""
     assert _year_int(desc.year) is None
