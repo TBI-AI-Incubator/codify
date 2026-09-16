@@ -44,8 +44,15 @@ UNKNOWN_YEAR = "0001"
 DRAFT_PREFIX = "draft-"
 
 #: What a title-derived slug wears when it would otherwise open the reserved
-#: namespace above. Short, since it is spent out of the slug's own cap.
+#: namespace above. Short, since it is spent out of the slug's own cap, and
+#: reserved in its own right: escaping a slug that already opens with it is what
+#: keeps the escape injective, so no two titles can arrive at one identity.
 TITLE_ESCAPE_PREFIX = "t-"
+
+
+def _opens_a_reserved_namespace(slug: str) -> bool:
+    return slug.startswith((DRAFT_PREFIX, TITLE_ESCAPE_PREFIX))
+
 
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
 
@@ -226,11 +233,14 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     # let the edition push a slug past the limit it declares. A limit with no
     # room for both keeps the edition, which is what separates an amendment from
     # the act it amends, and lets the assembled segment run to the suffix.
-    slug = _capped(_slugify(body), rule.max_length - len(suffix)).rstrip("-")
-    if slug.startswith(DRAFT_PREFIX):
-        # `draft-` is the content-address namespace: a title reducing to it would
-        # read as an unresolved identity and be refused as uncitable.
-        slug = _capped(f"{TITLE_ESCAPE_PREFIX}{slug}", rule.max_length - len(suffix)).rstrip("-")
+    limit = rule.max_length - len(suffix)
+    slug = _capped(_slugify(body), limit).rstrip("-")
+    # Tested on the assembled segment, which is what a URI carries: a base of
+    # "draft" and an edition suffix open the content-address namespace between
+    # them, and `draft-` there reads as an unresolved identity.
+    if _opens_a_reserved_namespace(f"{slug}{suffix}"):
+        escaped = _capped(_slugify(body), limit - len(TITLE_ESCAPE_PREFIX)).rstrip("-")
+        slug = f"{TITLE_ESCAPE_PREFIX}{escaped}"
     return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
 
 

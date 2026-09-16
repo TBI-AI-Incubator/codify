@@ -242,3 +242,29 @@ def test_an_invisible_between_a_letter_and_its_mark_does_not_fork_the_slug() -> 
     blocked = identity_from_title("Act Cafe​́ rules of 1991", rule)
     composed = identity_from_title("Act Café rules of 1991", rule)
     assert blocked.slug == composed.slug
+
+
+_ESCAPE_RULE = TitleIdentity(
+    strip_prefixes=["Act "], year_particles=["of"], edition_markers=["No."]
+)
+
+
+def test_an_edition_suffix_cannot_complete_the_reserved_namespace() -> None:
+    """The base alone does not open it; the base and the suffix together do, and
+    the URI carries them together."""
+    slug = identity_from_title("Act draft (No. 2) of 1991", _ESCAPE_RULE).slug
+    assert is_citable_work_uri(f"/akn/xa/act/1991/{slug}")
+    assert not slug.startswith(DRAFT_PREFIX)
+
+
+def test_the_escape_is_reserved_too_so_it_cannot_merge_two_titles() -> None:
+    """Escaping only the reserved namespace maps a title already wearing the
+    escape onto the escaped form of another."""
+    plain = identity_from_title("Act draft rules of 1991", _ESCAPE_RULE).slug
+    wearing = identity_from_title("Act t draft rules of 1991", _ESCAPE_RULE).slug
+    assert plain != wearing
+    assert is_citable_work_uri(f"/akn/xa/act/1991/{wearing}")
+
+
+def test_an_ordinary_title_is_not_escaped() -> None:
+    assert identity_from_title("Act normal rules of 1991", _ESCAPE_RULE).slug == "normal-rules"
