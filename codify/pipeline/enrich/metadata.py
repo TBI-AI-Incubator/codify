@@ -14,6 +14,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    title_year_as_gregorian,
     title_year_token,
     year_from_calendar,
 )
@@ -195,7 +196,10 @@ def gregorian_year(
     if not candidate and from_title:
         title_year = title_year_token(from_title, metadata.get("number"))
         if title_year:
-            return int(title_year)
+            # The same conversion the URI path makes, or the stored year and the
+            # one the document is filed under disagree.
+            in_gregorian = title_year_as_gregorian(title_year, country)
+            return int(in_gregorian) if in_gregorian else None
     if not candidate:
         return None
     if cal and cal != "gregorian":

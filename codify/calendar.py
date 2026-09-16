@@ -278,6 +278,22 @@ def declares_local_date_grammar(country: str) -> bool:
     return _rule_and_patterns(country) is not None
 
 
+def title_year_as_gregorian(token: str, country: str) -> str:
+    """A year a title states, in Gregorian, by the jurisdiction's own rule. A
+    jurisdiction dating in another calendar states a local year in its titles."""
+    cfg = try_load_config(country) if country else None
+    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+    if cfg is None or cfg.calendar == "gregorian":
+        return token
+    if rule is not None:
+        try:
+            return str(to_gregorian_year(token, country))
+        except (CalendarConversionError, LookupError):
+            return ""
+    converted = year_from_calendar(token, cfg.calendar, country)
+    return str(converted) if converted is not None else ""
+
+
 def local_date_from_text(text: str, country: str) -> date | None:
     """The Gregorian date a source states its document was made on, or None.
     Cue-anchored: an unintroduced dated line is usually one the document amends."""

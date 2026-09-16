@@ -20,6 +20,7 @@ from codify.calendar import (
     reads_as_a_gregorian_year,
     reform_shift,
     sole_year_token,
+    title_year_as_gregorian,
     title_year_token,
     to_gregorian_year,
     year_from_calendar,
@@ -35,7 +36,6 @@ from codify.jurisdictions import (
     JurisdictionConfig,
     load_config,
     placeholder_statuses_for_code,
-    try_load_config,
 )
 from codify.lang import normalise_digits, to_iso639_3
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta
@@ -104,18 +104,8 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
     if title:
         # The title of a document in a local calendar states a local year.
         token = title_year_token(title, metadata.get("number"))
-        return _title_year_as_gregorian(token, country) if token else token
+        return title_year_as_gregorian(token, country) if token else token
     return ""
-
-
-def _title_year_as_gregorian(token: str, country: str) -> str:
-    """A year a title states, in Gregorian. A jurisdiction dating in another
-    calendar states a local year there, and nothing else converts it."""
-    cfg = try_load_config(country) if country else None
-    if cfg is None or cfg.calendar == "gregorian":
-        return token
-    converted = _local_year_to_gregorian(token, cfg, country)
-    return str(converted) if converted is not None else ""
 
 
 def _fold_language(raw: str | None, source: str, jurisdiction: str | None) -> str | None:
@@ -221,15 +211,10 @@ def _built_date(gregorian_year: int, month_day: tuple[int, int]) -> str:
 
 
 def _rebased_date(raw_date: str, gregorian_year: int) -> str:
-    """`raw_date` on `gregorian_year`, or unchanged when the two do not form a
-    date."""
+    """`raw_date` on `gregorian_year`, or "" when the two do not form a date.
+    Keeping it would leave a local date beside a converted year."""
     parts = _month_day(raw_date)
-    if parts is None:
-        return raw_date
-    try:
-        return date(gregorian_year, *parts).isoformat()
-    except ValueError:
-        return raw_date
+    return _built_date(gregorian_year, parts) if parts is not None else ""
 
 
 def _year_int(year: str) -> int | None:
@@ -431,11 +416,9 @@ def resolve_descriptors(
     source_text = classification_text if classification_text is not None else source_bytes
     source_date: date | None = None
     stated_month: int | None = None
-    if (
-        not raw_date
-        and isinstance(source_text, str)
-        and declares_local_date_grammar(jurisdiction_code)
-    ):
+    # Run whenever the text and a grammar allow: a field holding a non-date
+    # would otherwise hide a date the document itself states.
+    if isinstance(source_text, str) and declares_local_date_grammar(jurisdiction_code):
         # Deterministic, and ahead of the model, which reports the year and
         # drops the day.
         stated = local_date_from_text(source_text, jurisdiction_code)

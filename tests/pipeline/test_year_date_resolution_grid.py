@@ -195,6 +195,22 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1936",
         "1936-02-29",
     ),
+    (
+        "unlabelled local date whose day does not exist",
+        "xg",
+        {"title": POST, "date": "2511-04-31", "calendar": ""},
+        "",
+        "1968",
+        "",
+    ),
+    (
+        "a non-date field does not hide a source date",
+        "xg",
+        {"title": PRE, "date": "unknown"},
+        SOURCE_PRE,
+        "1936",
+        "1936-01-31",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -235,6 +251,9 @@ WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe
 UNECHOED = {
     "unlabelled local date echoing the title": ("2511", "2511-09-09"),
     "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
+    # Same: nothing marks it local, so it stays as the model wrote it. Whether a
+    # model date should be validated at all is a question for every calendar.
+    "unlabelled local date whose day does not exist": ("2511", "2511-04-31"),
 }
 
 
