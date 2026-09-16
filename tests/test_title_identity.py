@@ -233,3 +233,12 @@ def test_a_title_reducing_to_the_draft_namespace_is_moved_out_of_it() -> None:
     slug = identity_from_title("Act draft rules of 1991", rule).slug
     assert not slug.startswith(DRAFT_PREFIX)
     assert is_citable_work_uri(f"/akn/xa/act/1991/{slug}")
+
+
+def test_an_invisible_between_a_letter_and_its_mark_does_not_fork_the_slug() -> None:
+    """Removed after composition it leaves a decomposed letter where the same
+    word composed; removed before, both reach one slug."""
+    rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"])
+    blocked = identity_from_title("Act Cafe​́ rules of 1991", rule)
+    composed = identity_from_title("Act Café rules of 1991", rule)
+    assert blocked.slug == composed.slug

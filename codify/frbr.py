@@ -165,10 +165,11 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     states is the last one it states: an earlier one belongs to the instrument
     being amended.
     """
-    # Format characters go before anything matches: one leading invisible defeats
-    # the kind-word test, and one mid-word forks the slug.
-    folded = "".join(
-        c for c in unicodedata.normalize("NFC", title) if unicodedata.category(c) != "Cf"
+    # Format characters go before the composition, not after: an invisible
+    # between a base letter and its combining mark blocks the two from composing,
+    # so removing it later leaves a different string from the same word.
+    folded = unicodedata.normalize(
+        "NFC", "".join(c for c in title if unicodedata.category(c) != "Cf")
     )
     text = " ".join(normalise_digits(folded).split())
     edition_re = (

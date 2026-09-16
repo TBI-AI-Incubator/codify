@@ -292,15 +292,22 @@ def local_date_from_text(text: str, country: str) -> date | None:
         return None
     rule, patterns = found_rule
     folded = normalise_digits(text)
-    # Every cue, not the first: a document may name the cue before the signature
-    # block that carries the date, and one barren cue would end the search.
-    # Searched unbounded and rejected by distance: an `endpos` shortens the
-    # string, so a year straddling the bound matches as its first three digits.
-    for cue in patterns.cue.finditer(folded):
-        candidate = patterns.date.search(folded, cue.start())
-        if candidate is None or candidate.start() - cue.start() >= _DATE_WINDOW_CHARS:
+    # One pass over each: a fresh search per cue re-reads the rest of the
+    # document, so a date-free document full of cue phrases is quadratic. Both
+    # sequences are in order, so a cursor over the cues finds the nearest one
+    # preceding each date. Searched unbounded and rejected by distance: an
+    # `endpos` shortens the string, so a year straddling the bound would match
+    # as its first three digits.
+    cues = [m.start() for m in patterns.cue.finditer(folded)]
+    if not cues:
+        return None
+    nearest = 0
+    for candidate in patterns.date.finditer(folded, cues[0]):
+        while nearest + 1 < len(cues) and cues[nearest + 1] <= candidate.start():
+            nearest += 1
+        if candidate.start() - cues[nearest] >= _DATE_WINDOW_CHARS:
             continue
-        # Validated here, not after the loop: a syntactic match that is not a
+        # Validated here, not after the walk: a syntactic match that is not a
         # real date (31 April) would otherwise hide a valid later cue.
         stated = _compose(candidate, patterns, rule, country)
         if stated is not None:

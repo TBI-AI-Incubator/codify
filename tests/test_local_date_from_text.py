@@ -253,3 +253,33 @@ def test_a_reform_declared_out_of_range_is_refused(broken: dict[str, int]) -> No
             date_cues=["c"],
             **broken,
         )
+
+
+_MANY_CUES = """
+import sys, time
+sys.path.insert(0, {root!r})
+from codify.calendar import compile_local_date_patterns
+from codify.jurisdictions import CalendarConversion
+from tests.test_local_date_from_text import MONTHS
+rule = CalendarConversion(
+    kind="buddhist", month_names=MONTHS, month_day_is_gregorian=True,
+    date_cues=["A B C"], year_particles=["P"],
+)
+p = compile_local_date_patterns(rule)
+text = "A B C " * 20000
+cues = [m.start() for m in p.cue.finditer(text)]
+n = 0
+for m in p.date.finditer(text, cues[0]):
+    n += 1
+print(len(cues), n)
+"""
+
+
+def test_a_document_full_of_cues_and_no_date_is_read_once() -> None:
+    """A fresh search per cue re-reads the rest of the document, so 20k cue
+    phrases and no date took time in the square of the document length."""
+    script = _MANY_CUES.format(root=str(Path(__file__).resolve().parents[1]))
+    try:
+        subprocess.run([sys.executable, "-c", script], timeout=15, check=True)
+    except subprocess.TimeoutExpired:
+        pytest.fail("the cue walk did not finish within 15s on 20k date-free cues")
