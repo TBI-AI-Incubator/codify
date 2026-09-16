@@ -292,6 +292,19 @@ def local_date_from_text(text: str, country: str) -> date | None:
         return None
     rule, patterns = found_rule
     folded = normalise_digits(text)
+    return _first_stated_date(folded, patterns, rule, country)
+
+
+def _first_stated_date(
+    folded: str,
+    patterns: _LocalDatePatterns,
+    rule: CalendarConversion,
+    country: str,
+) -> date | None:
+    """The first date a declared cue introduces, or None.
+
+    Separate so a caller can bound it without a jurisdiction to load.
+    """
     # One pass over each: a fresh search per cue re-reads the rest of the
     # document, so a date-free document full of cue phrases is quadratic. Both
     # sequences are in order, so a cursor over the cues finds the nearest one

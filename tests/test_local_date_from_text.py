@@ -256,22 +256,17 @@ def test_a_reform_declared_out_of_range_is_refused(broken: dict[str, int]) -> No
 
 
 _MANY_CUES = """
-import sys, time
+import sys
 sys.path.insert(0, {root!r})
-from codify.calendar import compile_local_date_patterns
+from codify.calendar import _first_stated_date, compile_local_date_patterns
 from codify.jurisdictions import CalendarConversion
 from tests.test_local_date_from_text import MONTHS
 rule = CalendarConversion(
     kind="buddhist", month_names=MONTHS, month_day_is_gregorian=True,
     date_cues=["A B C"], year_particles=["P"],
 )
-p = compile_local_date_patterns(rule)
-text = "A B C " * 20000
-cues = [m.start() for m in p.cue.finditer(text)]
-n = 0
-for m in p.date.finditer(text, cues[0]):
-    n += 1
-print(len(cues), n)
+patterns = compile_local_date_patterns(rule)
+assert _first_stated_date("A B C " * 20000, patterns, rule, "xn") is None
 """
 
 
