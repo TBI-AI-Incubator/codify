@@ -387,11 +387,12 @@ def resolve_descriptors(
     # calendar whatever script its digits are in; converting it is not optional
     # just because it happens to read as four ASCII digits.
     stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
-    # A model year equal to the one the title states is the same local year read
-    # twice, not independent Gregorian evidence, however the model labelled it.
+    # A model year whose one year run equals the title's is that local year read
+    # twice, not independent Gregorian evidence. Compared on the run rather than
+    # the whole field, which a model decorates with the era it just read.
     echoes_title = (
         identity is not None
-        and normalise_digits(str(metadata.get("year") or "").strip()) == identity.year
+        and sole_year_token(normalise_digits(str(metadata.get("year") or ""))) == identity.year
     )
     if (
         identity is not None

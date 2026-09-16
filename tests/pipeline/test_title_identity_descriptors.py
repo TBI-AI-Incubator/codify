@@ -246,3 +246,17 @@ def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None
     # than the three-digit number the offset produced.
     assert desc.year == ""
     assert _year_int(desc.year) is None
+
+
+def test_a_decorated_model_year_still_echoes_the_title(configs: None) -> None:
+    """A model answers with the era it just read; the field is decorated, the
+    year run inside it is the same local year the title states."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องหมายการค้า พ.ศ. 2559", "number": "", "year": "B.E. 2559"},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "2016"
