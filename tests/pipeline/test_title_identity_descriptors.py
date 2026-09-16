@@ -384,3 +384,23 @@ def test_a_date_field_naming_no_year_is_not_a_stated_year(configs: None) -> None
         classification_text="",
     )
     assert desc.year == "1968"
+
+
+def test_the_month_settles_the_year_even_on_a_day_the_local_year_lacks(configs: None) -> None:
+    """The month decides a pre-reform conversion, so reading it through a whole
+    local date loses both the year and the day at once."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {
+            "title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2478",
+            "number": "",
+            "date": "2478-02-29",
+            "calendar": "",
+        },
+        jurisdiction_code="xr",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "1936"
+    assert desc.raw_date == "1936-02-29"
