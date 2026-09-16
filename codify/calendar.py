@@ -176,6 +176,9 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
 # Conversion kinds whose `_apply_rule` arm already branches on the month.
 _MONTH_SENSITIVE_KINDS = frozenset({"bikram_samvat", "ethiopian"})
 
+# A blank line, which ends the paragraph a cue introduces.
+_PARAGRAPH_BREAK = re.compile(r"\n[^\S\n]*\n")
+
 # How much text after a cue may hold the date it introduces; beyond it the date
 # belongs to the next paragraph.
 _DATE_WINDOW_CHARS = 200
@@ -301,6 +304,10 @@ def _first_stated_date(
         while nearest + 1 < len(cues) and cues[nearest + 1] <= candidate.start():
             nearest += 1
         if candidate.start() - cues[nearest] >= _DATE_WINDOW_CHARS:
+            continue
+        # A cue introduces what follows it in its own paragraph. Wrapped lines
+        # still count; a blank line ends what the cue can reach.
+        if _PARAGRAPH_BREAK.search(folded, cues[nearest], candidate.start()):
             continue
         # Validated inside the walk, or a syntactic non-date (31 April) hides a
         # valid later cue.

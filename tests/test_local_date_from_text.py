@@ -288,3 +288,10 @@ def test_a_long_cue_does_not_spend_the_window_on_itself() -> None:
     filler = "ก" * (_DATE_WINDOW_CHARS - 10)
     found = local_date_from_text(f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn")
     assert found == date(2016, 4, 26)
+
+
+def test_a_barren_cue_does_not_reach_into_the_next_paragraph() -> None:
+    """A cue introduces what follows it in its own paragraph; a dated line after
+    a blank line is the next paragraph's, and usually one the document amends."""
+    text = "ให้ไว้ ณ วันที่\n\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
+    assert local_date_from_text(text, "xn") is None

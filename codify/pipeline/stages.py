@@ -186,6 +186,14 @@ def _month_of(raw_date: str) -> int | None:
     return parts[0] if parts else None
 
 
+def _built_date(gregorian_year: int, month_day: tuple[int, int]) -> str:
+    """The date, or "" when the parts do not form one on that year."""
+    try:
+        return date(gregorian_year, *month_day).isoformat()
+    except ValueError:
+        return ""
+
+
 def _rebased_date(raw_date: str, gregorian_year: int) -> str:
     """`raw_date` on `gregorian_year`, or unchanged when the two do not form a
     date."""
@@ -383,8 +391,11 @@ def resolve_descriptors(
     number = str(metadata.get("number") or "")
     year = resolve_year(metadata, jurisdiction_code, title=title)
     # Non-Gregorian raw dates stay in the local calendar; the FRBR URI year
-    # must be Gregorian, so blank the date and rely on the resolved year.
+    # must be Gregorian, so blank the date and rely on the resolved year. The
+    # month and day are kept: they are calendar-independent and settle the
+    # conversion the year alone cannot.
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
+    local_month_day = _month_day(raw_date) if cal != "gregorian" else None
     if cal != "gregorian":
         raw_date = ""
     cfg = load_config(jurisdiction_code)
@@ -438,7 +449,9 @@ def resolve_descriptors(
     ):
         # The month of whichever date the document gave, the source's or the
         # model's, since a year that began mid-year needs one to settle.
-        month = stated_month if stated_month is not None else _month_of(raw_date)
+        month = stated_month
+        if month is None:
+            month = local_month_day[0] if local_month_day else _month_of(raw_date)
         converted = _local_year_to_gregorian(
             identity.year,
             cfg,
@@ -449,9 +462,12 @@ def resolve_descriptors(
         # or a larger offset, gives a number no URI can carry. Cleared when it
         # does not, or the unconverted local value stays and reaches the URI.
         year = str(converted) if converted is not None and _year_int(str(converted)) else ""
-        if date_echoes_title and year:
-            # The whole date was local, not just its year; its month settled the
-            # conversion, so the day converts with it.
+        if year and local_month_day is not None:
+            # The date was local by its own label; only its year needed
+            # converting, and the month that settled it is calendar-independent.
+            raw_date = _built_date(int(year), local_month_day)
+        elif year and date_echoes_title:
+            # Local without saying so: the same conversion, read off the field.
             raw_date = _rebased_date(raw_date, int(year))
     if _year_int(year) is None and raw_date:
         # Without this the URI takes the unknown-year placeholder while the

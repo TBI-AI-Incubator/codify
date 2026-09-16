@@ -404,3 +404,23 @@ def test_the_month_settles_the_year_even_on_a_day_the_local_year_lacks(configs: 
     )
     assert desc.year == "1936"
     assert desc.raw_date == "1936-02-29"
+
+
+def test_a_labelled_local_date_keeps_its_month_and_day(configs: None) -> None:
+    """A model that labels its date correctly is not worse off than one that
+    mislabels it: the month still settles the conversion and the day survives."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {
+            "title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2478",
+            "number": "",
+            "date": "2478-02-29",
+            "calendar": "buddhist",
+        },
+        jurisdiction_code="xr",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "1936"
+    assert desc.raw_date == "1936-02-29"
