@@ -295,3 +295,6 @@ def test_a_barren_cue_does_not_reach_into_the_next_paragraph() -> None:
     a blank line is the next paragraph's, and usually one the document amends."""
     text = "ให้ไว้ ณ วันที่\n\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
     assert local_date_from_text(text, "xn") is None
+    # Control: one line break is a wrap, not a paragraph, and still reaches.
+    wrapped = "ให้ไว้ ณ วันที่\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
+    assert local_date_from_text(wrapped, "xn") == date(1937, 8, 4)
