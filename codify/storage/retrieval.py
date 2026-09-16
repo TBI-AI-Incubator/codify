@@ -48,6 +48,9 @@ RRF_K = 60
 # `SUM(1.0 / (:rrf_k + rn))`, so two ids each seen by one arm at the same rank
 # score identically; without it Postgres orders those ties any way it likes and
 # the ranking is not reproducible offline.
+# Keep distance ordering on the indexed embedding relation. A per-provision
+# LATERAL LIMIT forces a corpus scan before the global distance sort. The
+# anti-join excludes fallback vectors wherever a preferred vector exists.
 _HYBRID_SQL = text(
     """
     WITH fts AS (
@@ -65,20 +68,18 @@ _HYBRID_SQL = text(
     vec AS (
       SELECT p.id, ROW_NUMBER() OVER (ORDER BY e.embedding <=> :query_vec) AS rn
       FROM provisions p
-      JOIN LATERAL (
-        SELECT e.embedding
-        FROM provision_embeddings e
-        WHERE e.provision_id = p.id
-          AND (
-            e.model_id = :model_id
-            OR (CAST(:fallback_model_id AS text) IS NOT NULL
-                AND e.model_id = CAST(:fallback_model_id AS text))
+      JOIN provision_embeddings e ON e.provision_id = p.id
+        AND (
+          e.model_id = :model_id
+          OR (
+            e.model_id = CAST(:fallback_model_id AS text)
+            AND NOT EXISTS (
+              SELECT 1 FROM provision_embeddings preferred
+              WHERE preferred.provision_id = p.id
+                AND preferred.model_id = :model_id
+            )
           )
-        -- One vector per provision, the preferred construction where it exists.
-        -- During a re-embed both are present and the older must not compete.
-        ORDER BY (e.model_id = :model_id) DESC
-        LIMIT 1
-      ) e ON TRUE
+        )
       WHERE p.version_id = ANY(:version_ids)
         AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
         AND (p.normative OR CAST(:include_non_normative AS boolean))
@@ -138,20 +139,18 @@ _DENSE_ONLY_SQL = text(
     """
     SELECT p.id, p.akn_eid, p.text, 0.0 AS rrf_score
     FROM provisions p
-    JOIN LATERAL (
-        SELECT e.embedding
-        FROM provision_embeddings e
-        WHERE e.provision_id = p.id
-          AND (
-            e.model_id = :model_id
-            OR (CAST(:fallback_model_id AS text) IS NOT NULL
-                AND e.model_id = CAST(:fallback_model_id AS text))
+    JOIN provision_embeddings e ON e.provision_id = p.id
+        AND (
+          e.model_id = :model_id
+          OR (
+            e.model_id = CAST(:fallback_model_id AS text)
+            AND NOT EXISTS (
+              SELECT 1 FROM provision_embeddings preferred
+              WHERE preferred.provision_id = p.id
+                AND preferred.model_id = :model_id
+            )
           )
-        -- One vector per provision, the preferred construction where it exists.
-        -- During a re-embed both are present and the older must not compete.
-        ORDER BY (e.model_id = :model_id) DESC
-        LIMIT 1
-      ) e ON TRUE
+        )
     WHERE p.version_id = ANY(:version_ids)
       AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
       AND (p.normative OR CAST(:include_non_normative AS boolean))
@@ -216,6 +215,10 @@ async def hybrid_search(
     alone, never on where a provision sits, because a normative annex is law."""
     if not version_ids:
         return []
+    # Continue the approximate index scan after model/scope filters, rather
+    # than stopping at pgvector's default 40 candidates before those filters.
+    # Transaction-local: never change the next borrower's search settings.
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'strict_order'"))
     tokens = (await query_tokens_for(session, query_text, version_ids)).split()
     if not tokens:
         # An empty tokenisation means the query carried no letters or digits.
