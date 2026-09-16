@@ -1,9 +1,5 @@
-"""One year-and-date resolution, read by every caller that needs either.
-
-The URI year, the work date and the stored year are three readings of one
-answer. Resolved apart they drifted, so they are resolved together here and
-each caller takes the field it needs.
-"""
+"""One year-and-date resolution. The URI year, the work date and the stored year
+are three readings of one answer, and resolved apart they drifted."""
 
 from __future__ import annotations
 
@@ -51,9 +47,8 @@ class Dating(NamedTuple):
 def _local_year_to_gregorian(
     local_year: str, cfg: Any, country: str, month: int | None = None
 ) -> int | None:
-    """A local-calendar year as Gregorian, by the jurisdiction's own rule first:
-    a config may declare an epoch the calendar's name does not imply. The month
-    settles a year that began mid-year and so straddles two Gregorian ones."""
+    """A local year as Gregorian, by the jurisdiction's own rule first: a config
+    may declare an epoch the calendar's name does not imply. The month settles."""
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if rule is None:
         return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
@@ -175,9 +170,8 @@ def resolve_dating(
     title: str = "",
     source_text: str = "",
 ) -> Dating:
-    """The year and date one document is filed under. The model's fields, a date
-    the source itself states, and a title the jurisdiction declares a grammar for
-    are read in one place so no caller can answer differently from another."""
+    """The year and date one document is filed under: the model's fields, a date
+    the source states and a title grammar, read in one place for every caller."""
     model_title = str(metadata.get("title") or "")
     cfg = try_load_config(country) if country else None
     year = _year_from_fields(metadata, country, model_title or title)

@@ -10,12 +10,9 @@ import structlog
 from pydantic import BaseModel, Field
 
 from codify.calendar import (
-    canonical_year_and_date,
-    labelled_year_as_gregorian,
-    month_stating_this_year,
     normalise_calendar,
-    title_year_as_gregorian,
     title_year_token,
+    year_from_calendar,
 )
 from codify.core.llm import LLMClient
 from codify.pipeline.dating import resolve_dating
@@ -177,23 +174,21 @@ def number_from_title(title: str) -> str:
 
 
 def _legacy_year(metadata: dict[str, Any], country: str, title: str) -> int | None:
-    """What a run checkpointed before the era work stored: the old coercion, and
-    no refusal. A replay has to reproduce it rather than improve on it."""
-    raw_year, raw_date = canonical_year_and_date(metadata)
+    """What the shipped run stored: the generic conversion and the old coercion,
+    the title year uncoverted. A replay reproduces it rather than improves it."""
+    raw_year = str(metadata.get("year") or "").strip()
+    raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     from_title = str(metadata.get("title") or "").strip() or title.strip()
     if not candidate and from_title:
         title_year = title_year_token(from_title, metadata.get("number"))
         if title_year:
-            in_gregorian = title_year_as_gregorian(title_year, country)
-            return int(in_gregorian) if in_gregorian else None
+            return int(title_year)
     if not candidate:
         return None
     if cal and cal != "gregorian":
-        converted = labelled_year_as_gregorian(
-            candidate, cal, country, month_stating_this_year(metadata, candidate)
-        )
+        converted = year_from_calendar(candidate, cal, country)
         if converted is not None:
             return converted
     try:
@@ -209,10 +204,8 @@ def gregorian_year(
     legacy: bool = False,
     title: str = "",
 ) -> int | None:
-    """The Gregorian year to store for an `extract_metadata` result: one reading
-    of the shared resolution, so the stored year and the year the document is
-    filed under cannot differ. Pass the country, or a calendar needing the
-    jurisdiction's own table and a title grammar go unread."""
+    """One reading of the shared resolution, so the stored year and the year the
+    document is filed under cannot differ. Pass the country, or neither is read."""
     if legacy:
         return _legacy_year(metadata, country, title)
     return resolve_dating(metadata, country=country, title=title).stored_year

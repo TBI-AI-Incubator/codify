@@ -327,8 +327,7 @@ def labelled_year_as_gregorian(
     token: str, label: str, country: str, month: int | None = None
 ) -> int | None:
     """A local year in Gregorian: the jurisdiction's rule where the label names
-    its calendar, or the generic conversion for that label. The month settles a
-    year that began mid-year."""
+    its calendar, else the generic conversion. The month settles a mid-year one."""
     # Never for an era-named calendar: a bare number there is part of a year,
     # not one, and the generic path refuses it on purpose.
     if normalise_calendar(label) not in ERA_NAMED_CALENDARS and declares_this_calendar(
@@ -393,9 +392,8 @@ def _first_stated_date(
 
 
 def reform_shift(rule: CalendarConversion, local_year: int, month: int) -> int:
-    """1 where a local year that began mid-year puts this month in the next
-    Gregorian year, else 0. Kinds whose own arm reads the month are already
-    shifted and must not be twice."""
+    """1 where a year that began mid-year puts this month in the next Gregorian
+    year, else 0. A kind whose own arm reads the month is shifted already."""
     reform = rule.new_year_reform_year
     if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS:
         return 0

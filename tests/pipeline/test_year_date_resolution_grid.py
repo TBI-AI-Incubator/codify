@@ -467,3 +467,38 @@ def test_the_same_grid_without_a_title_grammar(
     """
     twin = _resolve(WITHOUT_IDENTITY[code], metadata, source)
     assert (twin.year, twin.raw_date) == UNECHOED.get(case, (expected_year, expected_date)), case
+
+
+#: What the shipped run stored, read off the pre-branch function: the replay arm
+#: has to reproduce these, conversions the config gained since included.
+REPLAY = [
+    ("a title-only year, with a country", {"title": POST}, "xg", 2511),
+    ("a title-only year, no country", {"title": POST}, "", 2511),
+    ("a labelled year", {"year": "2478", "calendar": "buddhist"}, "xg", 1935),
+    (
+        "a labelled year beside a first-quarter date",
+        {"year": "2478", "date": "2478-01-31", "calendar": "buddhist"},
+        "xg",
+        1935,
+    ),
+    ("a labelled year, custom epoch", {"year": "2478", "calendar": "buddhist"}, "xe", 1935),
+    (
+        "a labelled year, custom epoch and a grammar",
+        {"year": "2478", "calendar": "buddhist"},
+        "xei",
+        1935,
+    ),
+    ("a year already Gregorian", {"year": "1968"}, "xg", 1968),
+]
+
+
+@pytest.mark.parametrize(("case", "metadata", "code", "stored"), REPLAY, ids=[r[0] for r in REPLAY])
+def test_the_replay_arm_stores_what_the_shipped_run_stored(
+    case: str, metadata: dict[str, object], code: str, stored: int
+) -> None:
+    """A replay reproduces a checkpointed answer. Every conversion this branch
+    added is a conversion that run never made."""
+    from codify.pipeline.enrich.metadata import gregorian_year
+
+    try_load_config.cache_clear()
+    assert gregorian_year(dict(metadata), code, legacy=True) == stored, case

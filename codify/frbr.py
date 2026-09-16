@@ -143,9 +143,8 @@ _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
 def _opens_with_prefix(body: str, prefix: str) -> bool:
-    """A kind word opens the title, and a Latin one ends on a word boundary:
-    without that "Act" matches inside "Action". A script written without spaces
-    has no boundary to test."""
+    """A kind word opens the title, a Latin one on a word boundary: without that
+    "Act" matches inside "Action". A script without spaces has none to test."""
     if not body.startswith(prefix):
         return False
     rest = body[len(prefix) :]
