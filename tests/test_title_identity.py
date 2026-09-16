@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from codify.frbr import identity_from_title
-from codify.jurisdictions import TitleIdentity
+from codify.jurisdictions import SLUG_FLOOR, TitleIdentity
 
 # An abugida whose vowel and tone marks are separate codepoints, so a slug built
 # on `\w` loses them. Used as script data; no corpus is implied.
@@ -159,12 +160,22 @@ def test_a_longer_digit_run_is_not_the_titles_year() -> None:
     assert identity_from_title("พระราชบัญญัติภาพยนตร์ พ.ศ. 25340", RULE).year == ""
 
 
-@pytest.mark.parametrize("limit", [1, 5, 6, 7, 12, 20])
-def test_the_declared_limit_holds_however_little_room_the_edition_leaves(limit: int) -> None:
-    """A suffix longer than the limit still yields a segment that carries the
-    edition, which is what separates an amendment from the act it amends."""
+@pytest.mark.parametrize("limit", [SLUG_FLOOR, 20, 24, 100])
+def test_the_declared_limit_covers_the_edition_suffix(limit: int) -> None:
+    """The whole segment fits the limit, and it still carries the edition, which
+    is what separates an amendment from the act it amends."""
     rule = RULE.model_copy(update={"max_length": limit})
     result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2534", rule)
     assert result.edition == "3"
     assert result.slug.endswith("-ฉบับที่-3")
-    assert len(result.slug) <= max(limit, len("-ฉบับที่-3") + 6)
+    assert len(result.slug) <= limit
+
+
+@pytest.mark.parametrize("limit", [0, 1, SLUG_FLOOR - 1])
+def test_a_limit_too_short_to_hold_an_identity_is_refused(limit: int) -> None:
+    """Below the floor the segment cannot carry both a digest and an edition,
+    so the cap would be exceeded silently instead."""
+    with pytest.raises(ValidationError):
+        RULE.model_copy(update={"max_length": limit}).model_validate(
+            RULE.model_dump() | {"max_length": limit}
+        )

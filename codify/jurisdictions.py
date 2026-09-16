@@ -357,6 +357,11 @@ class CalendarConversion(BaseModel):
         return self
 
 
+#: Shortest `TitleIdentity.max_length` that can hold a truncation digest and a
+#: short edition suffix. `codify.frbr` reads it back when it caps a slug.
+SLUG_FLOOR = 16
+
+
 class TitleIdentity(BaseModel):
     """How a jurisdiction that numbers nothing derives an identity from a title.
 
@@ -393,8 +398,11 @@ class TitleIdentity(BaseModel):
     # than the work itself; an edition number after one is the edition the
     # publisher folded in, not this document's.
     consolidation_markers: list[str] = Field(default_factory=list)
-    # Longest slug kept, in characters.
-    max_length: int = 100
+    # Longest slug kept, in characters. Floored: a segment carries the edition
+    # ordinal and, where it was truncated, a digest, and dropping either merges
+    # two works onto one URI. A limit below the floor cannot hold both, so it is
+    # refused rather than silently exceeded.
+    max_length: int = Field(default=100, ge=SLUG_FLOOR)
 
 
 class FrbrConfig(BaseModel):
