@@ -289,3 +289,18 @@ def test_a_cited_edition_stays_in_the_base_and_the_last_one_is_this_acts() -> No
     # The cited edition is what tells the two apart from a sibling amending
     # another instrument, so it stays in the base.
     assert "2" in third.slug
+
+
+def test_a_latin_year_particle_needs_a_token_boundary() -> None:
+    """Without one "of" matches inside "proof" and claims the digits after it."""
+    rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"])
+    assert identity_from_title("Act proof 1991", rule) == ("proof-1991", "", "")
+    # Control: the particle as a word still states the year.
+    assert identity_from_title("Act widgets of 1991", rule) == ("widgets", "", "1991")
+
+
+def test_a_non_latin_particle_keeps_matching_without_a_space() -> None:
+    """A script written without inter-word spaces would lose its year to a
+    boundary rule meant for Latin words."""
+    rule = TitleIdentity(strip_prefixes=["พระราชบัญญัติ"], year_particles=["พ.ศ."])
+    assert identity_from_title("พระราชบัญญัติเครื่องร่อนสุริยะพ.ศ.2511", rule).year == "2511"
