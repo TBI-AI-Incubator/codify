@@ -15,6 +15,7 @@ from codify.calendar import (
     ERA_NAMED_CALENDARS,
     CalendarConversionError,
     declares_local_date_grammar,
+    labelled_year_as_gregorian,
     local_date_from_text,
     normalise_calendar,
     reads_as_a_gregorian_year,
@@ -70,7 +71,7 @@ def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> 
     cal = normalise_calendar(metadata.get("calendar"))
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     if candidate and cal and cal != "gregorian":
-        converted = year_from_calendar(candidate, cal, country)
+        converted = labelled_year_as_gregorian(candidate, cal, country)
         if converted is not None:
             return str(converted)
         if cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):
@@ -176,7 +177,7 @@ def _local_year_to_gregorian(
     )
 
 
-_ISO_DATE = re.compile(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})")
+_ISO_DATE = re.compile(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})(?![0-9])")
 
 
 def _grid_is_gregorian(cfg: Any) -> bool:

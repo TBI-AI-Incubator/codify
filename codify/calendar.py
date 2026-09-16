@@ -282,16 +282,34 @@ def title_year_as_gregorian(token: str, country: str) -> str:
     """A year a title states, in Gregorian, by the jurisdiction's own rule. A
     jurisdiction dating in another calendar states a local year in its titles."""
     cfg = try_load_config(country) if country else None
-    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if cfg is None or cfg.calendar == "gregorian":
         return token
-    if rule is not None:
-        try:
-            return str(to_gregorian_year(token, country))
-        except (CalendarConversionError, LookupError):
-            return ""
-    converted = year_from_calendar(token, cfg.calendar, country)
+    converted = labelled_year_as_gregorian(token, cfg.calendar, country)
     return str(converted) if converted is not None else ""
+
+
+def declares_this_calendar(label: str, country: str) -> bool:
+    """Whether `label` names the calendar this jurisdiction declares, so its own
+    conversion rule applies rather than the generic one for that calendar."""
+    cfg = try_load_config(country) if country else None
+    if cfg is None:
+        return False
+    return normalise_calendar(cfg.calendar) in (normalise_calendar(label), f"{label}_era")
+
+
+def labelled_year_as_gregorian(token: str, label: str, country: str) -> int | None:
+    """A local year in Gregorian: the jurisdiction's rule where the label names
+    its calendar, or the generic conversion for that label."""
+    # Never for an era-named calendar: a bare number there is part of a year,
+    # not one, and the generic path refuses it on purpose.
+    if normalise_calendar(label) not in ERA_NAMED_CALENDARS and declares_this_calendar(
+        label, country
+    ):
+        try:
+            return to_gregorian_year(token, country)
+        except (CalendarConversionError, LookupError):
+            return None
+    return year_from_calendar(token, label, country)
 
 
 def local_date_from_text(text: str, country: str) -> date | None:

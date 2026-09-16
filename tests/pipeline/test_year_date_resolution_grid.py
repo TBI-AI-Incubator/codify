@@ -68,6 +68,9 @@ JURISDICTIONS = {
     "xs": (False, True, True),
     # A declared epoch the calendar's name does not imply, and no title grammar.
     "xe": (False, True, True),
+    # The same declared epoch, with a title grammar, so every year source can be
+    # exercised against a rule the calendar's name does not imply.
+    "xei": (True, True, True),
     # The same three, with no title grammar declared.
     "xg2": (False, True, True),
     "xn2": (False, True, False),
@@ -85,7 +88,9 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "country_code": code,
             "uri_patterns": {"act": f"/akn/{code}/act/{{year}}/{{number}}"},
             "calendar_conversion": _conversion(
-                gregorian_grid=grid, reform=reform, epoch_year=-200 if code == "xe" else -543
+                gregorian_grid=grid,
+                reform=reform,
+                epoch_year=-200 if code in ("xe", "xei") else -543,
             ),
         }
         if identity:
@@ -211,6 +216,40 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1936",
         "1936-01-31",
     ),
+    ("custom epoch, title only, with a grammar", "xei", {"title": PRE}, "", "2278", ""),
+    (
+        "custom epoch, labelled year",
+        "xei",
+        {"title": PRE, "year": "2478", "calendar": "buddhist"},
+        "",
+        "2278",
+        "",
+    ),
+    (
+        "custom epoch, labelled date",
+        "xei",
+        {"title": PRE, "date": "2478-02-20", "calendar": "buddhist"},
+        "",
+        "2279",
+        "2279-02-20",
+    ),
+    (
+        "custom epoch, unlabelled echo",
+        "xei",
+        {"title": PRE, "date": "2478-09-09", "calendar": ""},
+        "",
+        "2278",
+        "2278-09-09",
+    ),
+    ("custom epoch, source date", "xei", {"title": PRE}, SOURCE_PRE, "2279", "2279-01-31"),
+    (
+        "a day run longer than two digits is not a date",
+        "xg",
+        {"title": POST, "date": "2511-09-090", "calendar": "buddhist"},
+        "",
+        "1968",
+        "",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -243,7 +282,7 @@ def test_year_and_date_resolution(
 
 #: Each jurisdiction of the grid paired with its twin declaring no title grammar,
 #: so every cell runs on both sides of that axis.
-WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe"}
+WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe", "xei": "xe"}
 
 #: Cells whose local-ness is visible only by echoing the title. With no title
 #: grammar there is nothing to echo, the model called the date Gregorian, and
@@ -254,6 +293,10 @@ UNECHOED = {
     # Same: nothing marks it local, so it stays as the model wrote it. Whether a
     # model date should be validated at all is a question for every calendar.
     "unlabelled local date whose day does not exist": ("2511", "2511-04-31"),
+    "custom epoch, unlabelled echo": ("2478", "2478-09-09"),
+    # Nothing converts it and nothing clears it, but three digits cannot form a
+    # URI year segment either way, so both sides end uncitable.
+    "year the conversion cannot carry": ("999", ""),
 }
 
 
@@ -274,10 +317,4 @@ def test_the_same_grid_without_a_title_grammar(
     states the year. Everything a date settles must settle the same either way.
     """
     twin = _resolve(WITHOUT_IDENTITY[code], metadata, source)
-    stated = str(metadata.get("date") or "") or source
-    if not stated:
-        # Nothing but the title carries a year, so the two sides may differ only
-        # in that the twin reads it through the generic fallback.
-        assert twin.raw_date == ""
-        return
     assert (twin.year, twin.raw_date) == UNECHOED.get(case, (expected_year, expected_date)), case

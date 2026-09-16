@@ -11,12 +11,12 @@ from pydantic import BaseModel, Field
 
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
+    labelled_year_as_gregorian,
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
     title_year_as_gregorian,
     title_year_token,
-    year_from_calendar,
 )
 from codify.core.llm import LLMClient
 
@@ -203,7 +203,7 @@ def gregorian_year(
     if not candidate:
         return None
     if cal and cal != "gregorian":
-        converted = year_from_calendar(candidate, cal, country)
+        converted = labelled_year_as_gregorian(candidate, cal, country)
         if converted is not None:
             return converted
         if not legacy and cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):
