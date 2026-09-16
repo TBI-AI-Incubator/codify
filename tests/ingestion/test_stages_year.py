@@ -51,9 +51,21 @@ def test_the_stored_year_matches_the_uri_year_on_a_title_only_year(tmp_path, mon
         "xb": {
             "calendar": "buddhist_era",
             "frbr": {"country_code": "xb", "calendar_conversion": conversion},
-        }
+        },
+        "xc": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xc",
+                "calendar_conversion": {"kind": "buddhist", "epoch_year": -200},
+            },
+        },
     }
     metadata = {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511"}
     with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
         assert resolve_year(metadata, "xb", title=str(metadata["title"])) == "1968"
         assert gregorian_year(metadata, "xb") == 1968
+        # A year the model states, on a declared epoch the calendar name does
+        # not imply: both paths take the jurisdiction's rule, not the generic one.
+        labelled = {"year": "2511", "calendar": "buddhist"}
+        assert resolve_year(labelled, "xc") == "2311"
+        assert gregorian_year(labelled, "xc") == 2311
