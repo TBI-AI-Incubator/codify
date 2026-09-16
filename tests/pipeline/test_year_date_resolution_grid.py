@@ -45,6 +45,9 @@ SOURCE_PRE = "ให้ไว้ ณ วันที่ ๓๑ มกราค�
 SOURCE_POST = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๕๑๑\n"
 #: A cue date naming the year after the one PRE's title states.
 SOURCE_OTHER = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๒๔๗๙\n"
+#: A title naming the Act it amends before itself, so two year runs stand in it
+#: and only the grammar can say which is the instrument's own.
+TWO_YEARS = "พระราชบัญญัติแก้ไขเพิ่มเติมพระราชบัญญัติมโหรีหลวง พ.ศ. 2478 พ.ศ. 2486"
 
 
 def _conversion(
@@ -310,6 +313,25 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1935",
         "1937-01-31",
     ),
+    # --- the title grammar is the only thing that can answer -----------------
+    (
+        # Unlabelled and bare: nothing but the title says the year is local.
+        "a bare year echoing the title, unlabelled",
+        "xg",
+        {"title": POST, "year": "2511", "calendar": ""},
+        "",
+        "1968",
+        "",
+    ),
+    ("a title naming two years", "xg", {"title": TWO_YEARS}, "", "1943", ""),
+    (
+        "a title naming two years, with the year field",
+        "xg",
+        {"title": TWO_YEARS, "year": "2486", "calendar": "buddhist"},
+        "",
+        "1943",
+        "",
+    ),
     # --- fields that state no year ------------------------------------------
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -366,15 +388,20 @@ def test_every_year_path_answers_the_same(
     # review found them disagreeing about one document.
     assert resolved == (str(stored) if stored is not None else ""), case
     if source:
-        # The descriptor refines the year with a month only the source states.
+        # The descriptor refines the year with a month only the source states,
+        # which the two helpers are never handed.
         return
-    # Against the twin declaring no title grammar, where the descriptor knows
-    # nothing the other two do not.
+    # And the descriptor itself, which knows nothing the other two do not.
+    try_load_config.cache_clear()
+    assert _resolve(code, metadata, source).year == resolved, case
+    # Against the twin declaring no title grammar, on the same three readings.
     twin = WITHOUT_IDENTITY[code]
     try_load_config.cache_clear()
-    assert _resolve(twin, metadata, source).year == stages.resolve_year(
-        dict(metadata), twin, title=title
-    ), case
+    twin_resolved = stages.resolve_year(dict(metadata), twin, title=title)
+    twin_stored = gregorian_year(dict(metadata), twin, title=title)
+    assert twin_resolved == (str(twin_stored) if twin_stored is not None else ""), case
+    try_load_config.cache_clear()
+    assert _resolve(twin, metadata, source).year == twin_resolved, case
 
 
 #: Each jurisdiction of the grid paired with its twin declaring no title grammar,
@@ -398,6 +425,11 @@ UNECHOED = {
     # stated, converted on its own year; only the document's year is decided
     # elsewhere, and both sides agree on that.
     "an echoed year with a date naming another year": ("1935", "1938-05-20"),
+    # No grammar, so the bare local year is read as written; the same title with
+    # two year runs names no single one, and nothing else states it.
+    "a bare year echoing the title, unlabelled": ("2511", ""),
+    "a title naming two years": ("", ""),
+    "a title naming two years, with the year field": ("1943", ""),
     # No title year to disagree with, so the date off the document is the
     # document's own and states the year.
     "a source date naming another local year": ("1937", "1937-01-31"),

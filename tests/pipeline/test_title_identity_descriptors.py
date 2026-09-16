@@ -9,7 +9,7 @@ import pytest
 from codify.frbr import build_frbr_work_uri, is_citable_work_uri
 from codify.jurisdictions import try_load_config
 from codify.pipeline import stages
-from codify.pipeline.stages import _year_int
+from codify.pipeline.dating import _year_int
 
 MONTHS = [
     "มกราคม",
