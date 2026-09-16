@@ -228,17 +228,27 @@ async def latest_versions_for_jurisdiction(
     return [row[0] for row in result.all()]
 
 
+# Coverage needs one matching embedding per version, not every embedding in
+# the corpus. Keep LIMIT inside the lateral probe so the planner cannot flatten
+# this into a global embedding join before counting distinct versions.
 _COUNT_EMBEDDED_SQL = text(
     """
-    SELECT count(DISTINCT p.version_id)
-    FROM provisions p
-    JOIN provision_embeddings e ON e.provision_id = p.id
-    WHERE p.version_id = ANY(:version_ids)
-      AND (
-        e.model_id = :model_id
-        OR (CAST(:fallback_model_id AS text) IS NOT NULL
-            AND e.model_id = CAST(:fallback_model_id AS text))
-      )
+    SELECT count(*)
+    FROM (SELECT DISTINCT unnest(:version_ids) AS id) scoped
+    JOIN LATERAL (
+      SELECT 1
+      FROM provisions p
+      WHERE p.version_id = scoped.id
+        AND EXISTS (
+          SELECT 1 FROM provision_embeddings e
+          WHERE e.provision_id = p.id
+            AND (
+              e.model_id = :model_id
+              OR e.model_id = CAST(:fallback_model_id AS text)
+            )
+        )
+      LIMIT 1
+    ) matched ON TRUE
     """
 ).bindparams(bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))))
 
