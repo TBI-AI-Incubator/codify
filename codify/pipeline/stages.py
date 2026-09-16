@@ -167,19 +167,33 @@ def _local_year_to_gregorian(
     )
 
 
-def _month_of(raw_date: str) -> int | None:
-    """The month a full ISO date names, or None."""
-    try:
-        return date.fromisoformat(normalise_digits(raw_date)[:10]).month
-    except ValueError:
+_ISO_DATE = re.compile(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})")
+
+
+def _month_day(raw_date: str) -> tuple[int, int] | None:
+    """The month and day an ISO date names, read without its year: 29 February
+    is a day of one calendar's leap year and not the other's."""
+    found = _ISO_DATE.match(normalise_digits(raw_date))
+    if found is None:
         return None
+    month, day = int(found.group(2)), int(found.group(3))
+    return (month, day) if 1 <= month <= 12 and 1 <= day <= 31 else None
+
+
+def _month_of(raw_date: str) -> int | None:
+    """The month an ISO date names, or None."""
+    parts = _month_day(raw_date)
+    return parts[0] if parts else None
 
 
 def _rebased_date(raw_date: str, gregorian_year: int) -> str:
-    """`raw_date` on `gregorian_year`, or unchanged when it is not a full date."""
+    """`raw_date` on `gregorian_year`, or unchanged when the two do not form a
+    date."""
+    parts = _month_day(raw_date)
+    if parts is None:
+        return raw_date
     try:
-        stated = date.fromisoformat(normalise_digits(raw_date)[:10])
-        return stated.replace(year=gregorian_year).isoformat()
+        return date(gregorian_year, *parts).isoformat()
     except ValueError:
         return raw_date
 
@@ -397,7 +411,12 @@ def resolve_descriptors(
     identity = identity_from_title(model_title, title_rule) if title_rule else None
     # A year the model never stated came from the title, so it is local whatever
     # script its digits are in.
-    stated_by_model = bool(str(metadata.get("year") or "") or str(metadata.get("date") or ""))
+    # Stated, not merely present: a field naming no year run says nothing, and
+    # blocking the conversion on it leaves a local year in the URI.
+    stated_by_model = any(
+        sole_year_token(normalise_digits(str(metadata.get(field) or "")))
+        for field in ("year", "date")
+    )
     # A model year whose run equals the title's is that local year read twice.
     # Compared on the run, since a model decorates the field with the era, and on
     # the date too: a model dating a document in the local calendar while calling

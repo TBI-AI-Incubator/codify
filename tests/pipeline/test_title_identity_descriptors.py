@@ -350,3 +350,37 @@ def test_a_date_field_echoing_the_title_is_local_too(configs: None) -> None:
     )
     assert desc.year == "1968"
     assert desc.raw_date == "1968-09-09"
+
+
+def test_a_day_valid_only_in_the_converted_year_survives(configs: None) -> None:
+    """29 February falls in a leap year of one calendar and not the other, so
+    validating the day against the local year loses the date."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {
+            "title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2503",
+            "number": "",
+            "date": "2503-02-29",
+            "calendar": "",
+        },
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "1960"
+    assert desc.raw_date == "1960-02-29"
+
+
+def test_a_date_field_naming_no_year_is_not_a_stated_year(configs: None) -> None:
+    """Presence is not a statement: a field holding no year run leaves the
+    title's local year unconverted in the URI."""
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "number": "", "date": "unknown"},
+        jurisdiction_code="xn",
+        source_bytes=b"",
+        fallback_stem="source",
+        classification_text="",
+    )
+    assert desc.year == "1968"
