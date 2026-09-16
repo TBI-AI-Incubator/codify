@@ -13,6 +13,7 @@ import structlog
 
 from codify.calendar import (
     ERA_NAMED_CALENDARS,
+    declares_local_date_grammar,
     local_date_from_text,
     normalise_calendar,
     reads_as_a_gregorian_year,
@@ -324,7 +325,7 @@ def resolve_descriptors(
     if cal != "gregorian":
         raw_date = ""
     cfg = load_config(jurisdiction_code)
-    if not raw_date:
+    if not raw_date and declares_local_date_grammar(jurisdiction_code):
         # The day a local-calendar document states it was made on. Deterministic
         # and ahead of the model, which reports the year and drops the day.
         source_text = (

@@ -344,8 +344,10 @@ class TitleIdentity(BaseModel):
     strip_prefixes: list[str] = Field(default_factory=list)
     # Words marking the year that follows as the instrument's own.
     year_particles: list[str] = Field(default_factory=list)
-    # The word inside a parenthetical naming this instrument's edition number.
-    edition_marker: str = ""
+    # Words inside a parenthetical naming this instrument's edition number,
+    # spelling variants included. The first is the canonical one and is what a
+    # slug carries, so a reform of the orthography does not fork an identity.
+    edition_markers: list[str] = Field(default_factory=list)
     # Parenthetical words marking a re-publication of an earlier work rather
     # than the work itself; an edition number after one is the edition the
     # publisher folded in, not this document's.

@@ -43,7 +43,7 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     identity = {
         "strip_prefixes": ["พระราชบัญญัติ"],
         "year_particles": ["พ.ศ."],
-        "edition_marker": "ฉบับที่",
+        "edition_markers": ["ฉบับที่"],
         "consolidation_markers": ["Update"],
     }
 

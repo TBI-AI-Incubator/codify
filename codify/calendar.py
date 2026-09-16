@@ -219,6 +219,15 @@ def _rule_and_patterns(
     return None if patterns is None else (rule, patterns)
 
 
+def declares_local_date_grammar(country: str) -> bool:
+    """Whether this jurisdiction names the months a dated line is written in.
+
+    Read before decoding a source, so a jurisdiction that declares no grammar
+    costs nothing.
+    """
+    return _rule_and_patterns(country) is not None
+
+
 def local_date_from_text(text: str, country: str) -> date | None:
     """The Gregorian date a source states its document was made on, or None.
 

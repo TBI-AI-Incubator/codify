@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 
 from codify.frbr import identity_from_title
@@ -12,7 +16,7 @@ from codify.jurisdictions import TitleIdentity
 RULE = TitleIdentity(
     strip_prefixes=["พระราชบัญญัติประกอบรัฐธรรมนูญ", "พระราชบัญญัติ"],
     year_particles=["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."],
-    edition_marker="ฉบับที่",
+    edition_markers=["ฉบับที่", "ฉะบับที่"],
     consolidation_markers=["Update", "ครั้งที่"],
     max_length=100,
 )
@@ -88,5 +92,38 @@ def test_slug_is_capped_at_the_declared_length() -> None:
     assert len(result.slug) == 12
 
 
+@pytest.mark.parametrize(
+    ("title", "slug"),
+    [
+        # Both declared spellings of the edition word reach one canonical slug,
+        # so a reform of the orthography does not fork an identity.
+        ("พระราชบัญญัติภาพยนตร์ (ฉบับที่ 2) พุทธศักราช 2479", "ภาพยนตร์-ฉบับที่-2"),
+        ("พระราชบัญญัติภาพยนตร์ (ฉะบับที่ 2) พุทธศักราช 2479", "ภาพยนตร์-ฉบับที่-2"),
+    ],
+)
+def test_an_edition_spelling_variant_reaches_the_canonical_slug(title: str, slug: str) -> None:
+    assert identity_from_title(title, RULE).slug == slug
+
+
 def test_an_undeclared_grammar_derives_nothing() -> None:
     assert identity_from_title("Act No. 7 of 1992", TitleIdentity()).slug == "act-no-7-of-1992"
+
+
+_ADVERSARIAL = """
+import sys
+sys.path.insert(0, {root!r})
+from tests.test_title_identity import RULE
+from codify.frbr import identity_from_title
+identity_from_title("(" * 40000, RULE)
+identity_from_title("พ.ศ. " * 40000, RULE)
+identity_from_title("(ฉบับที่ " * 40000, RULE)
+"""
+
+
+def test_the_title_patterns_are_bounded_on_adversarial_input() -> None:
+    """`re` holds the GIL and takes no timeout, so the bound is a child process."""
+    script = _ADVERSARIAL.format(root=str(Path(__file__).resolve().parents[1]))
+    try:
+        subprocess.run([sys.executable, "-c", script], timeout=10, check=True)
+    except subprocess.TimeoutExpired:
+        pytest.fail("a title pattern did not return within 10s on 40k repeats")

@@ -108,7 +108,9 @@ def _alternation(words: Iterable[str]) -> str:
     return "|".join(re.escape(w) for w in ordered)
 
 
-_PARENTHETICAL = re.compile(r"\(([^)]*)\)")
+# `[^()]*`, not `[^)]*`: an unclosed run of openers would otherwise rescan
+# to end of title from every one of them.
+_PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
 def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity:
@@ -122,8 +124,8 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     """
     text = " ".join(normalise_digits(unicodedata.normalize("NFC", title)).split())
     edition_re = (
-        re.compile(rf"\(\s*{re.escape(rule.edition_marker)}\s*([0-9]+)\s*\)")
-        if rule.edition_marker
+        re.compile(rf"\(\s*(?:{_alternation(rule.edition_markers)})\s*([0-9]+)\s*\)")
+        if rule.edition_markers
         else None
     )
     consolidation_re = (
@@ -163,7 +165,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             break
     slug = _slugify(body)[: rule.max_length].rstrip("-")
     if slug and edition:
-        slug = f"{slug}-{_slugify(rule.edition_marker)}-{edition}"
+        slug = f"{slug}-{_slugify(rule.edition_markers[0])}-{edition}"
     return TitleDerivedIdentity(slug=slug, edition=edition, year=year)
 
 
