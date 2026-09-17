@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from codify.embed.client import EmbeddingClient
 from codify.retrieve.hybrid import retrieve
 from codify.storage.embeddings import upsert_embedding
-from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
+from codify.storage.jurisdictions import get_or_create_jurisdiction
+from codify.storage.models import Law, Provision, Section, Version
 from codify.testing import postgres_url
 
 pytestmark = [pytest.mark.integration, pytest.mark.live_llm]
@@ -43,9 +44,8 @@ async def embedding_client() -> EmbeddingClient:
 
 async def _build_version(session: AsyncSession, suffix: str | None = None) -> uuid.UUID:
     suffix = suffix or uuid.uuid4().hex[:8]
-    j = Jurisdiction(code=f"zz-{suffix}", name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    # Through the writer: it creates the jurisdiction's embeddings partition.
+    j = await get_or_create_jurisdiction(session, f"zz-{suffix}", name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title=f"Synthetic Act {suffix}",
@@ -74,6 +74,15 @@ async def _add_provisions_with_embeddings(
     *,
     section_title: str | None = None,
 ) -> list[uuid.UUID]:
+    jurisdiction_id = (
+        await session.execute(
+            text(
+                "SELECT l.jurisdiction_id FROM versions v JOIN laws l ON l.id = v.law_id "
+                "WHERE v.id = :version"
+            ),
+            {"version": version_id},
+        )
+    ).scalar_one()
     if section_title is not None:
         sec_eid = f"sec_{uuid.uuid4().hex[:8]}"
         sec = Section(
@@ -102,7 +111,14 @@ async def _add_provisions_with_embeddings(
         )
         session.add(p)
         await session.flush()
-        await upsert_embedding(session, p.id, vec, model_id)
+        await upsert_embedding(
+            session,
+            p.id,
+            vec,
+            model_id,
+            version_id=version_id,
+            jurisdiction_id=jurisdiction_id,
+        )
         ids.append(p.id)
     return ids
 
@@ -250,9 +266,7 @@ async def test_multi_version_filter_spans_versions(
     session: AsyncSession, embedding_client: EmbeddingClient
 ) -> None:
     suffix = uuid.uuid4().hex[:8]
-    j = Jurisdiction(code=f"zz-{suffix}", name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    j = await get_or_create_jurisdiction(session, f"zz-{suffix}", name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title="Multi",
@@ -331,9 +345,7 @@ async def test_jurisdiction_resolution_round_trip(
     """jurisdiction_code resolves through the storage helper and runs end-to-end."""
     suffix = uuid.uuid4().hex[:8]
     code = f"zz-{suffix}"
-    j = Jurisdiction(code=code, name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    j = await get_or_create_jurisdiction(session, code, name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title="J",

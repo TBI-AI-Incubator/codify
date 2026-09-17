@@ -32,8 +32,12 @@ async def upsert_embedding(
     provision_id: uuid.UUID,
     vector: list[float],
     model_id: str,
+    *,
+    version_id: uuid.UUID,
+    jurisdiction_id: uuid.UUID,
 ) -> ProvisionEmbedding:
-    """Upsert via ON CONFLICT (provision_id, model_id). Different model_ids coexist."""
+    """Upsert via ON CONFLICT (provision_id, model_id, jurisdiction_id). Different
+    model_ids coexist. The scope keys route the row to its jurisdiction's partition."""
     # id supplied explicitly: pg_insert bypasses SQLModel's default_factory.
     stmt = (
         pg_insert(ProvisionEmbedding)
@@ -42,9 +46,11 @@ async def upsert_embedding(
             provision_id=provision_id,
             embedding=vector,
             model_id=model_id,
+            version_id=version_id,
+            jurisdiction_id=jurisdiction_id,
         )
         .on_conflict_do_update(
-            index_elements=["provision_id", "model_id"],
+            index_elements=["provision_id", "model_id", "jurisdiction_id"],
             set_={"embedding": vector},
         )
         .returning(ProvisionEmbedding)
@@ -96,7 +102,7 @@ async def embed_version_provisions(
     """
     model_id = model_id or embedding_model_id(client.model, path_context=path_context)
     stmt = (
-        select(Provision, Section, Law.title)
+        select(Provision, Section, Law.title, Law.jurisdiction_id)
         .outerjoin(Section, Provision.section_id == Section.id)
         .join(Version, Version.id == Provision.version_id)
         .join(Law, Law.id == Version.law_id)
@@ -123,12 +129,19 @@ async def embed_version_provisions(
 
     items = [
         (_context(law_title, section, path_context=path_context), provision.text)
-        for provision, section, law_title in rows
+        for provision, section, law_title, _jurisdiction in rows
     ]
     vectors = await client.embed_documents(items)
 
-    for (provision, _section, _law), vector in zip(rows, vectors, strict=True):
-        await upsert_embedding(session, provision.id, vector, model_id)
+    for (provision, _section, _law, jurisdiction_id), vector in zip(rows, vectors, strict=True):
+        await upsert_embedding(
+            session,
+            provision.id,
+            vector,
+            model_id,
+            version_id=version_id,
+            jurisdiction_id=jurisdiction_id,
+        )
 
     return len(rows)
 

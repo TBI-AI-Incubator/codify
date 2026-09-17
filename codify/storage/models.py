@@ -608,8 +608,11 @@ class LifecycleEventRow(SQLModel, table=True):
 
 
 class ProvisionEmbedding(SQLModel, table=True):
+    """Partitioned by `jurisdiction_id`, one HNSW per partition; `version_id` is
+    the in-scan filter. Both are the provision's, copied so the index can see them."""
+
     __tablename__ = "provision_embeddings"
-    __table_args__ = (UniqueConstraint("provision_id", "model_id"),)
+    __table_args__ = (UniqueConstraint("provision_id", "model_id", "jurisdiction_id"),)
 
     id: uuid.UUID = uuid_pk()
     provision_id: uuid.UUID = Field(
@@ -622,6 +625,10 @@ class ProvisionEmbedding(SQLModel, table=True):
     embedding: list[float] = Field(sa_column=Column(HALFVEC(768), nullable=False))
     model_id: str = Field(sa_column=Column(Text, nullable=False))
     created_at: datetime = ts_now()
+    version_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False))
+    jurisdiction_id: uuid.UUID = Field(
+        sa_column=Column(PG_UUID(as_uuid=True), ForeignKey("jurisdictions.id"), primary_key=True)
+    )
 
 
 class VersionUnitEmbedding(SQLModel, table=True):
