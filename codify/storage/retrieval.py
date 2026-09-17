@@ -52,7 +52,9 @@ RRF_K = 60
 # partitioned by jurisdiction with one HNSW each: the jurisdiction predicate
 # prunes to the scope's partitions and the version predicate is applied inside
 # the ordered index scan. A window over the join instead sorts every embedding
-# in scope exactly, which measured 60 s cold on 67k provisions. The anti-join
+# in scope exactly, which measured 60 s cold on 67k provisions. The window
+# orders by `distance + 0`: the relaxed scan is approximately ordered and the
+# planner would otherwise take its order for the window's. The anti-join
 # excludes fallback vectors wherever a preferred vector exists.
 _HYBRID_SQL = text(
     """
@@ -69,7 +71,7 @@ _HYBRID_SQL = text(
       LIMIT :pool
     ),
     vec AS (
-      SELECT id, ROW_NUMBER() OVER (ORDER BY distance) AS rn
+      SELECT id, ROW_NUMBER() OVER (ORDER BY distance + 0) AS rn
       FROM (
         SELECT e.provision_id AS id, e.embedding <=> :query_vec AS distance
         FROM provision_embeddings e
@@ -146,7 +148,8 @@ async def query_tokens_for(
 
 
 # The relaxed scan may hand back its candidates a little out of order, so the
-# limited set is sorted once more outside it.
+# limited set is sorted once more outside it; `+ 0` so the planner does not
+# take the scan's claimed order for the sort's.
 _DENSE_ONLY_SQL = text(
     """
     SELECT id, akn_eid, text, 0.0 AS rrf_score
@@ -174,7 +177,7 @@ _DENSE_ONLY_SQL = text(
     ORDER BY e.embedding <=> :query_vec
     LIMIT :k
     ) nearest
-    ORDER BY distance, id
+    ORDER BY distance + 0, id
     """
 ).bindparams(
     bindparam("query_vec", type_=HALFVEC(768)),
