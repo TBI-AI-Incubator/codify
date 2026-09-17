@@ -843,6 +843,22 @@ class TestAMonthIsReadOnItsOwnGrid:
         blind = _apply_rule(local_year, rule, month=None)
         assert _apply_rule(local_year, rule, month=month, day=day, month_grid=month_grid) == blind
 
+    @pytest.mark.parametrize(
+        ("month", "day"),
+        [(0, 10), (13, 10), (2, 0), (2, 99)],
+        ids=["month 0", "month 13", "day 0", "day 99"],
+    )
+    def test_a_value_off_the_grid_takes_no_reform_shift(self, month: int, day: int) -> None:
+        """The reform shift reads the month against the new-year month; a value
+        off the grid cannot be read against it, so a pre-reform year stays."""
+        rule = self._gregorian_grid("buddhist", new_year_month=4, new_year_reform_year=2484)
+        assert _apply_rule("2478", rule, month=month, day=day) == _apply_rule(
+            "2478", rule, month=None
+        )
+        assert (
+            _apply_rule("2478", rule, month=2, day=10) == _apply_rule("2478", rule, month=None) + 1
+        )
+
     def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
         rule = self._gregorian_grid("bikram_samvat")
         assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)

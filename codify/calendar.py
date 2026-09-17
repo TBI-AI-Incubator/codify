@@ -124,7 +124,10 @@ def _apply_rule(
         raise CalendarConversionError(f"{local_year!r} is not a year")
     earlier = _in_the_earlier_gregorian_year(rule, month, day, month_grid)
     converted = _convert(local_year, rule, earlier)
-    if month is None or rule.new_year_reform_year is None:
+    # Off the Gregorian grid a month cannot be read against the new-year month.
+    if month is None or not 1 <= month <= 12 or day is not None and not 1 <= day <= 31:
+        return converted
+    if rule.new_year_reform_year is None:
         return converted
     # Shifted here and nowhere else, so no caller can disagree or shift twice.
     on_gregorian_grid = month_grid == "gregorian" or rule.month_day_is_gregorian

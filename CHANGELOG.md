@@ -2,8 +2,8 @@
 
 ## 0.2.0 — unpublished
 
-Two breaks, so the minor moves, as `VERSIONING.md` prescribes while the major
-is zero.
+Three breaks, so the minor moves, as `VERSIONING.md` prescribes while the
+major is zero.
 
 - `to_gregorian_year(..., month=)` read a Gregorian month of a Bikram Samvat
   year the wrong way round, filing April to December under the later Gregorian
@@ -15,6 +15,13 @@ is zero.
   against the demo holdings on 17 September 2026: no stored law has a year
   below 1000 and no work URI carries a one- to three-digit year segment, so no
   shipped corpus moves.
+- A metadata date field the model left unlabelled had its year converted through
+  the jurisdiction's calendar; it is now taken as written unless it echoes the
+  year a declared title grammar reads, since converting a year no document
+  states as local put a year no document states into the URI. Verified against
+  the demo holdings on 17 September 2026: no jurisdiction with a non-Gregorian
+  calendar (af, et, ir, jp, kp, ma, np, sa, th, tw) has any law stored, so no
+  shipped row moves.
 
 ## 0.1.0 — private extraction candidate
 
