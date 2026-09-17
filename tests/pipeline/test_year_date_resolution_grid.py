@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from codify.calendar import labelled_year_as_gregorian, month_stating_this_year
+from codify.calendar import labelled_year_as_gregorian, month_day_stating_this_year
 from codify.jurisdictions import try_load_config
 from codify.pipeline import stages
 
@@ -120,8 +120,11 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
     ("title only, pre-reform", "xg", {"title": PRE}, "", "1935", ""),
     ("title only, post-reform", "xg", {"title": POST}, "", "1968", ""),
     ("title only, no reform declared", "xn", {"title": PRE}, "", "1935", ""),
-    # No grammar declares the title, so the year converts month-blind.
-    ("no identity, no date", "xs", {"title": PRE}, "", "1935", ""),
+    # No grammar declares the title, so its year is read as written.
+    ("no identity, no date", "xs", {"title": PRE}, "", "2478", ""),
+    # An ordinary title in a jurisdiction dating in another calendar: with no
+    # grammar to say which year is local, none is.
+    ("a plain title, no grammar", "xs", {"title": "Act of 2023"}, "", "2023", ""),
     # --- source states a date ------------------------------------------------
     ("source date, pre-reform", "xg", {"title": PRE}, SOURCE_PRE, "1936", "1936-01-31"),
     ("source date, post-reform", "xg", {"title": POST}, SOURCE_POST, "1968", "1968-01-31"),
@@ -204,7 +207,7 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1968-09-09",
     ),
     # --- the configured rule, not a generic offset --------------------------
-    ("custom epoch, title only", "xe", {"title": PRE}, "", "2278", ""),
+    ("custom epoch, title only", "xe", {"title": PRE}, "", "2478", ""),
     (
         "no identity, labelled local date",
         "xs",
@@ -425,6 +428,12 @@ WITHOUT_IDENTITY = {"xg": "xg2", "xn": "xn2", "xo": "xo2", "xs": "xs", "xe": "xe
 #: Cells whose local-ness shows only by echoing the title. With no grammar
 #: there is nothing to echo, so the model's word is the only reading left.
 UNECHOED = {
+    # A title-only year with no grammar is read as written, as it always was.
+    "title only, pre-reform": ("2478", ""),
+    "title only, post-reform": ("2511", ""),
+    "title only, no reform declared": ("2478", ""),
+    "custom epoch, title only, with a grammar": ("2478", ""),
+    "date field naming no year": ("2511", "unknown"),
     "unlabelled local date echoing the title": ("2511", "2511-09-09"),
     "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
     # Same: nothing marks it local, so it stays as the model wrote it. Whether a
@@ -452,14 +461,14 @@ UNECHOED = {
 def test_a_padded_date_still_states_its_month() -> None:
     """A model pads the field. The month lookup matches on the canonical value,
     not on whatever whitespace came with it."""
-    assert month_stating_this_year({"date": " 2478-02-29 "}, "2478") == 2
+    assert month_day_stating_this_year({"date": " 2478-02-29 "}, "2478") == (2, 29)
 
 
 def test_a_decorated_year_converts_with_a_month() -> None:
     """The era written beside the year reaches the reform shift, which must read
     the same number the conversion did rather than the decorated string."""
     try_load_config.cache_clear()
-    assert labelled_year_as_gregorian("B.E. 2478", "buddhist", "xg", 1) == 1936
+    assert labelled_year_as_gregorian("B.E. 2478", "buddhist", "xg", (1, 31)) == 1936
 
 
 @pytest.mark.parametrize(

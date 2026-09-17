@@ -379,3 +379,21 @@ def test_a_latin_month_name_matches_a_whole_word_only() -> None:
     assert patterns is not None
     assert _first_stated_date("dated 1 Mayor 2567", patterns, rule, "xn") is None
     assert _first_stated_date("dated 1 May 2567", patterns, rule, "xn") == date(2024, 5, 1)
+
+
+def test_a_date_does_not_assemble_across_a_blank_line_either() -> None:
+    """The parts of a date may wrap, but not span a paragraph: a day left at the
+    end of one and a month opening the next are not one date."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["ให้ไว้ ณ วันที่"],
+        year_particles=["พ.ศ."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    split = "ให้ไว้ ณ วันที่ 26\n\nเมษายน พ.ศ. 2559"
+    wrapped = "ให้ไว้ ณ วันที่ 26\nเมษายน พ.ศ. 2559"
+    assert _first_stated_date(split, patterns, rule, "xn") is None
+    assert _first_stated_date(wrapped, patterns, rule, "xn") == date(2016, 4, 26)

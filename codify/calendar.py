@@ -24,7 +24,9 @@ class CalendarConversionError(ValueError):
     pass
 
 
-def to_gregorian_year(local_year: str | int, country_code: str, month: int | None = None) -> int:
+def to_gregorian_year(
+    local_year: str | int, country_code: str, month: int | None = None, day: int | None = None
+) -> int:
     """Convert a local-calendar year to Gregorian. A named jurisdiction with no
     config raises: reading a Hijri year as Gregorian is a plausible wrong date."""
     if not country_code:
@@ -34,29 +36,47 @@ def to_gregorian_year(local_year: str | int, country_code: str, month: int | Non
     if cfg.frbr is None or cfg.frbr.calendar_conversion is None:
         return _coerce_int(local_year)
 
-    return _apply_rule(local_year, cfg.frbr.calendar_conversion, month=month)
+    return _apply_rule(local_year, cfg.frbr.calendar_conversion, month=month, day=day)
 
 
-#: How many of a calendar's own months fall in the earlier of the two Gregorian
-#: years its year straddles: Baisakh to Poush, Meskerem to Tahsas.
-_LOCAL_MONTHS_IN_EARLIER_YEAR = {"bikram_samvat": 9, "ethiopian": 4}
+#: Where a local year meets 1 January on its own grid: the month straddling it,
+#: its last day surely before, its first day surely after. Poush; Tahsas.
+_LOCAL_TURN = {"bikram_samvat": (9, 15, 18), "ethiopian": (4, 21, 23)}
+#: The same on the Gregorian grid: the month the local new year falls in, the
+#: last day surely before it, the first day surely on or after.
+_GREGORIAN_TURN = {"bikram_samvat": (4, 12, 14), "ethiopian": (9, 10, 12)}
 
 
-def _in_the_earlier_gregorian_year(rule: CalendarConversion, month: int | None) -> bool | None:
-    """Whether the month puts the date in the earlier Gregorian year, or None
-    where no month can say: the grids differ, so each is read on its own terms."""
+def _in_the_earlier_gregorian_year(
+    rule: CalendarConversion, month: int | None, day: int | None
+) -> bool | None:
+    """Whether the date falls in the earlier of the two Gregorian years its
+    local year straddles, or None where the month, or the day, cannot say."""
     if month is None:
         return None
     if rule.month_day_is_gregorian:
-        # From the new-year month on, the date is still in the Gregorian year
-        # the local year opened in.
-        if rule.kind == "bikram_samvat":
-            return month >= (rule.new_year_month or 4)
-        if rule.kind == "ethiopian":
-            return month >= 9
+        turn = _GREGORIAN_TURN.get(rule.kind)
+        if turn is None:
+            return None
+        turn_month, before, after = turn
+        turn_month = rule.new_year_month or turn_month
+        if rule.new_year_day:
+            before, after = rule.new_year_day - 1, rule.new_year_day
+        if month != turn_month:
+            return month > turn_month
+        # In the new-year month, the days before it close the earlier year.
+        if day is None or before < day < after:
+            return None
+        return day >= after
+    turn = _LOCAL_TURN.get(rule.kind)
+    if turn is None:
         return None
-    early = _LOCAL_MONTHS_IN_EARLIER_YEAR.get(rule.kind)
-    return None if early is None else month <= early
+    turn_month, before, after = turn
+    if month != turn_month:
+        return month < turn_month
+    if day is None or before < day < after:
+        return None
+    return day <= before
 
 
 def _coerce_int(v: str | int) -> int:
@@ -72,7 +92,9 @@ def _coerce_int(v: str | int) -> int:
 _SIGNED_INT_RE = re.compile(r"^[+-]?\d+$")
 
 
-def _apply_rule(local_year: str | int, rule: CalendarConversion, *, month: int | None) -> int:
+def _apply_rule(
+    local_year: str | int, rule: CalendarConversion, *, month: int | None, day: int | None = None
+) -> int:
     kind = rule.kind
     # Every calendar here begins at one. Parse a numeric string before the check,
     # or "0" and "-5" pass a guard the integers fail. A non-numeric value is an
@@ -80,7 +102,7 @@ def _apply_rule(local_year: str | int, rule: CalendarConversion, *, month: int |
     numeric = str(local_year).strip()
     if _SIGNED_INT_RE.match(numeric) and int(numeric) < 1:
         raise CalendarConversionError(f"{local_year!r} is not a year")
-    earlier = _in_the_earlier_gregorian_year(rule, month)
+    earlier = _in_the_earlier_gregorian_year(rule, month, day)
 
     if kind == "epoch_offset":
         if rule.epoch_year is None:
@@ -300,16 +322,6 @@ def declares_local_date_grammar(country: str) -> bool:
     return _rule_and_patterns(country) is not None
 
 
-def title_year_as_gregorian(token: str, country: str) -> str:
-    """A year a title states, in Gregorian, by the jurisdiction's own rule. A
-    jurisdiction dating in another calendar states a local year in its titles."""
-    cfg = try_load_config(country) if country else None
-    if cfg is None or cfg.calendar == "gregorian":
-        return token
-    converted = labelled_year_as_gregorian(token, cfg.calendar, country)
-    return str(converted) if converted is not None else ""
-
-
 def declares_this_calendar(label: str, country: str) -> bool:
     """Whether `label` names the calendar this jurisdiction declares, so its own
     conversion rule applies rather than the generic one for that calendar."""
@@ -329,21 +341,21 @@ def canonical_year_and_date(metadata: dict[str, Any]) -> tuple[str, str]:
     return (normalise_digits(fields[0]).strip(), normalise_digits(fields[1]).strip())
 
 
-def month_stating_this_year(metadata: dict[str, Any], token: str) -> int | None:
-    """The month of a metadata date whose year run is `token`, or None. A year
-    that began mid-year needs one to settle, and every year path must read it."""
+def month_day_stating_this_year(metadata: dict[str, Any], token: str) -> tuple[int, int] | None:
+    """The month and day of a metadata date whose year run is `token`, or None.
+    A year that began mid-year needs them to settle, on every year path."""
     _, raw = canonical_year_and_date(metadata)
-    found = re.match(r"^([0-9]{1,4})-([0-9]{2})-[0-9]{2}(?![0-9])", raw)
+    found = re.match(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})(?![0-9])", raw)
     # On the year the token states, not the string carrying it: a model writes
     # the era beside the number.
     if found is None or found.group(1) != sole_year_token(normalise_digits(token)):
         return None
-    month = int(found.group(2))
-    return month if 1 <= month <= 12 else None
+    month, day = int(found.group(2)), int(found.group(3))
+    return (month, day) if 1 <= month <= 13 and 1 <= day <= 31 else None
 
 
 def labelled_year_as_gregorian(
-    token: str, label: str, country: str, month: int | None = None
+    token: str, label: str, country: str, month_day: tuple[int, int] | None = None
 ) -> int | None:
     """A local year in Gregorian: the jurisdiction's rule where the label names
     its calendar, else the generic conversion. The month settles a mid-year one."""
@@ -352,8 +364,9 @@ def labelled_year_as_gregorian(
     if normalise_calendar(label) not in ERA_NAMED_CALENDARS and declares_this_calendar(
         label, country
     ):
+        month, day = month_day if month_day is not None else (None, None)
         try:
-            converted = to_gregorian_year(token, country, month=month)
+            converted = to_gregorian_year(token, country, month=month, day=day)
             # The same coercion the conversion made, or a decorated year the
             # conversion accepted raises here instead of shifting.
             local = _coerce_int(token)
@@ -397,9 +410,9 @@ def _first_stated_date(
             nearest += 1
         if candidate.start() - cues[nearest] >= _DATE_WINDOW_CHARS:
             continue
-        # A cue introduces what follows it in its own paragraph. Wrapped lines
-        # still count; a blank line ends what the cue can reach.
-        if _PARAGRAPH_BREAK.search(folded, cues[nearest], candidate.start()):
+        # A cue introduces what follows it in its own paragraph, the date's own
+        # parts included: wrapped lines count, a blank line ends the reach.
+        if _PARAGRAPH_BREAK.search(folded, cues[nearest], candidate.end()):
             continue
         # Validated inside the walk, or a syntactic non-date (31 April) hides a
         # valid later cue.

@@ -43,16 +43,25 @@ def test_resolve_year_prefers_explicit_year() -> None:
 
 
 def test_the_stored_year_matches_the_uri_year_on_a_title_only_year(tmp_path, monkeypatch) -> None:
-    """The helper documents that it agrees with the URI path; a title stating a
-    local year must not store one number and file the document under another."""
+    """The helper agrees with the URI path either way: a title-only year is read
+    as written with no title grammar declared, and converted by one where it is."""
     from codify.pipeline.stages import resolve_year
     from tests.config_fixtures import isolated_configs
 
     conversion = {"kind": "buddhist", "epoch_year": -543}
+    grammar = {"strip_prefixes": ["พระราชบัญญัติ"], "year_particles": ["พ.ศ."]}
     configs = {
         "xb": {
             "calendar": "buddhist_era",
             "frbr": {"country_code": "xb", "calendar_conversion": conversion},
+        },
+        "xg": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xg",
+                "calendar_conversion": conversion,
+                "title_identity": grammar,
+            },
         },
         "xc": {
             "calendar": "buddhist_era",
@@ -64,8 +73,10 @@ def test_the_stored_year_matches_the_uri_year_on_a_title_only_year(tmp_path, mon
     }
     metadata = {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511"}
     with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
-        assert resolve_year(metadata, "xb", title=str(metadata["title"])) == "1968"
-        assert gregorian_year(metadata, "xb") == 1968
+        assert resolve_year(metadata, "xb", title=str(metadata["title"])) == "2511"
+        assert gregorian_year(metadata, "xb") == 2511
+        assert resolve_year(metadata, "xg", title=str(metadata["title"])) == "1968"
+        assert gregorian_year(metadata, "xg") == 1968
         # A year the model states, on a declared epoch the calendar name does
         # not imply: both paths take the jurisdiction's rule, not the generic one.
         labelled = {"year": "2511", "calendar": "buddhist"}

@@ -16,12 +16,11 @@ from codify.calendar import (
     declares_local_date_grammar,
     labelled_year_as_gregorian,
     local_date_from_text,
-    month_stating_this_year,
+    month_day_stating_this_year,
     normalise_calendar,
     reads_as_a_gregorian_year,
     reform_shift,
     sole_year_token,
-    title_year_as_gregorian,
     title_year_token,
     to_gregorian_year,
     year_from_calendar,
@@ -45,15 +44,16 @@ class Dating(NamedTuple):
 
 
 def _local_year_to_gregorian(
-    local_year: str, cfg: Any, country: str, month: int | None = None
+    local_year: str, cfg: Any, country: str, month_day: tuple[int, int] | None = None
 ) -> int | None:
     """A local year as Gregorian, by the jurisdiction's own rule first: a config
     may declare an epoch the calendar's name does not imply. The month settles."""
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
     if rule is None:
         return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
+    month, day = month_day if month_day is not None else (None, None)
     try:
-        converted = to_gregorian_year(local_year, country, month=month)
+        converted = to_gregorian_year(local_year, country, month=month, day=day)
     except (CalendarConversionError, LookupError):
         logger.warning("local_year_unconverted", country=country, raw=local_year)
         return None
@@ -79,12 +79,6 @@ def _month_day(raw_date: str) -> tuple[int, int] | None:
         return None
     month, day = int(found.group(2)), int(found.group(3))
     return (month, day) if 1 <= month <= 12 and 1 <= day <= 31 else None
-
-
-def _month_of(raw_date: str) -> int | None:
-    """The month an ISO date names, or None."""
-    parts = _month_day(raw_date)
-    return parts[0] if parts else None
 
 
 def _built_date(gregorian_year: int, month_day: tuple[int, int]) -> str:
@@ -128,7 +122,7 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
     candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
     if candidate and cal and cal != "gregorian":
         converted = labelled_year_as_gregorian(
-            candidate, cal, country, month_stating_this_year(metadata, candidate)
+            candidate, cal, country, month_day_stating_this_year(metadata, candidate)
         )
         if converted is not None:
             return str(converted)
@@ -160,9 +154,8 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
         if "-" in raw_date:
             return raw_date.split("-")[0]
     if title:
-        # The title of a document in a local calendar states a local year.
-        token = title_year_token(title, metadata.get("number"))
-        return title_year_as_gregorian(token, country) if token else token
+        # As written: only a declared title grammar says which year is local.
+        return title_year_token(title, metadata.get("number"))
     return ""
 
 
@@ -191,19 +184,14 @@ def resolve_dating(
     if cal != "gregorian":
         raw_date = ""
     source_date: date | None = None
-    stated_month: int | None = None
     # Run whenever the text and a grammar allow: a field holding a non-date
     # would otherwise hide a date the document itself states.
     if source_text and declares_local_date_grammar(country):
         # Deterministic, and ahead of the model, which reports the year and
         # drops the day.
-        stated = local_date_from_text(source_text, country)
-        if stated is not None:
-            source_date = stated
-            raw_date = stated.isoformat()
-            # Kept for the conversion: a year that began mid-year straddles two
-            # Gregorian ones.
-            stated_month = stated.month
+        source_date = local_date_from_text(source_text, country)
+        if source_date is not None:
+            raw_date = source_date.isoformat()
     # An instrument series that numbers nothing states its identity in its title.
     title_rule = cfg.frbr.title_identity if cfg is not None and cfg.frbr is not None else None
     identity = identity_from_title(model_title, title_rule) if title_rule else None
@@ -230,15 +218,17 @@ def resolve_dating(
     ):
         # The source's month, but only where converting with it lands on the
         # date the source states: a cue date naming another year is another's.
-        source_month = stated_month
-        if source_date is not None and stated_month is not None:
-            with_month = _local_year_to_gregorian(identity.year, cfg, country, month=stated_month)
-            source_month = stated_month if with_month == source_date.year else None
-        month = source_month
-        if month is None:
-            month = month_stating_this_year(metadata, identity.year) or _month_of(raw_date)
+        source_month_day: tuple[int, int] | None = None
+        if source_date is not None:
+            source_month_day = (source_date.month, source_date.day)
+            with_month = _local_year_to_gregorian(identity.year, cfg, country, source_month_day)
+            if with_month != source_date.year:
+                source_month_day = None
+        month_day = source_month_day
+        if month_day is None:
+            month_day = month_day_stating_this_year(metadata, identity.year) or _month_day(raw_date)
         converted = _local_year_to_gregorian(
-            identity.year, cfg, country, month=month if date_echoes_title else source_month
+            identity.year, cfg, country, month_day if date_echoes_title else source_month_day
         )
         # Through the gate the metadata year passes, or the unconverted local
         # value stays and reaches the URI.
@@ -258,7 +248,7 @@ def resolve_dating(
         # converts it where no title grammar is declared.
         stated_local = sole_year_token(stated_date)
         converted = (
-            _local_year_to_gregorian(stated_local, cfg, country, local_month_day[0])
+            _local_year_to_gregorian(stated_local, cfg, country, local_month_day)
             if stated_local
             else None
         )
