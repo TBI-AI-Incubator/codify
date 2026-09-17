@@ -812,6 +812,24 @@ EDGES = [
         "2478",
         "",
     ),
+    # A month no grid holds: the field states nothing, so the labelled year is
+    # not converted from it and the title year stands as its grammar reads it.
+    (
+        "a labelled date with a month no grid holds",
+        "xg",
+        {"title": PRE, "date": "2478-14-10", "calendar": "buddhist"},
+        "",
+        "1935",
+        "",
+    ),
+    (
+        "a labelled date with a month no grid holds, no grammar",
+        "xg2",
+        {"title": PRE, "date": "2478-14-10", "calendar": "buddhist"},
+        "",
+        "2478",
+        "",
+    ),
 ]
 
 
