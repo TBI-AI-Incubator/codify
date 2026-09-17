@@ -2,26 +2,54 @@
 
 ## 0.2.0 — unpublished
 
-Three breaks, so the minor moves, as `VERSIONING.md` prescribes while the
-major is zero.
+Eleven breaks, so the minor moves, as `VERSIONING.md` prescribes while the
+major is zero. Enumerated by running every year-resolution grid cell and edge
+row through the 0.1.0 and 0.2.0 callers (`resolve_year`, `gregorian_year`,
+`resolve_descriptors`) and grouping every differing cell; the raw table is on
+the pull request. Each line names the input shape that triggers it. Verified
+against the demo holdings on 17 September 2026: no jurisdiction with a
+non-Gregorian calendar (af, et, ir, jp, kp, ma, np, sa, th, tw) has any law
+stored, no stored law has a year below 1000, and no work URI carries a one- to
+three-digit year segment, so no shipped row moves.
 
-- `to_gregorian_year(..., month=)` read a Gregorian month of a Bikram Samvat
-  year the wrong way round, filing April to December under the later Gregorian
-  year. Corrected against the calendar (1 Baisakh 2080 was 14 April 2023). No
-  caller passed a month before this change, so no stored year moved; the new
-  `month_grid` keyword names the grid a month is on and defaults to Gregorian.
-- A three-digit year files as a four-digit URI segment (`622` under `/0622/`),
-  where it previously produced a URI `is_citable_work_uri` refused. Verified
-  against the demo holdings on 17 September 2026: no stored law has a year
-  below 1000 and no work URI carries a one- to three-digit year segment, so no
-  shipped corpus moves.
-- A metadata date field the model left unlabelled had its year converted through
-  the jurisdiction's calendar; it is now taken as written unless it echoes the
-  year a declared title grammar reads, since converting a year no document
-  states as local put a year no document states into the URI. Verified against
-  the demo holdings on 17 September 2026: no jurisdiction with a non-Gregorian
-  calendar (af, et, ir, jp, kp, ma, np, sa, th, tw) has any law stored, so no
-  shipped row moves.
+1. A date field the model left unlabelled is read as written; 0.1.0 converted
+   its year through the jurisdiction's calendar, filing a Gregorian `1968-09-09`
+   under 1425 in a Buddhist-Era jurisdiction. Converted now only where a
+   declared title grammar shows the year is local.
+2. `to_gregorian_year(..., month=)` read a Gregorian month of a Bikram Samvat
+   year the wrong way round, filing April to December under the later year.
+   Corrected against the calendar (1 Baisakh 2080 was 14 April 2023); the new
+   `month_grid` keyword names the grid a month is on, defaulting to Gregorian.
+3. A three-digit year is carried as a four-digit segment and stored as its
+   number: `622` files under `/0622/` where 0.1.0 minted a URI
+   `is_citable_work_uri` refused, and a converted year below 1000 is carried
+   the same way instead of dropped.
+4. The sentinels `0000` and `0001` in a year field are no year; 0.1.0 returned
+   them, and `0000` crashed the document-class match.
+5. A five-digit year run (`12024`, in a year or date field) is no year; 0.1.0
+   converted it to `11481` and crashed the class match.
+6. A date field that is not wholly a real date states nothing: no year run
+   and no date. 0.1.0 split `2024-01-01junk` on a dash and converted its year,
+   and passed `2024-02-31`, `2511-04-31`, a three-digit day and `unknown`
+   through as the work date.
+7. A year field in native digits (`๒๕๑๑`) is returned in ASCII by
+   `resolve_year`; 0.1.0 returned the native digits while storing `2511`.
+8. A date labelled with a calendar the jurisdiction does not declare is read
+   as written; 0.1.0 retried its year through the jurisdiction's own rule.
+9. A work date is emitted only where its year is the URI year; 0.1.0 emitted
+   `2511-09-09` beside a URI year of 2020 and `unknown` beside any year.
+10. The stored year is the URI year wherever the URI has one; 0.1.0 stored
+    `None` where the date field held no date while the URI took the title's
+    year, and stored a raw local year where the URI took the converted one.
+11. A labelled year converts by the jurisdiction's declared rule; 0.1.0 used
+    the generic table for that calendar and ignored a declared epoch.
+
+Three more groups of differing cells are reachable only through config fields
+0.1.0 could not load, so they are capability rather than breaks: a dated line
+the source states is read where a date grammar is declared; a labelled local
+date converts with its month and the new-year reform where a Gregorian grid
+and a reform year are declared; and such a date's month and day carry into the
+work date.
 
 ## 0.1.0 — private extraction candidate
 
