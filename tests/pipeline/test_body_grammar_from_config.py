@@ -417,3 +417,59 @@ def test_outputs_keep_source_offsets_after_the_cut(declared: Any) -> None:
     asyncio.run(run())
     traced = next(a for a in traces[0].anchors if a.kind == "schedule")
     assert traced.char_offset == note.char_offset
+
+
+def test_a_caption_after_the_closing_phrase_survives_the_continuity_test(declared: Any) -> None:
+    """Body 1, an excluded appended 1, then a note holding 2: continuity would read
+    the note as a table caption in the body. Past the signature it is an attachment."""
+    text = (
+        f"Section 1\nOne.\n\n{CLOSING}\n\nAppended\nSection 1\nAppended one.\n\n"
+        "NOTE\nWhy.\n\nSection 2\nNote two.\n"
+    )
+    scan = _scan(text)
+    notes = [a for a in scan.anchors if a.kind == "schedule"]
+    assert [a.heading for a in notes] == ["NOTE"]
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert "Note two." not in (bound.conclusions or "")
+
+
+def test_an_ascii_suffix_alias_folds_in_the_parsed_eid(monkeypatch: pytest.MonkeyPatch) -> None:
+    from codify.pipeline.enrich.bluebell import _ascii_fold_eid
+
+    monkeypatch.setattr(jurisdictions, "insertion_suffix_folds", lambda: dict(SUFFIXES))
+    assert _ascii_fold_eid("sec_5zib") == "sec_5bis"
+    assert _ascii_fold_eid("sec_5zib_2__p_1") == "sec_5bis_2__p_1"
+    assert _ascii_fold_eid("sec_5") == "sec_5"
+
+
+def test_declared_markers_in_the_denominator_stop_at_the_closing_phrase(
+    declared: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A basic unit marked without a keyword ("5.") is counted by its own scanner."""
+    from codify.pipeline.enrich.anchors import _marker_numbers
+
+    config = jurisdictions.load_config(COUNTRY)
+    act = config.document_classes["act"]
+    marked = act.model_copy(
+        update={
+            "hierarchy": [
+                jurisdictions.HierarchyEntry(
+                    local_term="Item",
+                    akn_element="section",
+                    level="basic",
+                    numbering="arabic_period",
+                    marker_form="arabic_period",
+                )
+            ]
+        }
+    )
+    config = config.model_copy(
+        update={"document_classes": {**config.document_classes, "act": marked}}
+    )
+    original = jurisdictions.load_config
+    monkeypatch.setattr(
+        anchors_mod, "load_config", lambda c: config if c == COUNTRY else original(c)
+    )
+    text = f"1. One.\n\n2. Two.\n\n{CLOSING}\n\n5. Five.\n\n6. Six.\n"
+    expected = _marker_numbers(text, config, "act", "section")
+    assert expected == {"1", "2"}, expected

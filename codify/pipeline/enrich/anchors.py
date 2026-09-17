@@ -1300,6 +1300,8 @@ def scan_anchors_with_ambiguity(
         ),
     )
     annexes = _stamp(_scan_unnumbered_annexes(text, raw, toc_end, country), "unnumbered_annex")
+    body_offsets = [a.char_offset for a in raw if a.kind != "schedule"]
+    closing_floor = _closing_floor(text, country, min(body_offsets)) if body_offsets else None
     fires["unnumbered_annex"] = len(annexes)
     raw.extend(annexes)
     raw.sort(key=lambda a: a.char_offset)
@@ -1307,7 +1309,9 @@ def scan_anchors_with_ambiguity(
     # here as a probe: a body table caption is not an annex, and scanning past
     # one would pull the rest of the document inside it.
     outlines = _stamp(
-        _scan_attachment_outlines(text, _drop_embedded_schedule_captions(raw), toc_end, country),
+        _scan_attachment_outlines(
+            text, _drop_embedded_schedule_captions(raw, closing_floor), toc_end, country
+        ),
         "attachment_outline",
     )
     if outlines:
@@ -1365,7 +1369,7 @@ def scan_anchors_with_ambiguity(
         fires,
         "drop_embedded_schedule_captions",
         raw,
-        _drop_embedded_schedule_captions(raw),
+        _drop_embedded_schedule_captions(raw, closing_floor),
         spans,
         reads_as="table_caption",
     )
@@ -1573,7 +1577,9 @@ def _scan_unnumbered_annexes(
     return out
 
 
-def _drop_embedded_schedule_captions(anchors: list[StructuralAnchor]) -> list[StructuralAnchor]:
+def _drop_embedded_schedule_captions(
+    anchors: list[StructuralAnchor], floor: int | None = None
+) -> list[StructuralAnchor]:
     """Drop schedule anchors that caption a table embedded in the body.
 
     A جدول/ملحق heading is a real annex or a caption for an embedded table, and
@@ -1590,7 +1596,7 @@ def _drop_embedded_schedule_captions(anchors: list[StructuralAnchor]) -> list[St
 
     dropped: set[int] = set()
     for i, a in enumerate(ordered):
-        if a.kind != "schedule":
+        if a.kind != "schedule" or (floor is not None and a.char_offset >= floor):
             continue
         prev_num = next(
             (
@@ -3952,10 +3958,17 @@ def _marker_numbers(
     declared = [e for e in doc_class.hierarchy if e.marker_form]
     # Unioned, not returned alone: the scan counts both spellings, and one of
     # them alone scores a document against a fraction of what it captured.
+    declared_found = _scan_declared_markers(text, 0, declared, config.code)[0]
+    floor: int | None = None
+    if declared_found:
+        floor = _closing_floor(text, config.code, min(a.char_offset for a in declared_found))
     from_declared = {
         _normalise_number(a.number)
-        for a in _scan_declared_markers(text, 0, declared, config.code)[0]
-        if a.kind == kind and a.number and _line_start(text, a.char_offset) not in exclude_starts
+        for a in declared_found
+        if a.kind == kind
+        and a.number
+        and _line_start(text, a.char_offset) not in exclude_starts
+        and (floor is None or a.char_offset < floor)
     }
     aliases: list[str] = []
     for entry in doc_class.hierarchy:
@@ -3980,7 +3993,6 @@ def _marker_numbers(
     # body's, so this is a floor against systemic drops. Single-provision gaps
     # belong to the anchor-count and cover-reconciliation validators.
     distinct: set[str] = set()
-    floor: int | None = None
     for m in pattern.finditer(text):
         if _partial_decimal_number(text, m):
             continue
