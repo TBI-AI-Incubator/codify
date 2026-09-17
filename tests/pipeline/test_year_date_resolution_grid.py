@@ -350,6 +350,15 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "",
     ),
     ("the zero sentinel in the year field", "xg", {"title": UNDATED, "year": "0000"}, "", "", ""),
+    (
+        # A five-digit run is not a year, and no four of its digits are either.
+        "a five-digit year in the date field",
+        "xg",
+        {"title": UNDATED, "date": "12024-01-01"},
+        "",
+        "",
+        "12024-01-01",
+    ),
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
         "year the conversion cannot carry",

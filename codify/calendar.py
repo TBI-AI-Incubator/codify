@@ -443,7 +443,7 @@ def _compose(
     month = patterns.month_index[found.group("month")]
     local_year = int(found.group("year"))
     try:
-        gregorian_year = _apply_rule(local_year, rule, month=month)
+        gregorian_year = _apply_rule(local_year, rule, month=month, day=int(found.group("day")))
     except CalendarConversionError as exc:
         # A misconfigured rule otherwise reads as "this document states no
         # date", the same answer a whole corpus would give.

@@ -346,6 +346,8 @@ class CalendarConversion(BaseModel):
             raise ValueError("month_day_is_gregorian needs exactly 12 month_names")
         if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
             raise ValueError("new_year_month must be a month, 1 to 12")
+        if self.new_year_day is not None and not 1 <= self.new_year_day <= 31:
+            raise ValueError("new_year_day must be a day of a month, 1 to 31")
         if self.new_year_reform_year is not None and self.new_year_reform_year < 1:
             # Every calendar here counts from one.
             raise ValueError("new_year_reform_year must be a year")

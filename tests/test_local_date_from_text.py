@@ -397,3 +397,32 @@ def test_a_date_does_not_assemble_across_a_blank_line_either() -> None:
     wrapped = "ให้ไว้ ณ วันที่ 26\nเมษายน พ.ศ. 2559"
     assert _first_stated_date(split, patterns, rule, "xn") is None
     assert _first_stated_date(wrapped, patterns, rule, "xn") == date(2016, 4, 26)
+
+
+def test_the_day_the_source_states_settles_the_new_year_month() -> None:
+    """14 April 2023 opened BS 2080: the day, not only the month, says which
+    Gregorian year an April date of that local year falls in."""
+    rule = CalendarConversion(
+        kind="bikram_samvat",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["BS"],
+        new_year_month=4,
+        new_year_day=14,
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 14 April 2080", patterns, rule, "xn") == date(2023, 4, 14)
+    assert _first_stated_date("dated 1 April 2080", patterns, rule, "xn") == date(2024, 4, 1)
+
+
+@pytest.mark.parametrize("day", [0, 32])
+def test_a_new_year_day_outside_a_month_is_refused(day: int) -> None:
+    with pytest.raises(ValidationError):
+        CalendarConversion(kind="bikram_samvat", new_year_day=day)
+
+
+@pytest.mark.parametrize("day", [1, 31])
+def test_a_new_year_day_at_the_edge_of_a_month_is_accepted(day: int) -> None:
+    assert CalendarConversion(kind="bikram_samvat", new_year_day=day).new_year_day == day

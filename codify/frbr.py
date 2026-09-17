@@ -191,6 +191,12 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             # long for an int is unharmed.
             edition = own.group(1).lstrip("0") or "0"
     body = text[: own.start()] + " " + text[own.end() :] if own is not None else text
+    if edition_re is not None:
+        # A retained edition reads the same however it was spelt, or one cited
+        # instrument forks the slug on the publisher's spelling.
+        body = edition_re.sub(
+            lambda m: f"({rule.edition_markers[0]} {m.group(1).lstrip('0') or '0'})", body
+        )
     if consolidation_re is not None:
         body = _PARENTHETICAL.sub(
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body

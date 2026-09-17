@@ -330,3 +330,20 @@ def test_a_latin_year_particle_matches_a_whole_word_only() -> None:
     rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
     assert identity_from_title("Act Widgets of 1991", rule).year == "1991"
     assert identity_from_title("Act Widgets thereof 1991", rule).year == ""
+
+
+def test_a_retained_edition_is_spelt_with_the_canonical_marker() -> None:
+    """An earlier edition stays in the base to tell two amendments apart, so its
+    marker must read the same however the publisher spelt it."""
+    rule = TitleIdentity(
+        strip_prefixes=["พระราชบัญญัติ"],
+        year_particles=["พ.ศ."],
+        edition_markers=["ฉบับที่", "ฉะบับที่"],
+    )
+    canonical = identity_from_title(
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 2) พ.ศ. 2475 (ฉบับที่ 5) พ.ศ. 2486", rule
+    )
+    variant = identity_from_title(
+        "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 02) พ.ศ. 2475 (ฉบับที่ 5) พ.ศ. 2486", rule
+    )
+    assert variant.slug == canonical.slug == "มโหรีหลวง-ฉบับที่-2-พ-ศ-2475-ฉบับที่-5"

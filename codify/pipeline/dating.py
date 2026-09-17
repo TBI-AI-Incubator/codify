@@ -143,16 +143,16 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
             "year_calendar_unconverted", raw=raw_year, calendar=cal, country=country, year=digits
         )
         return digits
-    if raw_date:
+    head = raw_date.split("-")[0] if "-" in raw_date else ""
+    if sole_year_token(head):
         # Converted only where the model called the date local. Converting one
         # it called Gregorian puts a year no document states in the URI.
         if cal and cal != "gregorian":
             try:
-                return str(to_gregorian_year(raw_date.split("-")[0], country))
+                return str(to_gregorian_year(head, country))
             except Exception:  # noqa: BLE001, S110
                 pass
-        if "-" in raw_date:
-            return raw_date.split("-")[0]
+        return head
     if title:
         # As written: only a declared title grammar says which year is local.
         return title_year_token(title, metadata.get("number"))
@@ -262,9 +262,11 @@ def resolve_dating(
         # An exact date off the document settles the year nothing else converted.
         year = str(source_date.year)
     if _year_int(year) is None and raw_date:
-        # Without this the URI takes the unknown-year placeholder while the
-        # document carries its own date.
-        year = raw_date[:4] if _year_int(raw_date[:4]) is not None else year
+        # Or the URI takes the placeholder while the document carries its own
+        # date. The whole year run: a five-digit one would lend its first four.
+        stated = _ISO_DATE.match(raw_date)
+        if stated is not None and _year_int(stated.group(1)) is not None:
+            year = stated.group(1)
     if year in _SENTINELS:
         # A field holding the placeholder states no year, for any reader.
         year = ""
