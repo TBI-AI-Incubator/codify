@@ -342,9 +342,10 @@ class CalendarConversion(BaseModel):
             raise ValueError("month_names must be non-blank and distinct")
         if self.date_cues and not any(c.strip() for c in self.date_cues):
             raise ValueError("date_cues must carry at least one non-blank cue")
-        if self.month_day_is_gregorian and len(self.month_names) != 12:
-            # Any other count renumbers the months or leaves one unreadable.
-            raise ValueError("month_day_is_gregorian needs exactly 12 month_names")
+        if self.month_day_is_gregorian and self.month_names and len(self.month_names) != 12:
+            # Named at all, the months of a Gregorian grid are twelve; any other
+            # count renumbers them. Unnamed, the grid serves the metadata path.
+            raise ValueError("month_names on a Gregorian grid must be exactly 12")
         if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
             raise ValueError("new_year_month must be a month, 1 to 12")
         if self.new_year_day is not None and not 1 <= self.new_year_day <= 31:

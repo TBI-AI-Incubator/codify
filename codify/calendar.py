@@ -354,6 +354,13 @@ def declares_local_date_grammar(country: str) -> bool:
     return _rule_and_patterns(country) is not None
 
 
+def _declared_rule(country: str) -> CalendarConversion | None:
+    """The conversion rule the jurisdiction declares, or None: naming a calendar
+    without one leaves only the generic conversion to apply."""
+    cfg = try_load_config(country) if country else None
+    return cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+
+
 def declares_this_calendar(label: str, country: str) -> bool:
     """Whether `label` names the calendar this jurisdiction declares, so its own
     conversion rule applies rather than the generic one for that calendar."""
@@ -393,8 +400,10 @@ def labelled_year_as_gregorian(
     its calendar, else the generic conversion. The month settles a mid-year one."""
     # Never for an era-named calendar: a bare number there is part of a year,
     # not one, and the generic path refuses it on purpose.
-    if normalise_calendar(label) not in ERA_NAMED_CALENDARS and declares_this_calendar(
-        label, country
+    if (
+        normalise_calendar(label) not in ERA_NAMED_CALENDARS
+        and declares_this_calendar(label, country)
+        and _declared_rule(country) is not None
     ):
         month, day = month_day if month_day is not None else (None, None)
         try:

@@ -517,3 +517,13 @@ def test_month_names_differing_only_by_case_are_refused() -> None:
             month_day_is_gregorian=True,
             date_cues=["dated"],
         )
+
+
+def test_the_gregorian_grid_flag_loads_without_a_date_grammar() -> None:
+    """A jurisdiction whose labelled dates are on the Gregorian grid need not
+    name its months: the grid flag serves the metadata path on its own."""
+    rule = CalendarConversion(kind="buddhist", month_day_is_gregorian=True)
+    assert rule.month_day_is_gregorian and not rule.month_names
+    assert compile_local_date_patterns(rule) is None
+    with pytest.raises(ValidationError, match="12"):
+        CalendarConversion(kind="buddhist", month_day_is_gregorian=True, month_names=["a", "b"])

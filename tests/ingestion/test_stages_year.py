@@ -110,3 +110,22 @@ def test_a_padded_or_cased_label_still_names_the_configured_calendar(
         assert gregorian_year({"year": "2511", "calendar": label}, "xc") == 2311
         assert declares_this_calendar(label, "xc")
         assert labelled_year_as_gregorian("2511", label, "xc") == 2311
+
+
+def test_a_declared_calendar_without_a_rule_converts_generically(tmp_path, monkeypatch) -> None:
+    """A jurisdiction naming its calendar but declaring no conversion rule has
+    no rule to apply; the generic conversion answers, not the raw local year."""
+    from codify.calendar import labelled_year_as_gregorian
+    from codify.pipeline.stages import resolve_descriptors, resolve_year
+    from tests.config_fixtures import isolated_configs
+
+    configs = {"xb0": {"calendar": "buddhist_era", "frbr": {"country_code": "xb0"}}}
+    metadata = {"year": "2511", "calendar": "buddhist"}
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        assert labelled_year_as_gregorian("2511", "buddhist", "xb0") == 1968
+        assert resolve_year(metadata, "xb0") == "1968"
+        assert gregorian_year(metadata, "xb0") == 1968
+        desc = resolve_descriptors(
+            metadata, jurisdiction_code="xb0", source_bytes=b"", fallback_stem="s"
+        )
+        assert desc.year == "1968"
