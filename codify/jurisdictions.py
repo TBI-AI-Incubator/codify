@@ -370,7 +370,9 @@ class CalendarConversion(BaseModel):
         if self.kind == "era_table" and (self.month_names or self.date_cues):
             # The grammar captures a bare number, which an era table reads as a
             # year of its latest era.
-            raise ValueError("an era_table conversion cannot carry a date grammar (date_cues)")
+            raise ValueError(
+                "an era_table conversion cannot carry a date grammar (month_names, date_cues)"
+            )
         return self
 
 

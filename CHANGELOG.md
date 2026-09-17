@@ -28,10 +28,11 @@ three-digit year segment, so no shipped row moves.
    them, and `0000` crashed the document-class match.
 5. A five-digit year run (`12024`, in a year or date field) is no year; 0.1.0
    converted it to `11481` and crashed the class match.
-6. A date field that is not wholly a real date states nothing: no year run
-   and no date. 0.1.0 split `2024-01-01junk` on a dash and converted its year,
-   and passed `2024-02-31`, `2511-04-31`, a three-digit day and `unknown`
-   through as the work date.
+6. A date field not shaped as a date (`2024-01-01junk`, a three-digit day,
+   `unknown`) states nothing: no year run and no date. 0.1.0 split it on a
+   dash and converted what came first, or passed it through as the work date.
+   A date-shaped value with a day the month does not hold (`2024-02-31`,
+   `2511-04-31`) keeps its year run and emits no date; 0.1.0 emitted it.
 7. A year field in native digits (`๒๕๑๑`) is returned in ASCII by
    `resolve_year`; 0.1.0 returned the native digits while storing `2511`.
 8. A date labelled with a calendar the jurisdiction does not declare is read

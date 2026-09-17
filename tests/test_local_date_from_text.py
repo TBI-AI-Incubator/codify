@@ -477,7 +477,7 @@ ERAS = [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}]
 def test_a_date_grammar_beside_an_era_table_is_refused_at_load() -> None:
     """Both grammars capture a bare number, which an era table reads as a year
     of its latest era; declaring them together is a config error, named."""
-    with pytest.raises(ValidationError, match="era_table.*date_cues"):
+    with pytest.raises(ValidationError, match="era_table.*month_names, date_cues"):
         CalendarConversion(
             kind="era_table",
             eras=ERAS,
@@ -485,6 +485,11 @@ def test_a_date_grammar_beside_an_era_table_is_refused_at_load() -> None:
             month_day_is_gregorian=True,
             date_cues=["dated"],
         )
+    # Either half of the grammar alone is refused, and the message names both.
+    with pytest.raises(ValidationError, match="month_names, date_cues"):
+        CalendarConversion(kind="era_table", eras=ERAS, month_names=ENGLISH_MONTHS)
+    with pytest.raises(ValidationError, match="month_names, date_cues"):
+        CalendarConversion(kind="era_table", eras=ERAS, date_cues=["dated"])
     assert CalendarConversion(kind="era_table", eras=ERAS).kind == "era_table"
 
 
