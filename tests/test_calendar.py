@@ -807,6 +807,40 @@ class TestAMonthIsReadOnItsOwnGrid:
         assert _apply_rule("2080", CalendarConversion(kind="bikram_samvat"), month=1) == 2024
         assert to_gregorian_year("2080", "xnp", month=1) == 2024
 
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day", "month_grid"),
+        [
+            # Off the Gregorian grid: month 0, month 13, day 0, day 99.
+            ("bikram_samvat", "2080", 0, 10, "gregorian"),
+            ("bikram_samvat", "2080", 13, 10, "gregorian"),
+            ("bikram_samvat", "2080", 4, 0, "gregorian"),
+            ("bikram_samvat", "2080", 4, 99, "gregorian"),
+            ("ethiopian", "2016", 9, 0, "gregorian"),
+            ("ethiopian", "2016", 9, 40, "gregorian"),
+            # Off the calendar's own grid: month 0, one past its last, day 0, day 40.
+            ("bikram_samvat", "2080", 0, 10, "local"),
+            ("bikram_samvat", "2080", 13, 10, "local"),
+            ("bikram_samvat", "2080", 9, 0, "local"),
+            ("bikram_samvat", "2080", 9, 40, "local"),
+            ("ethiopian", "2016", 0, 10, "local"),
+            ("ethiopian", "2016", 14, 10, "local"),
+            ("ethiopian", "2016", 4, 0, "local"),
+            ("ethiopian", "2016", 4, 40, "local"),
+        ],
+    )
+    def test_a_value_off_the_grid_settles_nothing(
+        self, kind: str, local_year: str, month: int, day: int, month_grid: str
+    ) -> None:
+        """A month or day no grid holds cannot say which side of the new year the
+        date fell; the year converts as it does with no month at all."""
+        rule = (
+            self._gregorian_grid(kind)
+            if month_grid == "gregorian"
+            else CalendarConversion(kind=kind)
+        )
+        blind = _apply_rule(local_year, rule, month=None)
+        assert _apply_rule(local_year, rule, month=month, day=day, month_grid=month_grid) == blind
+
     def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
         rule = self._gregorian_grid("bikram_samvat")
         assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)

@@ -326,3 +326,18 @@ def test_a_latin_title_grammar_reads_any_casing(title: str) -> None:
         "Act Widgets (No. 3) of 1991", rule
     )
     assert identity_from_title(title, rule)[1:] == ("widgets", "3", "1991")
+
+
+def test_text_after_the_year_stays_in_the_identity() -> None:
+    """Only the year expression itself leaves the body: a substantive suffix
+    after it tells two instruments apart, and only declared markers are dropped."""
+    rule = TitleIdentity(
+        strip_prefixes=["Act"], year_particles=["of"], consolidation_markers=["Update"]
+    )
+    north = identity_from_title("Act Widgets of 1991 (Northern Region)", rule)
+    south = identity_from_title("Act Widgets of 1991 (Southern Region)", rule)
+    assert north.body == "widgets-northern-region"
+    assert north.segment != south.segment
+    assert (north.year, south.year) == ("1991", "1991")
+    # A declared republication marker after the year still leaves.
+    assert identity_from_title("Act Widgets of 1991 (Update 2020)", rule).body == "widgets"

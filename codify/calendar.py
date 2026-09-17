@@ -57,6 +57,8 @@ _LOCAL_TURN = {"bikram_samvat": (9, 15, 18), "ethiopian": (4, 21, 23)}
 #: The same on the Gregorian grid: the month the local new year falls in, the
 #: last day surely before it, the first day surely on or after.
 _GREGORIAN_TURN = {"bikram_samvat": (4, 12, 14), "ethiopian": (9, 10, 12)}
+#: How many months each calendar's own grid holds.
+_LOCAL_MONTHS = {"bikram_samvat": 12, "ethiopian": 13}
 
 
 def _in_the_earlier_gregorian_year(
@@ -64,13 +66,13 @@ def _in_the_earlier_gregorian_year(
 ) -> bool | None:
     """Whether the date falls in the earlier of the two Gregorian years its
     local year straddles, or None where the month, or the day, cannot say."""
-    if month is None:
+    # Off the grid, a month or a day says nothing, as no month says nothing.
+    if month is None or day is not None and not 1 <= day <= 31:
         return None
     # A month of the calendar's own grid is Gregorian where the config says so.
     if month_grid == "gregorian" or rule.month_day_is_gregorian:
         turn = _GREGORIAN_TURN.get(rule.kind)
-        # A thirteenth month is a month of the calendar's own grid, not this one.
-        if turn is None or month > 12:
+        if turn is None or not 1 <= month <= 12:
             return None
         turn_month, before, after = turn
         turn_month = rule.new_year_month or turn_month
@@ -83,7 +85,7 @@ def _in_the_earlier_gregorian_year(
             return None
         return day >= after
     turn = _LOCAL_TURN.get(rule.kind)
-    if turn is None:
+    if turn is None or not 1 <= month <= _LOCAL_MONTHS[rule.kind]:
         return None
     turn_month, before, after = turn
     if month != turn_month:
