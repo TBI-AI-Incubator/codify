@@ -399,7 +399,7 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "",
         "",
     ),
-    ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
+    ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", ""),
     (
         # A segment is four digits, so a three-digit year is carried padded.
         "a three-digit year is carried padded",
@@ -483,7 +483,7 @@ UNECHOED = {
     "title only, post-reform": ("2511", ""),
     "title only, no reform declared": ("2478", ""),
     "custom epoch, title only, with a grammar": ("2478", ""),
-    "date field naming no year": ("2511", "unknown"),
+    "date field naming no year": ("2511", ""),
     "unlabelled local date echoing the title": ("2511", "2511-09-09"),
     "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
     # Same: nothing marks it local, so it stays as the model wrote it. Whether a
@@ -492,9 +492,9 @@ UNECHOED = {
     "custom epoch, unlabelled echo": ("2478", "2478-09-09"),
     # Read as written and carried padded; only the grammar side converts it.
     "a three-digit year is carried padded": ("0999", ""),
-    # With no title to conflict with, the date is the one the model stated,
-    # converted on its own year; both sides agree on the document's.
-    "an echoed year with a date naming another year": ("1935", "1938-05-20"),
+    # The model's year field decides, and the date it contradicts is not
+    # emitted beside it on either side.
+    "an echoed year with a date naming another year": ("1935", ""),
     # No grammar, so the bare local year is read as written; the same title with
     # two year runs names no single one, and nothing else states it.
     "a bare year echoing the title, unlabelled": ("2511", ""),
@@ -506,6 +506,39 @@ UNECHOED = {
     # document's own and states the year.
     "a source date naming another local year": ("1937", "1937-01-31"),
 }
+
+
+def test_the_reform_shift_is_the_conversion_layer_s_alone() -> None:
+    """One answer for a January of a pre-reform year, whichever path converts
+    it: the public call, a labelled year, a dated line. Shifted once, not twice."""
+    from codify.calendar import labelled_year_as_gregorian, local_date_from_text, to_gregorian_year
+
+    try_load_config.cache_clear()
+    assert to_gregorian_year("2478", "xg", month=1) == 1936
+    assert labelled_year_as_gregorian("2478", "buddhist", "xg", (1, 31)) == 1936
+    assert local_date_from_text(SOURCE_PRE, "xg") == date(1936, 1, 31)
+    assert _resolve("xg", {"title": PRE}, SOURCE_PRE).year == "1936"
+
+
+@pytest.mark.parametrize(
+    ("case", "code", "metadata", "source", "expected_year", "expected_date"),
+    GRID,
+    ids=[row[0] for row in GRID],
+)
+def test_an_emitted_date_names_the_uri_year(
+    case: str,
+    code: str,
+    metadata: dict[str, object],
+    source: str,
+    expected_year: str,
+    expected_date: str,
+) -> None:
+    """A work date beside a URI year it contradicts classifies the document by
+    one year and files it under another; none is emitted, on either twin."""
+    for jurisdiction in (code, WITHOUT_IDENTITY[code]):
+        desc = _resolve(jurisdiction, metadata, source)
+        if desc.raw_date:
+            assert desc.raw_date[:4] == desc.year, (case, jurisdiction)
 
 
 def test_a_supplied_title_is_evidence_and_a_filename_is_not() -> None:

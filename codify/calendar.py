@@ -114,7 +114,6 @@ def _apply_rule(
     day: int | None = None,
     month_grid: MonthGrid = "gregorian",
 ) -> int:
-    kind = rule.kind
     # Every calendar here begins at one. Parse a numeric string before the check,
     # or "0" and "-5" pass a guard the integers fail. A non-numeric value is an
     # era name and belongs to the branch that reads it.
@@ -122,7 +121,18 @@ def _apply_rule(
     if _SIGNED_INT_RE.match(numeric) and int(numeric) < 1:
         raise CalendarConversionError(f"{local_year!r} is not a year")
     earlier = _in_the_earlier_gregorian_year(rule, month, day, month_grid)
+    converted = _convert(local_year, rule, earlier)
+    if month is None or rule.new_year_reform_year is None:
+        return converted
+    # Shifted here and nowhere else, so no caller can disagree or shift twice.
+    on_gregorian_grid = month_grid == "gregorian" or rule.month_day_is_gregorian
+    return converted + reform_shift(rule, _coerce_int(local_year), month, on_gregorian_grid)
 
+
+def _convert(local_year: str | int, rule: CalendarConversion, earlier: bool | None) -> int:
+    """The year by the rule's kind, month-blind but for the kinds whose own arm
+    reads which side of the Gregorian new year the date fell."""
+    kind = rule.kind
     if kind == "epoch_offset":
         if rule.epoch_year is None:
             raise CalendarConversionError("epoch_offset requires epoch_year")
@@ -388,17 +398,9 @@ def labelled_year_as_gregorian(
     ):
         month, day = month_day if month_day is not None else (None, None)
         try:
-            converted = to_gregorian_year(token, country, month=month, day=day, month_grid="local")
-            # The same coercion the conversion made, or a decorated year the
-            # conversion accepted raises here instead of shifting.
-            local = _coerce_int(token)
+            return to_gregorian_year(token, country, month=month, day=day, month_grid="local")
         except (CalendarConversionError, LookupError):
             return None
-        cfg = try_load_config(country)
-        rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
-        if rule is not None and month is not None:
-            converted += reform_shift(rule, local, month)
-        return converted
     return year_from_calendar(token, label, country)
 
 
@@ -446,13 +448,15 @@ def _first_stated_date(
     return None
 
 
-def reform_shift(rule: CalendarConversion, local_year: int, month: int) -> int:
+def reform_shift(
+    rule: CalendarConversion, local_year: int, month: int, on_gregorian_grid: bool
+) -> int:
     """1 where a year that began mid-year puts this month in the next Gregorian
     year, else 0. A kind whose own arm reads the month is shifted already."""
     reform = rule.new_year_reform_year
     # The new-year month is Gregorian-side too, so a month of another grid
     # cannot be compared with it.
-    if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS or not rule.month_day_is_gregorian:
+    if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS or not on_gregorian_grid:
         return 0
     return 1 if local_year < reform and month < (rule.new_year_month or 1) else 0
 
@@ -478,7 +482,6 @@ def _compose(
         # date", the same answer a whole corpus would give.
         logger.warning("local_date_conversion_failed", country=country, error=str(exc)[:160])
         return None
-    gregorian_year += reform_shift(rule, local_year, month)
     try:
         return date(gregorian_year, month, int(found.group("day")))
     except ValueError:

@@ -814,6 +814,10 @@ class TestAMonthIsReadOnItsOwnGrid:
         assert _apply_rule("2016", rule, month=13, month_grid="local") == 2024
 
     def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
+        """A local month on a grid nothing describes cannot meet the reform's
+        Gregorian-side threshold; the same month named Gregorian can."""
         rule = CalendarConversion(kind="buddhist", new_year_month=4, new_year_reform_year=2484)
-        assert _apply_rule("2478", rule, month=2) == _apply_rule("2478", rule, month=None)
-        assert reform_shift(rule, 2478, 2) == 0
+        blind = _apply_rule("2478", rule, month=None)
+        assert _apply_rule("2478", rule, month=2, month_grid="local") == blind
+        assert _apply_rule("2478", rule, month=2, month_grid="gregorian") == blind + 1
+        assert reform_shift(rule, 2478, 2, on_gregorian_grid=False) == 0

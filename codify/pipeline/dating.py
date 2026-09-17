@@ -20,7 +20,6 @@ from codify.calendar import (
     month_day_stating_this_year,
     normalise_calendar,
     reads_as_a_gregorian_year,
-    reform_shift,
     sole_year_token,
     title_year_token,
     to_gregorian_year,
@@ -55,15 +54,10 @@ def _local_year_to_gregorian(
     month, day = month_day if month_day is not None else (None, None)
     try:
         # A metadata date is in the calendar its label names: its own grid.
-        converted = to_gregorian_year(local_year, country, month=month, day=day, month_grid="local")
+        return to_gregorian_year(local_year, country, month=month, day=day, month_grid="local")
     except (CalendarConversionError, LookupError):
         logger.warning("local_year_unconverted", country=country, raw=local_year)
         return None
-    if month is None:
-        return converted
-    return converted + reform_shift(
-        rule, int(sole_year_token(normalise_digits(local_year)) or 0), month
-    )
 
 
 def _grid_is_gregorian(cfg: Any) -> bool:
@@ -196,7 +190,6 @@ def resolve_dating(
     if cal != "gregorian":
         raw_date = ""
     source_date: date | None = None
-    model_date = raw_date
     # Run whenever the text and a grammar allow: a field holding a non-date
     # would otherwise hide a date the document itself states.
     if source_text and declares_local_date_grammar(country):
@@ -233,14 +226,14 @@ def resolve_dating(
         and identity.year
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
-        # The source's date only where the title's year, converted with its
-        # month, lands on it: one naming another year is another document's.
+        # The source's month only where the title's year, converted with it,
+        # lands on the source's year; the exit invariant drops the date itself.
         source_month_day: tuple[int, int] | None = None
         if source_date is not None:
             source_month_day = (source_date.month, source_date.day)
             with_month = _local_year_to_gregorian(identity.year, cfg, country, source_month_day)
             if with_month != source_date.year:
-                source_month_day, source_date, raw_date = None, None, model_date
+                source_month_day = None
         month_day = source_month_day
         if month_day is None:
             month_day = month_day_stating_this_year(metadata, identity.year) or _month_day(raw_date)
@@ -288,6 +281,10 @@ def resolve_dating(
     # form or nothing, and the stored year is its number.
     year = _segment(year)
     raw_date = _canonical_date(raw_date)
+    if raw_date[:4] != year:
+        # A date beside a year it contradicts would classify the document by one
+        # year and file it under another: an exit invariant, not a branch.
+        raw_date = ""
     return Dating(year, raw_date, int(year) if year else None)
 
 
