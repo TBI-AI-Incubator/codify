@@ -3,6 +3,7 @@ Axes: calendar label, month grid, stated date, echo, reform, title grammar."""
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -389,13 +390,14 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
     ),
     ("the zero sentinel in the year field", "xg", {"title": UNDATED, "year": "0000"}, "", "", ""),
     (
-        # A five-digit run is not a year, and no four of its digits are either.
+        # A five-digit run is not a year, no four of its digits are either, and
+        # a date-shaped value with one is no date a reader can parse.
         "a five-digit year in the date field",
         "xg",
         {"title": UNDATED, "date": "12024-01-01"},
         "",
         "",
-        "12024-01-01",
+        "",
     ),
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
@@ -592,7 +594,7 @@ def test_the_replay_arm_stores_what_the_shipped_run_stored(
 
 
 #: A year below 1000 is carried padded to the four digits a URI segment has and
-#: stored as its number; a five-digit one is no year. From every source, on both twins.
+#: stored as its number; a five-digit one is no year, and no date. Every source, both twins.
 SOURCE_999 = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๙๙๙\n"
 SOURCE_12024 = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๑๒๐๒๔\n"
 TITLE_999 = "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999"
@@ -683,7 +685,7 @@ EDGES = [
         {"title": TITLE_999, "date": "999-05-05", "calendar": ""},
         "",
         "0999",
-        "999-05-05",
+        "0999-05-05",
     ),
     (
         "unlabelled echo, 12024",
@@ -691,7 +693,7 @@ EDGES = [
         {"title": TITLE_12024, "date": "12024-05-05", "calendar": ""},
         "",
         "",
-        "12024-05-05",
+        "",
     ),
     (
         "unlabelled echo, 12024, no grammar",
@@ -699,7 +701,7 @@ EDGES = [
         {"title": TITLE_12024, "date": "12024-05-05", "calendar": ""},
         "",
         "",
-        "12024-05-05",
+        "",
     ),
     ("source date, 999", "xg", {"title": UNDATED}, SOURCE_999, "0457", "0457-01-31"),
     ("source date, 999, no grammar", "xg2", {"title": UNDATED}, SOURCE_999, "0457", "0457-01-31"),
@@ -725,6 +727,9 @@ def test_a_year_at_the_edge_is_canonical_or_nothing(
 
     desc = _resolve(code, metadata, source)
     assert (desc.year, desc.raw_date) == (expected_year, expected_date), case
+    if desc.raw_date:
+        # Every date emitted is one a reader can parse.
+        assert date.fromisoformat(desc.raw_date), case
     if source:
         # The helpers never see the source; the source-date rows test the
         # descriptor alone, as the grid does.

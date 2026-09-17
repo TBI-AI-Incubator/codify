@@ -426,3 +426,21 @@ def test_a_new_year_day_outside_a_month_is_refused(day: int) -> None:
 @pytest.mark.parametrize("day", [1, 31])
 def test_a_new_year_day_at_the_edge_of_a_month_is_accepted(day: int) -> None:
     assert CalendarConversion(kind="bikram_samvat", new_year_day=day).new_year_day == day
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("ให้ไว้ ณ\r\rวันที่ 26 เมษายน พ.ศ. 2559", None),
+        ("ให้ไว้ ณ\r\n\r\nวันที่ 26 เมษายน พ.ศ. 2559", None),
+        ("ให้ไว้ ณ\rวันที่ 26 เมษายน พ.ศ. 2559", date(2016, 4, 26)),
+        ("ให้ไว้ ณ\r\nวันที่ 26 เมษายน พ.ศ. 2559", date(2016, 4, 26)),
+    ],
+    ids=["CR-only paragraph", "CRLF paragraph", "CR wrap", "CRLF wrap"],
+)
+def test_every_line_ending_breaks_a_paragraph_the_same_way(
+    text: str, expected: date | None
+) -> None:
+    """A carriage return is a line break, not whitespace: two of them end a
+    paragraph as two newlines do, whichever convention wrote the file."""
+    assert local_date_from_text(text, "xn") == expected

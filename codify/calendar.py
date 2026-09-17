@@ -388,7 +388,9 @@ def local_date_from_text(text: str, country: str) -> date | None:
     if found_rule is None:
         return None
     rule, patterns = found_rule
-    folded = normalise_digits(text)
+    # One line-ending convention before any pattern runs: a carriage return is
+    # a break, and two of them a paragraph, as with newlines.
+    folded = normalise_digits(text.replace("\r\n", "\n").replace("\r", "\n"))
     return _first_stated_date(folded, patterns, rule, country)
 
 

@@ -106,6 +106,15 @@ def _year_int(year: str) -> int | None:
     return number if number > 1 else None
 
 
+def _canonical_date(raw_date: str) -> str:
+    """The date with its year in four digits, as the URI carries it; a date-shaped
+    value whose year no date can hold is nothing. Anything else as written."""
+    stated = _ISO_DATE.match(raw_date)
+    if stated is not None and _year_int(stated.group(1)) is not None:
+        return f"{int(stated.group(1)):04d}{raw_date[stated.end(1) :]}"
+    return "" if re.match(r"[0-9]{5,}-", raw_date) else raw_date
+
+
 def _segment(year: str) -> str:
     """The year as a URI segment: four digits, padded, or "" where it names none."""
     number = _year_int(year)
@@ -276,6 +285,7 @@ def resolve_dating(
     # One gate at the exit for every source a year can come from: the segment
     # form or nothing, and the stored year is its number.
     year = _segment(year)
+    raw_date = _canonical_date(raw_date)
     return Dating(year, raw_date, int(year) if year else None)
 
 
