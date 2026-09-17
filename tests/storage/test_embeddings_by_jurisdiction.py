@@ -398,15 +398,21 @@ def test_the_migration_carries_every_row_into_its_partition_and_back(temp_db: st
 
 
 def _suffixed_constraints(conn) -> list[tuple[str, str]]:
-    """Names Postgres deduplicated with a digit while the old table held them,
-    on the table and its partitions; the migration restores the bare names."""
+    """Names still carrying the build prefix or a deduplicating digit, on the
+    table and its partitions and their indexes; the swap leaves none."""
     return [
         tuple(row)
         for row in conn.execute(
             text(
+                "WITH t AS (SELECT relid FROM pg_partition_tree('provision_embeddings'::regclass) "
+                "UNION SELECT 'provision_embeddings'::regclass) "
                 "SELECT c.conrelid::regclass::text, c.conname FROM pg_constraint c "
-                "JOIN pg_partition_tree('provision_embeddings'::regclass) t "
-                "ON t.relid = c.conrelid WHERE c.conname ~ '[a-z]\\d+$'"
+                "JOIN t ON t.relid = c.conrelid "
+                "WHERE c.conname ~ '[a-z]\\d+$' OR c.conname ~ '^provision_embeddings_(new|flat)_' "
+                "UNION ALL "
+                "SELECT i.indrelid::regclass::text, i.indexrelid::regclass::text FROM pg_index i "
+                "JOIN t ON t.relid = i.indrelid "
+                "WHERE i.indexrelid::regclass::text ~ '^provision_embeddings_(new|flat)_'"
             )
         ).all()
     ]
