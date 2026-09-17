@@ -94,7 +94,7 @@ def migration_connection() -> Iterator[Connection]:
     from sqlalchemy import create_engine
     from sqlalchemy.engine import make_url
 
-    raw = os.environ["POSTGRES_URL"]
+    raw = os.environ.get("POSTGRES_URL", "postgresql://codify:codify@localhost:5432/codify")
     engine = create_engine(make_url(raw).set(drivername="postgresql+psycopg"))
     try:
         with engine.connect() as connection, connection.begin():

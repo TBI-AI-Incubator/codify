@@ -43,8 +43,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Running the core migration chain standalone (packages/codify/alembic.ini).
-# The product pulls these in via apps/api; a core-only install needs the extra.
+# Running the core migration chain standalone (alembic.ini at the root).
+# A hosting service brings its own; a core-only install needs the extra.
 migrations = ["alembic>=1.14", "psycopg[binary]>=3.3.4"]
 
 [project.scripts]

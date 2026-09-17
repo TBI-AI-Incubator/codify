@@ -8,9 +8,9 @@ counts, which shows that an ingest produced nothing but not why.
 writes a bundle instead: page images, every anchor with its producing pass, the
 coverage measurement with both number sets, the pre-body-fill scaffold, the
 final AKN and the validator findings. Every artifact is captured from the run,
-not recomputed. It needs a LiteLLM gateway (`docker compose -f
-docker-compose.yaml -f docker-compose.dev.yaml up -d litellm postgres minio`);
-no database write, so no migration or deploy.
+not recomputed. It needs a chat model behind an OpenAI-compatible endpoint
+(`LITELLM_BASE_URL` and `LITELLM_API_KEY`, read from the environment or the
+nearest `.env`); no database write, so no migration or deploy.
 
     codify scan-corpus ~/corpus --jurisdiction xa
 
@@ -25,6 +25,7 @@ import argparse
 import asyncio
 import io
 import json
+import logging
 import os
 import sys
 import time
@@ -174,6 +175,9 @@ async def _run(args: argparse.Namespace) -> int:
         azure_foundry_ocr_url=_foundry_ocr_url(),
         azure_foundry_ocr_key=os.environ.get("AZURE_OPENAI_API_KEY") or None,
         azure_foundry_ocr_rpm=int(os.environ.get("AZURE_FOUNDRY_OCR_RPM") or 40),
+        # No run context here, so proxy attribution would carry nothing; direct
+        # mode also lets the URL name any OpenAI-compatible provider.
+        telemetry_mode="direct",
     )
 
     pages: list[PageResult] = []
@@ -545,6 +549,9 @@ def _load_env() -> None:
     from dotenv import find_dotenv, load_dotenv
 
     load_dotenv(find_dotenv(usecwd=True), override=False)
+    # Tracing is optional; the SDK warns on every run it is absent.
+    if not os.environ.get("LANGFUSE_PUBLIC_KEY"):
+        logging.getLogger("langfuse").setLevel(logging.ERROR)
 
 
 def main(argv: list[str] | None = None) -> int:

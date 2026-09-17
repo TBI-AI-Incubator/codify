@@ -7,6 +7,7 @@ helpers; the pipeline itself is covered in tests/parse.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,34 @@ def test_the_structuring_pass_asks_for_the_counts_the_bundle_writes() -> None:
     assert written is not None
     assert written["masked"] == 2, written
     assert written["unclosed"] == 1, written
+
+
+async def test_the_client_is_built_off_the_proxy(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """Proxy attribution rides the request body as `metadata`, which a provider's
+    own OpenAI-compatible endpoint rejects with a 400; the CLI has no run to
+    attribute anyway."""
+    from codify import cli
+
+    seen: dict[str, object] = {}
+
+    class _Stop(Exception):
+        pass
+
+    def _capture(**kwargs: object) -> None:
+        seen.update(kwargs)
+        raise _Stop
+
+    monkeypatch.setattr(cli, "create_llm_client", _capture)
+    source = tmp_path / "act.txt"
+    source.write_text("1. Short title.\n")
+    args = argparse.Namespace(
+        source=str(source),
+        jurisdiction="xa",
+        out=str(tmp_path / "bundle"),
+        model="m",
+        ocr_model="",
+        quiet=True,
+    )
+    with pytest.raises(_Stop):
+        await cli._run(args)
+    assert seen["telemetry_mode"] == "direct"
