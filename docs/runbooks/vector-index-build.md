@@ -16,12 +16,13 @@ but it is a long-running statement.
 ## Which partitions still need one
 
 ```sql
-SELECT c.relname AS partition, pg_size_pretty(pg_relation_size(c.oid)) AS size,
+SELECT j.code, c.relname AS partition, pg_size_pretty(pg_relation_size(c.oid)) AS size,
        c.reltuples::bigint AS rows,
        EXISTS (SELECT 1 FROM pg_index i JOIN pg_inherits h ON h.inhrelid = i.indexrelid
                WHERE i.indrelid = c.oid
                  AND h.inhparent = 'provision_embeddings_hnsw_idx'::regclass) AS attached
 FROM pg_inherits p JOIN pg_class c ON c.oid = p.inhrelid
+JOIN jurisdictions j ON c.relname = 'provision_embeddings_p_' || replace(j.id::text, '-', '')
 WHERE p.inhparent = 'provision_embeddings'::regclass
 ORDER BY c.reltuples DESC;
 ```
@@ -31,11 +32,11 @@ ORDER BY c.reltuples DESC;
 ```sql
 SET maintenance_work_mem = '2GB';
 SET max_parallel_maintenance_workers = 4;
-CREATE INDEX CONCURRENTLY provision_embeddings_p_xa_0e468e25_embedding_idx
-    ON provision_embeddings_p_xa_0e468e25
+CREATE INDEX CONCURRENTLY provision_embeddings_p_<id>_embedding_idx
+    ON provision_embeddings_p_<id>
     USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64);
-ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_xa_0e468e25_embedding_idx;
-ANALYZE provision_embeddings_p_xa_0e468e25;
+ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_<id>_embedding_idx;
+ANALYZE provision_embeddings_p_<id>;
 ```
 
 Roughly 1.5 KB of index per vector: a 100k-row partition is minutes, ten
@@ -46,5 +47,5 @@ rerun. The parent turns valid on its own once every partition has attached.
 
 ## Check
 
-`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<code>_<id>_embedding_idx`;
+`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<id>_embedding_idx`;
 before the build it names the partition's `version_id` btree and a sort.

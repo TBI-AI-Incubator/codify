@@ -97,7 +97,7 @@ async def test_a_new_jurisdiction_gets_a_partition_with_its_own_vector_index(
 ) -> None:
     code = f"zp{uuid.uuid4().hex[:6]}"
     jurisdiction = await get_or_create_jurisdiction(session, code)
-    partition = embedding_partition_name(code, jurisdiction.id)
+    partition = embedding_partition_name(jurisdiction.id)
     bound = (
         await session.execute(
             text(
@@ -147,7 +147,7 @@ async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
         )
     ).all()
     assert len(rows) == 3
-    assert {r[0] for r in rows} == {embedding_partition_name(code, jurisdiction.id)}
+    assert {r[0] for r in rows} == {embedding_partition_name(jurisdiction.id)}
     assert {r[1] for r in rows} == {version.id}
     assert {r[2] for r in rows} == {jurisdiction.id}
 
@@ -215,7 +215,7 @@ async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSessio
         "akn_type": None,
         "include_non_normative": False,
     }
-    partition = embedding_partition_name(code, jurisdiction.id)
+    partition = embedding_partition_name(jurisdiction.id)
     # Both dense paths: the hybrid arm is what a worded query runs.
     for sql in (_HYBRID_SQL, _DENSE_ONLY_SQL):
         plan = "\n".join(
@@ -356,7 +356,7 @@ def test_the_migration_carries_every_row_into_its_partition_and_back(temp_db: st
             assert len(rows) == 6
             for code, version, jurisdiction, partition in rows:
                 assert (version, jurisdiction) in expected[code]
-                assert partition == embedding_partition_name(code, uuid.UUID(jurisdiction))
+                assert partition == embedding_partition_name(uuid.UUID(jurisdiction))
             valid = conn.execute(
                 text(
                     "SELECT indisvalid FROM pg_index "
@@ -404,17 +404,15 @@ async def test_codes_that_fold_alike_get_their_own_partitions(session: AsyncSess
     stem = uuid.uuid4().hex[:5]
     first = await get_or_create_jurisdiction(session, f"z{stem}-a")
     second = await get_or_create_jurisdiction(session, f"z{stem}_a")
-    assert embedding_partition_name(first.code, first.id) != embedding_partition_name(
-        second.code, second.id
-    )
+    names = {embedding_partition_name(first.id), embedding_partition_name(second.id)}
     partitions = (
         await session.execute(
             text(
                 "SELECT count(*) FROM pg_inherits "
                 "WHERE inhparent = 'provision_embeddings'::regclass "
-                "AND inhrelid::regclass::text LIKE :stem"
+                "AND inhrelid::regclass::text = ANY(:names)"
             ),
-            {"stem": f"provision_embeddings_p_z{stem}%"},
+            {"names": list(names)},
         )
     ).scalar_one()
-    assert partitions == 2
+    assert len(names) == 2 and partitions == 2

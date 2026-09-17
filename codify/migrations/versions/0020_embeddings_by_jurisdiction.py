@@ -75,10 +75,9 @@ def upgrade() -> None:
         ) PARTITION BY LIST (jurisdiction_id)
         """
     )
-    rows = op.get_bind().execute(sa.text("SELECT id, code FROM jurisdictions")).all()
-    for jurisdiction_id, code in rows:
+    for (jurisdiction_id,) in op.get_bind().execute(sa.text("SELECT id FROM jurisdictions")).all():
         op.execute(
-            f'CREATE TABLE "{embedding_partition_name(code, jurisdiction_id)}" '
+            f'CREATE TABLE "{embedding_partition_name(jurisdiction_id)}" '
             f"PARTITION OF provision_embeddings FOR VALUES IN ('{jurisdiction_id}')"
         )
     op.execute(

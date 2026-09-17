@@ -47,7 +47,7 @@ async def get_or_create_jurisdiction(
     )
     session.add(row)
     await session.flush()
-    await ensure_embedding_partition(session, row.id, row.code)
+    await ensure_embedding_partition(session, row.id)
     return row
 
 
