@@ -48,9 +48,14 @@ RRF_K = 60
 # `SUM(1.0 / (:rrf_k + rn))`, so two ids each seen by one arm at the same rank
 # score identically; without it Postgres orders those ties any way it likes and
 # the ranking is not reproducible offline.
-# Keep distance ordering on the indexed embedding relation. A per-provision
-# LATERAL LIMIT forces a corpus scan before the global distance sort. The
-# anti-join excludes fallback vectors wherever a preferred vector exists.
+# The dense arm orders and limits on `provision_embeddings` itself, which is
+# partitioned by jurisdiction with one HNSW each: the jurisdiction predicate
+# prunes to the scope's partitions and the version predicate is applied inside
+# the ordered index scan. A window over the join instead sorts every embedding
+# in scope exactly, which measured 60 s cold on 67k provisions. The window
+# orders by `distance + 0`: the relaxed scan is approximately ordered and the
+# planner would otherwise take its order for the window's. The anti-join
+# excludes fallback vectors wherever a preferred vector exists.
 _HYBRID_SQL = text(
     """
     WITH fts AS (
@@ -66,25 +71,31 @@ _HYBRID_SQL = text(
       LIMIT :pool
     ),
     vec AS (
-      SELECT p.id, ROW_NUMBER() OVER (ORDER BY e.embedding <=> :query_vec) AS rn
-      FROM provisions p
-      JOIN provision_embeddings e ON e.provision_id = p.id
-        AND (
-          e.model_id = :model_id
-          OR (
-            e.model_id = CAST(:fallback_model_id AS text)
-            AND NOT EXISTS (
-              SELECT 1 FROM provision_embeddings preferred
-              WHERE preferred.provision_id = p.id
-                AND preferred.model_id = :model_id
+      SELECT id, ROW_NUMBER() OVER (ORDER BY distance + 0) AS rn
+      FROM (
+        SELECT e.provision_id AS id, e.embedding <=> :query_vec AS distance
+        FROM provision_embeddings e
+        JOIN provisions p ON p.id = e.provision_id
+        WHERE e.jurisdiction_id = ANY(:jurisdiction_ids)
+          AND e.version_id = ANY(:version_ids)
+          AND (
+            e.model_id = :model_id
+            OR (
+              e.model_id = CAST(:fallback_model_id AS text)
+              AND NOT EXISTS (
+                SELECT 1 FROM provision_embeddings preferred
+                WHERE preferred.provision_id = e.provision_id
+                  AND preferred.jurisdiction_id = e.jurisdiction_id
+                  AND preferred.model_id = :model_id
+              )
             )
           )
-        )
-      WHERE p.version_id = ANY(:version_ids)
-        AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-        AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
-      LIMIT :pool
+          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
+          AND (p.normative OR CAST(:include_non_normative AS boolean))
+          AND p.excluded_from_pool IS NOT TRUE
+        ORDER BY e.embedding <=> :query_vec
+        LIMIT :pool
+      ) nearest
     ),
     fused AS (
       SELECT id, SUM(1.0 / (:rrf_k + rn)) AS rrf_score
@@ -100,6 +111,7 @@ _HYBRID_SQL = text(
 ).bindparams(
     bindparam("query_vec", type_=HALFVEC(768)),
     bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
 )
 
 
@@ -135,39 +147,63 @@ async def query_tokens_for(
     return " ".join(await expand_terms(session, tokens))
 
 
+# The relaxed scan may hand back its candidates a little out of order, so the
+# limited set is sorted once more outside it; `+ 0` so the planner does not
+# take the scan's claimed order for the sort's.
 _DENSE_ONLY_SQL = text(
     """
-    SELECT p.id, p.akn_eid, p.text, 0.0 AS rrf_score
-    FROM provisions p
-    JOIN provision_embeddings e ON e.provision_id = p.id
-        AND (
-          e.model_id = :model_id
-          OR (
-            e.model_id = CAST(:fallback_model_id AS text)
-            AND NOT EXISTS (
-              SELECT 1 FROM provision_embeddings preferred
-              WHERE preferred.provision_id = p.id
-                AND preferred.model_id = :model_id
-            )
+    SELECT id, akn_eid, text, 0.0 AS rrf_score
+    FROM (
+    SELECT p.id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
+    FROM provision_embeddings e
+    JOIN provisions p ON p.id = e.provision_id
+    WHERE e.jurisdiction_id = ANY(:jurisdiction_ids)
+      AND e.version_id = ANY(:version_ids)
+      AND (
+        e.model_id = :model_id
+        OR (
+          e.model_id = CAST(:fallback_model_id AS text)
+          AND NOT EXISTS (
+            SELECT 1 FROM provision_embeddings preferred
+            WHERE preferred.provision_id = e.provision_id
+              AND preferred.jurisdiction_id = e.jurisdiction_id
+              AND preferred.model_id = :model_id
           )
         )
-    WHERE p.version_id = ANY(:version_ids)
+      )
       AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
       AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
+      AND p.excluded_from_pool IS NOT TRUE
     ORDER BY e.embedding <=> :query_vec
     LIMIT :k
+    ) nearest
+    ORDER BY distance + 0, id
     """
 ).bindparams(
     bindparam("query_vec", type_=HALFVEC(768)),
     bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
 )
+
+_JURISDICTIONS_SQL = text(
+    "SELECT DISTINCT l.jurisdiction_id FROM versions v JOIN laws l ON l.id = v.law_id "
+    "WHERE v.id = ANY(:version_ids)"
+).bindparams(bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))))
+
+
+async def scope_jurisdictions(
+    session: AsyncSession, version_ids: list[uuid.UUID]
+) -> list[uuid.UUID]:
+    """The partitions a version set lives in, so the planner prunes to them."""
+    rows = await session.execute(_JURISDICTIONS_SQL, {"version_ids": version_ids})
+    return [row[0] for row in rows.all()]
 
 
 async def _dense_only(
     session: AsyncSession,
     query_vec: list[float],
     version_ids: list[uuid.UUID],
+    jurisdiction_ids: list[uuid.UUID],
     k: int,
     model_id: str,
     akn_type: str | None = None,
@@ -180,6 +216,7 @@ async def _dense_only(
         {
             "query_vec": query_vec,
             "version_ids": version_ids,
+            "jurisdiction_ids": jurisdiction_ids,
             "k": k,
             "model_id": model_id,
             "fallback_model_id": fallback_model_id,
@@ -215,10 +252,13 @@ async def hybrid_search(
     alone, never on where a provision sits, because a normative annex is law."""
     if not version_ids:
         return []
-    # Continue the approximate index scan after model/scope filters, rather
-    # than stopping at pgvector's default 40 candidates before those filters.
+    # Continue the approximate index scan past rows the version and model
+    # filters discard, rather than stopping at pgvector's default 40 candidates.
+    # Relaxed: strict order re-reads the graph per candidate (37 s against
+    # 0.96 s measured) and the window above re-sorts the pool anyway.
     # Transaction-local: never change the next borrower's search settings.
-    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'strict_order'"))
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
+    jurisdiction_ids = await scope_jurisdictions(session, version_ids)
     tokens = (await query_tokens_for(session, query_text, version_ids)).split()
     if not tokens:
         # An empty tokenisation means the query carried no letters or digits.
@@ -228,6 +268,7 @@ async def hybrid_search(
             session,
             query_vec,
             version_ids,
+            jurisdiction_ids,
             k,
             model_id,
             akn_type,
@@ -243,6 +284,7 @@ async def hybrid_search(
             # AND would demand one language's stem and another's at once.
             "query_match": " | ".join(tokens),
             "version_ids": version_ids,
+            "jurisdiction_ids": jurisdiction_ids,
             "k": k,
             "pool": candidate_pool,
             "rrf_k": rrf_k,

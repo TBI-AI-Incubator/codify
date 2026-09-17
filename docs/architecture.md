@@ -7,7 +7,10 @@ The CLI and Python API share the same processing modules:
 3. The pipeline constructs a skeleton and fills content, using configured model
    providers where required.
 4. AKN validation and quality checks produce findings for review.
-5. Storage, embedding and retrieval are optional application integrations.
+5. Storage, embedding and retrieval are optional application integrations. Embeddings
+   are partitioned by jurisdiction, one vector index each, so a scoped search reads
+   one partition; `docs/runbooks/vector-index-build.md` builds them on a populated
+   database.
 
 Model-assisted processing can introduce errors. Retain source material and
 inspect validation findings before relying on structured output. Schema validity

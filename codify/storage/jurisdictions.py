@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.storage.models import Jurisdiction, Law, Provision, Version
+from codify.storage.partitions import ensure_embedding_partition
 
 
 class JurisdictionCounts(BaseModel):
@@ -46,6 +47,7 @@ async def get_or_create_jurisdiction(
     )
     session.add(row)
     await session.flush()
+    await ensure_embedding_partition(session, row.id)
     return row
 
 

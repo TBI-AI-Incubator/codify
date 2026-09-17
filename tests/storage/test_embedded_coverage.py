@@ -14,15 +14,18 @@ from codify.testing import postgres_url
 
 # CTEs shadow corpus tables: these controls need PostgreSQL syntax but neither
 # migrations nor persisted fixtures. No customer data or providers are used.
+# One law in one jurisdiction; `u(n)` is the zero-padded uuid ending in n.
 FIXTURE_SQL = """
-WITH provisions(id, version_id) AS (
-  VALUES (1, '00000000-0000-0000-0000-000000000001'::uuid),
-         (2, '00000000-0000-0000-0000-000000000001'::uuid),
-         (3, '00000000-0000-0000-0000-000000000002'::uuid),
-         (4, '00000000-0000-0000-0000-000000000003'::uuid),
-         (5, '00000000-0000-0000-0000-000000000004'::uuid)
-), provision_embeddings(provision_id, model_id) AS (
-  VALUES (1, 'new'), (1, 'old'), (2, 'new'), (3, 'old'), (4, 'unrelated')
+WITH u AS (SELECT n, ('00000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid AS id
+           FROM generate_series(1, 20) n),
+laws(id, jurisdiction_id) AS (
+  SELECT (SELECT id FROM u WHERE n = 10), (SELECT id FROM u WHERE n = 20)
+), versions(id, law_id) AS (
+  SELECT id, (SELECT id FROM u WHERE n = 10) FROM u WHERE n IN (1, 2, 3, 4)
+), provision_embeddings(provision_id, model_id, version_id, jurisdiction_id) AS (
+  SELECT p, m, (SELECT id FROM u WHERE n = v), (SELECT id FROM u WHERE n = 20)
+  FROM (VALUES (1, 'new', 1), (1, 'old', 1), (2, 'new', 1), (3, 'old', 2), (4, 'unrelated', 3))
+       AS rows(p, m, v)
 )
 """
 
@@ -81,6 +84,8 @@ async def test_count_passes_both_model_identities_and_scope():
 def test_coverage_probe_stops_after_one_embedding_per_distinct_version():
     sql = str(_COUNT_EMBEDDED_SQL)
     assert "SELECT DISTINCT unnest(:version_ids)" in sql
-    assert "JOIN LATERAL" in sql
-    assert "LIMIT 1" in sql
-    assert "p.version_id = scoped.id" in sql
+    assert "EXISTS" in sql
+    # The probe names the partition and its version index; nothing goes through provisions.
+    assert "e.jurisdiction_id = l.jurisdiction_id" in sql
+    assert "e.version_id = scoped.id" in sql
+    assert "provisions" not in sql

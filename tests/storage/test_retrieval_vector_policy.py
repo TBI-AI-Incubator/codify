@@ -24,7 +24,9 @@ def test_indexable_vector_selection_preserves_preferred_and_scope(hybrid, fallba
     # SQLite exercises the actual selection predicates with scalar distances;
     # it cannot establish pgvector recall, PostgreSQL planning or latency.
     sql = sql.replace("e.embedding <=> :query_vec", "abs(e.embedding - :query_vec)")
-    sql = sql.replace("p.version_id = ANY(:version_ids)", "p.version_id = :version_id")
+    sql = sql.replace("e.version_id = ANY(:version_ids)", "e.version_id = :version_id")
+    sql = sql.replace("e.jurisdiction_id = ANY(:jurisdiction_ids)", "e.jurisdiction_id = 1")
+    assert "e.jurisdiction_id = 1" in sql
     with sqlite3.connect(":memory:") as db:
         db.executescript("""
             CREATE TABLE provisions (
@@ -33,7 +35,8 @@ def test_indexable_vector_selection_preserves_preferred_and_scope(hybrid, fallba
             );
             CREATE TABLE provision_embeddings (
                 provision_id INTEGER, model_id TEXT, embedding REAL,
-                UNIQUE(provision_id, model_id)
+                version_id INTEGER, jurisdiction_id INTEGER,
+                UNIQUE(provision_id, model_id, jurisdiction_id)
             );
             INSERT INTO provisions VALUES
                 (1,'a','both',1,'article',1,0),
@@ -43,11 +46,12 @@ def test_indexable_vector_selection_preserves_preferred_and_scope(hybrid, fallba
                 (5,'e','excluded',1,'article',1,1),
                 (6,'f','non normative',1,'article',0,0),
                 (7,'g','wrong type',1,'paragraph',1,0),
-                (8,'h','unrelated model',1,'article',1,0);
+                (8,'h','unrelated model',1,'article',1,0),
+                (9,'i','other jurisdiction',1,'article',1,0);
             INSERT INTO provision_embeddings VALUES
-                (1,'new',0.9),(1,'old',0.01),(2,'old',0.2),(3,'new',0.3),
-                (4,'new',0.01),(5,'new',0.01),(6,'new',0.01),(7,'new',0.01),
-                (8,'unrelated',0.01);
+                (1,'new',0.9,1,1),(1,'old',0.01,1,1),(2,'old',0.2,1,1),(3,'new',0.3,1,1),
+                (4,'new',0.01,2,1),(5,'new',0.01,1,1),(6,'new',0.01,1,1),(7,'new',0.01,1,1),
+                (8,'unrelated',0.01,1,1),(9,'new',0.001,1,2);
         """)
         rows = db.execute(
             sql,
@@ -84,8 +88,9 @@ async def test_both_vector_paths_enable_transaction_local_iterative_scan(tokens)
             == []
         )
     statements = [str(call.args[0]) for call in session.execute.await_args_list]
-    assert statements[0] == "SET LOCAL hnsw.iterative_scan = 'strict_order'"
-    assert len(statements) == 2
+    assert statements[0] == "SET LOCAL hnsw.iterative_scan = 'relaxed_order'"
+    # The setting, the partition lookup, the search.
+    assert len(statements) == 3
 
 
 async def test_empty_scope_does_not_execute_or_change_settings():

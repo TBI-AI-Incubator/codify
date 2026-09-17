@@ -7,7 +7,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlalchemy import delete, select
+from pgvector.sqlalchemy import HALFVEC
+from sqlalchemy import delete, literal, select
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,18 +35,33 @@ async def upsert_embedding(
     vector: list[float],
     model_id: str,
 ) -> ProvisionEmbedding:
-    """Upsert via ON CONFLICT (provision_id, model_id). Different model_ids coexist."""
+    """Upsert via ON CONFLICT (provision_id, model_id, jurisdiction_id). Different
+    model_ids coexist. The version and jurisdiction are read from the provision
+    in the same statement, never taken from the caller: they route the row to its
+    partition and scope every search, so a wrong pair would hide the provision
+    from its own scope. A provision that does not exist raises, as the key did."""
     # id supplied explicitly: pg_insert bypasses SQLModel's default_factory.
+    scope = (
+        select(
+            literal(uuid.uuid4(), type_=PG_UUID(as_uuid=True)),
+            Provision.id,
+            literal(vector, type_=HALFVEC(768)),
+            literal(model_id),
+            Provision.version_id,
+            Law.jurisdiction_id,
+        )
+        .join(Version, Version.id == Provision.version_id)
+        .join(Law, Law.id == Version.law_id)
+        .where(Provision.id == provision_id)
+    )
     stmt = (
         pg_insert(ProvisionEmbedding)
-        .values(
-            id=uuid.uuid4(),
-            provision_id=provision_id,
-            embedding=vector,
-            model_id=model_id,
+        .from_select(
+            ["id", "provision_id", "embedding", "model_id", "version_id", "jurisdiction_id"],
+            scope,
         )
         .on_conflict_do_update(
-            index_elements=["provision_id", "model_id"],
+            index_elements=["provision_id", "model_id", "jurisdiction_id"],
             set_={"embedding": vector},
         )
         .returning(ProvisionEmbedding)

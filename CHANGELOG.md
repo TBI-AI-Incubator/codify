@@ -44,6 +44,16 @@ three-digit year segment, so no shipped row moves.
     year, and stored a raw local year where the URI took the converted one.
 11. A labelled year converts by the jurisdiction's declared rule; 0.1.0 used
     the generic table for that calendar and ignored a declared epoch.
+12. `provision_embeddings` is partitioned by `jurisdiction_id` and carries
+    `version_id` (migration 0020): the primary key is `(id, jurisdiction_id)`,
+    the unique key `(provision_id, model_id, jurisdiction_id)`, and each
+    partition holds its own HNSW index, built from
+    `docs/runbooks/vector-index-build.md` on a populated database. A scoped
+    search reads one partition's index instead of scanning every embedding in
+    scope; the dense arm's `hnsw.iterative_scan` is `relaxed_order`.
+13. `upsert_embedding` reads the provision's version and jurisdiction itself;
+    `get_or_create_jurisdiction` creates the jurisdiction's partition, and an
+    embedding for a jurisdiction written around it fails at insert.
 
 Three more groups of differing cells are reachable only through config fields
 0.1.0 could not load, so they are capability rather than breaks: a dated line

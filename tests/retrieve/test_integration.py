@@ -15,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from codify.embed.client import EmbeddingClient
 from codify.retrieve.hybrid import retrieve
 from codify.storage.embeddings import upsert_embedding
-from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
+from codify.storage.jurisdictions import get_or_create_jurisdiction
+from codify.storage.models import Law, Provision, Section, Version
 from codify.testing import postgres_url
 
 pytestmark = [pytest.mark.integration, pytest.mark.live_llm]
@@ -43,9 +44,8 @@ async def embedding_client() -> EmbeddingClient:
 
 async def _build_version(session: AsyncSession, suffix: str | None = None) -> uuid.UUID:
     suffix = suffix or uuid.uuid4().hex[:8]
-    j = Jurisdiction(code=f"zz-{suffix}", name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    # Through the writer: it creates the jurisdiction's embeddings partition.
+    j = await get_or_create_jurisdiction(session, f"zz-{suffix}", name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title=f"Synthetic Act {suffix}",
@@ -214,8 +214,12 @@ async def test_latency_under_200ms_on_10k_corpus(
     chunk = 200
     insert_emb = text(
         """
-        INSERT INTO provision_embeddings (id, provision_id, embedding, model_id, created_at)
-        VALUES (gen_random_uuid(), :pid, CAST(:vec AS halfvec(768)), 'embeddinggemma', NOW())
+        INSERT INTO provision_embeddings
+            (id, provision_id, embedding, model_id, created_at, version_id, jurisdiction_id)
+        SELECT gen_random_uuid(), p.id, CAST(:vec AS halfvec(768)), 'embeddinggemma', NOW(),
+               p.version_id, l.jurisdiction_id
+        FROM provisions p JOIN versions v ON v.id = p.version_id JOIN laws l ON l.id = v.law_id
+        WHERE p.id = :pid
         """
     )
     for start_i in range(0, n, chunk):
@@ -250,9 +254,7 @@ async def test_multi_version_filter_spans_versions(
     session: AsyncSession, embedding_client: EmbeddingClient
 ) -> None:
     suffix = uuid.uuid4().hex[:8]
-    j = Jurisdiction(code=f"zz-{suffix}", name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    j = await get_or_create_jurisdiction(session, f"zz-{suffix}", name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title="Multi",
@@ -331,9 +333,7 @@ async def test_jurisdiction_resolution_round_trip(
     """jurisdiction_code resolves through the storage helper and runs end-to-end."""
     suffix = uuid.uuid4().hex[:8]
     code = f"zz-{suffix}"
-    j = Jurisdiction(code=code, name="Test", languages=["en"])
-    session.add(j)
-    await session.flush()
+    j = await get_or_create_jurisdiction(session, code, name="Test", languages=["en"])
     law = Law(
         jurisdiction_id=j.id,
         title="J",

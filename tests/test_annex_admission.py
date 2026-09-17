@@ -62,7 +62,8 @@ def test_admission_refuses_unknown_constraint_semantics(expression: str) -> None
 
 def test_canonical_graph_has_new_identity_and_rejects_legacy_stamps() -> None:
     scripts = ScriptDirectory.from_config(Config(str(_ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["0019_search_term_lexicon"]
+    # One head, and the admission revision on the path to it.
+    assert len(scripts.get_heads()) == 1
     head = scripts.get_revision("0019_search_term_lexicon")
     assert head is not None and head.down_revision == "0018_annex_admission"
     current = scripts.get_revision("0018_annex_admission")
