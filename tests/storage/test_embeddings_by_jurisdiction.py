@@ -24,7 +24,7 @@ from codify.storage.embeddings import embed_version_provisions, upsert_embedding
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.partitions import embedding_partition_name
-from codify.storage.retrieval import _DENSE_ONLY_SQL, hybrid_search
+from codify.storage.retrieval import _DENSE_ONLY_SQL, _HYBRID_SQL, hybrid_search
 from codify.testing import postgres_url
 
 pytestmark = pytest.mark.integration
@@ -201,31 +201,37 @@ async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSessio
     await session.execute(text("SET LOCAL enable_bitmapscan = off"))
     await session.execute(text("SET LOCAL enable_sort = off"))
     await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
-    plan = "\n".join(
-        row[0]
-        for row in (
-            await session.execute(
-                text("EXPLAIN " + str(_DENSE_ONLY_SQL)).bindparams(
-                    bindparam("query_vec", type_=HALFVEC(_DIM)),
-                    bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-                    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-                ),
-                {
-                    "query_vec": _vec(0.26),
-                    "version_ids": [version.id],
-                    "jurisdiction_ids": [jurisdiction.id],
-                    "k": 2,
-                    "model_id": "test-model",
-                    "fallback_model_id": None,
-                    "akn_type": None,
-                    "include_non_normative": False,
-                },
-            )
-        ).all()
-    )
+    params = {
+        "query_vec": _vec(0.26),
+        "version_ids": [version.id],
+        "jurisdiction_ids": [jurisdiction.id],
+        "k": 2,
+        "pool": 10,
+        "rrf_k": 60,
+        "query_tokens": "provision says",
+        "query_match": "provision | says",
+        "model_id": "test-model",
+        "fallback_model_id": None,
+        "akn_type": None,
+        "include_non_normative": False,
+    }
     partition = embedding_partition_name(code, jurisdiction.id)
-    assert partition in plan, plan
-    assert f"Index Scan using {partition}_embedding_idx" in plan, plan
+    # Both dense paths: the hybrid arm is what a worded query runs.
+    for sql in (_HYBRID_SQL, _DENSE_ONLY_SQL):
+        plan = "\n".join(
+            row[0]
+            for row in (
+                await session.execute(
+                    text("EXPLAIN " + str(sql)).bindparams(
+                        bindparam("query_vec", type_=HALFVEC(_DIM)),
+                        bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                        bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                    ),
+                    {k: v for k, v in params.items() if f":{k}" in str(sql)},
+                )
+            ).all()
+        )
+        assert f"Index Scan using {partition}_embedding_idx" in plan, plan
     # And the answer is the nearest provisions by vector, in order.
     rows = await hybrid_search(
         session,
