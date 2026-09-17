@@ -706,9 +706,11 @@ class TestAMonthIsReadOnItsOwnGrid:
         assert _apply_rule(local_year, self._gregorian_grid(kind), month=month, day=day) == expected
 
     def test_a_declared_new_year_day_settles_the_whole_month(self) -> None:
-        rule = self._gregorian_grid("bikram_samvat", new_year_month=4, new_year_day=14)
-        assert _apply_rule("2080", rule, month=4, day=13) == 2024
-        assert _apply_rule("2080", rule, month=4, day=14) == 2023
+        """A jurisdiction naming the day removes the band: on 13 April, which the
+        default band leaves open, the declared day decides."""
+        rule = self._gregorian_grid("bikram_samvat", new_year_month=4, new_year_day=13)
+        assert _apply_rule("2080", rule, month=4, day=13) == 2023
+        assert _apply_rule("2080", rule, month=4, day=12) == 2024
 
     @pytest.mark.parametrize(
         ("kind", "local_year", "month", "day"),
