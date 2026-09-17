@@ -815,6 +815,8 @@ class TestAMonthIsReadOnItsOwnGrid:
             ("bikram_samvat", "2080", 13, 10, "gregorian"),
             ("bikram_samvat", "2080", 4, 0, "gregorian"),
             ("bikram_samvat", "2080", 4, 99, "gregorian"),
+            ("ethiopian", "2016", 0, 10, "gregorian"),
+            ("ethiopian", "2016", 13, 10, "gregorian"),
             ("ethiopian", "2016", 9, 0, "gregorian"),
             ("ethiopian", "2016", 9, 40, "gregorian"),
             # Off the calendar's own grid: month 0, one past its last, day 0, day 40.
