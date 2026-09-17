@@ -499,6 +499,9 @@ UNECHOED = {
     # Nothing marks it local, so its year is read as written; the day does not
     # exist on any grid, so no date is emitted.
     "unlabelled local date whose day does not exist": ("2511", ""),
+    # A field that is not wholly a date states nothing; the title year is read
+    # as written with no grammar.
+    "a day run longer than two digits is not a date": ("2511", ""),
     "custom epoch, unlabelled echo": ("2478", "2478-09-09"),
     # Read as written and carried padded; only the grammar side converts it.
     "a three-digit year is carried padded": ("0999", ""),
@@ -765,13 +768,48 @@ EDGES = [
         "2024",
         "",
     ),
-    ("a suffixed date", "xg", {"title": UNDATED, "date": "2024-01-01junk"}, "", "2024", ""),
+    # A field that is not wholly a date states nothing: no year run, no month.
+    ("a suffixed date", "xg", {"title": UNDATED, "date": "2024-01-01junk"}, "", "", ""),
     (
         "a suffixed date, no grammar",
         "xg2",
         {"title": UNDATED, "date": "2024-01-01junk"},
         "",
-        "2024",
+        "",
+        "",
+    ),
+    # Labelled local and suffixed: neither the year shift nor a date, and the
+    # title's own year converts month-blind where a grammar reads it.
+    (
+        "a suffixed labelled local date",
+        "xg",
+        {"title": PRE, "date": "2478-02-29junk", "calendar": "buddhist"},
+        "",
+        "1935",
+        "",
+    ),
+    (
+        "a suffixed labelled local date, no grammar",
+        "xg2",
+        {"title": PRE, "date": "2478-02-29junk", "calendar": "buddhist"},
+        "",
+        "2478",
+        "",
+    ),
+    (
+        "a suffixed unlabelled echo",
+        "xg",
+        {"title": PRE, "date": "2478-02-29junk", "calendar": ""},
+        "",
+        "1935",
+        "",
+    ),
+    (
+        "a suffixed unlabelled echo, no grammar",
+        "xg2",
+        {"title": PRE, "date": "2478-02-29junk", "calendar": ""},
+        "",
+        "2478",
         "",
     ),
 ]

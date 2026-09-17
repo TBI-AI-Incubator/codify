@@ -3,7 +3,6 @@ are three readings of one answer, and resolved apart they drifted."""
 
 from __future__ import annotations
 
-import re
 from datetime import date
 from typing import Any, NamedTuple
 
@@ -21,6 +20,7 @@ from codify.calendar import (
     normalise_calendar,
     reads_as_a_gregorian_year,
     sole_year_token,
+    stated_date_parts,
     title_year_token,
     to_gregorian_year,
     year_from_calendar,
@@ -30,8 +30,6 @@ from codify.jurisdictions import try_load_config
 from codify.lang import normalise_digits
 
 logger = structlog.get_logger()
-
-_ISO_DATE = re.compile(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})(?![0-9])")
 
 
 class Dating(NamedTuple):
@@ -68,13 +66,16 @@ def _grid_is_gregorian(cfg: Any) -> bool:
 
 
 def _month_day(raw_date: str) -> tuple[int, int] | None:
-    """The month and day an ISO date names, read without its year: 29 February
-    is a day of one calendar's leap year and not the other's."""
-    found = _ISO_DATE.match(normalise_digits(raw_date))
-    if found is None:
-        return None
-    month, day = int(found.group(2)), int(found.group(3))
-    return (month, day) if 1 <= month <= 12 and 1 <= day <= 31 else None
+    """The month and day an ISO date names on the Gregorian grid, read without
+    its year: 29 February is a day of one calendar's leap year and not another's."""
+    parts = stated_date_parts(raw_date)
+    return (parts.month, parts.day) if parts is not None and parts.month <= 12 else None
+
+
+def _date_year(raw_date: str) -> str:
+    """The year run a date field states, or "" where the field is not wholly a date."""
+    parts = stated_date_parts(raw_date)
+    return parts.year if parts is not None else ""
 
 
 def _built_date(gregorian_year: int, month_day: tuple[int, int]) -> str:
@@ -104,11 +105,11 @@ def _year_int(year: str) -> int | None:
 def _canonical_date(raw_date: str) -> str:
     """The date as a reader parses it, its year in the four digits the URI
     carries, or "": a value that is not wholly a real date is no date."""
-    stated = _ISO_DATE.fullmatch(raw_date)
-    if stated is None or _year_int(stated.group(1)) is None:
+    parts = stated_date_parts(raw_date)
+    if parts is None or _year_int(parts.year) is None:
         return ""
     try:
-        return date(*map(int, stated.groups())).isoformat()
+        return date(int(parts.year), parts.month, parts.day).isoformat()
     except ValueError:
         return ""
 
@@ -124,7 +125,7 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
     local, or the one the title states when they state none."""
     raw_year, raw_date = canonical_year_and_date(metadata)
     cal = normalise_calendar(metadata.get("calendar"))
-    candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
+    candidate = raw_year or _date_year(raw_date)
     if candidate and cal and cal != "gregorian":
         converted = labelled_year_as_gregorian(
             candidate, cal, country, month_day_stating_this_year(metadata, candidate)
@@ -148,7 +149,7 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
             "year_calendar_unconverted", raw=raw_year, calendar=cal, country=country, year=digits
         )
         return digits
-    head = raw_date.split("-")[0] if "-" in raw_date else ""
+    head = _date_year(raw_date)
     if sole_year_token(head):
         # As written. A label the jurisdiction declares was converted above; one
         # it does not is no licence to convert by the jurisdiction's rule.
@@ -189,7 +190,7 @@ def resolve_dating(
     )
     # Carried only where date and title name one year: rebuilding a date
     # stating another on the title's would invent one neither states.
-    local_date_year = sole_year_token(normalise_digits(raw_date))
+    local_date_year = _date_year(raw_date)
     if cal != "gregorian":
         raw_date = ""
     source_date: date | None = None
@@ -210,14 +211,14 @@ def resolve_dating(
     identity = identity_from_title(model_title, title_rule) if title_rule else None
     # Stated, not merely present: a field naming no year run says nothing, and
     # blocking the conversion on it leaves a local year in the URI.
-    stated_by_model = any(
-        sole_year_token(normalise_digits(str(metadata.get(field) or "")))
-        for field in ("year", "date")
+    stated_by_model = bool(
+        sole_year_token(normalise_digits(str(metadata.get("year") or "")))
+        or _date_year(stated_date)
     )
     # A field whose year run equals the title's is that local year read twice.
     # A date echoes only where the year field states nothing else.
     year_run = sole_year_token(normalise_digits(str(metadata.get("year") or "")))
-    date_run = sole_year_token(stated_date)
+    date_run = _date_year(stated_date)
     converted_from_title = False
     local_year = identity.year if identity is not None else ""
     date_echoes_title = bool(local_year) and date_run == local_year and year_run in ("", local_year)
@@ -257,7 +258,7 @@ def resolve_dating(
     if local_month_day is not None and not converted_from_title and source_date is None:
         # A date the model labelled local states its own year, and nothing else
         # converts it where no title grammar is declared.
-        stated_local = sole_year_token(stated_date)
+        stated_local = _date_year(stated_date)
         converted = (
             _local_year_to_gregorian(stated_local, cfg, country, local_month_day)
             if stated_local
@@ -275,9 +276,8 @@ def resolve_dating(
     if _year_int(year) is None and raw_date:
         # Or the URI takes the placeholder while the document carries its own
         # date. The whole year run: a five-digit one would lend its first four.
-        stated = _ISO_DATE.match(raw_date)
-        if stated is not None and _year_int(stated.group(1)) is not None:
-            year = stated.group(1)
+        if _year_int(_date_year(raw_date)) is not None:
+            year = _date_year(raw_date)
     # One gate at the exit for every source a year can come from: the segment
     # form or nothing, and the stored year is its number.
     year = _segment(year)

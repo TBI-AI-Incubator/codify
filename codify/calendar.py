@@ -403,17 +403,40 @@ def canonical_year_and_date(metadata: dict[str, Any]) -> tuple[str, str]:
     return (normalise_digits(fields[0]).strip(), normalise_digits(fields[1]).strip())
 
 
+#: A date field, whole: a year run of up to four digits, a month, a day.
+_DATE_FIELD = re.compile(r"([0-9]{1,4})-([0-9]{2})-([0-9]{2})")
+
+
+class DateParts(NamedTuple):
+    """What a date field states: its year run as written, since a local year is
+    not a Gregorian one, and a month and day within the widest grid."""
+
+    year: str
+    month: int
+    day: int
+
+
+def stated_date_parts(raw: str) -> DateParts | None:
+    """The one reading of a date field, or None where the field is not wholly
+    a date: every consumer of a year run, a month or a day reads this."""
+    found = _DATE_FIELD.fullmatch(normalise_digits(raw).strip())
+    if found is None:
+        return None
+    month, day = int(found.group(2)), int(found.group(3))
+    if not (1 <= month <= 13 and 1 <= day <= 31):
+        return None
+    return DateParts(found.group(1), month, day)
+
+
 def month_day_stating_this_year(metadata: dict[str, Any], token: str) -> tuple[int, int] | None:
     """The month and day of a metadata date whose year run is `token`, or None.
     A year that began mid-year needs them to settle, on every year path."""
-    _, raw = canonical_year_and_date(metadata)
-    found = re.match(r"^([0-9]{1,4})-([0-9]{2})-([0-9]{2})(?![0-9])", raw)
+    parts = stated_date_parts(canonical_year_and_date(metadata)[1])
     # On the year the token states, not the string carrying it: a model writes
     # the era beside the number.
-    if found is None or found.group(1) != sole_year_token(normalise_digits(token)):
+    if parts is None or parts.year != sole_year_token(normalise_digits(token)):
         return None
-    month, day = int(found.group(2)), int(found.group(3))
-    return (month, day) if 1 <= month <= 13 and 1 <= day <= 31 else None
+    return (parts.month, parts.day)
 
 
 def labelled_year_as_gregorian(
