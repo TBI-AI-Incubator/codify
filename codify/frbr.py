@@ -111,7 +111,8 @@ def _slug_char(ch: str) -> str:
 
 
 def _slugify(text: str) -> str:
-    return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").lower()
+    # Folded, not lowered: a sharp s and its capitals must reach one identity.
+    return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").casefold()
 
 
 def _alternation(words: Iterable[str]) -> str:

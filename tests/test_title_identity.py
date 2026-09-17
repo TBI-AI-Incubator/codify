@@ -341,3 +341,13 @@ def test_text_after_the_year_stays_in_the_identity() -> None:
     assert (north.year, south.year) == ("1991", "1991")
     # A declared republication marker after the year still leaves.
     assert identity_from_title("Act Widgets of 1991 (Update 2020)", rule).body == "widgets"
+
+
+def test_case_is_folded_not_lowered() -> None:
+    """Lowering leaves a sharp s where its capitals fold to two letters, so one
+    title set two ways minted two identities; folding reaches one."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
+    assert identity_from_title("Act Straße of 1991", rule) == identity_from_title(
+        "Act STRASSE of 1991", rule
+    )
+    assert identity_from_title("Act Straße of 1991", rule).body == "strasse"
