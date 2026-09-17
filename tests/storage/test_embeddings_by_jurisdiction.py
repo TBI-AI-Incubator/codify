@@ -216,6 +216,18 @@ async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSessio
         "include_non_normative": False,
     }
     partition = embedding_partition_name(jurisdiction.id)
+    # The child index's own name: Postgres trims an auto-named one to 63 characters.
+    vector_index = (
+        await session.execute(
+            text(
+                "SELECT i.indexrelid::regclass::text FROM pg_index i "
+                "JOIN pg_inherits h ON h.inhrelid = i.indexrelid "
+                "WHERE i.indrelid = CAST(:name AS regclass) "
+                "AND h.inhparent = 'provision_embeddings_hnsw_idx'::regclass"
+            ),
+            {"name": partition},
+        )
+    ).scalar_one()
     # Both dense paths: the hybrid arm is what a worded query runs.
     for sql in (_HYBRID_SQL, _DENSE_ONLY_SQL):
         plan = "\n".join(
@@ -231,7 +243,7 @@ async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSessio
                 )
             ).all()
         )
-        assert f"Index Scan using {partition}_embedding_idx" in plan, plan
+        assert f"Index Scan using {vector_index} on {partition}" in plan, plan
     # And the answer is the nearest provisions by vector, in order.
     rows = await hybrid_search(
         session,

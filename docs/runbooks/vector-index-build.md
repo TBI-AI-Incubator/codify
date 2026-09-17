@@ -32,10 +32,10 @@ ORDER BY c.reltuples DESC;
 ```sql
 SET maintenance_work_mem = '2GB';
 SET max_parallel_maintenance_workers = 4;
-CREATE INDEX CONCURRENTLY provision_embeddings_p_<id>_embedding_idx
+CREATE INDEX CONCURRENTLY provision_embeddings_p_<id>_hnsw
     ON provision_embeddings_p_<id>
     USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64);
-ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_<id>_embedding_idx;
+ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_<id>_hnsw;
 ANALYZE provision_embeddings_p_<id>;
 ```
 
@@ -47,5 +47,5 @@ rerun. The parent turns valid on its own once every partition has attached.
 
 ## Check
 
-`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<id>_embedding_idx`;
+`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<id>_hnsw on provision_embeddings_p_<id>` (a partition created after the parent index carries an auto-named `_embedding_idx`, trimmed to 63 characters);
 before the build it names the partition's `version_id` btree and a sort.
