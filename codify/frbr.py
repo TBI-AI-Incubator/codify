@@ -22,7 +22,7 @@ from codify.jurisdictions import (
     resolve_frbr_country,
     try_load_config,
 )
-from codify.lang import normalise_digits
+from codify.lang import normalise_digits, word_bounded
 
 logger = structlog.get_logger()
 
@@ -132,9 +132,10 @@ def _capped(slug: str, limit: int) -> str:
 
 
 def _alternation(words: Iterable[str]) -> str:
-    """Longest first, so a particle that prefixes another matches whole."""
+    """Longest first, so a word that prefixes another matches whole; and each
+    bounded, so "of" does not match inside "proof" nor "Update" in "Updated"."""
     ordered = sorted({w for w in words if w}, key=lambda w: (-len(w), w))
-    return "|".join(re.escape(w) for w in ordered)
+    return "|".join(word_bounded(w) for w in ordered)
 
 
 # `[^()]*`, not `[^)]*`: an unclosed run of openers would otherwise rescan
@@ -143,23 +144,8 @@ _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 
 def _opens_with_prefix(body: str, prefix: str) -> bool:
-    """A kind word opens the title, a Latin one on a word boundary: without that
-    "Act" matches inside "Action". A script without spaces has none to test."""
-    if not body.startswith(prefix):
-        return False
-    rest = body[len(prefix) :]
-    if not (prefix.isascii() and prefix[-1:].isalnum()):
-        return True
-    return not rest[:1].isalnum()
-
-
-def _particle_alternation(words: Iterable[str]) -> str:
-    """`_alternation`, with a word boundary on any particle that is a Latin word:
-    without one "of" matches inside "proof" and takes the digits after it."""
-    ordered = sorted({w for w in words if w}, key=lambda w: (-len(w), w))
-    return "|".join(
-        rf"\b{re.escape(w)}" if w.isascii() and w[0].isalpha() else re.escape(w) for w in ordered
-    )
+    """A kind word opens the title, a Latin one whole: "Act" is not in "Action"."""
+    return re.match(word_bounded(prefix), body) is not None
 
 
 def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int | None:
@@ -210,7 +196,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
         )
     year_re = (
-        re.compile(rf"(?:{_particle_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
+        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
         if rule.year_particles
         else None
     )

@@ -15,7 +15,7 @@ from typing import Any, NamedTuple, cast
 import structlog
 
 from .jurisdictions import CalendarConversion, load_config, try_load_config
-from .lang import normalise_digits
+from .lang import normalise_digits, word_bounded
 
 logger = structlog.get_logger()
 
@@ -201,9 +201,10 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     if not rule.month_names or not rule.date_cues or not rule.month_day_is_gregorian:
         return None
     index = {name: i for i, name in enumerate(rule.month_names, start=1) if name}
-    months = "|".join(re.escape(m) for m in sorted(index, key=lambda m: (-len(m), m)))
+    # Each literal bounded where it is a Latin word: "May" is not "Mayor".
+    months = "|".join(word_bounded(m) for m in sorted(index, key=lambda m: (-len(m), m)))
     particles = "|".join(
-        re.escape(p) for p in sorted(rule.year_particles, key=lambda p: (-len(p), p)) if p
+        word_bounded(p) for p in sorted(rule.year_particles, key=lambda p: (-len(p), p)) if p
     )
     # The particle carries the separator that follows it, so the pattern holds
     # one whitespace run rather than two around an optional group.
@@ -213,7 +214,7 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     # Longest first, or a shorter cue wins at the same offset and spends the
     # reach on the rest of the longer one.
     ordered = sorted({c for c in rule.date_cues if c.strip()}, key=lambda c: (-len(c), c))
-    cues = "|".join(_CUE_GAP.join(map(re.escape, c.split())) for c in ordered)
+    cues = "|".join(_CUE_GAP.join(map(word_bounded, c.split())) for c in ordered)
     return _LocalDatePatterns(
         re.compile(cues),
         re.compile(

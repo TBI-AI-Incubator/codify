@@ -310,3 +310,23 @@ def test_a_latin_kind_prefix_ends_on_a_word_boundary() -> None:
     rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
     assert identity_from_title("Action of 1991", rule).slug == "action"
     assert identity_from_title("Act ion of 1991", rule).slug == "ion"
+
+
+def test_a_latin_marker_matches_a_whole_word_only() -> None:
+    """A consolidation marker inside a longer word is not the marker: stripping
+    the parenthetical on it collides two different titles."""
+    rule = TitleIdentity(
+        strip_prefixes=["Act"], year_particles=["of"], consolidation_markers=["Update"]
+    )
+    kept = identity_from_title("Act Widgets (Updated reporting) of 1991", rule).slug
+    assert kept == "widgets-updated-reporting"
+    assert kept != identity_from_title("Act Widgets of 1991", rule).slug
+    assert identity_from_title("Act Widgets (Update 2020) of 1991", rule).slug == "widgets"
+
+
+def test_a_latin_year_particle_matches_a_whole_word_only() -> None:
+    """The particle's trailing edge is a boundary as well: "of" followed by
+    digits without a space is not the word."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
+    assert identity_from_title("Act Widgets of 1991", rule).year == "1991"
+    assert identity_from_title("Act Widgets thereof 1991", rule).year == ""

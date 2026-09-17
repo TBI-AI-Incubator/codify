@@ -327,3 +327,55 @@ def test_a_longer_cue_wins_over_a_shorter_one_it_contains() -> None:
     assert len(filler) + 1 > _DATE_WINDOW_CHARS - len(" ณ วันที่")
     text = long_cue + filler + stated
     assert _first_stated_date(text, patterns, rule, "xn") == date(2016, 4, 26)
+
+
+ENGLISH_MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]
+
+
+def test_a_latin_cue_matches_a_whole_word_only() -> None:
+    """A cue that is the tail of a longer word is not the cue: "undated" must
+    not introduce a date as "dated" does."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert (
+        _first_stated_date("This instrument is undated 1 January 2567", patterns, rule, "xn")
+        is None
+    )
+    assert _first_stated_date(
+        "This instrument is dated 1 January 2567", patterns, rule, "xn"
+    ) == date(2024, 1, 1)
+
+
+def test_a_latin_month_name_matches_a_whole_word_only() -> None:
+    """ "May" inside "Mayor" is not the month."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 1 Mayor 2567", patterns, rule, "xn") is None
+    assert _first_stated_date("dated 1 May 2567", patterns, rule, "xn") == date(2024, 5, 1)
