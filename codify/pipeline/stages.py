@@ -326,7 +326,7 @@ def resolve_descriptors(
     # slash; this one cannot.
     number = number.replace("/", "-")
     if not number and identity is not None:
-        number = identity.slug
+        number = identity.segment
     if not number:
         number = draft_number(source_bytes)
     if document_class and document_class.number_has_year_prefix:

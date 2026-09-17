@@ -8,10 +8,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
 
-from codify.frbr import DRAFT_PREFIX, identity_from_title, is_citable_work_uri
-from codify.jurisdictions import SLUG_DIGEST_CHARS, SLUG_FLOOR, TitleIdentity
+from codify.frbr import TITLE_DIGEST_PREFIX, identity_from_title, is_citable_work_uri
+from codify.jurisdictions import SLUG_DIGEST_CHARS, TitleIdentity
 
 # Every title here is fabricated. Thai vowel and tone marks are separate
 # codepoints, which is the property the combining-mark case turns on.
@@ -20,21 +19,17 @@ RULE = TitleIdentity(
     year_particles=["พระพุทธศักราช", "พุทธศักราช", "พุทธสักราช", "พ.ศ."],
     edition_markers=["ฉบับที่", "ฉะบับที่"],
     consolidation_markers=["Update", "ครั้งที่"],
-    max_length=100,
 )
+
+SEGMENT = re.compile(rf"{TITLE_DIGEST_PREFIX}[0-9a-f]{{{SLUG_DIGEST_CHARS}}}")
 
 
 @pytest.mark.parametrize(
-    ("title", "slug", "edition", "year"),
+    ("title", "body", "edition", "year"),
     [
-        # The principal instrument and its amendment take different slugs.
+        # The principal instrument and its amendment take different identities.
         ("พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", "เครื่องร่อนสุริยะ", "", "2511"),
-        (
-            "พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ 3) พ.ศ. 2468",
-            "เครื่องร่อนสุริยะ-ฉบับที่-3",
-            "3",
-            "2468",
-        ),
+        ("พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ 3) พ.ศ. 2468", "เครื่องร่อนสุริยะ", "3", "2468"),
         # Native digits reach the same identity as their ASCII spelling.
         ("พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. ๒๕๑๑", "เครื่องร่อนสุริยะ", "", "2511"),
         # A longer kind word is stripped whole, not by its shorter prefix.
@@ -47,7 +42,7 @@ RULE = TitleIdentity(
             "2511",
         ),
         # An edition number after a re-publication marker is the edition folded
-        # in, so it neither renames the work nor forks it from its own slug.
+        # in, so it neither renames the work nor forks it from its own identity.
         (
             "พระราชบัญญัติกองทุนเมฆฝน พ.ศ. 2481 (ฉบับ Update ล่าสุด) (ครั้งที่ 6) (ฉบับที่ 7)",
             "กองทุนเมฆฝน",
@@ -58,7 +53,7 @@ RULE = TitleIdentity(
         # instrument being amended and stays, telling two amendments apart.
         (
             "พระราชบัญญัติแก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน พ.ศ. 2477 (ฉบับที่ 5) พ.ศ. 2486",
-            "แก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน-พระพุทธศักราช-2477-ฉบับที่-5",
+            "แก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน-พระพุทธศักราช-2477",
             "5",
             "2486",
         ),
@@ -73,56 +68,77 @@ RULE = TitleIdentity(
         ("พระราชบัญญัติวิทยาลัยดารา (ฉบับ Update ล่าสุด)", "วิทยาลัยดารา", "", ""),
     ],
 )
-def test_identity_from_title(title: str, slug: str, edition: str, year: str) -> None:
+def test_identity_from_title(title: str, body: str, edition: str, year: str) -> None:
     result = identity_from_title(title, RULE)
-    assert (result.slug, result.edition, result.year) == (slug, edition, year)
+    assert (result.body, result.edition, result.year) == (body, edition, year)
+    assert SEGMENT.fullmatch(result.segment), result.segment
 
 
-def test_slug_keeps_the_marks_a_word_is_written_with() -> None:
-    """`\\w` drops combining marks, so a slug built on it is not the title."""
+def test_the_segment_is_a_digest_of_the_whole_identity() -> None:
+    """Body, edition and year each decide it, and nothing else does: the same
+    identity from another spelling is the same segment, a different one is not."""
+    base = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2511", RULE)
+    assert identity_from_title("พระราชบัญญัติ มโหรีหลวง  (ฉะบับที่ 03)  พุทธศักราช ๒๕๑๑", RULE) == base
+    for other in (
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 4) พ.ศ. 2511",
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2512",
+        "พระราชบัญญัติมโหรีหลวงใหม่ (ฉบับที่ 3) พ.ศ. 2511",
+    ):
+        assert identity_from_title(other, RULE).segment != base.segment, other
+
+
+def test_the_segment_is_ascii_and_citable() -> None:
+    """No script reaches the URI, and the prefix is not the content-address one."""
+    found = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2511", RULE)
+    assert found.segment.isascii()
+    assert is_citable_work_uri(f"/akn/xz/act/1968/{found.segment}")
+
+
+def test_the_body_keeps_the_marks_a_word_is_written_with() -> None:
+    """`\\w` drops combining marks, so an identity built on it is not the title."""
     result = identity_from_title("พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511", RULE)
-    assert result.slug == "เครื่องร่อนสุริยะ"
-    assert "ื" in result.slug  # SARA UEE, a mark `\w` discards
+    assert result.body == "เครื่องร่อนสุริยะ"
+    assert "ื" in result.body  # SARA UEE, a mark `\w` discards
 
 
 def test_identity_is_a_pure_function_of_the_title() -> None:
     title = "พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ 3) พ.ศ. 2468"
     assert identity_from_title(title, RULE) == identity_from_title(title, RULE)
     # Typography a publisher varies must not fork the identity.
-    assert (
-        identity_from_title(title, RULE).slug
-        == identity_from_title("พระราชบัญญัติ เครื่องร่อนสุริยะ  (ฉบับที่ 3)  พ.ศ.2468", RULE).slug
+    assert identity_from_title(title, RULE) == identity_from_title(
+        "พระราชบัญญัติ เครื่องร่อนสุริยะ  (ฉบับที่ 3)  พ.ศ.2468", RULE
     )
 
 
-def test_slug_is_capped_at_the_declared_length() -> None:
-    rule = RULE.model_copy(update={"max_length": 12})
-    result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " พ.ศ. 2511", rule)
-    assert len(result.slug) == 12
-
-
 @pytest.mark.parametrize(
-    ("title", "slug"),
+    "title",
     [
-        # Both declared spellings of the edition word reach one canonical slug,
-        # so a reform of the orthography does not fork an identity.
-        ("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 2) พุทธศักราช 2475", "มโหรีหลวง-ฉบับที่-2"),
-        ("พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 2) พุทธศักราช 2475", "มโหรีหลวง-ฉบับที่-2"),
+        # Both declared spellings of the edition word reach one identity, so a
+        # reform of the orthography does not fork it.
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 2) พุทธศักราช 2475",
+        "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 2) พุทธศักราช 2475",
     ],
 )
-def test_an_edition_spelling_variant_reaches_the_canonical_slug(title: str, slug: str) -> None:
-    assert identity_from_title(title, RULE).slug == slug
+def test_an_edition_spelling_variant_reaches_the_canonical_identity(title: str) -> None:
+    assert identity_from_title(title, RULE) == identity_from_title(
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 2) พ.ศ. 2475", RULE
+    )
 
 
-def test_an_undeclared_grammar_derives_nothing() -> None:
-    assert identity_from_title("Act No. 7 of 1992", TitleIdentity()).slug == "act-no-7-of-1992"
+def test_an_undeclared_grammar_derives_the_whole_title() -> None:
+    assert identity_from_title("Act No. 7 of 1992", TitleIdentity()).body == "act-no-7-of-1992"
+
+
+def test_a_title_naming_nothing_yields_no_segment() -> None:
+    assert identity_from_title("", RULE).segment == ""
+    assert identity_from_title("พระราชบัญญัติ", RULE).segment == ""
 
 
 _ADVERSARIAL = """
 import sys
 sys.path.insert(0, {root!r})
 from tests.test_title_identity import RULE
-from codify.frbr import DRAFT_PREFIX, identity_from_title, is_citable_work_uri
+from codify.frbr import identity_from_title
 identity_from_title("(" * 40000, RULE)
 identity_from_title("พ.ศ. " * 40000, RULE)
 identity_from_title("(ฉบับที่ " * 40000, RULE)
@@ -147,69 +163,19 @@ def test_an_invisible_character_does_not_fork_the_identity(invisible: str) -> No
     assert identity_from_title(marked, RULE) == identity_from_title(plain, RULE)
 
 
-def test_two_titles_sharing_a_long_prefix_keep_separate_identities() -> None:
-    """Truncation would merge two works onto one URI."""
-    rule = RULE.model_copy(update={"max_length": 24})
-    a = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + "ข พ.ศ. 2511", rule)
-    b = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + "ค พ.ศ. 2511", rule)
-    assert a.slug != b.slug
-    assert len(a.slug) <= 24 and len(b.slug) <= 24
-
-
-def test_the_cap_covers_the_edition_suffix_too() -> None:
-    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR})
-    result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2511", rule)
-    assert result.edition == "3"
-    assert len(result.slug) <= SLUG_FLOOR
-
-
-def test_two_long_titles_differing_late_do_not_share_a_digest() -> None:
-    """Six hex characters collide on ordinary titles: these two do."""
-    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR})
-    made = [
-        identity_from_title(f"พระราชบัญญัติ{'a' * 120}{tail} พ.ศ. 2511", rule).slug
+def test_two_long_titles_differing_late_keep_separate_identities() -> None:
+    """A digest of the whole identity, not of a prefix: these differ only at
+    the end of a long body."""
+    made = {
+        identity_from_title(f"พระราชบัญญัติ{'a' * 120}{tail} พ.ศ. 2511", RULE).segment
         for tail in ("889", "5838")
-    ]
-    assert made[0] != made[1]
-
-
-def test_a_suffix_that_consumes_the_whole_cap_keeps_both_parts() -> None:
-    """The edition separates an amendment from what it amends and the digest two
-    long titles, so a limit too tight for both is exceeded, not either dropped."""
-    rule = RULE.model_copy(update={"max_length": SLUG_FLOOR, "edition_markers": ["ฉ" * SLUG_FLOOR]})
-    result = identity_from_title(
-        "พระราชบัญญัติ" + "ก" * 60 + f" ({'ฉ' * SLUG_FLOOR} 3) พ.ศ. 2511", rule
-    )
-    assert result.edition == "3"
-    assert result.slug.endswith(f"-{'ฉ' * SLUG_FLOOR}-3")
-    assert result.slug[:SLUG_DIGEST_CHARS].isalnum()
-    assert len(result.slug) == SLUG_DIGEST_CHARS + len(f"-{'ฉ' * SLUG_FLOOR}-3")
+    }
+    assert len(made) == 2
 
 
 def test_a_longer_digit_run_is_not_the_titles_year() -> None:
     """A prefix of a longer run is not a year, as `sole_year_token` also holds."""
     assert identity_from_title("พระราชบัญญัติมโหรีหลวง พ.ศ. 25110", RULE).year == ""
-
-
-@pytest.mark.parametrize("limit", [SLUG_FLOOR, SLUG_FLOOR + 4, 40, 100])
-def test_the_declared_limit_covers_the_edition_suffix(limit: int) -> None:
-    """The whole segment fits the limit, and it still carries the edition, which
-    is what separates an amendment from the act it amends."""
-    rule = RULE.model_copy(update={"max_length": limit})
-    result = identity_from_title("พระราชบัญญัติ" + "ก" * 40 + " (ฉบับที่ 3) พ.ศ. 2511", rule)
-    assert result.edition == "3"
-    assert result.slug.endswith("-ฉบับที่-3")
-    assert len(result.slug) <= limit
-
-
-@pytest.mark.parametrize("limit", [0, 1, SLUG_FLOOR - 1])
-def test_a_limit_too_short_to_hold_an_identity_is_refused(limit: int) -> None:
-    """Below the floor the segment cannot carry both a digest and an edition,
-    so the cap would be exceeded silently instead."""
-    with pytest.raises(ValidationError):
-        RULE.model_copy(update={"max_length": limit}).model_validate(
-            RULE.model_dump() | {"max_length": limit}
-        )
 
 
 def test_a_marker_word_in_a_substantive_title_is_not_a_republication() -> None:
@@ -218,7 +184,7 @@ def test_a_marker_word_in_a_substantive_title_is_not_a_republication() -> None:
     principal = identity_from_title("พระราชบัญญัติUpdate Services พ.ศ. 2511", RULE)
     amendment = identity_from_title("พระราชบัญญัติUpdate Services (ฉบับที่ 2) พ.ศ. 2511", RULE)
     assert amendment.edition == "2"
-    assert amendment.slug != principal.slug
+    assert amendment.segment != principal.segment
 
 
 @pytest.mark.parametrize("written", ["3", "03", "003"])
@@ -226,55 +192,20 @@ def test_an_edition_is_its_number_not_its_typography(written: str) -> None:
     """A padded ordinal and a bare one are one edition; two URIs would fork it."""
     result = identity_from_title(f"พระราชบัญญัติมโหรีหลวง (ฉบับที่ {written}) พ.ศ. 2475", RULE)
     assert result.edition == "3"
-    assert result.slug == "มโหรีหลวง-ฉบับที่-3"
+    assert result == identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2475", RULE)
 
 
 def test_a_lone_zero_edition_survives_canonicalisation() -> None:
     assert identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 0) พ.ศ. 2475", RULE).edition == "0"
 
 
-def test_a_title_reducing_to_the_draft_namespace_is_moved_out_of_it() -> None:
-    """`draft-` names a content address; an identity that reads as one would be
-    refused as uncitable."""
-    rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"], edition_markers=["No."])
-    slug = identity_from_title("Act draft rules of 1991", rule).slug
-    assert not slug.startswith(DRAFT_PREFIX)
-    assert is_citable_work_uri(f"/akn/xa/act/1991/{slug}")
-
-
-def test_an_invisible_between_a_letter_and_its_mark_does_not_fork_the_slug() -> None:
+def test_an_invisible_between_a_letter_and_its_mark_does_not_fork_the_identity() -> None:
     """Removed after composition it leaves a decomposed letter where the same
-    word composed; removed before, both reach one slug."""
+    word composed; removed before, both reach one identity."""
     rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"])
     blocked = identity_from_title("Act Cafe​́ rules of 1991", rule)
     composed = identity_from_title("Act Café rules of 1991", rule)
-    assert blocked.slug == composed.slug
-
-
-_ESCAPE_RULE = TitleIdentity(
-    strip_prefixes=["Act "], year_particles=["of"], edition_markers=["No."]
-)
-
-
-def test_an_edition_suffix_cannot_complete_the_reserved_namespace() -> None:
-    """The base alone does not open it; the base and the suffix together do, and
-    the URI carries them together."""
-    slug = identity_from_title("Act draft (No. 2) of 1991", _ESCAPE_RULE).slug
-    assert is_citable_work_uri(f"/akn/xa/act/1991/{slug}")
-    assert not slug.startswith(DRAFT_PREFIX)
-
-
-def test_the_escape_is_reserved_too_so_it_cannot_merge_two_titles() -> None:
-    """Escaping only the reserved namespace maps a title already wearing the
-    escape onto the escaped form of another."""
-    plain = identity_from_title("Act draft rules of 1991", _ESCAPE_RULE).slug
-    wearing = identity_from_title("Act t draft rules of 1991", _ESCAPE_RULE).slug
-    assert plain != wearing
-    assert is_citable_work_uri(f"/akn/xa/act/1991/{wearing}")
-
-
-def test_an_ordinary_title_is_not_escaped() -> None:
-    assert identity_from_title("Act normal rules of 1991", _ESCAPE_RULE).slug == "normal-rules"
+    assert blocked == composed
 
 
 def test_a_cited_edition_stays_in_the_base_and_the_last_one_is_this_acts() -> None:
@@ -284,18 +215,18 @@ def test_a_cited_edition_stays_in_the_base_and_the_last_one_is_this_acts() -> No
     third = identity_from_title("Act amending Foo (No. 2) of 1980 (No. 3) of 1990", rule)
     fourth = identity_from_title("Act amending Foo (No. 2) of 1980 (No. 4) of 1990", rule)
     assert (third.edition, fourth.edition) == ("3", "4")
-    assert third.slug != fourth.slug
+    assert third.segment != fourth.segment
     # The cited edition is what tells the two apart from a sibling amending
     # another instrument, so it stays in the base.
-    assert "2" in third.slug
+    assert third.body == "amending-foo-no-2-of-1980"
 
 
 def test_a_latin_year_particle_needs_a_token_boundary() -> None:
     """Without one "of" matches inside "proof" and claims the digits after it."""
     rule = TitleIdentity(strip_prefixes=["Act "], year_particles=["of"])
-    assert identity_from_title("Act proof 1991", rule) == ("proof-1991", "", "")
+    assert identity_from_title("Act proof 1991", rule)[1:] == ("proof-1991", "", "")
     # Control: the particle as a word still states the year.
-    assert identity_from_title("Act widgets of 1991", rule) == ("widgets", "", "1991")
+    assert identity_from_title("Act widgets of 1991", rule)[1:] == ("widgets", "", "1991")
 
 
 def test_a_non_latin_particle_keeps_matching_without_a_space() -> None:
@@ -307,10 +238,10 @@ def test_a_non_latin_particle_keeps_matching_without_a_space() -> None:
 
 def test_a_latin_kind_prefix_ends_on_a_word_boundary() -> None:
     """Without one "Act" strips itself out of "Action" and two different titles
-    reduce to the same slug."""
+    reduce to the same identity."""
     rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
-    assert identity_from_title("Action of 1991", rule).slug == "action"
-    assert identity_from_title("Act ion of 1991", rule).slug == "ion"
+    assert identity_from_title("Action of 1991", rule).body == "action"
+    assert identity_from_title("Act ion of 1991", rule).body == "ion"
 
 
 def test_a_latin_marker_matches_a_whole_word_only() -> None:
@@ -319,10 +250,10 @@ def test_a_latin_marker_matches_a_whole_word_only() -> None:
     rule = TitleIdentity(
         strip_prefixes=["Act"], year_particles=["of"], consolidation_markers=["Update"]
     )
-    kept = identity_from_title("Act Widgets (Updated reporting) of 1991", rule).slug
-    assert kept == "widgets-updated-reporting"
-    assert kept != identity_from_title("Act Widgets of 1991", rule).slug
-    assert identity_from_title("Act Widgets (Update 2020) of 1991", rule).slug == "widgets"
+    kept = identity_from_title("Act Widgets (Updated reporting) of 1991", rule)
+    assert kept.body == "widgets-updated-reporting"
+    assert kept.segment != identity_from_title("Act Widgets of 1991", rule).segment
+    assert identity_from_title("Act Widgets (Update 2020) of 1991", rule).body == "widgets"
 
 
 def test_a_latin_year_particle_matches_a_whole_word_only() -> None:
@@ -347,18 +278,18 @@ def test_a_retained_edition_is_spelt_with_the_canonical_marker() -> None:
     variant = identity_from_title(
         "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 02) พ.ศ. 2475 (ฉบับที่ 5) พ.ศ. 2486", rule
     )
-    assert variant.slug == canonical.slug == "มโหรีหลวง-ฉบับที่-2-พ-ศ-2475-ฉบับที่-5"
+    assert variant == canonical
+    assert canonical.body == "มโหรีหลวง-ฉบับที่-2-พ-ศ-2475"
 
 
-def test_a_title_slug_shaped_like_a_number_is_escaped() -> None:
-    """A numberless title reducing to digits would collide with an instrument
-    numbered the same; only that shape takes the escape, and it round-trips."""
+def test_a_title_reducing_to_digits_cannot_collide_with_a_number() -> None:
+    """A numberless title reducing to digits takes the digest form like any
+    other, so it cannot meet the instrument numbered the same."""
     rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
-    assert identity_from_title("Act 17 of 1991", rule).slug == "t-17"
-    assert identity_from_title("Act 12-2020 of 2020", rule).slug == "t-12-2020"
-    assert identity_from_title("Act 17a of 1991", rule).slug == "t-17a"
-    assert identity_from_title("Act 17 widgets of 1991", rule).slug == "17-widgets"
-    assert identity_from_title("พระราชบัญญัติมโหรีหลวง พ.ศ. 2475", RULE).slug == "มโหรีหลวง"
+    found = identity_from_title("Act 17 of 1991", rule)
+    assert found.body == "17"
+    assert SEGMENT.fullmatch(found.segment)
+    assert found.segment != "17"
 
 
 def test_an_edition_after_a_republication_marker_leaves_the_base_too() -> None:
@@ -370,9 +301,9 @@ def test_an_edition_after_a_republication_marker_leaves_the_base_too() -> None:
         consolidation_markers=["Update"],
         edition_markers=["No."],
     )
-    assert identity_from_title("Act Foo (Update) (No. 7) of 1991", rule).slug == "foo"
-    assert identity_from_title("Act Foo of 1991 (Update) (No. 7)", rule).slug == "foo"
-    assert identity_from_title("Act Foo (No. 7) of 1991", rule).slug == "foo-no-7"
+    assert identity_from_title("Act Foo (Update) (No. 7) of 1991", rule)[1:] == ("foo", "", "1991")
+    assert identity_from_title("Act Foo of 1991 (Update) (No. 7)", rule)[1:] == ("foo", "", "1991")
+    assert identity_from_title("Act Foo (No. 7) of 1991", rule)[1:] == ("foo", "7", "1991")
 
 
 @pytest.mark.parametrize("particle", ["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."])
@@ -380,7 +311,7 @@ def test_a_retained_year_is_spelt_with_the_canonical_particle(particle: str) -> 
     """A cited year stays in the base to tell two amendments apart, so its
     particle must read the same whichever configured alias the title used."""
     title = f"พระราชบัญญัติแก้ไขเพิ่มเติมมโหรีหลวง {particle} 2477 (ฉบับที่ 5) พ.ศ. 2486"
-    assert identity_from_title(title, RULE).slug == "แก้ไขเพิ่มเติมมโหรีหลวง-พระพุทธศักราช-2477-ฉบับที่-5"
+    assert identity_from_title(title, RULE).body == "แก้ไขเพิ่มเติมมโหรีหลวง-พระพุทธศักราช-2477"
 
 
 @pytest.mark.parametrize(
@@ -394,43 +325,4 @@ def test_a_latin_title_grammar_reads_any_casing(title: str) -> None:
     assert identity_from_title(title, rule) == identity_from_title(
         "Act Widgets (No. 3) of 1991", rule
     )
-    assert identity_from_title(title, rule).slug == "widgets-no-3"
-
-
-DIGEST_RULE = RULE.model_copy(update={"segment": "digest"})
-
-
-def test_a_digest_segment_is_ascii_under_the_escape_prefix() -> None:
-    """The segment form a jurisdiction may choose: the escape prefix and twelve
-    hex characters, no script anywhere, and citable as a number is."""
-    found = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2511", DIGEST_RULE)
-    assert re.fullmatch(r"t-[0-9a-f]{12}", found.slug), found.slug
-    assert (found.edition, found.year) == ("3", "2511")
-    assert is_citable_work_uri(f"/akn/xz/act/1968/{found.slug}")
-
-
-def test_the_digest_is_of_the_same_canonical_identity_the_slug_is() -> None:
-    """Every canonicalisation deciding a slug decides the digest: aliases,
-    spellings and editions that reach one slug reach one digest, and only those."""
-    same = [
-        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 03) พุทธศักราช 2511",
-        "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 3) พ.ศ. 2511",
-        "พระราชบัญญัติมโหรีหลวง\u200b (ฉบับที่ 3) พ.ศ. ๒๕๑๑",
-    ]
-    digests = {identity_from_title(t, DIGEST_RULE).slug for t in same}
-    slugs = {identity_from_title(t, RULE).slug for t in same}
-    assert len(digests) == len(slugs) == 1
-    other = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 4) พ.ศ. 2511", DIGEST_RULE).slug
-    assert other not in digests
-    another_year = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2512", DIGEST_RULE).slug
-    assert another_year not in digests
-
-
-def test_the_segment_form_defaults_to_the_slug() -> None:
-    assert TitleIdentity().segment == "slug"
-    assert identity_from_title("พระราชบัญญัติมโหรีหลวง พ.ศ. 2511", RULE).slug == "มโหรีหลวง"
-
-
-def test_a_title_naming_nothing_yields_no_digest_either() -> None:
-    assert identity_from_title("", DIGEST_RULE).slug == ""
-    assert identity_from_title("พระราชบัญญัติ", DIGEST_RULE).slug == ""
+    assert identity_from_title(title, rule)[1:] == ("widgets", "3", "1991")

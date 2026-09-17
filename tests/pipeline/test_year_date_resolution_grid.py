@@ -207,6 +207,16 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1968",
         "1968-09-09",
     ),
+    (
+        # The year field states a year outright; a date echoing the title is an
+        # echo only where no year field speaks. The date contradicts it and goes.
+        "an unlabelled date echoing the title beside an explicit year",
+        "xg",
+        {"title": POST, "year": "2020", "date": "2511-09-09", "calendar": ""},
+        "",
+        "2020",
+        "",
+    ),
     # --- the configured rule, not a generic offset --------------------------
     ("custom epoch, title only", "xe", {"title": PRE}, "", "2478", ""),
     (

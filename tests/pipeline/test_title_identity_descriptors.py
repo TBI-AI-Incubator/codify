@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 
-from codify.frbr import build_frbr_work_uri, is_citable_work_uri
-from codify.jurisdictions import try_load_config
+from codify.frbr import build_frbr_work_uri, identity_from_title, is_citable_work_uri
+from codify.jurisdictions import TitleIdentity, try_load_config
 from codify.pipeline import stages
 from codify.pipeline.dating import _year_int
 
@@ -28,6 +29,12 @@ MONTHS = [
 # Fabricated: it carries the grammar under test — kind prefix, combining marks,
 # edition parenthetical, year particle, native digits — and nothing else.
 TITLE = "พระราชบัญญัติเครื่องร่อนสุริยะ (ฉบับที่ ๓) พ.ศ. ๒๕๑๑"
+IDENTITY = {
+    "strip_prefixes": ["พระราชบัญญัติ"],
+    "year_particles": ["พ.ศ."],
+    "edition_markers": ["ฉบับที่"],
+    "consolidation_markers": ["Update"],
+}
 SOURCE_TEXT = f"{TITLE}\nให้ไว้ ณ วันที่ ๙ กันยายน พ.ศ. ๒๕๑๑\n"
 SOURCE = SOURCE_TEXT.encode()
 
@@ -44,12 +51,7 @@ def configs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "date_cues": ["ให้ไว้ ณ วันที่"],
         "year_particles": ["พ.ศ."],
     }
-    identity = {
-        "strip_prefixes": ["พระราชบัญญัติ"],
-        "year_particles": ["พ.ศ."],
-        "edition_markers": ["ฉบับที่"],
-        "consolidation_markers": ["Update"],
-    }
+    identity = IDENTITY
 
     def build(
         *, with_identity: bool, epoch_year: int = -543, reform: bool = False
@@ -103,8 +105,10 @@ def _descriptors(code: str) -> stages.Descriptors:
 def test_a_declared_title_grammar_mints_a_citable_work_uri(configs: None) -> None:
     desc = _descriptors("xn")
     uri = build_frbr_work_uri("xn", desc.doctype, desc.year, desc.number)
-    assert uri == "/akn/xn/act/1968/เครื่องร่อนสุริยะ-ฉบับที่-3"
+    assert re.fullmatch(r"/akn/xn/act/1968/t-[0-9a-f]{12}", uri), uri
     assert is_citable_work_uri(uri)
+    # The number is the title's identity, so its amendment files elsewhere.
+    assert desc.number == identity_from_title(TITLE, TitleIdentity(**IDENTITY)).segment
 
 
 def test_without_one_the_identity_is_the_content_address(configs: None) -> None:

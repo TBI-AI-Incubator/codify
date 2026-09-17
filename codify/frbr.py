@@ -43,17 +43,9 @@ UNKNOWN_YEAR = "0001"
 #: number opening with it, so nothing derived may take the same form.
 DRAFT_PREFIX = "draft-"
 
-#: Worn by a slug that would open the namespace above. Reserved itself, or two
-#: titles reach one identity; short, being spent out of the slug's own cap.
-TITLE_ESCAPE_PREFIX = "t-"
-
-
-def _opens_a_reserved_namespace(slug: str) -> bool:
-    """The content-address and escape prefixes, and the shape a law number
-    takes: a title reducing to one would collide with the instrument so numbered."""
-    return slug.startswith((DRAFT_PREFIX, TITLE_ESCAPE_PREFIX)) or bool(
-        _LAW_NUMBER_SHAPE.fullmatch(slug)
-    )
+#: Namespace of a title-derived identity: a digest, citable unlike the one
+#: above, and no shape a stated number or a content address can take.
+TITLE_DIGEST_PREFIX = "t-"
 
 
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
@@ -103,10 +95,11 @@ def series_number(value: object) -> str:
 
 
 class TitleDerivedIdentity(NamedTuple):
-    """What a title states about its own identity. `slug` is empty when the title
-    names it by nothing; `year` is local, `edition` separates an amendment."""
+    """What a title states about its own identity: the URI segment, a digest of
+    the canonical `body`, `edition` and local `year`; all empty for no title."""
 
-    slug: str
+    segment: str
+    body: str
     edition: str
     year: str
 
@@ -119,20 +112,6 @@ def _slug_char(ch: str) -> str:
 
 def _slugify(text: str) -> str:
     return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").lower()
-
-
-def _capped(slug: str, limit: int) -> str:
-    """`slug` within `limit` characters, cut on a separator and digest-marked, or
-    two titles sharing a long prefix truncate onto one identity."""
-    if len(slug) <= limit:
-        return slug
-    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()[:SLUG_DIGEST_CHARS]
-    if limit <= len(digest):
-        # Never shortened to fit: the digest is all that separates two titles
-        # sharing a prefix, and the URI outlives the limit that produced it.
-        return digest
-    head = slug[: limit - len(digest) - 1].rsplit("-", 1)[0]
-    return f"{head}-{digest}" if head else digest
 
 
 def _alternation(words: Iterable[str]) -> str:
@@ -231,27 +210,16 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         if _opens_with_prefix(body, prefix):
             body = body[len(prefix) :].strip()
             break
-    # The suffix is data and can consume the whole cap; neither it nor the
-    # digest is dropped, so the segment is at least their combined length.
-    suffix = f"-{_slugify(rule.edition_markers[0])}-{edition}" if edition else ""
-    # The cap covers the whole segment: capping the base alone let the edition
-    # push a slug past the declared limit.
-    limit = rule.max_length - len(suffix)
-    slug = _capped(_slugify(body), limit).rstrip("-")
-    # Tested on the assembled segment: a base and a suffix can open the
-    # content-address namespace between them.
-    if _opens_a_reserved_namespace(f"{slug}{suffix}"):
-        escaped = _capped(_slugify(body), limit - len(TITLE_ESCAPE_PREFIX)).rstrip("-")
-        slug = f"{TITLE_ESCAPE_PREFIX}{escaped}"
-    if slug and rule.segment == "digest":
-        # The same canonical identity the slug states, as a digest: uncapped
-        # body, edition and local year, so what decides one decides the other.
-        identity = f"{_slugify(body)}|{edition}|{year}".encode()
-        digest = hashlib.sha256(identity).hexdigest()[:SLUG_DIGEST_CHARS]
-        return TitleDerivedIdentity(
-            slug=f"{TITLE_ESCAPE_PREFIX}{digest}", edition=edition, year=year
-        )
-    return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
+    canonical = _slugify(body)
+    if not canonical:
+        return TitleDerivedIdentity(segment="", body="", edition=edition, year=year)
+    # The segment is a digest of the whole identity, so what the grammar folds
+    # decides it and nothing of the title's script reaches the URI.
+    identity = f"{canonical}|{edition}|{year}".encode()
+    digest = hashlib.sha256(identity).hexdigest()[:SLUG_DIGEST_CHARS]
+    return TitleDerivedIdentity(
+        segment=f"{TITLE_DIGEST_PREFIX}{digest}", body=canonical, edition=edition, year=year
+    )
 
 
 def law_number_token(value: object) -> str:

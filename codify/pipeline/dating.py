@@ -212,15 +212,13 @@ def resolve_dating(
         for field in ("year", "date")
     )
     # A field whose year run equals the title's is that local year read twice.
-    # On the run, since a model decorates the field, and on the date as well.
-    model_runs = {
-        sole_year_token(normalise_digits(str(metadata.get(field) or "")))
-        for field in ("year", "date")
-    }
+    # A date echoes only where the year field states nothing else.
+    year_run = sole_year_token(normalise_digits(str(metadata.get("year") or "")))
+    date_run = sole_year_token(stated_date)
     converted_from_title = False
     local_year = identity.year if identity is not None else ""
-    echoes_title = bool(local_year) and local_year in model_runs
-    date_echoes_title = echoes_title and sole_year_token(stated_date) == local_year
+    date_echoes_title = bool(local_year) and date_run == local_year and year_run in ("", local_year)
+    echoes_title = bool(local_year) and (year_run == local_year or date_echoes_title)
     if (
         identity is not None
         and identity.year

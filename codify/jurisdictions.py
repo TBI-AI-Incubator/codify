@@ -363,13 +363,9 @@ class CalendarConversion(BaseModel):
         return self
 
 
-#: Hex characters of the digest a truncated slug carries; six (2^24) collided on
-#: ordinary titles.
+#: Hex characters of the digest a title-derived segment carries; six (2^24)
+#: collided on ordinary titles.
 SLUG_DIGEST_CHARS = 12
-
-#: Shortest `max_length` holding a digest and a short edition suffix. A longer
-#: marker is data and can still push a segment past the limit.
-SLUG_FLOOR = SLUG_DIGEST_CHARS + 10
 
 
 class TitleIdentity(BaseModel):
@@ -403,12 +399,6 @@ class TitleIdentity(BaseModel):
     # Parenthetical words marking a re-publication; an edition number after one
     # is the edition folded in, not this document's.
     consolidation_markers: list[str] = Field(default_factory=list)
-    # Longest slug kept. Floored, since a limit holding neither the edition nor
-    # a digest would merge two works onto one URI.
-    max_length: int = Field(default=100, ge=SLUG_FLOOR)
-    # The segment's surface form: the slug itself, or an ASCII digest of the same
-    # canonical identity under the escape prefix, as a numbered corpus would carry.
-    segment: Literal["slug", "digest"] = "slug"
 
 
 class FrbrConfig(BaseModel):
