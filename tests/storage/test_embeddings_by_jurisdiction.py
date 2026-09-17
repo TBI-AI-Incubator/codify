@@ -38,12 +38,15 @@ def _vec(seed: float) -> list[float]:
 
 
 class _FixedVectors:
-    """Embeds by position, so the seed decides the neighbour order."""
+    """Embeds by position from a base, so the seed decides the neighbour order."""
 
     model = "test-model"
 
+    def __init__(self, base: float = 0.1) -> None:
+        self.base = base
+
     async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
-        return [_vec(0.1 * (i + 1)) for i in range(len(items))]
+        return [_vec(self.base * (i + 1)) for i in range(len(items))]
 
 
 @pytest.fixture
@@ -434,3 +437,56 @@ async def test_codes_that_fold_alike_get_their_own_partitions(session: AsyncSess
         )
     ).scalar_one()
     assert len(names) == 2 and partitions == 2
+
+
+async def test_a_global_search_merges_every_partition_by_distance(session: AsyncSession) -> None:
+    """Two jurisdictions, two partitions: the plan reads both vector indexes and
+    merges them, and the answer is the nearest across both, not per partition."""
+    stem = uuid.uuid4().hex[:5]
+    first, first_version = await _seed(session, f"zg{stem}a")
+    second, second_version = await _seed(session, f"zg{stem}b")
+    await embed_version_provisions(session, first_version.id, client=_FixedVectors(0.1))  # type: ignore[arg-type]
+    await embed_version_provisions(session, second_version.id, client=_FixedVectors(0.13))  # type: ignore[arg-type]
+    await session.execute(text("SET LOCAL enable_seqscan = off"))
+    await session.execute(text("SET LOCAL enable_bitmapscan = off"))
+    await session.execute(text("SET LOCAL enable_sort = off"))
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
+    plan = "\n".join(
+        row[0]
+        for row in (
+            await session.execute(
+                text("EXPLAIN " + str(_DENSE_ONLY_SQL)).bindparams(
+                    bindparam("query_vec", type_=HALFVEC(_DIM)),
+                    bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+                ),
+                {
+                    "query_vec": _vec(0.26),
+                    "version_ids": [first_version.id, second_version.id],
+                    "jurisdiction_ids": [first.id, second.id],
+                    "k": 3,
+                    "model_id": "test-model",
+                    "fallback_model_id": None,
+                    "akn_type": None,
+                    "include_non_normative": False,
+                },
+            )
+        ).all()
+    )
+    assert "Merge Append" in plan, plan
+    for jurisdiction in (first, second):
+        assert f"on {embedding_partition_name(jurisdiction.id)}" in plan, plan
+    # Seeds 0.1/0.2/0.3 and 0.13/0.26/0.39 against 0.26: the second
+    # jurisdiction's middle section first, then the first's last two.
+    rows = await hybrid_search(
+        session,
+        query_vec=_vec(0.26),
+        query_text="",
+        version_ids=[first_version.id, second_version.id],
+        k=3,
+        candidate_pool=10,
+        rrf_k=60,
+        model_id="test-model",
+    )
+    by_text = [(r[2].split(" of ")[1].split(" ")[0], r[1]) for r in rows]
+    assert by_text == [(second.code, "sec_1"), (first.code, "sec_2"), (first.code, "sec_1")]
