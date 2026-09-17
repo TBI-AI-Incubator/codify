@@ -15,6 +15,11 @@ candidate identifier, not evidence of a released tag or a benchmark run.
   requiring enrichment must provide it explicitly.
 - Test fixtures and documentation have been adapted for a standalone checkout.
   Database and provider tests remain separate from the default offline CI.
+- `to_gregorian_year(..., month=)` read a Gregorian month of a Bikram Samvat
+  year the wrong way round, filing April to December under the later Gregorian
+  year. Corrected against the calendar (1 Baisakh 2080 was 14 April 2023). No
+  caller passed a month before this change, so no stored year moved; the new
+  `month_grid` keyword names the grid a month is on and defaults to Gregorian.
 
 Prior monorepo benchmark numbers are not results for this candidate. The
 synthetic retrieval evaluator can be run separately against a disposable

@@ -196,6 +196,7 @@ def resolve_dating(
     if cal != "gregorian":
         raw_date = ""
     source_date: date | None = None
+    model_date = raw_date
     # Run whenever the text and a grammar allow: a field holding a non-date
     # would otherwise hide a date the document itself states.
     if source_text and declares_local_date_grammar(country):
@@ -232,14 +233,14 @@ def resolve_dating(
         and identity.year
         and (_year_int(year) is None or not stated_by_model or echoes_title)
     ):
-        # The source's month, but only where converting with it lands on the
-        # date the source states: a cue date naming another year is another's.
+        # The source's date only where the title's year, converted with its
+        # month, lands on it: one naming another year is another document's.
         source_month_day: tuple[int, int] | None = None
         if source_date is not None:
             source_month_day = (source_date.month, source_date.day)
             with_month = _local_year_to_gregorian(identity.year, cfg, country, source_month_day)
             if with_month != source_date.year:
-                source_month_day = None
+                source_month_day, source_date, raw_date = None, None, model_date
         month_day = source_month_day
         if month_day is None:
             month_day = month_day_stating_this_year(metadata, identity.year) or _month_day(raw_date)

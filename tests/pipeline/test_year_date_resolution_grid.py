@@ -314,13 +314,13 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
     ),
     (
         # The cue date names a year the title does not, so it dates another
-        # document: it stands as found, and its month settles nothing here.
+        # document: the title decided, and the date is discarded with its month.
         "a source date naming another local year",
         "xg",
         {"title": PRE},
         SOURCE_OTHER,
         "1935",
-        "1937-01-31",
+        "",
     ),
     # --- the title grammar is the only thing that can answer -----------------
     (
