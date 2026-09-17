@@ -425,12 +425,14 @@ class TestTheBodyFillRuleIsConditional:
 
         calls = await self._calls_for(_xa_sections(24, table_at=2))
         assert len(calls) >= 3, f"need several windows to tell the two guards apart: {len(calls)}"
+        with_table = 0
         for user, system in calls:
             carries_table = any(is_pipe_row(line) for line in user.splitlines())
+            with_table += carries_table
             assert (TABLE_ROWS_RULE in system) == carries_table, (carries_table, system[-200:])
-        assert sum(TABLE_ROWS_RULE in system for _, system in calls) == 1, [
-            s[-80:] for _, s in calls
-        ]
+        # The empty fill is retried in narrower windows, each one holding the table.
+        assert 1 <= with_table < len(calls), [s[-80:] for _, s in calls]
+        assert sum(TABLE_ROWS_RULE in system for _, system in calls) == with_table
 
     @pytest.mark.asyncio
     async def test_the_rule_lands_before_the_prompt_closes_itself(self) -> None:

@@ -141,11 +141,11 @@ def normalise_rtl_extract(text: str) -> str:
     return _STRAY_PAREN_MADDA_RE.sub(r"\1", text)
 
 
-def _expects_body(kind: str) -> bool:
+def _expects_body(kind: str, basic: str | None = None) -> bool:
     # Only leaf units are flagged empty. `section` stays excluded even though the
-    # canonical CONTAINER_KINDS omits it: the anchor scanner, not this check,
-    # decides section-as-unit against section-as-grouping.
-    return kind not in (CONTAINER_KINDS | {"section"})
+    # canonical CONTAINER_KINDS omits it, unless the doctype numbers its provisions
+    # as sections: then a section left empty is a dropped provision.
+    return kind == basic or kind not in (CONTAINER_KINDS | {"section"})
 
 
 def _anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
@@ -341,6 +341,16 @@ class AnchorInvariantError(RuntimeError):
 # normal. Ordered by preference, so a hierarchy with both `article` and `section`
 # picks `article`.
 _BASIC_UNIT_KINDS: tuple[str, ...] = ("article", "section", "rule")
+
+
+def _closing_phrases(config: JurisdictionConfig | None) -> list[str]:
+    """Every era's closing phrases: the structurer runs before the year is known."""
+    if config is None:
+        return []
+    phrases = list(config.closing_phrases)
+    for era in config.legal_eras:
+        phrases.extend(era.closing_phrases)
+    return phrases
 
 
 def basic_unit_kind(config: JurisdictionConfig | None, doctype: str) -> str | None:
@@ -640,11 +650,16 @@ async def text_to_bluebell_scaffolded(
             _trace(fallback="invariant_gate")
             raise AnchorInvariantError(spans=blocking)
 
+    from codify.pipeline.enrich.closing import bound_body_at_closing
     from codify.pipeline.enrich.enacting import split_opening_material
 
+    # The signature ends the body: markers after it belong to an appended
+    # instrument or a note, and the span itself becomes the conclusions.
+    bound = bound_body_at_closing(text, anchors, _closing_phrases(config), country=country)
+    text, anchors = bound.text, bound.anchors
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(
-        anchors, preface=preface, preamble=preamble, country=country
+        anchors, preface=preface, preamble=preamble, country=country, conclusions=bound.conclusions
     )
     _trace(scaffold=scaffold)
     windows = windows_from_anchors(text, anchors)
@@ -730,11 +745,12 @@ async def text_to_bluebell_scaffolded(
     # source text. Bare-heading anchors are legitimately empty and left alone; the
     # rest re-fill in progressively smaller windows.
     has_body_source = _anchors_with_body_source(text, anchors)
+    basic = basic_unit_kind(config, doctype)
     for max_per in (2, 1):
         targets = {
             a.akn_eid
             for a in anchors
-            if _expects_body(a.kind)
+            if _expects_body(a.kind, basic)
             and a.akn_eid in has_body_source
             and not by_eid.get(a.akn_eid, _EMPTY_BLOCK).lines
         }
@@ -764,7 +780,7 @@ async def text_to_bluebell_scaffolded(
     still_empty = {
         a.akn_eid
         for a in anchors
-        if _expects_body(a.kind)
+        if _expects_body(a.kind, basic)
         and a.akn_eid in has_body_source
         and not by_eid.get(a.akn_eid, _EMPTY_BLOCK).lines
     }

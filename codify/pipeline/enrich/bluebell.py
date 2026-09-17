@@ -127,6 +127,12 @@ def _latinise_num(num: str) -> str | None:
     latin = latinise_arabic_ordinal(base)
     if latin is not None:
         return latin + tail
+    # A declared insertion suffix ("5 bis" in the source script) folds the same
+    # way the anchor scanner keys it, so the two eIds agree.
+    from codify.jurisdictions import fold_inserted_suffix
+
+    if (inserted := fold_inserted_suffix(base)) is not None:
+        return inserted + tail
     bis = _BIS_EID_RE.match(base)
     if bis is not None:
         idx = bis.group("idx")

@@ -585,6 +585,9 @@ class AttachmentCaption(BaseModel):
     # lettered outline, not the Pasal hierarchy of the body it is attached to.
     # Empty keeps today's behaviour: the body's levels, or none.
     hierarchy: list[HierarchyEntry] = Field(default_factory=list)
+    # True where the caption opens a longer title on the same line ("SCHEDULE of
+    # fees…"), so the caption need only begin the line. The line is the heading.
+    prefix: bool = False
 
 
 class StructuringConfig(BaseModel):
@@ -606,6 +609,12 @@ class StructuringConfig(BaseModel):
     # Ordinal words used as container numbers ("Bagian Kesatu" is part 1).
     # Declared in the source's own casing; matching is case-sensitive.
     ordinal_words: dict[str, int] = Field(default_factory=dict)
+    # Words that follow a number to mark an inserted unit ("5 bis"), each mapped to
+    # the ASCII form its eId carries. Read from the source; the number keeps its script.
+    insertion_suffixes: dict[str, str] = Field(default_factory=dict)
+    # Words that, following a marker's number on its own line, make the line a
+    # citation list rather than a provision ("Article 5 to Article 9 apply").
+    citation_successors: list[str] = Field(default_factory=list)
     # Words that introduce a citation's number ("Pasal 41 ayat (3)"). A line
     # ending in one of these makes the bracketed number on the next line part
     # of the citation, not a structural marker opening a new provision.
@@ -1527,6 +1536,34 @@ def ordinal_word_folds() -> dict[str, str]:
             out[word] = str(value)
             out[word.upper()] = str(value)
     return out
+
+
+@lru_cache(maxsize=1)
+def insertion_suffix_folds() -> dict[str, str]:
+    """Every declared insertion suffix mapped to its ASCII form, across all
+    jurisdictions; one table, like `ordinal_word_folds`, for eId derivation."""
+    out: dict[str, str] = {}
+    for entry in sorted(JURISDICTIONS_DIR.glob("*/config.json")):
+        try:
+            raw = json.loads(entry.read_text())
+        except (OSError, json.JSONDecodeError):
+            logger.warning("insertion_suffixes_unreadable", config=str(entry))
+            continue
+        words = (raw.get("structuring") or {}).get("insertion_suffixes") or {}
+        out.update({str(word): str(value) for word, value in words.items()})
+    return out
+
+
+_INSERTED_NUMBER_RE = re.compile(r"^(?P<base>\S+?)\s*(?P<word>\D+?)$")
+
+
+def fold_inserted_suffix(num: str) -> str | None:
+    """`"5 bis"` as `"5bis"` when the word is a declared suffix, else None."""
+    m = _INSERTED_NUMBER_RE.match(num.strip())
+    if m is None:
+        return None
+    folded = insertion_suffix_folds().get(m.group("word").strip())
+    return f"{m.group('base')}{folded}" if folded else None
 
 
 @lru_cache(maxsize=32)

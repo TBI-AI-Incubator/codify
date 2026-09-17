@@ -1,0 +1,334 @@
+"""Config-declared grammar the scan reads: inserted suffixes, citation runs, the
+closing boundary, and captions that open an attachment by their first word.
+
+Synthetic jurisdiction throughout: the shapes are the subject, not any corpus."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from codify import jurisdictions
+from codify.pipeline.enrich import anchors as anchors_mod
+from codify.pipeline.enrich import scaffold as scaffold_mod
+from codify.pipeline.enrich import structure as structure_mod
+from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors_with_ambiguity
+from codify.pipeline.enrich.closing import bound_body_at_closing, closing_offset
+
+COUNTRY = "xa"
+SUFFIXES = {"zib": "bis", "zter": "ter", "zq": "quater"}
+CLOSING = "Sealed by the Harbour Clerk"
+SUCCESSORS = ["to", "and", "Section", "กขค"]
+
+
+@pytest.fixture
+def declared(monkeypatch: pytest.MonkeyPatch) -> jurisdictions.JurisdictionConfig:
+    """The synthetic jurisdiction with every grammar under test declared."""
+    original = jurisdictions.load_config
+    base = original(COUNTRY)
+    structuring = base.structuring.model_copy(
+        update={
+            "insertion_suffixes": SUFFIXES,
+            "citation_successors": SUCCESSORS,
+            "marker_boundary": "line_anchored",
+        }
+    )
+    config = base.model_copy(
+        update={
+            "structuring": structuring,
+            "closing_phrases": [CLOSING],
+            "attachments": [
+                jurisdictions.AttachmentCaption(caption="NOTE", normative=False),
+                jurisdictions.AttachmentCaption(caption="TABLE OF", prefix=True),
+            ],
+        }
+    )
+
+    def load(country: str) -> Any:
+        return config if country == COUNTRY else original(country)
+
+    for mod in (jurisdictions, anchors_mod, structure_mod):
+        monkeypatch.setattr(mod, "load_config", load)
+    monkeypatch.setattr(jurisdictions, "insertion_suffix_folds", lambda: dict(SUFFIXES))
+    for cached in (
+        anchors_mod.cached_regex,
+        anchors_mod._citation_successors_for,
+        anchors_mod._successor_re,
+        anchors_mod._prefix_captions,
+        anchors_mod._annex_caption_re,
+        anchors_mod._basic_unit_line_re,
+    ):
+        cached.cache_clear()
+    yield config
+    for cached in (
+        anchors_mod.cached_regex,
+        anchors_mod._citation_successors_for,
+        anchors_mod._successor_re,
+        anchors_mod._prefix_captions,
+        anchors_mod._annex_caption_re,
+        anchors_mod._basic_unit_line_re,
+    ):
+        cached.cache_clear()
+
+
+def _scan(text: str) -> anchors_mod.AnchorScan:
+    regex = build_anchor_regex(jurisdictions.load_config(COUNTRY), "act")
+    return scan_anchors_with_ambiguity(text, regex, country=COUNTRY, doctype="act")
+
+
+def _sections(scan: anchors_mod.AnchorScan) -> list[tuple[str, str]]:
+    return [(a.number or "", a.akn_eid) for a in scan.anchors if a.kind == "section"]
+
+
+BODY = """Section 5
+Five applies.
+
+Section 5 zib
+Five bis applies.
+
+Section 5
+zter*
+Five ter, wrapped.
+
+Section 6
+Six applies.
+"""
+
+
+def test_a_declared_suffix_is_one_number_and_not_a_twin(declared: Any) -> None:
+    scan = _scan(BODY)
+    assert _sections(scan) == [
+        ("5", "sec_5"),
+        ("5 zib", "sec_5bis"),
+        ("5 zter", "sec_5ter"),
+        ("6", "sec_6"),
+    ]
+    assert not [sp for sp in scan.ambiguity if sp.kind == "duplicate_number"]
+
+
+def test_a_suffix_word_needs_its_own_end(declared: Any) -> None:
+    """`zib` opening a longer word is prose after the number, not a suffix."""
+    scan = _scan("Section 5\nOne.\n\nSection 7 zibber applies.\nTwo.\n")
+    assert [n for n, _ in _sections(scan)] == ["5", "7"]
+
+
+def test_a_suffixed_number_sequences_as_its_base() -> None:
+    assert anchors_mod._roman_or_digit("5 zib") is None
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(jurisdictions, "insertion_suffix_folds", lambda: dict(SUFFIXES))
+        assert anchors_mod._roman_or_digit("5 zib") == 5
+        assert anchors_mod._normalise_number("12 zq") == "12quater"
+
+
+def test_the_eid_fold_agrees_with_the_scanner(monkeypatch: pytest.MonkeyPatch) -> None:
+    from codify.pipeline.enrich.bluebell import _ascii_fold_eid
+
+    # A non-Latin suffix, as a source script would write it; an ASCII eId is left alone.
+    monkeypatch.setattr(jurisdictions, "insertion_suffix_folds", lambda: {"ζib": "bis"})
+    assert _ascii_fold_eid("sec_٥ζib") == "sec_5bis"
+    assert _ascii_fold_eid("sec_5ζib__p_1") == "sec_5bis__p_1"
+
+
+def test_a_marker_followed_by_a_successor_is_a_citation_run(declared: Any) -> None:
+    text = "Section 5\nFive.\n\nSection 6 to Section 9 apply here.\nMore.\n\nSection 7\nSeven.\n"
+    scan = _scan(text)
+    assert [n for n, _ in _sections(scan)] == ["5", "7"]
+    reasons = [sp.detail.get("reason") for sp in scan.ambiguity if sp.kind == "unmatched_marker"]
+    assert "read_as_citation_run" in reasons
+
+
+def test_decorations_sit_between_the_number_and_the_successor(declared: Any) -> None:
+    scan = _scan("Section 5\nFive.\n\nSection 6[2]* and Section 8 apply.\n\nSection 7\nSeven.\n")
+    assert [n for n, _ in _sections(scan)] == ["5", "7"]
+
+
+def test_no_successors_declared_keeps_the_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    anchors_mod._citation_successors_for.cache_clear()
+    anchors_mod._successor_re.cache_clear()
+    scan = _scan("Section 5\nFive.\n\nSection 6 to Section 9 apply here.\n\nSection 7\nSeven.\n")
+    assert "6" in [n for n, _ in _sections(scan)]
+
+
+TAIL = """Section 1
+One.
+
+Section 2
+Two.
+
+Sealed by the Harbour Clerk
+The Warden
+
+Appended instrument
+Section 1
+Appended one.
+
+NOTE
+Why it was made.
+
+Section 2
+Appended two.
+"""
+
+
+def test_the_closing_phrase_bounds_the_body(declared: Any) -> None:
+    scan = _scan(TAIL)
+    cut = next(sp for sp in scan.ambiguity if sp.kind == "tail_excluded")
+    assert cut.detail["anchors"] == 1, "the appended section before the caption was not counted"
+    assert not [sp for sp in scan.ambiguity if sp.kind == "duplicate_number"], (
+        "the appended section collided with the body's before the cut"
+    )
+    bound = bound_body_at_closing(TAIL, scan.anchors, [CLOSING])
+    assert bound.cut_at == TAIL.index(CLOSING)
+    body = [a for a in bound.anchors if a.kind == "section" and a.parent_eid is None]
+    assert [a.number for a in body] == ["1", "2"], "a marker after the signature stayed in the body"
+    assert bound.conclusions is not None and bound.conclusions.startswith(CLOSING)
+    assert "Appended one." in bound.conclusions, "the cut span was dropped instead of kept"
+    # The attachment and its own section survive the cut with offsets that still index the text.
+    note = next(a for a in bound.anchors if a.kind == "schedule")
+    assert bound.text[note.char_offset :].lstrip().startswith("NOTE")
+    inside = [a for a in bound.anchors if a.parent_eid == note.akn_eid]
+    assert [a.number for a in inside] == ["2"]
+
+
+def test_no_closing_phrase_leaves_the_text_alone(declared: Any) -> None:
+    scan = _scan(TAIL)
+    bound = bound_body_at_closing(TAIL, scan.anchors, [])
+    assert bound.text == TAIL and bound.conclusions is None and bound.excluded_anchors == 0
+    assert closing_offset(TAIL, ["Nothing here"], after=0) is None
+
+
+def test_a_caption_before_the_closing_phrase_is_not_an_attachment(declared: Any) -> None:
+    # Nothing numbered follows the caption, the shape the caption rule reads as an annex.
+    text = f"Section 1\nOne.\n\nSection 2\nTwo.\n\nNOTE\nA body note.\n\n{CLOSING}\nThe Warden\n"
+    scan = _scan(text)
+    assert not [a for a in scan.anchors if a.kind == "schedule"]
+
+
+def test_a_prefix_caption_takes_its_line_as_the_heading(declared: Any) -> None:
+    text = f"Section 1\nOne.\n\n{CLOSING}\n\nTABLE OF FEES AND DUTIES\n1. Two coins.\n"
+    scan = _scan(text)
+    schedules = [a for a in scan.anchors if a.kind == "schedule"]
+    assert [a.heading for a in schedules] == ["TABLE OF FEES AND DUTIES"]
+
+
+def test_a_long_line_opening_with_the_caption_word_is_prose(declared: Any) -> None:
+    long_line = "TABLE OF " + "x" * 90
+    text = f"Section 1\nOne.\n\n{CLOSING}\n\n{long_line}\n"
+    assert not [a for a in _scan(text).anchors if a.kind == "schedule"]
+
+
+def test_the_scaffold_places_conclusions_before_the_first_attachment(declared: Any) -> None:
+    scan = _scan(TAIL)
+    bound = bound_body_at_closing(TAIL, scan.anchors, [CLOSING])
+    scaffold, _ = scaffold_mod.scaffold_from_anchors(
+        bound.anchors, preface="Title", country=COUNTRY, conclusions=bound.conclusions
+    )
+    lines = scaffold.splitlines()
+    assert lines.index("CONCLUSIONS") > lines.index("  SECTION 2")
+    first_schedule = next(i for i, line in enumerate(lines) if line.startswith("SCHEDULE"))
+    assert lines.index("CONCLUSIONS") < first_schedule
+    assert f"  {CLOSING}" in lines
+
+
+def test_a_wrapped_marker_still_bounds_a_reversed_quote(declared: Any) -> None:
+    """The number may wrap onto the next line; the quote walker's boundary reads it."""
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    assert boundary is not None
+    assert boundary.search("Section\n5\nText")
+
+
+class _EmptyFillClient:
+    """Returns no bodies, so the structurer's verbatim fallback fills every anchor."""
+
+    async def chat_schema(self, *a: Any, **k: Any) -> Any:
+        return scaffold_mod.BodyFillResponse(bodies=[])
+
+
+@pytest.mark.asyncio
+async def test_the_structured_document_keeps_the_tail_out_of_the_body(declared: Any) -> None:
+    """End to end: the signature lands in conclusions, the appended instrument's text
+    is kept there, and the note is an attachment holding its own section."""
+    from codify.pipeline.enrich.bluebell import parse_to_akn
+
+    bluebell = await structure_mod.text_to_bluebell_scaffolded(
+        "AN ACT\n\n" + TAIL, client=_EmptyFillClient(), country=COUNTRY, doctype="act"
+    )
+    akn = parse_to_akn(bluebell, country=COUNTRY, doctype="act", date="2020", number="1")
+    body = akn[akn.index("<body") : akn.index("</body>")]
+    assert body.count("<section ") == 2, body
+    assert "One." in body and "Two." in body, "an empty section was never refilled"
+    assert "Appended one." not in body
+    conclusions = akn[akn.index("<conclusions") : akn.index("</conclusions>")]
+    assert CLOSING in conclusions and "Appended one." in conclusions
+    attachments = akn[akn.index("<attachments") :]
+    assert "Why it was made." in attachments and "Appended two." in attachments
+
+
+def test_a_slashed_insertion_is_its_own_number(declared: Any) -> None:
+    scan = _scan("Section 7\nSeven.\n\nSection 7/1\nSeven one.\n\nSection 8\nEight.\n")
+    assert _sections(scan) == [("7", "sec_7"), ("7/1", "sec_7-1"), ("8", "sec_8")]
+    assert not [sp for sp in scan.ambiguity if sp.kind == "duplicate_number"]
+
+
+def test_a_dropped_closer_does_not_mask_the_provisions_that_follow(declared: Any) -> None:
+    """The definitions block opens a quote nothing closes; the next quotation is
+    pages later. The span ends at the blank line, since a heading lies between."""
+    text = (
+        "Section 1\nIn this Act, \u201cterm means a thing.\n\n"
+        "Section 2\nTwo.\n\nSection 3\nA \u201cquoted\u201d word.\n"
+    )
+    scan = _scan(text)
+    assert [n for n, _ in _sections(scan)] == ["1", "2", "3"]
+
+
+def test_a_precursor_in_an_unspaced_script_follows_a_letter_directly() -> None:
+    """Scripts without word spacing glue the precursor to the word before it."""
+    from codify.pipeline.enrich.anchors import _precursor_re
+
+    glued = _precursor_re(("ตาม",))
+    assert glued.search("ให้ธนาคารตาม")
+    assert glued.search("as per") is None
+    spaced = _precursor_re(("per",))
+    assert spaced.search("as per") and spaced.search("paper") is None
+
+
+def test_a_quoted_closing_phrase_is_not_the_boundary(declared: Any) -> None:
+    """An amendment quotes an instrument that ends on the phrase; the real one follows."""
+    text = (
+        "Section 1\nOne.\n\nSection 2\nThe old Act read: \u201cSection 9\nNine.\n"
+        f"{CLOSING}\nThe old Warden\u201d and is repealed.\n\n"
+        f"Section 3\nThree.\n\n{CLOSING}\nThe Warden\n"
+    )
+    scan = _scan(text)
+    assert [n for n, _ in _sections(scan)] == ["1", "2", "3"]
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert bound.cut_at == text.rindex(CLOSING)
+
+
+def test_a_successor_is_a_whole_word(declared: Any) -> None:
+    scan = _scan("Section 5\nFive.\n\nSection 6 tomorrow applies.\n\nSection 7\nSeven.\n")
+    assert [n for n, _ in _sections(scan)] == ["5", "6", "7"]
+
+
+def test_the_coverage_denominator_stops_at_the_closing_phrase(declared: Any) -> None:
+    from codify.pipeline.enrich.anchors import _marker_numbers
+
+    text = (
+        f"Section 1\nOne.\n\nSection 2\nTwo.\n\n{CLOSING}\n\nSection 5\nFive.\n\nSection 6\nSix.\n"
+    )
+    expected = _marker_numbers(text, jurisdictions.load_config(COUNTRY), "act", "section")
+    assert expected == {"1", "2"}, expected
+
+
+def test_a_successor_in_an_unspaced_script_needs_no_word_end(declared: Any) -> None:
+    scan = _scan("Section 5\nFive.\n\nSection 6 กขคงจ\nSix.\n\nSection 7\nSeven.\n")
+    assert [n for n, _ in _sections(scan)] == ["5", "7"]
+
+
+def test_a_stray_opener_does_not_hide_the_closing_phrase(declared: Any) -> None:
+    # No blank line and no closer: the stray span reaches the signature.
+    text = f"Section 1\nOne.\n\nSection 2\nTwo \u201cunclosed.\n{CLOSING}\nThe Warden\n"
+    scan = _scan(text)
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert bound.cut_at == text.index(CLOSING)

@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.3.0 — unpublished
+
+Body grammar the jurisdiction config declares, and three behaviour changes that
+apply without a declaration. Under `VERSIONING.md` the minor moves while the
+major is zero.
+
+Breaks, in that the structurer's output changes for documents it already read:
+
+1. A doctype whose numbered provision is the `section` element now refills a
+   section the model left empty, in narrower windows and then verbatim, as it
+   always did for articles. 0.2.0 excluded `section` from that recovery, so a
+   dropped section shipped empty.
+2. A quotation no longer runs over a provision heading: a span nothing closes
+   ends at the blank line before the next marker, and a marker whose number
+   wraps onto the next line bounds a reversed quotation. 0.2.0 let a stray
+   curly quote in a definitions block mask the provisions after it.
+4. A slashed insertion (`7/1`) is read as its own number, keyed as the parser's
+   `sec_7-1`; 0.2.0 read it as `7` and dropped one of the pair as a twin.
+3. Where a jurisdiction declares `closing_phrases`, the scan ends the body at the
+   first line opening with one: markers between it and the first attachment
+   caption are dropped and counted (`tail_excluded`), the span is emitted verbatim
+   as `CONCLUSIONS`, and an attachment caption before it titles a body table
+   rather than opening an attachment. 0.2.0 fed the span to the body-fill and
+   lifted the attestation out of the last provision afterwards.
+
+New config, additive:
+
+- `structuring.insertion_suffixes`: words that follow a number to mark an
+  inserted unit, each mapped to the ASCII form its eId carries (`5 bis`). The
+  scan reads the suffix, on the same line or the next, and no longer files the
+  unit as a twin of its base.
+- `structuring.citation_successors`: words that, following a marker's number on
+  its own line, make the line a citation run rather than a provision.
+- `structuring.prose_precursors` in a script that runs words together (Thai,
+  Lao, Khmer, Myanmar blocks) may follow a letter directly.
+- `attachments[].prefix`: a caption that opens a longer title on the same line.
+
 ## 0.2.0 — unpublished
 
 Eleven breaks, so the minor moves, as `VERSIONING.md` prescribes while the

@@ -21,6 +21,7 @@ AMBIGUITY_KINDS: tuple[str, ...] = (
     "unmatched_marker",
     "untwinned_tail",
     "adoption_suppressed",
+    "tail_excluded",
 )
 
 # `toc_without_body` is absent on purpose: a cover-listed unit still yields an
