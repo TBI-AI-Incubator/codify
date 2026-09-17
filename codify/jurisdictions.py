@@ -406,6 +406,9 @@ class TitleIdentity(BaseModel):
     # Longest slug kept. Floored, since a limit holding neither the edition nor
     # a digest would merge two works onto one URI.
     max_length: int = Field(default=100, ge=SLUG_FLOOR)
+    # The segment's surface form: the slug itself, or an ASCII digest of the same
+    # canonical identity under the escape prefix, as a numbered corpus would carry.
+    segment: Literal["slug", "digest"] = "slug"
 
 
 class FrbrConfig(BaseModel):

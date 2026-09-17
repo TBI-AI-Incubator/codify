@@ -243,6 +243,14 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     if _opens_a_reserved_namespace(f"{slug}{suffix}"):
         escaped = _capped(_slugify(body), limit - len(TITLE_ESCAPE_PREFIX)).rstrip("-")
         slug = f"{TITLE_ESCAPE_PREFIX}{escaped}"
+    if slug and rule.segment == "digest":
+        # The same canonical identity the slug states, as a digest: uncapped
+        # body, edition and local year, so what decides one decides the other.
+        identity = f"{_slugify(body)}|{edition}|{year}".encode()
+        digest = hashlib.sha256(identity).hexdigest()[:SLUG_DIGEST_CHARS]
+        return TitleDerivedIdentity(
+            slug=f"{TITLE_ESCAPE_PREFIX}{digest}", edition=edition, year=year
+        )
     return TitleDerivedIdentity(slug=f"{slug}{suffix}" if slug else "", edition=edition, year=year)
 
 

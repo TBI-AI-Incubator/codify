@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -394,3 +395,42 @@ def test_a_latin_title_grammar_reads_any_casing(title: str) -> None:
         "Act Widgets (No. 3) of 1991", rule
     )
     assert identity_from_title(title, rule).slug == "widgets-no-3"
+
+
+DIGEST_RULE = RULE.model_copy(update={"segment": "digest"})
+
+
+def test_a_digest_segment_is_ascii_under_the_escape_prefix() -> None:
+    """The segment form a jurisdiction may choose: the escape prefix and twelve
+    hex characters, no script anywhere, and citable as a number is."""
+    found = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2511", DIGEST_RULE)
+    assert re.fullmatch(r"t-[0-9a-f]{12}", found.slug), found.slug
+    assert (found.edition, found.year) == ("3", "2511")
+    assert is_citable_work_uri(f"/akn/xz/act/1968/{found.slug}")
+
+
+def test_the_digest_is_of_the_same_canonical_identity_the_slug_is() -> None:
+    """Every canonicalisation deciding a slug decides the digest: aliases,
+    spellings and editions that reach one slug reach one digest, and only those."""
+    same = [
+        "พระราชบัญญัติมโหรีหลวง (ฉบับที่ 03) พุทธศักราช 2511",
+        "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 3) พ.ศ. 2511",
+        "พระราชบัญญัติมโหรีหลวง\u200b (ฉบับที่ 3) พ.ศ. ๒๕๑๑",
+    ]
+    digests = {identity_from_title(t, DIGEST_RULE).slug for t in same}
+    slugs = {identity_from_title(t, RULE).slug for t in same}
+    assert len(digests) == len(slugs) == 1
+    other = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 4) พ.ศ. 2511", DIGEST_RULE).slug
+    assert other not in digests
+    another_year = identity_from_title("พระราชบัญญัติมโหรีหลวง (ฉบับที่ 3) พ.ศ. 2512", DIGEST_RULE).slug
+    assert another_year not in digests
+
+
+def test_the_segment_form_defaults_to_the_slug() -> None:
+    assert TitleIdentity().segment == "slug"
+    assert identity_from_title("พระราชบัญญัติมโหรีหลวง พ.ศ. 2511", RULE).slug == "มโหรีหลวง"
+
+
+def test_a_title_naming_nothing_yields_no_digest_either() -> None:
+    assert identity_from_title("", DIGEST_RULE).slug == ""
+    assert identity_from_title("พระราชบัญญัติ", DIGEST_RULE).slug == ""
