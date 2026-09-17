@@ -873,3 +873,48 @@ class TestAMonthIsReadOnItsOwnGrid:
         assert _apply_rule("2478", rule, month=2, month_grid="local") == blind
         assert _apply_rule("2478", rule, month=2, month_grid="gregorian") == blind + 1
         assert reform_shift(rule, 2478, 2, on_gregorian_grid=False) == 0
+
+
+class TestEveryAliasReachesTheDeclaredRule:
+    """The prompt and the generic converter each accept spellings of a calendar
+    the config names another way; one alias set folds them all, so no spelling
+    a model emits can bypass a declared rule."""
+
+    ALIASES = [
+        ("lunar_hijri", "hijri_lunar", ["hijri", "lunar_hijri", "hijri_lunar", "islamic"]),
+        ("solar_hijri", "hijri_solar", ["hijri_solar", "solar_hijri", "persian", "jalali"]),
+        ("buddhist_era", "buddhist", ["buddhist", "buddhist_era", "thai"]),
+        ("ethiopian", "ethiopian", ["ethiopian", "ethiopic"]),
+        ("minguo", "epoch_offset", ["minguo", "roc", "taiwan"]),
+        ("japanese_era", "era_table", ["japanese_era"]),
+    ]
+
+    @pytest.mark.parametrize(("declared", "kind", "labels"), ALIASES, ids=[a[0] for a in ALIASES])
+    def test_each_label_names_the_declared_calendar(
+        self, declared: str, kind: str, labels: list[str], tmp_path, monkeypatch
+    ) -> None:
+        from codify.calendar import declares_this_calendar
+        from tests.config_fixtures import isolated_configs
+
+        rule: dict[str, object] = {"kind": kind}
+        if kind == "epoch_offset":
+            rule["epoch_year"] = 1911
+        if kind == "era_table":
+            rule["eras"] = [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}]
+        configs = {
+            "xq": {
+                "calendar": declared,
+                "frbr": {"country_code": "xq", "calendar_conversion": rule},
+            }
+        }
+        with isolated_configs(monkeypatch, tmp_path / "j", configs):
+            for label in labels:
+                assert declares_this_calendar(label, "xq"), label
+                assert declares_this_calendar(f" {label.upper()} ", "xq"), label
+            assert not declares_this_calendar("gregorian", "xq")
+
+    def test_the_generic_converter_reads_the_same_aliases(self) -> None:
+        assert year_from_calendar(2566, "thai") == year_from_calendar(2566, "buddhist_era") == 2023
+        assert year_from_calendar(114, "roc") == year_from_calendar(114, "minguo") == 2025
+        assert year_from_calendar(1445, "islamic") == year_from_calendar(1445, "lunar_hijri")
+        assert year_from_calendar(1403, "jalali") == year_from_calendar(1403, "solar_hijri")

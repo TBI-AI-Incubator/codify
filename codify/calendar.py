@@ -174,20 +174,39 @@ def _convert(local_year: str | int, rule: CalendarConversion, earlier: bool | No
     raise CalendarConversionError(f"unknown calendar conversion kind: {kind}")
 
 
+#: Every spelling of a calendar the prompt, the configs or a caller may use, to
+#: the one name the rest of this module reads. One set, so no alias bypasses.
+_CALENDAR_ALIASES = {
+    **dict.fromkeys(("hijri", "hijri_lunar", "lunar_hijri", "islamic"), "lunar_hijri"),
+    **dict.fromkeys(("hijri_solar", "solar_hijri", "persian", "jalali"), "solar_hijri"),
+    **dict.fromkeys(("buddhist", "buddhist_era", "thai"), "buddhist_era"),
+    **dict.fromkeys(("ethiopian", "ethiopic"), "ethiopian"),
+    **dict.fromkeys(("minguo", "roc", "taiwan"), "minguo"),
+    "japanese_era": "japanese_era",
+}
+
+
+def calendar_family(label: str | None) -> str:
+    """The one name for a calendar however it was spelt; an unknown spelling is
+    itself, normalised, so it matches nothing it should not."""
+    named = normalise_calendar(label)
+    return _CALENDAR_ALIASES.get(named, named)
+
+
 def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int | None:
     """Convert a year + calendar to Gregorian. Returns None if the calendar
     isn't supported, or if it needs a jurisdiction's era table and no country
     was given to find one. Uses Muharram 1 / Farvardin 1 / Meskerem 1 / etc. for
     the conversion since FRBR URIs only need the year."""
-    cal = normalise_calendar(calendar)
-    if cal in ("minguo", "roc", "taiwan"):
+    cal = calendar_family(calendar)
+    if cal == "minguo":
         # Before the coercion, which concatenated every digit of a native date and
         # returned early on 民國元年, where 元 is the first year.
         year_only = _leading_year(str(year))
         if year_only is None or year_only < 1:
             return None
         return year_only + 1911
-    if cal in ("japanese_era",):
+    if cal == "japanese_era":
         # Before the int coercion: this arm's input is "Reiwa 5", not a number,
         # and the era table belongs to the jurisdiction rather than this module.
         if not country or str(year).strip().lstrip("-").isdigit():
@@ -214,7 +233,7 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
         return None
     if cal in ("", "gregorian"):
         return n
-    if cal in ("hijri", "hijri_lunar", "lunar_hijri", "islamic"):
+    if cal == "lunar_hijri":
         # hijridate uses Umm al-Qura (accurate but only covers 1343-1500 AH);
         # fall back to convertdate's tabular Islamic for older years.
         try:
@@ -225,11 +244,11 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
             from convertdate import islamic  # type: ignore[import-untyped]
 
             return cast(int, islamic.to_gregorian(n, 1, 1)[0])
-    if cal in ("hijri_solar", "solar_hijri", "persian", "jalali"):
+    if cal == "solar_hijri":
         from convertdate import persian
 
         return cast(int, persian.to_gregorian(n, 1, 1)[0])
-    if cal in ("ethiopian", "ethiopic"):
+    if cal == "ethiopian":
         # Ethiopian year begins on Meskerem 1 (≈ 11 Sept Gregorian); the
         # overlap year is EC + 7 before that date and EC + 8 after, so
         # for FRBR year purposes the predominant Gregorian year is EC + 8.
@@ -242,7 +261,7 @@ def year_from_calendar(year: str | int, calendar: str, country: str = "") -> int
         from convertdate import hebrew
 
         return cast(int, hebrew.to_gregorian(n, 7, 1)[0])  # Tishrei 1, civil new year
-    if cal in ("buddhist", "buddhist_era", "thai"):
+    if cal == "buddhist_era":
         return n - 543
     return None
 
@@ -372,10 +391,9 @@ def declares_this_calendar(label: str, country: str) -> bool:
     cfg = try_load_config(country) if country else None
     if cfg is None:
         return False
-    # Both forms from the normalised label: the era alias built from the raw
-    # string misses a padded or upper-cased one, which a model answer may be.
-    named = normalise_calendar(label)
-    return normalise_calendar(cfg.calendar) in (named, f"{named}_era")
+    # Through the one alias set, so a spelling the prompt emits and one the
+    # config uses name the same calendar.
+    return calendar_family(cfg.calendar) == calendar_family(label)
 
 
 def canonical_year_and_date(metadata: dict[str, Any]) -> tuple[str, str]:

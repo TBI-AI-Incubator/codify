@@ -417,15 +417,40 @@ def test_the_day_the_source_states_settles_the_new_year_month() -> None:
     assert _first_stated_date("dated 1 April 2080", patterns, rule, "xn") == date(2024, 4, 1)
 
 
-@pytest.mark.parametrize("day", [0, 32])
-def test_a_new_year_day_outside_a_month_is_refused(day: int) -> None:
-    with pytest.raises(ValidationError):
-        CalendarConversion(kind="bikram_samvat", new_year_day=day)
+@pytest.mark.parametrize(
+    ("fields", "day"),
+    [
+        # Against the kind's default new-year month, April, which has thirty days.
+        ({"kind": "bikram_samvat"}, 0),
+        ({"kind": "bikram_samvat"}, 31),
+        ({"kind": "bikram_samvat"}, 32),
+        # Against a declared month: February never has a thirtieth.
+        ({"kind": "bikram_samvat", "new_year_month": 2}, 30),
+        ({"kind": "ethiopian"}, 31),
+    ],
+)
+def test_a_new_year_day_the_month_does_not_hold_is_refused(
+    fields: dict[str, object], day: int
+) -> None:
+    """The day is read against the new-year month at conversion; one the month
+    does not hold would file every date of that month on the wrong side."""
+    with pytest.raises(ValidationError, match="new_year_day"):
+        CalendarConversion(**fields, new_year_day=day)
 
 
-@pytest.mark.parametrize("day", [1, 31])
-def test_a_new_year_day_at_the_edge_of_a_month_is_accepted(day: int) -> None:
-    assert CalendarConversion(kind="bikram_samvat", new_year_day=day).new_year_day == day
+@pytest.mark.parametrize(
+    ("fields", "day"),
+    [
+        ({"kind": "bikram_samvat"}, 1),
+        ({"kind": "bikram_samvat"}, 30),
+        ({"kind": "bikram_samvat", "new_year_month": 1}, 31),
+        # A leap day is a day of February in the years that have one.
+        ({"kind": "bikram_samvat", "new_year_month": 2}, 29),
+        ({"kind": "ethiopian"}, 30),
+    ],
+)
+def test_a_new_year_day_the_month_holds_is_accepted(fields: dict[str, object], day: int) -> None:
+    assert CalendarConversion(**fields, new_year_day=day).new_year_day == day
 
 
 @pytest.mark.parametrize(

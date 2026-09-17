@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import os
@@ -276,6 +277,10 @@ class DocumentClass(BaseModel):
     authoritative_language: str | None = None
 
 
+#: The Gregorian month each kind's new year falls in when the config names none.
+_DEFAULT_NEW_YEAR_MONTH = {"bikram_samvat": 4, "ethiopian": 9}
+
+
 class CalendarConversion(BaseModel):
     """Deterministic conversion rule for non-Gregorian local calendars.
 
@@ -348,8 +353,13 @@ class CalendarConversion(BaseModel):
             raise ValueError("month_names on a Gregorian grid must be exactly 12")
         if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
             raise ValueError("new_year_month must be a month, 1 to 12")
-        if self.new_year_day is not None and not 1 <= self.new_year_day <= 31:
-            raise ValueError("new_year_day must be a day of a month, 1 to 31")
+        if self.new_year_day is not None:
+            # Against the month it will be read in: a day that month never has
+            # would file every date of the month on one side.
+            month = self.new_year_month or _DEFAULT_NEW_YEAR_MONTH.get(self.kind, 1)
+            longest = max(calendar.monthrange(year, month)[1] for year in (2023, 2024))
+            if not 1 <= self.new_year_day <= longest:
+                raise ValueError(f"new_year_day must be a day of month {month}, 1 to {longest}")
         if self.new_year_reform_year is not None and self.new_year_reform_year < 1:
             # Every calendar here counts from one.
             raise ValueError("new_year_reform_year must be a year")
