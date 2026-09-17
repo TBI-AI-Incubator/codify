@@ -651,34 +651,26 @@ class TestAStringYearIsGuardedLikeAnInteger:
 
 
 class TestAMonthIsReadOnItsOwnGrid:
-    """The Gregorian-side thresholds read a Gregorian month; a month of the
-    calendar's own grid is read against where that calendar's year begins."""
+    """Anchored on the calendars themselves: 1 Baisakh 2080 was 14 April 2023 and
+    1 Meskerem 2016 was 12 September 2023, so each year straddles two Gregorian."""
 
     @pytest.mark.parametrize(
         ("kind", "local_year", "month", "expected"),
         [
-            ("bikram_samvat", "2080", 2, 2023),
-            ("bikram_samvat", "2080", 9, 2023),
-            ("bikram_samvat", "2080", 10, 2024),
-            ("ethiopian", "2016", 2, 2023),
-            ("ethiopian", "2016", 4, 2023),
-            ("ethiopian", "2016", 5, 2024),
-            ("ethiopian", "2016", 13, 2024),
+            # BS 2080 ran 14 April 2023 to 12 April 2024.
+            ("bikram_samvat", "2080", 4, 2023),
+            ("bikram_samvat", "2080", 6, 2023),
+            ("bikram_samvat", "2080", 12, 2023),
+            ("bikram_samvat", "2080", 1, 2024),
+            ("bikram_samvat", "2080", 3, 2024),
+            # EC 2016 ran 12 September 2023 to 10 September 2024.
+            ("ethiopian", "2016", 9, 2023),
+            ("ethiopian", "2016", 12, 2023),
+            ("ethiopian", "2016", 1, 2024),
+            ("ethiopian", "2016", 8, 2024),
         ],
     )
-    def test_a_local_month_is_read_against_the_calendars_own_new_year(
-        self, kind: str, local_year: str, month: int, expected: int
-    ) -> None:
-        from codify.calendar import _apply_rule
-        from codify.jurisdictions import CalendarConversion
-
-        assert _apply_rule(local_year, CalendarConversion(kind=kind), month=month) == expected
-
-    @pytest.mark.parametrize(
-        ("kind", "local_year", "month", "expected"),
-        [("bikram_samvat", "2080", 2, 2023), ("bikram_samvat", "2080", 6, 2024)],
-    )
-    def test_a_gregorian_month_is_read_against_the_declared_threshold(
+    def test_a_gregorian_month_lands_in_the_year_the_calendar_says(
         self, kind: str, local_year: str, month: int, expected: int
     ) -> None:
         from codify.calendar import _apply_rule
@@ -688,6 +680,29 @@ class TestAMonthIsReadOnItsOwnGrid:
             kind=kind, month_day_is_gregorian=True, month_names=[f"m{i}" for i in range(12)]
         )
         assert _apply_rule(local_year, rule, month=month) == expected
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "expected"),
+        [
+            # Baisakh opened on 14 April 2023; Poush ran into mid-January 2024.
+            ("bikram_samvat", "2080", 1, 2023),
+            ("bikram_samvat", "2080", 9, 2023),
+            ("bikram_samvat", "2080", 10, 2024),
+            ("bikram_samvat", "2080", 12, 2024),
+            # Meskerem opened on 12 September 2023; Tahsas ran into early January.
+            ("ethiopian", "2016", 1, 2023),
+            ("ethiopian", "2016", 4, 2023),
+            ("ethiopian", "2016", 5, 2024),
+            ("ethiopian", "2016", 13, 2024),
+        ],
+    )
+    def test_a_local_month_lands_in_the_year_the_calendar_says(
+        self, kind: str, local_year: str, month: int, expected: int
+    ) -> None:
+        from codify.calendar import _apply_rule
+        from codify.jurisdictions import CalendarConversion
+
+        assert _apply_rule(local_year, CalendarConversion(kind=kind), month=month) == expected
 
     def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
         from codify.calendar import _apply_rule, reform_shift

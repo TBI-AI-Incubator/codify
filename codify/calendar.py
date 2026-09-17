@@ -48,8 +48,10 @@ def _in_the_earlier_gregorian_year(rule: CalendarConversion, month: int | None) 
     if month is None:
         return None
     if rule.month_day_is_gregorian:
+        # From the new-year month on, the date is still in the Gregorian year
+        # the local year opened in.
         if rule.kind == "bikram_samvat":
-            return month < (rule.new_year_month or 4)
+            return month >= (rule.new_year_month or 4)
         if rule.kind == "ethiopian":
             return month >= 9
         return None
