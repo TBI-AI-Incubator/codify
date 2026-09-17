@@ -145,9 +145,13 @@ async def query_tokens_for(
     return " ".join(await expand_terms(session, tokens))
 
 
+# The relaxed scan may hand back its candidates a little out of order, so the
+# limited set is sorted once more outside it.
 _DENSE_ONLY_SQL = text(
     """
-    SELECT p.id, p.akn_eid, p.text, 0.0 AS rrf_score
+    SELECT id, akn_eid, text, 0.0 AS rrf_score
+    FROM (
+    SELECT p.id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
     FROM provision_embeddings e
     JOIN provisions p ON p.id = e.provision_id
     WHERE e.jurisdiction_id = ANY(:jurisdiction_ids)
@@ -169,6 +173,8 @@ _DENSE_ONLY_SQL = text(
       AND p.excluded_from_pool IS NOT TRUE
     ORDER BY e.embedding <=> :query_vec
     LIMIT :k
+    ) nearest
+    ORDER BY distance, id
     """
 ).bindparams(
     bindparam("query_vec", type_=HALFVEC(768)),

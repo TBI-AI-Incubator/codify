@@ -74,15 +74,6 @@ async def _add_provisions_with_embeddings(
     *,
     section_title: str | None = None,
 ) -> list[uuid.UUID]:
-    jurisdiction_id = (
-        await session.execute(
-            text(
-                "SELECT l.jurisdiction_id FROM versions v JOIN laws l ON l.id = v.law_id "
-                "WHERE v.id = :version"
-            ),
-            {"version": version_id},
-        )
-    ).scalar_one()
     if section_title is not None:
         sec_eid = f"sec_{uuid.uuid4().hex[:8]}"
         sec = Section(
@@ -111,14 +102,7 @@ async def _add_provisions_with_embeddings(
         )
         session.add(p)
         await session.flush()
-        await upsert_embedding(
-            session,
-            p.id,
-            vec,
-            model_id,
-            version_id=version_id,
-            jurisdiction_id=jurisdiction_id,
-        )
+        await upsert_embedding(session, p.id, vec, model_id)
         ids.append(p.id)
     return ids
 
@@ -230,8 +214,12 @@ async def test_latency_under_200ms_on_10k_corpus(
     chunk = 200
     insert_emb = text(
         """
-        INSERT INTO provision_embeddings (id, provision_id, embedding, model_id, created_at)
-        VALUES (gen_random_uuid(), :pid, CAST(:vec AS halfvec(768)), 'embeddinggemma', NOW())
+        INSERT INTO provision_embeddings
+            (id, provision_id, embedding, model_id, created_at, version_id, jurisdiction_id)
+        SELECT gen_random_uuid(), p.id, CAST(:vec AS halfvec(768)), 'embeddinggemma', NOW(),
+               p.version_id, l.jurisdiction_id
+        FROM provisions p JOIN versions v ON v.id = p.version_id JOIN laws l ON l.id = v.law_id
+        WHERE p.id = :pid
         """
     )
     for start_i in range(0, n, chunk):

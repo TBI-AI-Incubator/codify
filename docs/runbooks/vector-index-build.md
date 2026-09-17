@@ -31,11 +31,11 @@ ORDER BY c.reltuples DESC;
 ```sql
 SET maintenance_work_mem = '2GB';
 SET max_parallel_maintenance_workers = 4;
-CREATE INDEX CONCURRENTLY provision_embeddings_p_xa_embedding_idx
-    ON provision_embeddings_p_xa
+CREATE INDEX CONCURRENTLY provision_embeddings_p_xa_0e468e25_embedding_idx
+    ON provision_embeddings_p_xa_0e468e25
     USING hnsw (embedding halfvec_cosine_ops) WITH (m = 16, ef_construction = 64);
-ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_xa_embedding_idx;
-ANALYZE provision_embeddings_p_xa;
+ALTER INDEX provision_embeddings_hnsw_idx ATTACH PARTITION provision_embeddings_p_xa_0e468e25_embedding_idx;
+ANALYZE provision_embeddings_p_xa_0e468e25;
 ```
 
 Roughly 1.5 KB of index per vector: a 100k-row partition is minutes, ten
@@ -46,5 +46,5 @@ rerun. The parent turns valid on its own once every partition has attached.
 
 ## Check
 
-`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<code>_embedding_idx`;
+`EXPLAIN` of a scoped search names `Index Scan using provision_embeddings_p_<code>_<id>_embedding_idx`;
 before the build it names the partition's `version_id` btree and a sort.

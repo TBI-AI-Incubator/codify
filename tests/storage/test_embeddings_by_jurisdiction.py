@@ -97,7 +97,7 @@ async def test_a_new_jurisdiction_gets_a_partition_with_its_own_vector_index(
 ) -> None:
     code = f"zp{uuid.uuid4().hex[:6]}"
     jurisdiction = await get_or_create_jurisdiction(session, code)
-    partition = embedding_partition_name(code)
+    partition = embedding_partition_name(code, jurisdiction.id)
     bound = (
         await session.execute(
             text(
@@ -147,7 +147,7 @@ async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
         )
     ).all()
     assert len(rows) == 3
-    assert {r[0] for r in rows} == {embedding_partition_name(code)}
+    assert {r[0] for r in rows} == {embedding_partition_name(code, jurisdiction.id)}
     assert {r[1] for r in rows} == {version.id}
     assert {r[2] for r in rows} == {jurisdiction.id}
 
@@ -188,14 +188,7 @@ async def test_an_embedding_for_a_jurisdiction_with_no_partition_fails_loudly(
     session.add(provision)
     await session.flush()
     with pytest.raises(Exception, match="no partition of relation"):
-        await upsert_embedding(
-            session,
-            provision.id,
-            _vec(0.5),
-            "test-model",
-            version_id=version.id,
-            jurisdiction_id=jurisdiction.id,
-        )
+        await upsert_embedding(session, provision.id, _vec(0.5), "test-model")
 
 
 async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSession) -> None:
@@ -230,7 +223,7 @@ async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSessio
             )
         ).all()
     )
-    partition = embedding_partition_name(code)
+    partition = embedding_partition_name(code, jurisdiction.id)
     assert partition in plan, plan
     assert f"Index Scan using {partition}_embedding_idx" in plan, plan
     # And the answer is the nearest provisions by vector, in order.
@@ -357,7 +350,7 @@ def test_the_migration_carries_every_row_into_its_partition_and_back(temp_db: st
             assert len(rows) == 6
             for code, version, jurisdiction, partition in rows:
                 assert (version, jurisdiction) in expected[code]
-                assert partition == embedding_partition_name(code)
+                assert partition == embedding_partition_name(code, uuid.UUID(jurisdiction))
             valid = conn.execute(
                 text(
                     "SELECT indisvalid FROM pg_index "
@@ -399,3 +392,23 @@ def _suffixed_constraints(conn) -> list[tuple[str, str]]:
             )
         ).all()
     ]
+
+
+async def test_codes_that_fold_alike_get_their_own_partitions(session: AsyncSession) -> None:
+    stem = uuid.uuid4().hex[:5]
+    first = await get_or_create_jurisdiction(session, f"z{stem}-a")
+    second = await get_or_create_jurisdiction(session, f"z{stem}_a")
+    assert embedding_partition_name(first.code, first.id) != embedding_partition_name(
+        second.code, second.id
+    )
+    partitions = (
+        await session.execute(
+            text(
+                "SELECT count(*) FROM pg_inherits "
+                "WHERE inhparent = 'provision_embeddings'::regclass "
+                "AND inhrelid::regclass::text LIKE :stem"
+            ),
+            {"stem": f"provision_embeddings_p_z{stem}%"},
+        )
+    ).scalar_one()
+    assert partitions == 2
