@@ -49,7 +49,11 @@ TITLE_ESCAPE_PREFIX = "t-"
 
 
 def _opens_a_reserved_namespace(slug: str) -> bool:
-    return slug.startswith((DRAFT_PREFIX, TITLE_ESCAPE_PREFIX))
+    """The content-address and escape prefixes, and the shape a law number
+    takes: a title reducing to one would collide with the instrument so numbered."""
+    return slug.startswith((DRAFT_PREFIX, TITLE_ESCAPE_PREFIX)) or bool(
+        _LAW_NUMBER_SHAPE.fullmatch(slug)
+    )
 
 
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
@@ -190,13 +194,18 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             # "03" and "3" are one edition. Stripped as text, so a number too
             # long for an int is unharmed.
             edition = own.group(1).lstrip("0") or "0"
-    body = text[: own.start()] + " " + text[own.end() :] if own is not None else text
+    body = text
     if edition_re is not None:
-        # A retained edition reads the same however it was spelt, or one cited
-        # instrument forks the slug on the publisher's spelling.
-        body = edition_re.sub(
-            lambda m: f"({rule.edition_markers[0]} {m.group(1).lstrip('0') or '0'})", body
-        )
+        # The document's own edition leaves the base, as does one after the
+        # republication marker; a retained one is spelt the one declared way.
+        own_span = own.span() if own is not None else None
+
+        def _edition(m: re.Match[str]) -> str:
+            if m.span() == own_span or (marker is not None and m.start() > marker):
+                return " "
+            return f"({rule.edition_markers[0]} {m.group(1).lstrip('0') or '0'})"
+
+        body = edition_re.sub(_edition, text)
     if consolidation_re is not None:
         body = _PARENTHETICAL.sub(
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body

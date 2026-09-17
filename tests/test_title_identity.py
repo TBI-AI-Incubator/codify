@@ -347,3 +347,28 @@ def test_a_retained_edition_is_spelt_with_the_canonical_marker() -> None:
         "พระราชบัญญัติมโหรีหลวง (ฉะบับที่ 02) พ.ศ. 2475 (ฉบับที่ 5) พ.ศ. 2486", rule
     )
     assert variant.slug == canonical.slug == "มโหรีหลวง-ฉบับที่-2-พ-ศ-2475-ฉบับที่-5"
+
+
+def test_a_title_slug_shaped_like_a_number_is_escaped() -> None:
+    """A numberless title reducing to digits would collide with an instrument
+    numbered the same; only that shape takes the escape, and it round-trips."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"])
+    assert identity_from_title("Act 17 of 1991", rule).slug == "t-17"
+    assert identity_from_title("Act 12-2020 of 2020", rule).slug == "t-12-2020"
+    assert identity_from_title("Act 17a of 1991", rule).slug == "t-17a"
+    assert identity_from_title("Act 17 widgets of 1991", rule).slug == "17-widgets"
+    assert identity_from_title("พระราชบัญญัติมโหรีหลวง พ.ศ. 2475", RULE).slug == "มโหรีหลวง"
+
+
+def test_an_edition_after_a_republication_marker_leaves_the_base_too() -> None:
+    """It is not this document's edition, and it is not part of the base title
+    either: the republication folded it in, whatever its position."""
+    rule = TitleIdentity(
+        strip_prefixes=["Act"],
+        year_particles=["of"],
+        consolidation_markers=["Update"],
+        edition_markers=["No."],
+    )
+    assert identity_from_title("Act Foo (Update) (No. 7) of 1991", rule).slug == "foo"
+    assert identity_from_title("Act Foo of 1991 (Update) (No. 7)", rule).slug == "foo"
+    assert identity_from_title("Act Foo (No. 7) of 1991", rule).slug == "foo-no-7"

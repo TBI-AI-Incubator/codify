@@ -346,9 +346,9 @@ class TestOnlyAWholeYearIsAYear:
             assert resolve_year(metadata, "ps") == "", raw
             assert gregorian_year(metadata, "ps") is None, raw
 
-    def test_a_four_digit_year_passes_and_a_three_digit_one_is_no_year(self) -> None:
-        """A URI segment is four digits, so a three-digit year stored one number
-        while filing the work under none; the two now agree it is no year."""
+    def test_a_three_or_four_digit_year_still_passes(self) -> None:
+        """A URI segment is four digits, so a three-digit year is carried padded
+        and stored as the number it is; the canonical form reads the same."""
         from codify.pipeline.enrich.metadata import gregorian_year
         from codify.pipeline.stages import resolve_year
 
@@ -356,8 +356,9 @@ class TestOnlyAWholeYearIsAYear:
             metadata = {"year": raw}
             assert resolve_year(metadata, "ps") == raw, raw
             assert gregorian_year(metadata, "ps") == int(raw), raw
-        assert resolve_year({"year": "622"}, "ps") == ""
-        assert gregorian_year({"year": "622"}, "ps") is None
+        for raw in ("622", "0622"):
+            assert resolve_year({"year": raw}, "ps") == "0622", raw
+            assert gregorian_year({"year": raw}, "ps") == 622, raw
 
 
 class TestOfficialTextNumbersItsEras:
@@ -775,6 +776,11 @@ class TestAMonthIsReadOnItsOwnGrid:
         assert _apply_rule(local_year, rule, month=month, day=day) == _apply_rule(
             local_year, rule, month=None
         )
+
+    def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
+        rule = self._gregorian_grid("bikram_samvat")
+        assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)
+        assert _apply_rule("2016", CalendarConversion(kind="ethiopian"), month=13) == 2024
 
     def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
         rule = CalendarConversion(kind="buddhist", new_year_month=4, new_year_reform_year=2484)

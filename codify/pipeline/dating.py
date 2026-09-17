@@ -97,11 +97,18 @@ def _rebased_date(raw_date: str, gregorian_year: int) -> str:
 
 
 def _year_int(year: str) -> int | None:
-    """The year as a URI segment carries it, or None: four ASCII digits, the
-    first not zero, which also refuses the two sentinels no work is filed under."""
-    if len(year) != 4 or not year.isascii() or not year.isdecimal() or year[0] == "0":
+    """The number a year names, or None: three or four ASCII digits, past the
+    two sentinels no work is filed under. `_segment` carries it padded to four."""
+    if not (3 <= len(year) <= 4 and year.isascii() and year.isdecimal()):
         return None
-    return int(year)
+    number = int(year)
+    return number if number > 1 else None
+
+
+def _segment(year: str) -> str:
+    """The year as a URI segment: four digits, padded, or "" where it names none."""
+    number = _year_int(year)
+    return f"{number:04d}" if number is not None else ""
 
 
 def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str:
@@ -261,10 +268,9 @@ def resolve_dating(
         stated = _ISO_DATE.match(raw_date)
         if stated is not None and _year_int(stated.group(1)) is not None:
             year = stated.group(1)
-    # One gate at the exit for every source a year can come from: what no URI
-    # can carry, no reader is given.
-    if _year_int(year) is None:
-        year = ""
+    # One gate at the exit for every source a year can come from: the segment
+    # form or nothing, and the stored year is its number.
+    year = _segment(year)
     return Dating(year, raw_date, int(year) if year else None)
 
 

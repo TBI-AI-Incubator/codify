@@ -56,7 +56,8 @@ def _in_the_earlier_gregorian_year(
         return None
     if rule.month_day_is_gregorian:
         turn = _GREGORIAN_TURN.get(rule.kind)
-        if turn is None:
+        # A thirteenth month is a month of the calendar's own grid, not this one.
+        if turn is None or month > 12:
             return None
         turn_month, before, after = turn
         turn_month = rule.new_year_month or turn_month

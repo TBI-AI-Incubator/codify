@@ -242,8 +242,9 @@ def test_the_unknown_year_sentinel_gives_way_to_a_recovered_date(configs: None) 
     assert desc.year == "1968"
 
 
-def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None) -> None:
-    """A three-digit local year converts to a number no URI segment can carry."""
+def test_a_conversion_below_a_thousand_is_carried_padded(configs: None) -> None:
+    """A three-digit local year converts to a number below 1000, which the URI
+    segment carries in its four-digit form."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
         {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999", "number": ""},
@@ -252,10 +253,8 @@ def test_a_conversion_that_cannot_form_a_year_leaves_it_unresolved(configs: None
         fallback_stem="source",
         classification_text="",
     )
-    # Not merely unusable: unresolved, so the URI takes the placeholder rather
-    # than the three-digit number the offset produced.
-    assert desc.year == ""
-    assert _year_int(desc.year) is None
+    assert desc.year == "0456"
+    assert _year_int(desc.year) == 456
 
 
 def test_a_decorated_model_year_still_echoes_the_title(configs: None) -> None:
@@ -315,9 +314,9 @@ def test_a_year_straddling_two_gregorian_ones_follows_the_stated_date(configs: N
     assert desc.year == "1936"
 
 
-def test_an_echoed_year_that_cannot_convert_is_cleared_not_kept(configs: None) -> None:
-    """The local value is not a Gregorian year; leaving it in place would put it
-    in the URI instead of the unknown-year placeholder."""
+def test_an_echoed_year_below_a_thousand_converts_and_is_carried_padded(configs: None) -> None:
+    """The local value is not the Gregorian year; the echo converts it, and the
+    result is carried in the segment's four-digit form."""
     try_load_config.cache_clear()
     desc = stages.resolve_descriptors(
         {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999", "number": "", "year": "999"},
@@ -326,7 +325,7 @@ def test_an_echoed_year_that_cannot_convert_is_cleared_not_kept(configs: None) -
         fallback_stem="source",
         classification_text="",
     )
-    assert desc.year == ""
+    assert desc.year == "0456"
 
 
 def test_a_date_field_echoing_the_title_is_local_too(configs: None) -> None:
