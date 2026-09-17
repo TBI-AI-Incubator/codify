@@ -88,14 +88,14 @@ def test_historical_migration_is_preserved_exactly_outside_discovery() -> None:
 
 @pytest.fixture
 def migration_connection() -> Iterator[Connection]:
-    import os
     import uuid
 
     from sqlalchemy import create_engine
     from sqlalchemy.engine import make_url
 
-    raw = os.environ.get("POSTGRES_URL", "postgresql://codify:codify@localhost:5432/codify")
-    engine = create_engine(make_url(raw).set(drivername="postgresql+psycopg"))
+    from codify.testing import postgres_url
+
+    engine = create_engine(make_url(postgres_url()).set(drivername="postgresql+psycopg"))
     try:
         with engine.connect() as connection, connection.begin():
             schema = "annexmig_" + uuid.uuid4().hex

@@ -54,10 +54,11 @@ exactly this. The run takes under a minute and costs a few cents. `bundle/` then
 Nothing is written to a database.
 
 Read `anchors.jsonl` before `final.akn.xml`: a body is only filled under a basic unit
-(section, article) the scanner anchored, and a run that anchored none logs
-`body_fill_skipped` and ships the skeleton. The bundled scan prints its section numbers
-in the margin, which the `xa` scanner does not yet read, so today it anchors the six parts
-and no sections; that is the open issue on the samples.
+(section, article) the scanner anchored. A scan that found containers and no basic unit
+logs `body_fill_skipped` and ships the skeleton; one that found nothing at all logs
+`scaffold_no_anchors` and keeps the text verbatim. The bundled scan prints its section
+numbers in the margin, which the `xa` scanner does not yet read, so today it anchors the
+six parts and no sections; that is the open issue on the samples.
 
 Two lines in the log are worth knowing. `layout_pass_failed … OcrNotConfigured` says the
 optional second OCR engine (Azure AI Foundry) is not set up, so each scanned page is read
@@ -73,7 +74,8 @@ database, which is the way to see what the scanner claims before spending anythi
 ## Configuration
 
 The CLI reads `.env` from the working directory (or any parent); an exported variable
-wins. `.env.example` lists everything.
+wins. `pytest` and `alembic` read only the environment, so export what they need.
+`.env.example` lists everything.
 
 | Variable                                        | Purpose                                                  |
 | ----------------------------------------------- | -------------------------------------------------------- |
@@ -138,9 +140,9 @@ REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 ```
 
 Some tests commit or recreate data; never point `POSTGRES_URL` at a database you care
-about. `CODIFY_PG_PORT` moves the host port if 5432 is taken (set `POSTGRES_URL` to
-match). `live_llm` tests call a real model and can incur charges. See
-[the test guide](docs/offline-suite.md).
+about. `CODIFY_PG_PORT` moves the host port if 5432 is taken; export `POSTGRES_URL` to
+match. `live_llm` tests call a real model through a LiteLLM gateway and can incur charges.
+See [the test guide](docs/offline-suite.md).
 
 CI also runs Ruff, strict mypy and a wheel build; the exact commands are in
 `.github/workflows/ci.yml`.
