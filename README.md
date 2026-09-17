@@ -53,6 +53,12 @@ exactly this. The run takes under a minute and costs a few cents. `bundle/` then
 
 Nothing is written to a database.
 
+Read `anchors.jsonl` before `final.akn.xml`: a body is only filled under a basic unit
+(section, article) the scanner anchored, and a run that anchored none logs
+`body_fill_skipped` and ships the skeleton. The bundled scan prints its section numbers
+in the margin, which the `xa` scanner does not yet read, so today it anchors the six parts
+and no sections; that is the open issue on the samples.
+
 Two lines in the log are worth knowing. `layout_pass_failed … OcrNotConfigured` says the
 optional second OCR engine (Azure AI Foundry) is not set up, so each scanned page is read
 once by the chat model's vision route rather than twice; the run continues. `page_diverted_to_ocr`
