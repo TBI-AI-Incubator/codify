@@ -25,7 +25,7 @@ from codify.calendar import (
     to_gregorian_year,
     year_from_calendar,
 )
-from codify.frbr import UNKNOWN_YEAR, identity_from_title
+from codify.frbr import identity_from_title
 from codify.jurisdictions import try_load_config
 from codify.lang import normalise_digits
 
@@ -97,21 +97,11 @@ def _rebased_date(raw_date: str, gregorian_year: int) -> str:
 
 
 def _year_int(year: str) -> int | None:
-    """The year as a URI segment carries it, or None. Four ASCII digits exactly,
-    the two sentinels `is_citable_work_uri` refuses excluded."""
-    if len(year) != 4 or not year.isascii() or not year.isdecimal():
+    """The year as a URI segment carries it, or None: four ASCII digits, the
+    first not zero, which also refuses the two sentinels no work is filed under."""
+    if len(year) != 4 or not year.isascii() or not year.isdecimal() or year[0] == "0":
         return None
-    return None if year in _SENTINELS else int(year)
-
-
-#: What no URI files a work under: the unknown-year placeholder and year zero.
-_SENTINELS = frozenset({UNKNOWN_YEAR, "0000"})
-
-
-def _stored(uri_year: str) -> int | None:
-    """The URI year as a number, or None where it is not a whole run of ASCII
-    digits: an unconverted local year reaches here as the text that it is."""
-    return int(uri_year) if uri_year.isascii() and uri_year.isdecimal() else None
+    return int(year)
 
 
 def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str:
@@ -190,6 +180,10 @@ def resolve_dating(
         # Deterministic, and ahead of the model, which reports the year and
         # drops the day.
         source_date = local_date_from_text(source_text, country)
+        # Through the same gate as every other year: a converted year no URI
+        # can carry is padded to four digits by the date, and would pass as one.
+        if source_date is not None and _year_int(str(source_date.year)) is None:
+            source_date = None
         if source_date is not None:
             raw_date = source_date.isoformat()
     # An instrument series that numbers nothing states its identity in its title.
@@ -267,10 +261,11 @@ def resolve_dating(
         stated = _ISO_DATE.match(raw_date)
         if stated is not None and _year_int(stated.group(1)) is not None:
             year = stated.group(1)
-    if year in _SENTINELS:
-        # A field holding the placeholder states no year, for any reader.
+    # One gate at the exit for every source a year can come from: what no URI
+    # can carry, no reader is given.
+    if _year_int(year) is None:
         year = ""
-    return Dating(year, raw_date, _stored(year))
+    return Dating(year, raw_date, int(year) if year else None)
 
 
 __all__ = ["Dating", "resolve_dating"]

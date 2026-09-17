@@ -346,14 +346,18 @@ class TestOnlyAWholeYearIsAYear:
             assert resolve_year(metadata, "ps") == "", raw
             assert gregorian_year(metadata, "ps") is None, raw
 
-    def test_a_three_or_four_digit_year_still_passes(self) -> None:
+    def test_a_four_digit_year_passes_and_a_three_digit_one_is_no_year(self) -> None:
+        """A URI segment is four digits, so a three-digit year stored one number
+        while filing the work under none; the two now agree it is no year."""
         from codify.pipeline.enrich.metadata import gregorian_year
         from codify.pipeline.stages import resolve_year
 
-        for raw in ("622", "1443", "2024"):
+        for raw in ("1443", "2024"):
             metadata = {"year": raw}
             assert resolve_year(metadata, "ps") == raw, raw
             assert gregorian_year(metadata, "ps") == int(raw), raw
+        assert resolve_year({"year": "622"}, "ps") == ""
+        assert gregorian_year({"year": "622"}, "ps") is None
 
 
 class TestOfficialTextNumbersItsEras:

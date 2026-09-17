@@ -449,9 +449,7 @@ UNECHOED = {
     # model date should be validated at all is a question for every calendar.
     "unlabelled local date whose day does not exist": ("2511", "2511-04-31"),
     "custom epoch, unlabelled echo": ("2478", "2478-09-09"),
-    # Nothing converts it and nothing clears it, but three digits cannot form a
-    # URI year segment either way, so both sides end uncitable.
-    "year the conversion cannot carry": ("999", ""),
+    "year the conversion cannot carry": ("", ""),
     # With no title to conflict with, the date is the one the model stated,
     # converted on its own year; both sides agree on the document's.
     "an echoed year with a date naming another year": ("1935", "1938-05-20"),
@@ -533,3 +531,53 @@ def test_the_replay_arm_stores_what_the_shipped_run_stored(
 
     try_load_config.cache_clear()
     assert gregorian_year(dict(metadata), code, legacy=True) == stored, case
+
+
+#: A year no URI can carry, from every source one can reach the URI by: below
+#: 1000 and above 9999. The date beside it stays only where the model wrote it.
+SOURCE_999 = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๙๙๙\n"
+SOURCE_12024 = "ให้ไว้ ณ วันที่ ๓๑ มกราคม พ.ศ. ๑๒๐๒๔\n"
+UNCITABLE = [
+    ("title, 999", {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999"}, "", ""),
+    ("title, 12024", {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 12024"}, "", ""),
+    ("labelled year, 999", {"title": UNDATED, "year": "999", "calendar": "buddhist"}, "", ""),
+    ("labelled year, 12024", {"title": UNDATED, "year": "12024", "calendar": "buddhist"}, "", ""),
+    ("labelled date, 999", {"title": UNDATED, "date": "999-01-31", "calendar": "buddhist"}, "", ""),
+    (
+        "labelled date, 12024",
+        {"title": UNDATED, "date": "12024-01-31", "calendar": "buddhist"},
+        "",
+        "",
+    ),
+    (
+        "unlabelled echo, 999",
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999", "date": "999-05-05", "calendar": ""},
+        "",
+        "999-05-05",
+    ),
+    (
+        "unlabelled echo, 12024",
+        {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 12024", "date": "12024-05-05", "calendar": ""},
+        "",
+        "12024-05-05",
+    ),
+    ("source date, 999", {"title": UNDATED}, SOURCE_999, ""),
+    ("source date, 12024", {"title": UNDATED}, SOURCE_12024, ""),
+]
+
+
+@pytest.mark.parametrize(
+    ("case", "metadata", "source", "expected_date"), UNCITABLE, ids=[r[0] for r in UNCITABLE]
+)
+@pytest.mark.parametrize("code", ["xg", "xg2"], ids=["with a grammar", "without"])
+def test_a_year_no_uri_can_carry_reaches_no_reader(
+    code: str, case: str, metadata: dict[str, object], source: str, expected_date: str
+) -> None:
+    from codify.pipeline.enrich.metadata import gregorian_year
+
+    desc = _resolve(code, metadata, source)
+    assert (desc.year, desc.raw_date) == ("", expected_date), case
+    title = str(metadata.get("title") or "")
+    try_load_config.cache_clear()
+    assert stages.resolve_year(dict(metadata), code, title=title) == "", case
+    assert gregorian_year(dict(metadata), code, title=title) is None, case
