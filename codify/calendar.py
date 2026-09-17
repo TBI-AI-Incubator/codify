@@ -10,7 +10,7 @@ import re
 import unicodedata
 from datetime import date
 from functools import lru_cache
-from typing import Any, NamedTuple, cast
+from typing import Any, Literal, NamedTuple, cast
 
 import structlog
 
@@ -24,8 +24,18 @@ class CalendarConversionError(ValueError):
     pass
 
 
+#: Which grid a month is on: the Gregorian one, or the calendar's own, which the
+#: config may declare to be Gregorian. None takes the config's declaration.
+MonthGrid = Literal["gregorian", "local"]
+
+
 def to_gregorian_year(
-    local_year: str | int, country_code: str, month: int | None = None, day: int | None = None
+    local_year: str | int,
+    country_code: str,
+    month: int | None = None,
+    day: int | None = None,
+    *,
+    month_grid: MonthGrid | None = None,
 ) -> int:
     """Convert a local-calendar year to Gregorian. A named jurisdiction with no
     config raises: reading a Hijri year as Gregorian is a plausible wrong date."""
@@ -36,7 +46,9 @@ def to_gregorian_year(
     if cfg.frbr is None or cfg.frbr.calendar_conversion is None:
         return _coerce_int(local_year)
 
-    return _apply_rule(local_year, cfg.frbr.calendar_conversion, month=month, day=day)
+    return _apply_rule(
+        local_year, cfg.frbr.calendar_conversion, month=month, day=day, month_grid=month_grid
+    )
 
 
 #: Where a local year meets 1 January on its own grid: the month straddling it,
@@ -48,13 +60,14 @@ _GREGORIAN_TURN = {"bikram_samvat": (4, 12, 14), "ethiopian": (9, 10, 12)}
 
 
 def _in_the_earlier_gregorian_year(
-    rule: CalendarConversion, month: int | None, day: int | None
+    rule: CalendarConversion, month: int | None, day: int | None, month_grid: MonthGrid | None
 ) -> bool | None:
     """Whether the date falls in the earlier of the two Gregorian years its
     local year straddles, or None where the month, or the day, cannot say."""
     if month is None:
         return None
-    if rule.month_day_is_gregorian:
+    # A month of the calendar's own grid is Gregorian where the config says so.
+    if month_grid == "gregorian" or rule.month_day_is_gregorian:
         turn = _GREGORIAN_TURN.get(rule.kind)
         # A thirteenth month is a month of the calendar's own grid, not this one.
         if turn is None or month > 12:
@@ -94,7 +107,12 @@ _SIGNED_INT_RE = re.compile(r"^[+-]?\d+$")
 
 
 def _apply_rule(
-    local_year: str | int, rule: CalendarConversion, *, month: int | None, day: int | None = None
+    local_year: str | int,
+    rule: CalendarConversion,
+    *,
+    month: int | None,
+    day: int | None = None,
+    month_grid: MonthGrid | None = None,
 ) -> int:
     kind = rule.kind
     # Every calendar here begins at one. Parse a numeric string before the check,
@@ -103,7 +121,7 @@ def _apply_rule(
     numeric = str(local_year).strip()
     if _SIGNED_INT_RE.match(numeric) and int(numeric) < 1:
         raise CalendarConversionError(f"{local_year!r} is not a year")
-    earlier = _in_the_earlier_gregorian_year(rule, month, day)
+    earlier = _in_the_earlier_gregorian_year(rule, month, day, month_grid)
 
     if kind == "epoch_offset":
         if rule.epoch_year is None:
@@ -367,7 +385,7 @@ def labelled_year_as_gregorian(
     ):
         month, day = month_day if month_day is not None else (None, None)
         try:
-            converted = to_gregorian_year(token, country, month=month, day=day)
+            converted = to_gregorian_year(token, country, month=month, day=day, month_grid="local")
             # The same coercion the conversion made, or a decorated year the
             # conversion accepted raises here instead of shifting.
             local = _coerce_int(token)
@@ -446,7 +464,9 @@ def _compose(
     month = patterns.month_index[found.group("month")]
     local_year = int(found.group("year"))
     try:
-        gregorian_year = _apply_rule(local_year, rule, month=month, day=int(found.group("day")))
+        gregorian_year = _apply_rule(
+            local_year, rule, month=month, day=int(found.group("day")), month_grid="gregorian"
+        )
     except CalendarConversionError as exc:
         # A misconfigured rule otherwise reads as "this document states no
         # date", the same answer a whole corpus would give.

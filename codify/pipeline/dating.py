@@ -54,7 +54,8 @@ def _local_year_to_gregorian(
         return year_from_calendar(local_year, getattr(cfg, "calendar", ""), country)
     month, day = month_day if month_day is not None else (None, None)
     try:
-        converted = to_gregorian_year(local_year, country, month=month, day=day)
+        # A metadata date is in the calendar its label names: its own grid.
+        converted = to_gregorian_year(local_year, country, month=month, day=day, month_grid="local")
     except (CalendarConversionError, LookupError):
         logger.warning("local_year_unconverted", country=country, raw=local_year)
         return None

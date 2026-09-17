@@ -777,6 +777,32 @@ class TestAMonthIsReadOnItsOwnGrid:
             local_year, rule, month=None
         )
 
+    @pytest.mark.parametrize(
+        ("declared_gregorian", "month_grid", "expected"),
+        [
+            # The calendar's own grid, undeclared: January is Baisakh, 2023.
+            (False, None, 2023),
+            (False, "local", 2023),
+            # Named Gregorian, whatever the config declares: January, 2024.
+            (False, "gregorian", 2024),
+            (True, "gregorian", 2024),
+            # A declared Gregorian grid makes the calendar's own months Gregorian.
+            (True, None, 2024),
+            (True, "local", 2024),
+        ],
+    )
+    def test_the_month_is_read_on_the_grid_the_caller_names(
+        self, declared_gregorian: bool, month_grid: str | None, expected: int
+    ) -> None:
+        """Which grid month 1 of BS 2080 is on decides the year; the keyword
+        names it, and the config's declaration stands in where it is absent."""
+        rule = (
+            self._gregorian_grid("bikram_samvat")
+            if declared_gregorian
+            else CalendarConversion(kind="bikram_samvat")
+        )
+        assert _apply_rule("2080", rule, month=1, day=20, month_grid=month_grid) == expected
+
     def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
         rule = self._gregorian_grid("bikram_samvat")
         assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)
