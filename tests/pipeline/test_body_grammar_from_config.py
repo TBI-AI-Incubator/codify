@@ -108,6 +108,18 @@ Six applies.
 """
 
 
+def test_the_grammar_reads_windows_line_endings(declared: Any) -> None:
+    """Sources arrive with CRLF; a wrapped suffix, a caption line and the closing
+    phrase must read the same as with LF."""
+    lf = f"Section 5\nzter*\nFive ter.\n\nSection 6\nSix.\n\n{CLOSING}\n\nNOTE\nWhy.\n"
+    text = lf.replace("\n", "\r\n")
+    scan = _scan(text)
+    assert [n for n, _ in _sections(scan)] == ["5 zter", "6"]
+    assert [a.heading for a in scan.anchors if a.kind == "schedule"] == ["NOTE"]
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert bound.cut_at == text.index(CLOSING)
+
+
 def test_a_declared_suffix_is_one_number_and_not_a_twin(declared: Any) -> None:
     scan = _scan(BODY)
     assert _sections(scan) == [

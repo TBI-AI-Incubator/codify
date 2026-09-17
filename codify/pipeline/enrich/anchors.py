@@ -146,7 +146,7 @@ def _inserted_suffix_end(suffixes: Mapping[str, str]) -> str:
     if not suffixes:
         return _MARKER_NUM_END
     words = "|".join(re.escape(w) for w in sorted(suffixes, key=lambda w: (-len(w), w)))
-    return rf"(?:(?P<suffix>[ \t]*\n?[ \t]*(?:{words}))(?!\w)|{_MARKER_NUM_END})"
+    return rf"(?:(?P<suffix>[ \t]*(?:\r?\n)?[ \t]*(?:{words}))(?!\w)|{_MARKER_NUM_END})"
 
 
 def _separator_for(tolerances: AbstractSet[str]) -> str:
@@ -1489,14 +1489,14 @@ def _annex_caption_re(country: str) -> re.Pattern[str]:
     alts = "|".join(re.escape(c) for c in captions if c not in prefixes)
     # A prefix caption takes the rest of its line as the heading.
     opener = "|".join(re.escape(c) for c in sorted(prefixes, key=lambda c: (-len(c), c)))
-    prefixed = rf"|^[ \t]{{0,60}}(?P<prefixed>(?:{opener})[^\n]*)" if opener else ""
+    prefixed = rf"|^[ \t]{{0,60}}(?P<prefixed>(?:{opener})[^\r\n]*)" if opener else ""
     # A declared caption tolerates a centred indent and its own numbering
     # ("LAMPIRAN I"); the inferred Arabic form keeps its tight margin and its
     # bare-keyword rule, so PS behaviour does not move.
     return re.compile(
         rf"(?m)^(?:[ \t]{{0,8}}(?:ال)?(?:ملحق|جدول)"
         rf"|[ \t]{{0,60}}(?P<declared>{alts or '(?!)'})(?P<decnum>[ \t]+[IVXLCDM]+|[ \t]+\d+)?)"
-        rf"[ \t]*(?:(?P<colon>[:：])[ \t]*(?=\S)|$){prefixed}"
+        rf"[ \t]*(?:(?P<colon>[:：])[ \t]*(?=\S)|\r?$){prefixed}"
     )
 
 
