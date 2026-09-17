@@ -473,3 +473,19 @@ def test_a_title_grammar_beside_an_era_table_is_refused_at_load() -> None:
             calendar_conversion={"kind": "era_table", "eras": ERAS},
         )
     assert FrbrConfig(country_code="xj", calendar_conversion={"kind": "era_table", "eras": ERAS})
+
+
+@pytest.mark.parametrize("text", ["DATED 1 MAY 2567", "dated 1 may 2567", "Dated 1 May 2567"])
+def test_a_latin_grammar_reads_any_casing(text: str) -> None:
+    """A cue and a month name are words, not spellings: a signature block set in
+    capitals states the same date. Twelve names stay twelve."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date(text, patterns, rule, "xn") == date(2024, 5, 1)

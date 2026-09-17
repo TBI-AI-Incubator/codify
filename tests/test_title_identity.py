@@ -380,3 +380,17 @@ def test_a_retained_year_is_spelt_with_the_canonical_particle(particle: str) -> 
     particle must read the same whichever configured alias the title used."""
     title = f"พระราชบัญญัติแก้ไขเพิ่มเติมมโหรีหลวง {particle} 2477 (ฉบับที่ 5) พ.ศ. 2486"
     assert identity_from_title(title, RULE).slug == "แก้ไขเพิ่มเติมมโหรีหลวง-พระพุทธศักราช-2477-ฉบับที่-5"
+
+
+@pytest.mark.parametrize(
+    "title",
+    ["ACT WIDGETS (NO. 3) OF 1991", "act widgets (no. 3) of 1991", "Act Widgets (No. 3) of 1991"],
+)
+def test_a_latin_title_grammar_reads_any_casing(title: str) -> None:
+    """The kind prefix, the edition marker and the year particle are words: a
+    title set in capitals is the same title, and reaches the same identity."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"], edition_markers=["No."])
+    assert identity_from_title(title, rule) == identity_from_title(
+        "Act Widgets (No. 3) of 1991", rule
+    )
+    assert identity_from_title(title, rule).slug == "widgets-no-3"

@@ -259,7 +259,9 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     # cannot have a date composed from it.
     if not rule.month_names or not rule.date_cues or not rule.month_day_is_gregorian:
         return None
-    index = {name: i for i, name in enumerate(rule.month_names, start=1) if name}
+    # Folded, and the patterns case-blind with it: a Latin name in capitals is
+    # the same month, and twelve names stay twelve.
+    index = {name.casefold(): i for i, name in enumerate(rule.month_names, start=1) if name}
     # Each literal bounded where it is a Latin word: "May" is not "Mayor".
     months = "|".join(word_bounded(m) for m in sorted(index, key=lambda m: (-len(m), m)))
     particles = "|".join(
@@ -275,10 +277,11 @@ def compile_local_date_patterns(rule: CalendarConversion) -> _LocalDatePatterns 
     ordered = sorted({c for c in rule.date_cues if c.strip()}, key=lambda c: (-len(c), c))
     cues = "|".join(_CUE_GAP.join(map(word_bounded, c.split())) for c in ordered)
     return _LocalDatePatterns(
-        re.compile(cues),
+        re.compile(cues, re.IGNORECASE),
         re.compile(
             rf"(?<![0-9])(?P<day>[0-9]{{1,2}})\s*(?P<month>{months})\s*"
-            rf"{optional_particle}(?P<year>[0-9]{{3,4}})(?![0-9])"
+            rf"{optional_particle}(?P<year>[0-9]{{3,4}})(?![0-9])",
+            re.IGNORECASE,
         ),
         index,
     )
@@ -461,7 +464,7 @@ def _compose(
     country: str,
 ) -> date | None:
     """The Gregorian date a matched line states, or None when it states none."""
-    month = patterns.month_index[found.group("month")]
+    month = patterns.month_index[found.group("month").casefold()]
     local_year = int(found.group("year"))
     try:
         gregorian_year = _apply_rule(

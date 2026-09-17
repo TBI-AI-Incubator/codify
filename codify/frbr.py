@@ -149,7 +149,7 @@ _PARENTHETICAL = re.compile(r"\([^()]*\)")
 
 def _opens_with_prefix(body: str, prefix: str) -> bool:
     """A kind word opens the title, a Latin one whole: "Act" is not in "Action"."""
-    return re.match(word_bounded(prefix), body) is not None
+    return re.match(word_bounded(prefix), body, re.IGNORECASE) is not None
 
 
 def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int | None:
@@ -171,7 +171,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     )
     text = " ".join(normalise_digits(folded).split())
     edition_re = (
-        re.compile(rf"\(\s*(?:{_alternation(rule.edition_markers)})\s*([0-9]+)\s*\)")
+        re.compile(rf"\(\s*(?:{_alternation(rule.edition_markers)})\s*([0-9]+)\s*\)", re.IGNORECASE)
         if rule.edition_markers
         else None
     )
@@ -211,7 +211,9 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
         )
     year_re = (
-        re.compile(rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])")
+        re.compile(
+            rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])", re.IGNORECASE
+        )
         if rule.year_particles
         else None
     )
