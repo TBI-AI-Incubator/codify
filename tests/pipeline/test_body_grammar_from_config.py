@@ -5,6 +5,7 @@ Synthetic jurisdiction throughout: the shapes are the subject, not any corpus.""
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import pytest
@@ -41,6 +42,17 @@ def declared(monkeypatch: pytest.MonkeyPatch) -> jurisdictions.JurisdictionConfi
             "attachments": [
                 jurisdictions.AttachmentCaption(caption="NOTE", normative=False),
                 jurisdictions.AttachmentCaption(caption="TABLE OF", prefix=True),
+                jurisdictions.AttachmentCaption(
+                    caption="ANNEX",
+                    hierarchy=[
+                        jurisdictions.HierarchyEntry(
+                            local_term="Rule",
+                            akn_element="paragraph",
+                            level="basic",
+                            numbering="arabic_continuous",
+                        )
+                    ],
+                ),
             ],
         }
     )
@@ -362,3 +374,34 @@ def test_a_prefix_caption_may_carry_a_long_punctuated_title(declared: Any) -> No
     title = "TABLE OF RATES, FEES AND OTHER DUTIES ON SEVEN COUNTED WORDS."
     text = f"Section 1\nOne.\n\n{CLOSING}\n\n{title}\n1. Two coins.\n"
     assert [a.heading for a in _scan(text).anchors if a.kind == "schedule"] == [title]
+
+
+def test_an_attachment_keyword_scan_keeps_the_suffix(declared: Any) -> None:
+    levels = [a for a in jurisdictions.load_config(COUNTRY).attachments if a.caption == "ANNEX"][
+        0
+    ].hierarchy
+    window = "ANNEX\nRule 1\nAnnex one.\n\nRule 1 zib\nAnnex one bis.\n"
+    found = anchors_mod._scan_attachment_keywords(
+        window, 0, levels, jurisdictions.load_config(COUNTRY), []
+    )
+    assert [a.number for a in found] == ["1", "1 zib"]
+
+
+def test_outputs_keep_source_offsets_after_the_cut(declared: Any) -> None:
+    """The trace and the verbatim lane locate the source; the cut is internal."""
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    text = "AN ACT\n\n" + TAIL
+    _, _, at_source = text_to_bluebell_verbatim(text, country=COUNTRY)
+    note = next(a for a in at_source.values() if a.kind == "schedule")
+    assert text[note.char_offset :].lstrip().startswith("NOTE")
+    traces: list = []
+
+    async def run() -> None:
+        await structure_mod.text_to_bluebell_scaffolded(
+            text, client=_EmptyFillClient(), country=COUNTRY, doctype="act", on_scan=traces.append
+        )
+
+    asyncio.run(run())
+    traced = next(a for a in traces[0].anchors if a.kind == "schedule")
+    assert traced.char_offset == note.char_offset

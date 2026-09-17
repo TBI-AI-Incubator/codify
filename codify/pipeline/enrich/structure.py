@@ -405,11 +405,14 @@ async def text_to_bluebell_scaffolded(
 
     halts: list[StructureHalt] = []
 
+    # Source offsets throughout, even after the closing span is cut below.
+    trace_anchors = anchors
+
     def _trace(scaffold: str | None = None, fallback: str | None = None) -> None:
         if on_scan:
             on_scan(
                 ScanTrace(
-                    anchors=tuple(anchors),
+                    anchors=tuple(trace_anchors),
                     coverage=coverage,
                     scaffold=scaffold,
                     fallback=fallback,
@@ -646,6 +649,7 @@ async def text_to_bluebell_scaffolded(
     # The signature ends the body: markers after it belong to an appended
     # instrument or a note, and the span itself becomes the conclusions.
     bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
+    # `trace_anchors` keeps the pre-cut list: the trace's readers locate the source.
     text, anchors = bound.text, bound.anchors
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(

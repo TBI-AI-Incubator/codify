@@ -92,5 +92,6 @@ def text_to_bluebell_verbatim(
     )
     response = fill_bodies_verbatim(text, anchors)
     bluebell = assemble_filled_scaffold(scaffold, eid_to_anchor, response)
-
-    return bluebell, anchor_summary(anchors), eid_to_anchor
+    # Callers map these against the source, so hand back source offsets.
+    at_source = {a.akn_eid: a for a in bound.source_anchors if a.akn_eid in eid_to_anchor}
+    return bluebell, anchor_summary(anchors), at_source

@@ -2287,7 +2287,7 @@ def _scan_attachment_keywords(
             StructuralAnchor(
                 kind=kind,
                 keyword=_keyword_from_match(m, kind),
-                number=m.group("num") if "num" in m.groupdict() else None,
+                number=_matched_number(m) if "num" in m.groupdict() else None,
                 char_offset=m.start(),
                 line=window.count("\n", 0, m.start()) + 1,
                 matched_text=m.group(0).strip(),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 import structlog
 
@@ -19,6 +19,8 @@ class BodyBound:
 
     text: str
     anchors: list[StructuralAnchor]
+    # The same anchors at their source offsets, for outputs that locate the source.
+    source_anchors: list[StructuralAnchor] = field(default_factory=list)
     conclusions: str | None = None
     cut_at: int | None = None
     excluded_anchors: int = 0
@@ -60,24 +62,27 @@ def bound_body_at_closing(
     scan has dropped and counted its markers, and its text becomes the conclusions."""
     words = [p for p in phrases if p]
     if not anchors or not words:
-        return BodyBound(text, anchors)
+        return BodyBound(text, anchors, anchors)
     quoted = _closed_quote_mask(text, country)
     start = closing_offset(text, words, after=min(a.char_offset for a in anchors), quoted=quoted)
     if start is None:
-        return BodyBound(text, anchors)
+        return BodyBound(text, anchors, anchors)
     end = min(
         (a.char_offset for a in anchors if a.kind == "schedule" and a.char_offset >= start),
         default=len(text),
     )
     kept: list[StructuralAnchor] = []
+    source: list[StructuralAnchor] = []
     excluded = 0
     for a in anchors:
         if start <= a.char_offset < end:
             excluded += 1
-        elif a.char_offset >= end:
-            kept.append(replace(a, char_offset=a.char_offset - (end - start)))
-        else:
-            kept.append(a)
+            continue
+        source.append(a)
+        shift = end - start if a.char_offset >= end else 0
+        kept.append(replace(a, char_offset=a.char_offset - shift) if shift else a)
     conclusions = text[start:end].strip("\n") or None
     logger.info("body_bounded_at_closing", excluded_anchors=excluded, chars=end - start)
-    return BodyBound(text[:start] + text[end:], kept, conclusions, start, excluded, end - start)
+    return BodyBound(
+        text[:start] + text[end:], kept, source, conclusions, start, excluded, end - start
+    )
