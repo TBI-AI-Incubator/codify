@@ -1,0 +1,559 @@
+"""Reading the date a source states its document was made on."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from codify.calendar import (
+    _DATE_WINDOW_CHARS,
+    _first_stated_date,
+    compile_local_date_patterns,
+    declares_local_date_grammar,
+    local_date_from_text,
+)
+from codify.jurisdictions import CalendarConversion
+
+MONTHS = [
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม",
+]
+
+
+@pytest.fixture(autouse=True)
+def date_grammar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """One calendar that names its months, one that does not."""
+    from tests.config_fixtures import isolated_configs
+
+    named = {
+        "kind": "buddhist",
+        "epoch_year": -543,
+        "month_names": MONTHS,
+        "month_day_is_gregorian": True,
+        "date_cues": ["ให้ไว้ ณ วันที่", "ตราไว้ ณ วันที่", "ประกาศ ณ วันที่"],
+        "year_particles": ["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."],
+        "new_year_month": 4,
+        "new_year_reform_year": 2484,
+    }
+    configs = {
+        "xn": {
+            "calendar": "buddhist_era",
+            "frbr": {"country_code": "xn", "calendar_conversion": named},
+        },
+        # An era-table rule, whose `eras` hold dicts no cache key may carry.
+        "xj": {
+            "frbr": {
+                "country_code": "xj",
+                "calendar_conversion": {
+                    "kind": "era_table",
+                    "eras": [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}],
+                },
+            }
+        },
+        "xm": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xm",
+                "calendar_conversion": {"kind": "buddhist", "epoch_year": -543},
+            },
+        },
+    }
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        yield
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("ให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", date(2016, 4, 26)),
+        ("ให้ไว้ ณ วันที่ 26 เมษายน พ.ศ. 2559", date(2016, 4, 26)),
+        # A signature block wraps wherever the column ran out.
+        ("ให้ไว้ ณ\r\nวันที่ ๒๐\r\nสิงหาคม\r\nพุทธศักราช ๒๔๗๘", date(1935, 8, 20)),
+        # A second declared cue, and no year particle before the year.
+        ("ตราไว้ ณ วันที่ ๓ ธันวาคม ๒๕๐๐", date(1957, 12, 3)),
+    ],
+)
+def test_reads_a_dated_line_a_cue_introduces(text: str, expected: date) -> None:
+    assert local_date_from_text(text, "xn") == expected
+
+
+def test_a_year_that_began_mid_year_shifts_its_first_months() -> None:
+    """Before the reform the local year ran from month 4, so month 1 of local
+    year N falls in the Gregorian year after N + epoch."""
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๓๑ มกราคม พุทธศักราช ๒๔๗๘", "xn") == date(1936, 1, 31)
+    # Control: the same month after the reform takes the plain offset.
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๓๑ มกราคม พุทธศักราช ๒๕๐๐", "xn") == date(1957, 1, 31)
+    # Control: a month after the local new year is unshifted either side.
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๒๐ สิงหาคม พุทธศักราช ๒๔๗๘", "xn") == date(1935, 8, 20)
+
+
+def test_a_dated_line_no_cue_introduces_is_not_this_documents_date() -> None:
+    """The first dated line of an amending document is the one it amends."""
+    assert local_date_from_text("แก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐ ต่อไปนี้", "xn") is None
+
+
+def test_a_date_too_far_after_its_cue_belongs_to_the_next_paragraph() -> None:
+    assert local_date_from_text("ให้ไว้ ณ วันที่" + "ก" * 300 + " ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+
+
+def test_an_impossible_day_is_refused_rather_than_clamped() -> None:
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๓๑ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+
+
+def test_a_calendar_that_names_no_months_reads_nothing() -> None:
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xm") is None
+
+
+def test_an_undeclared_country_reads_nothing() -> None:
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "") is None
+
+
+_ADVERSARIAL = """
+import sys
+sys.path.insert(0, {root!r})
+from codify.calendar import compile_local_date_patterns
+from codify.jurisdictions import CalendarConversion
+from tests.test_local_date_from_text import MONTHS
+rule = CalendarConversion(
+    kind="buddhist",
+    month_names=MONTHS,
+    month_day_is_gregorian=True,
+    date_cues=["A B C"],
+    year_particles=["\u0e1e\u0e23\u0e30\u0e1e\u0e38\u0e17\u0e18\u0e28\u0e31\u0e01\u0e23\u0e32\u0e0a",
+                    "\u0e1e\u0e38\u0e17\u0e18\u0e28\u0e31\u0e01\u0e23\u0e32\u0e0a"],
+)
+patterns = compile_local_date_patterns(rule)
+patterns.date.search("1 \u0e21\u0e01\u0e23\u0e32\u0e04\u0e21" + " " * 40000 + "x")
+patterns.cue.search("A " * 40000)
+"""
+
+
+def test_the_shipped_patterns_are_bounded_on_a_long_non_matching_repeat() -> None:
+    """`re` holds the GIL and takes no timeout, so the bound is a child process
+    and a catastrophic pattern fails by name rather than hanging the run."""
+    script = _ADVERSARIAL.format(root=str(Path(__file__).resolve().parents[1]))
+    try:
+        subprocess.run([sys.executable, "-c", script], timeout=10, check=True)
+    except subprocess.TimeoutExpired:
+        pytest.fail("a date pattern did not return within 10s on 40k repeats")
+
+
+def test_a_calendar_with_its_own_month_grid_reads_nothing() -> None:
+    """The year converts; the month and day do not. Composing a Gregorian date
+    from a local month would be wrong by months, so the rule refuses."""
+    rule = CalendarConversion(kind="hijri_lunar", month_names=MONTHS, date_cues=["ให้ไว้ ณ วันที่"])
+    assert compile_local_date_patterns(rule) is None
+
+
+def test_a_year_straddling_the_window_edge_is_read_whole() -> None:
+    """Bounding the match's start, not the string: an `endpos` cutting the year
+    would match its first three digits and date the document a millennium off."""
+    cue = "ให้ไว้ ณ วันที่"
+    prefix = f"{cue} ๒๖ เมษายน พ.ศ. "
+    filler = "ก" * (_DATE_WINDOW_CHARS - len(prefix) - len(cue) + 12)
+    text = f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙"
+    found = local_date_from_text(text, "xn")
+    assert found == date(2016, 4, 26)
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"month_names": ["", *MONTHS], "date_cues": ["c"]},
+        {"month_names": [MONTHS[0], *MONTHS], "date_cues": ["c"]},
+        {"month_names": MONTHS, "date_cues": ["", " "]},
+    ],
+)
+def test_a_grammar_that_would_read_a_wrong_date_is_refused_at_load(
+    broken: dict[str, list[str]],
+) -> None:
+    """A blank month renumbers the calendar and a blank cue matches every
+    document at offset zero; both produce a valid, wrong date."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(kind="buddhist", month_day_is_gregorian=True, **broken)
+
+
+def test_a_longer_digit_run_is_not_a_year() -> None:
+    """`[0-9]{3,4}` would take the first four digits of a longer run."""
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙๐", "xn") is None
+
+
+def test_a_cue_introducing_no_date_does_not_end_the_search() -> None:
+    """A document may name the cue before the signature block that carries the
+    date; stopping at the first occurrence reads no date at all."""
+    barren = "ให้ไว้ ณ วันที่" + "ก" * 400
+    assert local_date_from_text(f"{barren}\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") == date(
+        2016, 4, 26
+    )
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"month_names": MONTHS[:11], "month_day_is_gregorian": True},
+        {"month_names": MONTHS, "month_day_is_gregorian": True, "new_year_reform_year": 2484},
+    ],
+)
+def test_a_grammar_whose_declaration_cannot_hold_is_refused(broken: dict[str, object]) -> None:
+    """Eleven months renumber the calendar; a reform year with no new-year month
+    can never fire, so the field reads as set and does nothing."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(kind="buddhist", date_cues=["c"], **broken)  # type: ignore[arg-type]
+
+
+def test_a_calendar_whose_rule_holds_dicts_is_asked_without_crashing() -> None:
+    """`eras` hold dicts, which no cache key may carry. Every ingest asks this of
+    every jurisdiction, so an era-table config must answer, not raise."""
+    assert declares_local_date_grammar("xj") is False
+    assert local_date_from_text("令和6年 ให้ไว้ ณ วันที่", "xj") is None
+
+
+def test_an_impossible_date_does_not_hide_a_valid_later_one() -> None:
+    """A syntactic match that is not a date must not end the cue walk."""
+    text = "ให้ไว้ ณ วันที่ ๓๑ เมษายน พ.ศ. ๒๕๕๙\nให้ไว้ ณ วันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙"
+    assert local_date_from_text(text, "xn") == date(2016, 4, 26)
+
+
+def test_a_longer_digit_run_is_not_a_day() -> None:
+    """Without a leading boundary "126 เมษายน" reads as the 26th."""
+    assert local_date_from_text("ให้ไว้ ณ วันที่ ๑๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"new_year_month": 0, "new_year_reform_year": 2484},
+        {"new_year_month": 13, "new_year_reform_year": 2484},
+        {"new_year_month": 4, "new_year_reform_year": 0},
+        {"new_year_month": 4, "new_year_reform_year": -1},
+    ],
+)
+def test_a_reform_declared_out_of_range_is_refused(broken: dict[str, int]) -> None:
+    """A month outside 1-12 and a year below one cannot describe a new year."""
+    with pytest.raises(ValidationError):
+        CalendarConversion(
+            kind="buddhist",
+            month_names=MONTHS,
+            month_day_is_gregorian=True,
+            date_cues=["c"],
+            **broken,
+        )
+
+
+_MANY_CUES = """
+import sys
+sys.path.insert(0, {root!r})
+from codify.calendar import _first_stated_date, compile_local_date_patterns
+from codify.jurisdictions import CalendarConversion
+from tests.test_local_date_from_text import MONTHS
+rule = CalendarConversion(
+    kind="buddhist", month_names=MONTHS, month_day_is_gregorian=True,
+    date_cues=["A B C"], year_particles=["P"],
+)
+patterns = compile_local_date_patterns(rule)
+assert _first_stated_date("A B C " * 20000, patterns, rule, "xn") is None
+"""
+
+
+def test_a_document_full_of_cues_and_no_date_is_read_once() -> None:
+    """A fresh search per cue re-reads the rest of the document, so 20k cue
+    phrases and no date took time in the square of the document length."""
+    script = _MANY_CUES.format(root=str(Path(__file__).resolve().parents[1]))
+    try:
+        subprocess.run([sys.executable, "-c", script], timeout=15, check=True)
+    except subprocess.TimeoutExpired:
+        pytest.fail("the cue walk did not finish within 15s on 20k date-free cues")
+
+
+def test_a_long_cue_does_not_spend_the_window_on_itself() -> None:
+    """Measured from the cue's end: a cue is a phrase, and one of any length
+    would otherwise consume the allowance meant for the text after it."""
+    cue = "ประกาศ ณ วันที่"
+    # Inside the window from the cue's end, outside it from the cue's start.
+    filler = "ก" * (_DATE_WINDOW_CHARS - 10)
+    found = local_date_from_text(f"{cue}{filler} ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn")
+    assert found == date(2016, 4, 26)
+
+
+def test_a_barren_cue_does_not_reach_into_the_next_paragraph() -> None:
+    """A cue introduces what follows it in its own paragraph; a dated line after
+    a blank line is the next paragraph's, and usually one the document amends."""
+    text = "ให้ไว้ ณ วันที่\n\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
+    assert local_date_from_text(text, "xn") is None
+    # Control: one line break is a wrap, not a paragraph, and still reaches.
+    wrapped = "ให้ไว้ ณ วันที่\nแก้ไขเพิ่มเติม ๔ สิงหาคม พ.ศ. ๒๔๘๐"
+    assert local_date_from_text(wrapped, "xn") == date(1937, 8, 4)
+
+
+def test_a_cue_does_not_assemble_across_a_blank_line() -> None:
+    """A separator inside a cue that swallows a paragraph break puts the break
+    inside the cue, where the reach check can no longer see it."""
+    assert local_date_from_text("ให้ไว้ ณ\n\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") is None
+    # Control: a single wrap inside the cue still assembles.
+    assert local_date_from_text("ให้ไว้ ณ\nวันที่ ๒๖ เมษายน พ.ศ. ๒๕๕๙", "xn") == date(2016, 4, 26)
+
+
+def test_a_longer_cue_wins_over_a_shorter_one_it_contains() -> None:
+    """Configuration order must not decide: the shorter cue ends earlier, so it
+    spends the reach allowance on the rest of the longer one."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["ให้ไว้", "ให้ไว้ ณ วันที่"],
+        year_particles=["พ.ศ."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    # Just inside the window from the longer cue's end, and outside it from the
+    # shorter cue's. ASCII digits: this calls the walk below the fold.
+    long_cue, stated = "ให้ไว้ ณ วันที่", " 26 เมษายน พ.ศ. 2559"
+    filler = "ก" * (_DATE_WINDOW_CHARS - 2)
+    assert len(filler) + 1 > _DATE_WINDOW_CHARS - len(" ณ วันที่")
+    text = long_cue + filler + stated
+    assert _first_stated_date(text, patterns, rule, "xn") == date(2016, 4, 26)
+
+
+ENGLISH_MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]
+
+
+def test_a_latin_cue_matches_a_whole_word_only() -> None:
+    """A cue that is the tail of a longer word is not the cue: "undated" must
+    not introduce a date as "dated" does."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert (
+        _first_stated_date("This instrument is undated 1 January 2567", patterns, rule, "xn")
+        is None
+    )
+    assert _first_stated_date(
+        "This instrument is dated 1 January 2567", patterns, rule, "xn"
+    ) == date(2024, 1, 1)
+
+
+def test_a_latin_month_name_matches_a_whole_word_only() -> None:
+    """ "May" inside "Mayor" is not the month."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 1 Mayor 2567", patterns, rule, "xn") is None
+    assert _first_stated_date("dated 1 May 2567", patterns, rule, "xn") == date(2024, 5, 1)
+
+
+def test_a_date_does_not_assemble_across_a_blank_line_either() -> None:
+    """The parts of a date may wrap, but not span a paragraph: a day left at the
+    end of one and a month opening the next are not one date."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["ให้ไว้ ณ วันที่"],
+        year_particles=["พ.ศ."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    split = "ให้ไว้ ณ วันที่ 26\n\nเมษายน พ.ศ. 2559"
+    wrapped = "ให้ไว้ ณ วันที่ 26\nเมษายน พ.ศ. 2559"
+    assert _first_stated_date(split, patterns, rule, "xn") is None
+    assert _first_stated_date(wrapped, patterns, rule, "xn") == date(2016, 4, 26)
+
+
+def test_the_day_the_source_states_settles_the_new_year_month() -> None:
+    """14 April 2023 opened BS 2080: the day, not only the month, says which
+    Gregorian year an April date of that local year falls in."""
+    rule = CalendarConversion(
+        kind="bikram_samvat",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["BS"],
+        new_year_month=4,
+        new_year_day=14,
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 14 April 2080", patterns, rule, "xn") == date(2023, 4, 14)
+    assert _first_stated_date("dated 1 April 2080", patterns, rule, "xn") == date(2024, 4, 1)
+
+
+@pytest.mark.parametrize(
+    ("fields", "day"),
+    [
+        # Against the kind's default new-year month, April, which has thirty days.
+        ({"kind": "bikram_samvat"}, 0),
+        ({"kind": "bikram_samvat"}, 31),
+        ({"kind": "bikram_samvat"}, 32),
+        # Against a declared month: February never has a thirtieth.
+        ({"kind": "bikram_samvat", "new_year_month": 2}, 30),
+        ({"kind": "ethiopian"}, 31),
+    ],
+)
+def test_a_new_year_day_the_month_does_not_hold_is_refused(
+    fields: dict[str, object], day: int
+) -> None:
+    """The day is read against the new-year month at conversion; one the month
+    does not hold would file every date of that month on the wrong side."""
+    with pytest.raises(ValidationError, match="new_year_day"):
+        CalendarConversion(**fields, new_year_day=day)
+
+
+@pytest.mark.parametrize(
+    ("fields", "day"),
+    [
+        ({"kind": "bikram_samvat"}, 1),
+        ({"kind": "bikram_samvat"}, 30),
+        ({"kind": "bikram_samvat", "new_year_month": 1}, 31),
+        # A leap day is a day of February in the years that have one.
+        ({"kind": "bikram_samvat", "new_year_month": 2}, 29),
+        ({"kind": "ethiopian"}, 30),
+    ],
+)
+def test_a_new_year_day_the_month_holds_is_accepted(fields: dict[str, object], day: int) -> None:
+    assert CalendarConversion(**fields, new_year_day=day).new_year_day == day
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("ให้ไว้ ณ\r\rวันที่ 26 เมษายน พ.ศ. 2559", None),
+        ("ให้ไว้ ณ\r\n\r\nวันที่ 26 เมษายน พ.ศ. 2559", None),
+        ("ให้ไว้ ณ\rวันที่ 26 เมษายน พ.ศ. 2559", date(2016, 4, 26)),
+        ("ให้ไว้ ณ\r\nวันที่ 26 เมษายน พ.ศ. 2559", date(2016, 4, 26)),
+    ],
+    ids=["CR-only paragraph", "CRLF paragraph", "CR wrap", "CRLF wrap"],
+)
+def test_every_line_ending_breaks_a_paragraph_the_same_way(
+    text: str, expected: date | None
+) -> None:
+    """A carriage return is a line break, not whitespace: two of them end a
+    paragraph as two newlines do, whichever convention wrote the file."""
+    assert local_date_from_text(text, "xn") == expected
+
+
+ERAS = [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}]
+
+
+def test_a_date_grammar_beside_an_era_table_is_refused_at_load() -> None:
+    """Both grammars capture a bare number, which an era table reads as a year
+    of its latest era; declaring them together is a config error, named."""
+    with pytest.raises(ValidationError, match="era_table.*month_names, date_cues"):
+        CalendarConversion(
+            kind="era_table",
+            eras=ERAS,
+            month_names=ENGLISH_MONTHS,
+            month_day_is_gregorian=True,
+            date_cues=["dated"],
+        )
+    # Either half of the grammar alone is refused, and the message names both.
+    with pytest.raises(ValidationError, match="month_names, date_cues"):
+        CalendarConversion(kind="era_table", eras=ERAS, month_names=ENGLISH_MONTHS)
+    with pytest.raises(ValidationError, match="month_names, date_cues"):
+        CalendarConversion(kind="era_table", eras=ERAS, date_cues=["dated"])
+    assert CalendarConversion(kind="era_table", eras=ERAS).kind == "era_table"
+
+
+def test_a_title_grammar_beside_an_era_table_is_refused_at_load() -> None:
+    from codify.jurisdictions import FrbrConfig
+
+    with pytest.raises(ValidationError, match="era_table.*title_identity"):
+        FrbrConfig(
+            country_code="xj",
+            title_identity={"strip_prefixes": ["Act"], "year_particles": ["of"]},
+            calendar_conversion={"kind": "era_table", "eras": ERAS},
+        )
+    assert FrbrConfig(country_code="xj", calendar_conversion={"kind": "era_table", "eras": ERAS})
+
+
+@pytest.mark.parametrize("text", ["DATED 1 MAY 2567", "dated 1 may 2567", "Dated 1 May 2567"])
+def test_a_latin_grammar_reads_any_casing(text: str) -> None:
+    """A cue and a month name are words, not spellings: a signature block set in
+    capitals states the same date. Twelve names stay twelve."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date(text, patterns, rule, "xn") == date(2024, 5, 1)
+
+
+def test_a_spelling_the_pattern_matches_but_no_month_names_is_no_date() -> None:
+    """Case-blind matching lets a dotless ı stand for i, so the regex can match
+    a spelling the folded lookup does not hold; that is no date, not a crash."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 1 Apr\u0131l 2567", patterns, rule, "xn") is None
+    assert _first_stated_date("dated 1 April 2567", patterns, rule, "xn") == date(2024, 4, 1)
+
+
+def test_month_names_differing_only_by_case_are_refused() -> None:
+    """The lookup folds its key, so two spellings of one name would leave one
+    slot unreachable; distinctness is judged on the folded form."""
+    with pytest.raises(ValidationError, match="distinct"):
+        CalendarConversion(
+            kind="buddhist",
+            month_names=["MAY", *ENGLISH_MONTHS[1:]],
+            month_day_is_gregorian=True,
+            date_cues=["dated"],
+        )
+
+
+def test_the_gregorian_grid_flag_loads_without_a_date_grammar() -> None:
+    """A jurisdiction whose labelled dates are on the Gregorian grid need not
+    name its months: the grid flag serves the metadata path on its own."""
+    rule = CalendarConversion(kind="buddhist", month_day_is_gregorian=True)
+    assert rule.month_day_is_gregorian and not rule.month_names
+    assert compile_local_date_patterns(rule) is None
+    with pytest.raises(ValidationError, match="12"):
+        CalendarConversion(kind="buddhist", month_day_is_gregorian=True, month_names=["a", "b"])

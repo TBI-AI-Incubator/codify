@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 import json
 import os
@@ -276,6 +277,10 @@ class DocumentClass(BaseModel):
     authoritative_language: str | None = None
 
 
+#: The Gregorian month each kind's new year falls in when the config names none.
+_DEFAULT_NEW_YEAR_MONTH = {"bikram_samvat": 4, "ethiopian": 9}
+
+
 class CalendarConversion(BaseModel):
     """Deterministic conversion rule for non-Gregorian local calendars.
 
@@ -316,13 +321,105 @@ class CalendarConversion(BaseModel):
     # Offset variant for month-sensitive: subtract `offset` from local year
     # before the new-year day, otherwise `offset + 1`.
     offset: int | None = None
+    # Month names in the local calendar's own order, index 0 = month 1. Present
+    # only where a dated line is read off the source text.
+    month_names: list[str] = Field(default_factory=list)
+    # Whether the months and days coincide with the Gregorian ones, so only the
+    # year converts. False for any calendar with a grid of its own.
+    month_day_is_gregorian: bool = False
+    # Phrases that introduce the date a document was made. A dated line elsewhere
+    # in the text is some other instrument's.
+    date_cues: list[str] = Field(default_factory=list)
+    # Words marking a year as belonging to this calendar ("B.E.", "A.H.").
+    year_particles: list[str] = Field(default_factory=list)
+    # The local year began in this month before `new_year_reform_year`, so an
+    # earlier date carries the previous year's number and the offset is short.
+    new_year_reform_year: int | None = None
     note: str = ""
+
+    @model_validator(mode="after")
+    def _date_grammar_is_usable(self) -> "CalendarConversion":
+        """A blank month renumbers the calendar and a blank cue compiles to a
+        pattern matching the start of every document."""
+        # On the folded form, since the lookup folds its key.
+        names = [n.strip().casefold() for n in self.month_names]
+        if self.month_names and (not all(names) or len(set(names)) != len(names)):
+            raise ValueError("month_names must be non-blank and distinct")
+        if self.date_cues and not any(c.strip() for c in self.date_cues):
+            raise ValueError("date_cues must carry at least one non-blank cue")
+        if self.month_day_is_gregorian and self.month_names and len(self.month_names) != 12:
+            # Named at all, the months of a Gregorian grid are twelve; any other
+            # count renumbers them. Unnamed, the grid serves the metadata path.
+            raise ValueError("month_names on a Gregorian grid must be exactly 12")
+        if self.new_year_month is not None and not 1 <= self.new_year_month <= 12:
+            raise ValueError("new_year_month must be a month, 1 to 12")
+        if self.new_year_day is not None:
+            # Against the month it will be read in: a day that month never has
+            # would file every date of the month on one side.
+            month = self.new_year_month or _DEFAULT_NEW_YEAR_MONTH.get(self.kind, 1)
+            longest = max(calendar.monthrange(year, month)[1] for year in (2023, 2024))
+            if not 1 <= self.new_year_day <= longest:
+                raise ValueError(f"new_year_day must be a day of month {month}, 1 to {longest}")
+        if self.new_year_reform_year is not None and self.new_year_reform_year < 1:
+            # Every calendar here counts from one.
+            raise ValueError("new_year_reform_year must be a year")
+        if self.new_year_reform_year is not None and not self.new_year_month:
+            # Without one the shift can never fire, so the field reads as set
+            # and does nothing.
+            raise ValueError("new_year_reform_year needs new_year_month")
+        if self.kind == "era_table" and (self.month_names or self.date_cues):
+            # The grammar captures a bare number, which an era table reads as a
+            # year of its latest era.
+            raise ValueError(
+                "an era_table conversion cannot carry a date grammar (month_names, date_cues)"
+            )
+        return self
+
+
+#: Hex characters of the digest a title-derived segment carries; six (2^24)
+#: collided on ordinary titles.
+SLUG_DIGEST_CHARS = 12
+
+
+class TitleIdentity(BaseModel):
+    """How a jurisdiction that numbers nothing derives an identity from a title.
+    Every field is a literal `codify.frbr.identity_from_title` reads."""
+
+    model_config = _STRICT
+
+    # Document-kind words opening a short title, longest first.
+    strip_prefixes: list[str] = Field(default_factory=list)
+    # Words marking the year that follows as the instrument's own.
+    year_particles: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _literals_are_not_blank(self) -> "TitleIdentity":
+        """A blank particle matches everywhere, so any run of digits would read
+        as the year and any parenthetical as an edition."""
+        for name in (
+            "strip_prefixes",
+            "year_particles",
+            "edition_markers",
+            "consolidation_markers",
+        ):
+            if any(not v.strip() for v in getattr(self, name)):
+                raise ValueError(f"{name} must not carry a blank entry")
+        return self
+
+    # Words inside a parenthetical naming this instrument's edition, spelling
+    # variants included; the first is canonical and is what a slug carries.
+    edition_markers: list[str] = Field(default_factory=list)
+    # Parenthetical words marking a re-publication; an edition number after one
+    # is the edition folded in, not this document's.
+    consolidation_markers: list[str] = Field(default_factory=list)
 
 
 class FrbrConfig(BaseModel):
     model_config = _LOOSE
 
     country_code: str
+    # Declared where instruments carry no number and the title is the identity.
+    title_identity: TitleIdentity | None = None
     uri_patterns: dict[str, str] = Field(default_factory=dict)
     date_calendar: Calendar = "gregorian"
     date_calendar_note: str | None = None
@@ -336,6 +433,15 @@ class FrbrConfig(BaseModel):
     number_note: str | None = None
     number_extraction: str | dict[str, Any] | None = None
     sample_uris: list[Any] | dict[str, str] | None = None
+
+    @model_validator(mode="after")
+    def _grammars_suit_the_conversion(self) -> "FrbrConfig":
+        """A title grammar captures a bare number; an era table reads one as a
+        year of its latest era, so the two cannot be declared together."""
+        rule = self.calendar_conversion
+        if self.title_identity is not None and rule is not None and rule.kind == "era_table":
+            raise ValueError("an era_table conversion cannot carry a title_identity grammar")
+        return self
 
 
 class NumberingConfig(BaseModel):

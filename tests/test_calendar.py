@@ -6,10 +6,12 @@ import pytest
 
 from codify.calendar import (
     CalendarConversionError,
+    _apply_rule,
+    reform_shift,
     to_gregorian_year,
     year_from_calendar,
 )
-from codify.jurisdictions import JurisdictionConfigError
+from codify.jurisdictions import CalendarConversion, JurisdictionConfigError
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +24,7 @@ def calendar_configs(tmp_path, monkeypatch):
         "ir": {"kind": "hijri_solar"},
         "th": {"kind": "buddhist"},
         "tw": {"kind": "epoch_offset", "epoch_year": 1911},
+        "xnp": {"kind": "bikram_samvat"},
         "jp": {
             "kind": "era_table",
             "eras": [
@@ -345,13 +348,18 @@ class TestOnlyAWholeYearIsAYear:
             assert gregorian_year(metadata, "ps") is None, raw
 
     def test_a_three_or_four_digit_year_still_passes(self) -> None:
+        """A URI segment is four digits, so a three-digit year is carried padded
+        and stored as the number it is; the canonical form reads the same."""
         from codify.pipeline.enrich.metadata import gregorian_year
         from codify.pipeline.stages import resolve_year
 
-        for raw in ("622", "1443", "2024"):
+        for raw in ("1443", "2024"):
             metadata = {"year": raw}
             assert resolve_year(metadata, "ps") == raw, raw
             assert gregorian_year(metadata, "ps") == int(raw), raw
+        for raw in ("622", "0622"):
+            assert resolve_year({"year": raw}, "ps") == "0622", raw
+            assert gregorian_year({"year": raw}, "ps") == 622, raw
 
 
 class TestOfficialTextNumbersItsEras:
@@ -648,3 +656,265 @@ class TestAStringYearIsGuardedLikeAnInteger:
         assert to_gregorian_year("令和6", "jp") == 2024
         assert to_gregorian_year(114, "tw") == 2025
         assert to_gregorian_year("1443", "sa") == 2021
+
+
+class TestAMonthIsReadOnItsOwnGrid:
+    """Anchored on the calendars themselves: 1 Baisakh 2080 was 14 April 2023 and
+    1 Meskerem 2016 was 12 September 2023, so each year straddles two Gregorian."""
+
+    @staticmethod
+    def _gregorian_grid(kind: str, **fields: int) -> CalendarConversion:
+        return CalendarConversion(
+            kind=kind,
+            month_day_is_gregorian=True,
+            month_names=[f"m{i}" for i in range(12)],
+            **fields,
+        )
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "expected"),
+        [
+            # BS 2080 ran 14 April 2023 to 12 April 2024.
+            ("bikram_samvat", "2080", 6, 2023),
+            ("bikram_samvat", "2080", 12, 2023),
+            ("bikram_samvat", "2080", 1, 2024),
+            ("bikram_samvat", "2080", 3, 2024),
+            # EC 2016 ran 12 September 2023 to 10 September 2024.
+            ("ethiopian", "2016", 10, 2023),
+            ("ethiopian", "2016", 12, 2023),
+            ("ethiopian", "2016", 1, 2024),
+            ("ethiopian", "2016", 8, 2024),
+        ],
+    )
+    def test_a_gregorian_month_lands_in_the_year_the_calendar_says(
+        self, kind: str, local_year: str, month: int, expected: int
+    ) -> None:
+        assert _apply_rule(local_year, self._gregorian_grid(kind), month=month) == expected
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day", "expected"),
+        [
+            # 14 April 2023 opened BS 2080; 12 April 2024 closed it.
+            ("bikram_samvat", "2080", 4, 14, 2023),
+            ("bikram_samvat", "2080", 4, 30, 2023),
+            ("bikram_samvat", "2080", 4, 12, 2024),
+            ("bikram_samvat", "2080", 4, 1, 2024),
+            # 12 September 2023 opened EC 2016; 10 September 2024 closed it.
+            ("ethiopian", "2016", 9, 12, 2023),
+            ("ethiopian", "2016", 9, 30, 2023),
+            ("ethiopian", "2016", 9, 10, 2024),
+            ("ethiopian", "2016", 9, 1, 2024),
+        ],
+    )
+    def test_the_new_year_month_is_settled_by_its_day(
+        self, kind: str, local_year: str, month: int, day: int, expected: int
+    ) -> None:
+        assert _apply_rule(local_year, self._gregorian_grid(kind), month=month, day=day) == expected
+
+    def test_a_declared_new_year_day_settles_the_whole_month(self) -> None:
+        """A jurisdiction naming the day removes the band: on 13 April, which the
+        default band leaves open, the declared day decides."""
+        rule = self._gregorian_grid("bikram_samvat", new_year_month=4, new_year_day=13)
+        assert _apply_rule("2080", rule, month=4, day=13) == 2023
+        assert _apply_rule("2080", rule, month=4, day=12) == 2024
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day"),
+        [("bikram_samvat", "2080", 4, 13), ("ethiopian", "2016", 9, 11)],
+        ids=["the day the new year moves over", "the day the new year moves over, ethiopian"],
+    )
+    def test_the_new_year_month_without_a_certain_day_settles_nothing(
+        self, kind: str, local_year: str, month: int, day: int
+    ) -> None:
+        rule = self._gregorian_grid(kind)
+        blind = _apply_rule(local_year, rule, month=None)
+        assert _apply_rule(local_year, rule, month=month, day=day) == blind
+        assert _apply_rule(local_year, rule, month=month, day=None) == blind
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day", "expected"),
+        [
+            # 1 Poush 2080 was 16 December 2023; 30 Poush 2080 was 14 January 2024.
+            ("bikram_samvat", "2080", 9, 1, 2023),
+            ("bikram_samvat", "2080", 9, 15, 2023),
+            ("bikram_samvat", "2080", 9, 18, 2024),
+            ("bikram_samvat", "2080", 9, 30, 2024),
+            ("bikram_samvat", "2080", 8, None, 2023),
+            ("bikram_samvat", "2080", 1, None, 2023),
+            ("bikram_samvat", "2080", 10, None, 2024),
+            ("bikram_samvat", "2080", 12, None, 2024),
+            # 1 Tahsas 2016 was 11 December 2023; 30 Tahsas 2016 was 9 January 2024.
+            ("ethiopian", "2016", 4, 1, 2023),
+            ("ethiopian", "2016", 4, 21, 2023),
+            ("ethiopian", "2016", 4, 23, 2024),
+            ("ethiopian", "2016", 4, 30, 2024),
+            ("ethiopian", "2016", 1, None, 2023),
+            ("ethiopian", "2016", 3, None, 2023),
+            ("ethiopian", "2016", 5, None, 2024),
+            ("ethiopian", "2016", 13, None, 2024),
+        ],
+    )
+    def test_a_local_month_lands_in_the_year_the_calendar_says(
+        self, kind: str, local_year: str, month: int, day: int | None, expected: int
+    ) -> None:
+        rule = CalendarConversion(kind=kind)
+        assert _apply_rule(local_year, rule, month=month, day=day, month_grid="local") == expected
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day"),
+        [
+            ("bikram_samvat", "2080", 9, None),
+            ("bikram_samvat", "2080", 9, 16),
+            ("ethiopian", "2016", 4, None),
+            ("ethiopian", "2016", 4, 22),
+        ],
+    )
+    def test_the_month_straddling_january_without_a_certain_day_settles_nothing(
+        self, kind: str, local_year: str, month: int, day: int | None
+    ) -> None:
+        rule = CalendarConversion(kind=kind)
+        assert _apply_rule(
+            local_year, rule, month=month, day=day, month_grid="local"
+        ) == _apply_rule(local_year, rule, month=None)
+
+    @pytest.mark.parametrize(
+        ("declared_gregorian", "month_grid", "expected"),
+        [
+            # The calendar's own grid, undeclared: January is Baisakh, 2023.
+            (False, "local", 2023),
+            # Named Gregorian, whatever the config declares: January, 2024.
+            (False, "gregorian", 2024),
+            (True, "gregorian", 2024),
+            # A declared Gregorian grid makes the calendar's own months Gregorian.
+            (True, "local", 2024),
+        ],
+    )
+    def test_the_month_is_read_on_the_grid_the_caller_names(
+        self, declared_gregorian: bool, month_grid: str, expected: int
+    ) -> None:
+        """Which grid month 1 of BS 2080 is on decides the year, and the
+        keyword names it."""
+        rule = (
+            self._gregorian_grid("bikram_samvat")
+            if declared_gregorian
+            else CalendarConversion(kind="bikram_samvat")
+        )
+        assert _apply_rule("2080", rule, month=1, day=20, month_grid=month_grid) == expected
+
+    def test_a_bare_public_call_reads_the_month_as_gregorian(self) -> None:
+        """The public argument keeps the meaning it shipped with: a month named
+        by a caller that says nothing about the grid is a Gregorian month."""
+        assert _apply_rule("2080", CalendarConversion(kind="bikram_samvat"), month=1) == 2024
+        assert to_gregorian_year("2080", "xnp", month=1) == 2024
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "day", "month_grid"),
+        [
+            # Off the Gregorian grid: month 0, month 13, day 0, day 99.
+            ("bikram_samvat", "2080", 0, 10, "gregorian"),
+            ("bikram_samvat", "2080", 13, 10, "gregorian"),
+            ("bikram_samvat", "2080", 4, 0, "gregorian"),
+            ("bikram_samvat", "2080", 4, 99, "gregorian"),
+            ("ethiopian", "2016", 0, 10, "gregorian"),
+            ("ethiopian", "2016", 13, 10, "gregorian"),
+            ("ethiopian", "2016", 9, 0, "gregorian"),
+            ("ethiopian", "2016", 9, 40, "gregorian"),
+            # Off the calendar's own grid: month 0, one past its last, day 0, day 40.
+            ("bikram_samvat", "2080", 0, 10, "local"),
+            ("bikram_samvat", "2080", 13, 10, "local"),
+            ("bikram_samvat", "2080", 9, 0, "local"),
+            ("bikram_samvat", "2080", 9, 40, "local"),
+            ("ethiopian", "2016", 0, 10, "local"),
+            ("ethiopian", "2016", 14, 10, "local"),
+            ("ethiopian", "2016", 4, 0, "local"),
+            ("ethiopian", "2016", 4, 40, "local"),
+        ],
+    )
+    def test_a_value_off_the_grid_settles_nothing(
+        self, kind: str, local_year: str, month: int, day: int, month_grid: str
+    ) -> None:
+        """A month or day no grid holds cannot say which side of the new year the
+        date fell; the year converts as it does with no month at all."""
+        rule = (
+            self._gregorian_grid(kind)
+            if month_grid == "gregorian"
+            else CalendarConversion(kind=kind)
+        )
+        blind = _apply_rule(local_year, rule, month=None)
+        assert _apply_rule(local_year, rule, month=month, day=day, month_grid=month_grid) == blind
+
+    @pytest.mark.parametrize(
+        ("month", "day"),
+        [(0, 10), (13, 10), (2, 0), (2, 99)],
+        ids=["month 0", "month 13", "day 0", "day 99"],
+    )
+    def test_a_value_off_the_grid_takes_no_reform_shift(self, month: int, day: int) -> None:
+        """The reform shift reads the month against the new-year month; a value
+        off the grid cannot be read against it, so a pre-reform year stays."""
+        rule = self._gregorian_grid("buddhist", new_year_month=4, new_year_reform_year=2484)
+        assert _apply_rule("2478", rule, month=month, day=day) == _apply_rule(
+            "2478", rule, month=None
+        )
+        assert (
+            _apply_rule("2478", rule, month=2, day=10) == _apply_rule("2478", rule, month=None) + 1
+        )
+
+    def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
+        rule = self._gregorian_grid("bikram_samvat")
+        assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)
+        rule = CalendarConversion(kind="ethiopian")
+        assert _apply_rule("2016", rule, month=13, month_grid="local") == 2024
+
+    def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
+        """A local month on a grid nothing describes cannot meet the reform's
+        Gregorian-side threshold; the same month named Gregorian can."""
+        rule = CalendarConversion(kind="buddhist", new_year_month=4, new_year_reform_year=2484)
+        blind = _apply_rule("2478", rule, month=None)
+        assert _apply_rule("2478", rule, month=2, month_grid="local") == blind
+        assert _apply_rule("2478", rule, month=2, month_grid="gregorian") == blind + 1
+        assert reform_shift(rule, 2478, 2, on_gregorian_grid=False) == 0
+
+
+class TestEveryAliasReachesTheDeclaredRule:
+    """The prompt and the generic converter each accept spellings of a calendar
+    the config names another way; one alias set folds them all, so no spelling
+    a model emits can bypass a declared rule."""
+
+    ALIASES = [
+        ("lunar_hijri", "hijri_lunar", ["hijri", "lunar_hijri", "hijri_lunar", "islamic"]),
+        ("solar_hijri", "hijri_solar", ["hijri_solar", "solar_hijri", "persian", "jalali"]),
+        ("buddhist_era", "buddhist", ["buddhist", "buddhist_era", "thai"]),
+        ("ethiopian", "ethiopian", ["ethiopian", "ethiopic"]),
+        ("minguo", "epoch_offset", ["minguo", "roc", "taiwan"]),
+        ("japanese_era", "era_table", ["japanese_era"]),
+    ]
+
+    @pytest.mark.parametrize(("declared", "kind", "labels"), ALIASES, ids=[a[0] for a in ALIASES])
+    def test_each_label_names_the_declared_calendar(
+        self, declared: str, kind: str, labels: list[str], tmp_path, monkeypatch
+    ) -> None:
+        from codify.calendar import declares_this_calendar
+        from tests.config_fixtures import isolated_configs
+
+        rule: dict[str, object] = {"kind": kind}
+        if kind == "epoch_offset":
+            rule["epoch_year"] = 1911
+        if kind == "era_table":
+            rule["eras"] = [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}]
+        configs = {
+            "xq": {
+                "calendar": declared,
+                "frbr": {"country_code": "xq", "calendar_conversion": rule},
+            }
+        }
+        with isolated_configs(monkeypatch, tmp_path / "j", configs):
+            for label in labels:
+                assert declares_this_calendar(label, "xq"), label
+                assert declares_this_calendar(f" {label.upper()} ", "xq"), label
+            assert not declares_this_calendar("gregorian", "xq")
+
+    def test_the_generic_converter_reads_the_same_aliases(self) -> None:
+        assert year_from_calendar(2566, "thai") == year_from_calendar(2566, "buddhist_era") == 2023
+        assert year_from_calendar(114, "roc") == year_from_calendar(114, "minguo") == 2025
+        assert year_from_calendar(1445, "islamic") == year_from_calendar(1445, "lunar_hijri")
+        assert year_from_calendar(1403, "jalali") == year_from_calendar(1403, "solar_hijri")

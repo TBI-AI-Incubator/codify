@@ -1,5 +1,7 @@
 """resolve_year and gregorian_year extract year from metadata or fallback title."""
 
+import pytest
+
 from codify.pipeline.enrich.metadata import gregorian_year
 from codify.pipeline.stages import resolve_year
 
@@ -38,3 +40,92 @@ def test_title_year_survives_a_different_document_number() -> None:
 def test_resolve_year_prefers_explicit_year() -> None:
     meta = {"year": "2021"}
     assert resolve_year(meta, "xe", title="2023-Tariff-Schedule") == "2021"
+
+
+def test_the_stored_year_matches_the_uri_year_on_a_title_only_year(tmp_path, monkeypatch) -> None:
+    """The helper agrees with the URI path either way: a title-only year is read
+    as written with no title grammar declared, and converted by one where it is."""
+    from codify.pipeline.stages import resolve_year
+    from tests.config_fixtures import isolated_configs
+
+    conversion = {"kind": "buddhist", "epoch_year": -543}
+    grammar = {"strip_prefixes": ["พระราชบัญญัติ"], "year_particles": ["พ.ศ."]}
+    configs = {
+        "xb": {
+            "calendar": "buddhist_era",
+            "frbr": {"country_code": "xb", "calendar_conversion": conversion},
+        },
+        "xg": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xg",
+                "calendar_conversion": conversion,
+                "title_identity": grammar,
+            },
+        },
+        "xc": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xc",
+                "calendar_conversion": {"kind": "buddhist", "epoch_year": -200},
+            },
+        },
+    }
+    metadata = {"title": "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 2511"}
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        assert resolve_year(metadata, "xb", title=str(metadata["title"])) == "2511"
+        assert gregorian_year(metadata, "xb") == 2511
+        assert resolve_year(metadata, "xg", title=str(metadata["title"])) == "1968"
+        assert gregorian_year(metadata, "xg") == 1968
+        # A year the model states, on a declared epoch the calendar name does
+        # not imply: both paths take the jurisdiction's rule, not the generic one.
+        labelled = {"year": "2511", "calendar": "buddhist"}
+        assert resolve_year(labelled, "xc") == "2311"
+        assert gregorian_year(labelled, "xc") == 2311
+
+
+@pytest.mark.parametrize("label", ["buddhist", " buddhist ", "BUDDHIST", " Buddhist_Era "])
+def test_a_padded_or_cased_label_still_names_the_configured_calendar(
+    label: str, tmp_path, monkeypatch
+) -> None:
+    """The label is a model answer, so its spacing and case vary; a comparison
+    form built from the raw string misses the rule and takes the generic offset.
+    """
+    from tests.config_fixtures import isolated_configs
+
+    configs = {
+        "xc": {
+            "calendar": "buddhist_era",
+            "frbr": {
+                "country_code": "xc",
+                "calendar_conversion": {"kind": "buddhist", "epoch_year": -200},
+            },
+        }
+    }
+    from codify.calendar import declares_this_calendar, labelled_year_as_gregorian
+
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        # Through the callers, which normalise, and at the helper, which is
+        # where a caller passing a raw label would otherwise lose the rule.
+        assert gregorian_year({"year": "2511", "calendar": label}, "xc") == 2311
+        assert declares_this_calendar(label, "xc")
+        assert labelled_year_as_gregorian("2511", label, "xc") == 2311
+
+
+def test_a_declared_calendar_without_a_rule_converts_generically(tmp_path, monkeypatch) -> None:
+    """A jurisdiction naming its calendar but declaring no conversion rule has
+    no rule to apply; the generic conversion answers, not the raw local year."""
+    from codify.calendar import labelled_year_as_gregorian
+    from codify.pipeline.stages import resolve_descriptors, resolve_year
+    from tests.config_fixtures import isolated_configs
+
+    configs = {"xb0": {"calendar": "buddhist_era", "frbr": {"country_code": "xb0"}}}
+    metadata = {"year": "2511", "calendar": "buddhist"}
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", configs):
+        assert labelled_year_as_gregorian("2511", "buddhist", "xb0") == 1968
+        assert resolve_year(metadata, "xb0") == "1968"
+        assert gregorian_year(metadata, "xb0") == 1968
+        desc = resolve_descriptors(
+            metadata, jurisdiction_code="xb0", source_bytes=b"", fallback_stem="s"
+        )
+        assert desc.year == "1968"

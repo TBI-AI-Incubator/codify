@@ -10,14 +10,12 @@ import structlog
 from pydantic import BaseModel, Field
 
 from codify.calendar import (
-    ERA_NAMED_CALENDARS,
     normalise_calendar,
-    reads_as_a_gregorian_year,
-    sole_year_token,
     title_year_token,
     year_from_calendar,
 )
 from codify.core.llm import LLMClient
+from codify.pipeline.dating import resolve_dating
 
 logger = structlog.get_logger()
 
@@ -175,18 +173,9 @@ def number_from_title(title: str) -> str:
     return match.group(1).strip().strip(".,;:·")
 
 
-def gregorian_year(
-    metadata: dict[str, Any],
-    country: str = "",
-    *,
-    legacy: bool = False,
-    title: str = "",
-) -> int | None:
-    """Best-effort Gregorian year from an `extract_metadata` result. Honours
-    the detected `calendar` field; falls back to the raw year for Gregorian
-    or empty calendars. Pass the country for a calendar whose conversion needs
-    the jurisdiction's own table, or the stored year will disagree with the URI
-    `resolve_year` builds from the same metadata."""
+def _legacy_year(metadata: dict[str, Any], country: str, title: str) -> int | None:
+    """What the shipped run stored: the generic conversion and the old coercion,
+    the title year unconverted. A replay reproduces it rather than improves it."""
     raw_year = str(metadata.get("year") or "").strip()
     raw_date = str(metadata.get("date") or "").strip()
     cal = normalise_calendar(metadata.get("calendar"))
@@ -202,16 +191,21 @@ def gregorian_year(
         converted = year_from_calendar(candidate, cal, country)
         if converted is not None:
             return converted
-        if not legacy and cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):
-            # Same refusal as the URI path, or the two disagree again.
-            return None
+    try:
+        return int(candidate)
+    except ValueError:
+        return None
+
+
+def gregorian_year(
+    metadata: dict[str, Any],
+    country: str = "",
+    *,
+    legacy: bool = False,
+    title: str = "",
+) -> int | None:
+    """One reading of the shared resolution, so the stored and filed years cannot
+    differ. A jurisdiction's own rules need its code; a plain year does not."""
     if legacy:
-        # A replay of a run checkpointed before the era work has to reproduce
-        # what that run stored, so it keeps the coercion that was there.
-        try:
-            return int(candidate)
-        except ValueError:
-            return None
-    # One rule for both paths, or a /2024/ URI stores a different year.
-    year_token = sole_year_token(candidate)
-    return int(year_token) if year_token else None
+        return _legacy_year(metadata, country, title)
+    return resolve_dating(metadata, country=country, title=title).stored_year

@@ -1,6 +1,8 @@
+import re
+
 import pytest
 
-from codify.lang import to_iso639_3
+from codify.lang import number_run, to_iso639_3, word_bounded
 
 
 def test_two_letter_codes_normalise_to_iso639_3():
@@ -55,3 +57,34 @@ def test_unknown_raises():
         to_iso639_3("klingon")
     with pytest.raises(ValueError):
         to_iso639_3("e n")
+
+
+@pytest.mark.parametrize(
+    ("literal", "inside", "alone"),
+    [
+        ("Update", "Updated", "Update 3"),
+        ("of", "thereof", "of 1991"),
+        ("dated", "undated", "dated 1"),
+    ],
+    ids=["a marker", "a particle", "a cue"],
+)
+def test_a_latin_literal_matches_a_whole_word_only(literal: str, inside: str, alone: str) -> None:
+    pattern = re.compile(word_bounded(literal))
+    assert pattern.search(inside) is None
+    assert pattern.search(alone) is not None
+
+
+@pytest.mark.parametrize(
+    ("literal", "text"),
+    [("ฉบับที่", "(ฉบับที่ 3)"), ("B.E.", "B.E.2567"), ("No.", "(No.3)")],
+    ids=["a script without spaces", "a trailing full stop", "a marker ending in a stop"],
+)
+def test_a_literal_without_a_latin_word_edge_is_not_bounded(literal: str, text: str) -> None:
+    assert re.compile(word_bounded(literal)).search(text) is not None
+
+
+@pytest.mark.parametrize(
+    ("digits", "number"), [("03", "3"), ("0999", "999"), ("0", "0"), ("000", "0"), ("", "")]
+)
+def test_a_digit_run_is_its_number(digits: str, number: str) -> None:
+    assert number_run(digits) == number

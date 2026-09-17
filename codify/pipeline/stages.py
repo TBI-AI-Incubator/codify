@@ -11,18 +11,19 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-from codify.calendar import (
-    ERA_NAMED_CALENDARS,
-    normalise_calendar,
-    reads_as_a_gregorian_year,
-    sole_year_token,
-    title_year_token,
-    to_gregorian_year,
-    year_from_calendar,
+from codify.frbr import (
+    UncitableFrbrUri,
+    identity_from_title,
+    law_number_token,
+    series_number,
 )
-from codify.frbr import UncitableFrbrUri, law_number_token, series_number
-from codify.jurisdictions import JurisdictionConfig, load_config, placeholder_statuses_for_code
+from codify.jurisdictions import (
+    JurisdictionConfig,
+    load_config,
+    placeholder_statuses_for_code,
+)
 from codify.lang import to_iso639_3
+from codify.pipeline.dating import resolve_dating
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta
 from codify.pipeline.enrich.amendments import lift_amendment_markup
 from codify.pipeline.enrich.asides import emit_marginal_notes
@@ -48,45 +49,9 @@ logger = structlog.get_logger()
 
 
 def resolve_year(metadata: dict[str, Any], country: str, *, title: str = "") -> str:
-    """Resolve a Gregorian year for FRBR URI use. Converts non-Gregorian
-    years when the metadata's `calendar` field flags one."""
-    raw_year = str(metadata.get("year") or "")
-    raw_date = str(metadata.get("date") or "")
-    cal = normalise_calendar(metadata.get("calendar"))
-    candidate = raw_year or (raw_date.split("-")[0] if "-" in raw_date else raw_date)
-    if candidate and cal and cal != "gregorian":
-        converted = year_from_calendar(candidate, cal, country)
-        if converted is not None:
-            return str(converted)
-        if cal in ERA_NAMED_CALENDARS and not reads_as_a_gregorian_year(candidate):
-            # The refusal has to reach the URI, or the number it declined to
-            # read is filed as the year anyway.
-            logger.warning(
-                "year_calendar_unconverted", raw=candidate, calendar=cal, country=country
-            )
-            return ""
-    if raw_year:
-        # Whole runs only, digits or not: "12024" is not a five-digit year.
-        if raw_year.isdigit() and sole_year_token(raw_year):
-            return raw_year
-        # One whole 3-4 digit run is a year; anything else is not.
-        digits = sole_year_token(raw_year)
-        logger.warning(
-            "year_calendar_unconverted", raw=raw_year, calendar=cal, country=country, year=digits
-        )
-        return digits
-    if raw_date:
-        cfg = load_config(country)
-        if cfg.calendar != "gregorian":
-            try:
-                return str(to_gregorian_year(raw_date.split("-")[0], country))
-            except Exception:  # noqa: BLE001, S110
-                pass
-        if "-" in raw_date:
-            return raw_date.split("-")[0]
-    if title:
-        return title_year_token(title, metadata.get("number"))
-    return ""
+    """The Gregorian year for FRBR URI use. One reading of the shared
+    resolution, so it cannot answer differently from the descriptor path."""
+    return resolve_dating(metadata, country=country, title=title).uri_year
 
 
 def _fold_language(raw: str | None, source: str, jurisdiction: str | None) -> str | None:
@@ -309,15 +274,23 @@ def resolve_descriptors(
 ) -> Descriptors:
     model_title = str(metadata.get("title", "") or "")
     title = model_title or fallback_stem
-    raw_date = str(metadata.get("date", "") or "")
     number = str(metadata.get("number") or "")
-    year = resolve_year(metadata, jurisdiction_code, title=title)
-    # Non-Gregorian raw dates stay in the local calendar; the FRBR URI year
-    # must be Gregorian, so blank the date and rely on the resolved year.
-    cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
-    if cal != "gregorian":
-        raw_date = ""
     cfg = load_config(jurisdiction_code)
+    # The extracted text, never the source bytes: on the scanned route those are
+    # the PDF file.
+    source_text = classification_text if classification_text is not None else source_bytes
+    dated = resolve_dating(
+        metadata,
+        country=jurisdiction_code,
+        title=model_title,
+        source_text=source_text if isinstance(source_text, str) else "",
+        stem=fallback_stem,
+    )
+    year, raw_date = dated.uri_year, dated.raw_date
+    # An instrument series that numbers nothing states its identity in its title,
+    # which is the number this document is cited by.
+    title_rule = cfg.frbr.title_identity if cfg.frbr is not None else None
+    identity = identity_from_title(model_title, title_rule) if title_rule else None
     doctype = resolve_doctype(
         cfg,
         title=title,
@@ -340,12 +313,20 @@ def resolve_descriptors(
     # The title is a second source, as `date` is for the year, but only a title the
     # model actually read qualifies: a filename stem is not evidence of a number, and
     # an amending act's short title states the number of the act it amends.
-    from_title = "" if metadata.get("is_amendment") else number_from_title(title_for_number)
+    # The generic inference reads only the number inside a title, so every second
+    # edition of a numberless series would collide. A stated number still wins.
+    from_title = (
+        ""
+        if metadata.get("is_amendment") or identity is not None
+        else number_from_title(title_for_number)
+    )
     number = citable_number(number) or citable_number(from_title)
     # `4/2016` is a fine citation and a bad path segment: as the document's own
     # number it would split the FRBR path in two. A cited number keeps its
     # slash; this one cannot.
     number = number.replace("/", "-")
+    if not number and identity is not None:
+        number = identity.segment
     if not number:
         number = draft_number(source_bytes)
     if document_class and document_class.number_has_year_prefix:

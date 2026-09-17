@@ -7,13 +7,22 @@ expression URIs add language and date segments. Parsing lives in
 
 from __future__ import annotations
 
+import hashlib
 import re
+import unicodedata
+from collections.abc import Iterable
 from datetime import date
+from typing import NamedTuple
 
 import structlog
 
-from codify.jurisdictions import resolve_frbr_country, try_load_config
-from codify.lang import normalise_digits
+from codify.jurisdictions import (
+    SLUG_DIGEST_CHARS,
+    TitleIdentity,
+    resolve_frbr_country,
+    try_load_config,
+)
+from codify.lang import normalise_digits, number_run, word_bounded
 
 logger = structlog.get_logger()
 
@@ -29,6 +38,15 @@ _UNCITABLE_SEGMENT = re.compile(r"//|/$")
 # Placeholder for an unresolved year. AKN requires a date segment and XSD 1.0
 # has no year zero, so `0001` keeps the resulting FRBR date schema-valid.
 UNKNOWN_YEAR = "0001"
+
+#: Namespace of a content-addressed identity. `is_citable_work_uri` refuses a
+#: number opening with it, so nothing derived may take the same form.
+DRAFT_PREFIX = "draft-"
+
+#: Namespace of a title-derived identity: a digest, citable unlike the one
+#: above, and no shape a stated number or a content address can take.
+TITLE_DIGEST_PREFIX = "t-"
+
 
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
 
@@ -50,7 +68,7 @@ def is_citable_work_uri(uri: str) -> bool:
         _URI_YEAR_SEGMENT.fullmatch(year) is not None
         and year not in (UNKNOWN_YEAR, "0000")
         and bool(number)
-        and not number.startswith("draft-")
+        and not number.startswith(DRAFT_PREFIX)
     )
 
 
@@ -74,6 +92,135 @@ def series_number(value: object) -> str:
     token = normalise_digits(str(value if value is not None else "")).strip()
     match = _SERIES_CITATION.fullmatch(token)
     return match.group(1) if match else ""
+
+
+class TitleDerivedIdentity(NamedTuple):
+    """What a title states about its own identity: the URI segment, a digest of
+    the canonical `body`, `edition` and local `year`; all empty for no title."""
+
+    segment: str
+    body: str
+    edition: str
+    year: str
+
+
+# Letters, numbers and combining marks: `\w` drops the vowel and tone marks an
+# abugida writes a word with. Format characters are gone before this runs.
+def _slug_char(ch: str) -> str:
+    return ch if unicodedata.category(ch)[0] in "LNM" else "-"
+
+
+def _slugify(text: str) -> str:
+    # Folded, not lowered: a sharp s and its capitals must reach one identity.
+    return re.sub(r"-+", "-", "".join(map(_slug_char, text))).strip("-").casefold()
+
+
+def _alternation(words: Iterable[str]) -> str:
+    """Longest first, so a word that prefixes another matches whole; and each
+    bounded, so "of" does not match inside "proof" nor "Update" in "Updated"."""
+    ordered = sorted({w for w in words if w}, key=lambda w: (-len(w), w))
+    return "|".join(word_bounded(w) for w in ordered)
+
+
+# `[^()]*`, not `[^)]*`: an unclosed run of openers would otherwise rescan
+# to end of title from every one of them.
+_PARENTHETICAL = re.compile(r"\([^()]*\)")
+
+
+def _opens_with_prefix(body: str, prefix: str) -> bool:
+    """A kind word opens the title, a Latin one whole: "Act" is not in "Action"."""
+    return re.match(word_bounded(prefix), body, re.IGNORECASE) is not None
+
+
+def _first_consolidation_paren(text: str, marker: re.Pattern[str] | None) -> int | None:
+    """Offset of the first parenthetical carrying a re-publication marker."""
+    if marker is None:
+        return None
+    return next(
+        (m.start() for m in _PARENTHETICAL.finditer(text) if marker.search(m.group(0))), None
+    )
+
+
+def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity:
+    """A citable identity from a title alone, for instruments carrying no number.
+    Pure, so a re-ingest mints the same URI; the year is the last one stated."""
+    # Stripped before the composition: an invisible between a letter and its
+    # mark blocks the two, so removing it after leaves a different string.
+    folded = unicodedata.normalize(
+        "NFC", "".join(c for c in title if unicodedata.category(c) != "Cf")
+    )
+    text = " ".join(normalise_digits(folded).split())
+    edition_re = (
+        re.compile(rf"\(\s*(?:{_alternation(rule.edition_markers)})\s*([0-9]+)\s*\)", re.IGNORECASE)
+        if rule.edition_markers
+        else None
+    )
+    consolidation_re = (
+        re.compile(_alternation(rule.consolidation_markers), re.IGNORECASE)
+        if rule.consolidation_markers
+        else None
+    )
+    edition = ""
+    own = None
+    if edition_re is not None:
+        # Inside a parenthetical only: the word can be part of a title. An
+        # edition after a republication marker is the one folded into it.
+        marker = _first_consolidation_paren(text, consolidation_re)
+        eligible = [m for m in edition_re.finditer(text) if marker is None or marker > m.start()]
+        if eligible:
+            # The last, as the year is: an earlier one belongs to the instrument
+            # being amended and stays in the base, telling two amendments apart.
+            own = eligible[-1]
+            # "03" and "3" are one edition. Stripped as text, so a number too
+            # long for an int is unharmed.
+            edition = number_run(own.group(1))
+    body = text
+    if edition_re is not None:
+        # The document's own edition leaves the base, as does one after the
+        # republication marker; a retained one is spelt the one declared way.
+        own_span = own.span() if own is not None else None
+
+        def _edition(m: re.Match[str]) -> str:
+            if m.span() == own_span or (marker is not None and m.start() > marker):
+                return " "
+            return f"({rule.edition_markers[0]} {number_run(m.group(1))})"
+
+        body = edition_re.sub(_edition, text)
+    if consolidation_re is not None:
+        body = _PARENTHETICAL.sub(
+            lambda m: " " if consolidation_re.search(m.group(0)) else m.group(0), body
+        )
+    year_re = (
+        re.compile(
+            rf"(?:{_alternation(rule.year_particles)})\s*([0-9]{{3,4}})(?![0-9])", re.IGNORECASE
+        )
+        if rule.year_particles
+        else None
+    )
+    years = list(year_re.finditer(body)) if year_re else []
+    # A year is its number, as an edition is: a leading zero is typography.
+    year = number_run(years[-1].group(1)) if years else ""
+    if years and year_re is not None:
+        # Only the own year leaves; an earlier one names another instrument and
+        # stays, spelt one way, as does any text after: undeclared is identity.
+        own_year = years[-1]
+        body = body[: own_year.start()] + " " + body[own_year.end() :]
+        body = year_re.sub(lambda m: f"{rule.year_particles[0]} {number_run(m.group(1))}", body)
+    body = body.strip()
+    for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
+        if _opens_with_prefix(body, prefix):
+            body = body[len(prefix) :].strip()
+            break
+    canonical = _slugify(body)
+    if not canonical:
+        return TitleDerivedIdentity(segment="", body="", edition=edition, year=year)
+    # The segment is a digest of the whole identity, so what the grammar folds
+    # decides it and nothing of the title's script reaches the URI.
+    identity = f"{canonical}|{edition}|{year}".encode()
+    digest = hashlib.sha256(identity).hexdigest()[:SLUG_DIGEST_CHARS]
+    return TitleDerivedIdentity(
+        segment=f"{TITLE_DIGEST_PREFIX}{digest}", body=canonical, edition=edition, year=year
+    )
 
 
 def law_number_token(value: object) -> str:

@@ -7,6 +7,8 @@ assignment boundary so `Version.language` is always 639-3.
 
 from __future__ import annotations
 
+import re
+
 import structlog
 
 logger = structlog.get_logger()
@@ -116,6 +118,23 @@ _DIGIT_TRANS = str.maketrans(
 def normalise_digits(text: str) -> str:
     """Map non-Latin decimal digits to ASCII (Arabic-Indic ٣ → 3)."""
     return text.translate(_DIGIT_TRANS)
+
+
+def number_run(digits: str) -> str:
+    """The number a digit run names: "03" and "3" are one ordinal, one year.
+    No run names nothing, and stays empty."""
+    return digits.lstrip("0") or ("0" if digits else "")
+
+
+def word_bounded(literal: str) -> str:
+    """The literal as a pattern, bounded at each ASCII alphanumeric edge so a
+    Latin word matches whole. A script written without spaces has no boundary."""
+    pattern = re.escape(literal)
+    if literal[:1].isascii() and literal[:1].isalnum():
+        pattern = r"\b" + pattern
+    if literal[-1:].isascii() and literal[-1:].isalnum():
+        pattern += r"\b"
+    return pattern
 
 
 # Regex character-class body of every digit normalise_digits folds. Detectors
