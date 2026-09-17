@@ -340,6 +340,44 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "1943",
         "",
     ),
+    # --- the label names a calendar other than the jurisdiction's -------------
+    (
+        # Read as written: a label the jurisdiction does not declare is not
+        # a licence to convert by the jurisdiction's rule.
+        "another label on the year field",
+        "xg",
+        {"title": UNDATED, "year": "2478", "calendar": "hindu"},
+        "",
+        "2478",
+        "",
+    ),
+    (
+        "another label on the date field",
+        "xg",
+        {"title": UNDATED, "date": "2478-05-20", "calendar": "hindu"},
+        "",
+        "2478",
+        "",
+    ),
+    (
+        # The generic rule for that calendar converts the year; the month and
+        # day are of that calendar's grid and do not carry.
+        "another label the generic rule knows",
+        "xg",
+        {"title": UNDATED, "date": "2016-05-20", "calendar": "ethiopian"},
+        "",
+        "2024",
+        "",
+    ),
+    (
+        # The title says which year this is, whatever the label says.
+        "another label, echoing the title",
+        "xg",
+        {"title": PRE, "year": "2478", "calendar": "hindu"},
+        "",
+        "1935",
+        "",
+    ),
     # --- fields that state no year ------------------------------------------
     (
         "the unknown-year sentinel in the year field",
@@ -458,6 +496,7 @@ UNECHOED = {
     # No grammar, so the bare local year is read as written; the same title with
     # two year runs names no single one, and nothing else states it.
     "a bare year echoing the title, unlabelled": ("2511", ""),
+    "another label, echoing the title": ("2478", ""),
     "an unlabelled echo, month grid not Gregorian": ("2478", "2478-02-20"),
     "a title naming two years": ("", ""),
     "a title naming two years, with the year field": ("1943", ""),
@@ -465,6 +504,23 @@ UNECHOED = {
     # document's own and states the year.
     "a source date naming another local year": ("1937", "1937-01-31"),
 }
+
+
+def test_a_supplied_title_is_evidence_and_a_filename_is_not() -> None:
+    """The title a caller hands `resolve_year` goes through the declared grammar
+    as a metadata title does; a filename stem only ever lends a bare year."""
+    try_load_config.cache_clear()
+    assert stages.resolve_year({}, "xg", title=POST) == "1968"
+    assert stages.resolve_year({"title": POST}, "xg", title=POST) == "1968"
+    try_load_config.cache_clear()
+    desc = stages.resolve_descriptors(
+        {"number": ""},
+        jurisdiction_code="xg",
+        source_bytes=b"",
+        fallback_stem=POST,
+        classification_text="",
+    )
+    assert (desc.year, desc.raw_date) == ("2511", "")
 
 
 def test_a_padded_date_still_states_its_month() -> None:

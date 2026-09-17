@@ -282,8 +282,9 @@ def resolve_descriptors(
     dated = resolve_dating(
         metadata,
         country=jurisdiction_code,
-        title=title,
+        title=model_title,
         source_text=source_text if isinstance(source_text, str) else "",
+        stem=fallback_stem,
     )
     year, raw_date = dated.uri_year, dated.raw_date
     # An instrument series that numbers nothing states its identity in its title,

@@ -14,6 +14,7 @@ from codify.calendar import (
     CalendarConversionError,
     canonical_year_and_date,
     declares_local_date_grammar,
+    declares_this_calendar,
     labelled_year_as_gregorian,
     local_date_from_text,
     month_day_stating_this_year,
@@ -142,13 +143,8 @@ def _year_from_fields(metadata: dict[str, Any], country: str, title: str) -> str
         return digits
     head = raw_date.split("-")[0] if "-" in raw_date else ""
     if sole_year_token(head):
-        # Converted only where the model called the date local. Converting one
-        # it called Gregorian puts a year no document states in the URI.
-        if cal and cal != "gregorian":
-            try:
-                return str(to_gregorian_year(head, country))
-            except Exception:  # noqa: BLE001, S110
-                pass
+        # As written. A label the jurisdiction declares was converted above; one
+        # it does not is no licence to convert by the jurisdiction's rule.
         return head
     if title:
         # As written: only a declared title grammar says which year is local.
@@ -162,19 +158,28 @@ def resolve_dating(
     country: str,
     title: str = "",
     source_text: str = "",
+    stem: str = "",
 ) -> Dating:
     """The year and date one document is filed under: the model's fields, a date
     the source states and a title grammar, read in one place for every caller."""
-    model_title = str(metadata.get("title") or "")
+    # A title, supplied or extracted, is evidence the grammar reads; a filename
+    # stem is not, and lends a bare year only where nothing else states one.
+    model_title = str(metadata.get("title") or "") or title
     cfg = try_load_config(country) if country else None
-    year = _year_from_fields(metadata, country, model_title or title)
+    year = _year_from_fields(metadata, country, model_title or stem)
     raw_date = canonical_year_and_date(metadata)[1]
     # A local date is blanked, the URI year being Gregorian. Its month and day
     # carry over only where the calendar declares the Gregorian grid.
     stated_date = raw_date
     cal = normalise_calendar(metadata.get("calendar")) or "gregorian"
     keeps_month_day = _grid_is_gregorian(cfg)
-    local_month_day = _month_day(raw_date) if cal != "gregorian" and keeps_month_day else None
+    # The parts carry only under the jurisdiction's own label: a date in another
+    # calendar names days of that calendar's grid.
+    local_month_day = (
+        _month_day(raw_date)
+        if cal != "gregorian" and keeps_month_day and declares_this_calendar(cal, country)
+        else None
+    )
     # Carried only where date and title name one year: rebuilding a date
     # stating another on the title's would invent one neither states.
     local_date_year = sole_year_token(normalise_digits(raw_date))
