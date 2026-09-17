@@ -107,7 +107,11 @@ def _year_int(year: str) -> int | None:
     the two sentinels `is_citable_work_uri` refuses excluded."""
     if len(year) != 4 or not year.isascii() or not year.isdecimal():
         return None
-    return None if year in (UNKNOWN_YEAR, "0000") else int(year)
+    return None if year in _SENTINELS else int(year)
+
+
+#: What no URI files a work under: the unknown-year placeholder and year zero.
+_SENTINELS = frozenset({UNKNOWN_YEAR, "0000"})
 
 
 def _stored(uri_year: str) -> int | None:
@@ -271,6 +275,9 @@ def resolve_dating(
         # Without this the URI takes the unknown-year placeholder while the
         # document carries its own date.
         year = raw_date[:4] if _year_int(raw_date[:4]) is not None else year
+    if year in _SENTINELS:
+        # A field holding the placeholder states no year, for any reader.
+        year = ""
     return Dating(year, raw_date, _stored(year))
 
 

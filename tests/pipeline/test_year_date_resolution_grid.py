@@ -43,6 +43,8 @@ SOURCE_OTHER = "ให้ไว้ ณ วันที่ ๓๑ มกราค
 #: A title naming the Act it amends before itself, so two year runs stand in it
 #: and only the grammar can say which is the instrument's own.
 TWO_YEARS = "พระราชบัญญัติแก้ไขเพิ่มเติมพระราชบัญญัติมโหรีหลวง พ.ศ. 2478 พ.ศ. 2486"
+#: A title stating no year, so a field's sentinel has nothing to hide behind.
+UNDATED = "พระราชบัญญัติเครื่องร่อนสุริยะ"
 
 
 def _conversion(
@@ -163,9 +165,17 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "xo",
         {"title": PRE, "date": "2478-02-20", "calendar": "buddhist"},
         "",
-        # The month settles the year even where its grid is not the Gregorian
-        # one; only the day cannot be carried across.
-        "1936",
+        # A month of another grid says nothing about a threshold set on the
+        # Gregorian one, so the year converts month-blind.
+        "1935",
+        "",
+    ),
+    (
+        "an unlabelled echo, month grid not Gregorian",
+        "xo",
+        {"title": PRE, "date": "2478-02-20", "calendar": ""},
+        "",
+        "1935",
         "",
     ),
     # --- the model states a local date and calls it Gregorian ----------------
@@ -328,6 +338,15 @@ GRID: list[tuple[str, str, dict[str, object], str, str, str]] = [
         "",
     ),
     # --- fields that state no year ------------------------------------------
+    (
+        "the unknown-year sentinel in the year field",
+        "xg",
+        {"title": UNDATED, "year": "0001"},
+        "",
+        "",
+        "",
+    ),
+    ("the zero sentinel in the year field", "xg", {"title": UNDATED, "year": "0000"}, "", "", ""),
     ("date field naming no year", "xg", {"title": POST, "date": "unknown"}, "", "1968", "unknown"),
     (
         "year the conversion cannot carry",
@@ -421,6 +440,7 @@ UNECHOED = {
     # No grammar, so the bare local year is read as written; the same title with
     # two year runs names no single one, and nothing else states it.
     "a bare year echoing the title, unlabelled": ("2511", ""),
+    "an unlabelled echo, month grid not Gregorian": ("2478", "2478-02-20"),
     "a title naming two years": ("", ""),
     "a title naming two years, with the year field": ("1943", ""),
     # No title year to disagree with, so the date off the document is the

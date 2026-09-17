@@ -648,3 +648,51 @@ class TestAStringYearIsGuardedLikeAnInteger:
         assert to_gregorian_year("令和6", "jp") == 2024
         assert to_gregorian_year(114, "tw") == 2025
         assert to_gregorian_year("1443", "sa") == 2021
+
+
+class TestAMonthIsReadOnItsOwnGrid:
+    """The Gregorian-side thresholds read a Gregorian month; a month of the
+    calendar's own grid is read against where that calendar's year begins."""
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "expected"),
+        [
+            ("bikram_samvat", "2080", 2, 2023),
+            ("bikram_samvat", "2080", 9, 2023),
+            ("bikram_samvat", "2080", 10, 2024),
+            ("ethiopian", "2016", 2, 2023),
+            ("ethiopian", "2016", 4, 2023),
+            ("ethiopian", "2016", 5, 2024),
+            ("ethiopian", "2016", 13, 2024),
+        ],
+    )
+    def test_a_local_month_is_read_against_the_calendars_own_new_year(
+        self, kind: str, local_year: str, month: int, expected: int
+    ) -> None:
+        from codify.calendar import _apply_rule
+        from codify.jurisdictions import CalendarConversion
+
+        assert _apply_rule(local_year, CalendarConversion(kind=kind), month=month) == expected
+
+    @pytest.mark.parametrize(
+        ("kind", "local_year", "month", "expected"),
+        [("bikram_samvat", "2080", 2, 2023), ("bikram_samvat", "2080", 6, 2024)],
+    )
+    def test_a_gregorian_month_is_read_against_the_declared_threshold(
+        self, kind: str, local_year: str, month: int, expected: int
+    ) -> None:
+        from codify.calendar import _apply_rule
+        from codify.jurisdictions import CalendarConversion
+
+        rule = CalendarConversion(
+            kind=kind, month_day_is_gregorian=True, month_names=[f"m{i}" for i in range(12)]
+        )
+        assert _apply_rule(local_year, rule, month=month) == expected
+
+    def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
+        from codify.calendar import _apply_rule, reform_shift
+        from codify.jurisdictions import CalendarConversion
+
+        rule = CalendarConversion(kind="buddhist", new_year_month=4, new_year_reform_year=2484)
+        assert _apply_rule("2478", rule, month=2) == _apply_rule("2478", rule, month=None)
+        assert reform_shift(rule, 2478, 2) == 0

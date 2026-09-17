@@ -37,6 +37,26 @@ def to_gregorian_year(local_year: str | int, country_code: str, month: int | Non
     return _apply_rule(local_year, cfg.frbr.calendar_conversion, month=month)
 
 
+#: How many of a calendar's own months fall in the earlier of the two Gregorian
+#: years its year straddles: Baisakh to Poush, Meskerem to Tahsas.
+_LOCAL_MONTHS_IN_EARLIER_YEAR = {"bikram_samvat": 9, "ethiopian": 4}
+
+
+def _in_the_earlier_gregorian_year(rule: CalendarConversion, month: int | None) -> bool | None:
+    """Whether the month puts the date in the earlier Gregorian year, or None
+    where no month can say: the grids differ, so each is read on its own terms."""
+    if month is None:
+        return None
+    if rule.month_day_is_gregorian:
+        if rule.kind == "bikram_samvat":
+            return month < (rule.new_year_month or 4)
+        if rule.kind == "ethiopian":
+            return month >= 9
+        return None
+    early = _LOCAL_MONTHS_IN_EARLIER_YEAR.get(rule.kind)
+    return None if early is None else month <= early
+
+
 def _coerce_int(v: str | int) -> int:
     if isinstance(v, int):
         return v
@@ -58,6 +78,7 @@ def _apply_rule(local_year: str | int, rule: CalendarConversion, *, month: int |
     numeric = str(local_year).strip()
     if _SIGNED_INT_RE.match(numeric) and int(numeric) < 1:
         raise CalendarConversionError(f"{local_year!r} is not a year")
+    earlier = _in_the_earlier_gregorian_year(rule, month)
 
     if kind == "epoch_offset":
         if rule.epoch_year is None:
@@ -69,11 +90,8 @@ def _apply_rule(local_year: str | int, rule: CalendarConversion, *, month: int |
 
     if kind == "bikram_samvat":
         offset = rule.offset if rule.offset is not None else 57
-        ny_month = rule.new_year_month or 4
         year = _coerce_int(local_year)
-        if month is not None and month < ny_month:
-            return year - offset
-        return year - offset + 1
+        return year - offset if earlier else year - offset + 1
 
     if kind == "buddhist":
         epoch = rule.epoch_year if rule.epoch_year is not None else -543
@@ -90,12 +108,10 @@ def _apply_rule(local_year: str | int, rule: CalendarConversion, *, month: int |
         return _coerce_int(local_year) + 621
 
     if kind == "ethiopian":
-        # Ethiopian calendar is 7-8 years behind Gregorian.
-        # After Sept 11 (Meskerem 1): EC + 8 = GC. Before: EC + 7 = GC.
+        # 7-8 years behind: EC + 7 from the new year in September, EC + 8 after
+        # the Gregorian one.
         year = _coerce_int(local_year)
-        if month is not None and month < 9:
-            return year + 8
-        return year + 7
+        return year + 8 if earlier is False else year + 7
 
     raise CalendarConversionError(f"unknown calendar conversion kind: {kind}")
 
@@ -395,7 +411,9 @@ def reform_shift(rule: CalendarConversion, local_year: int, month: int) -> int:
     """1 where a year that began mid-year puts this month in the next Gregorian
     year, else 0. A kind whose own arm reads the month is shifted already."""
     reform = rule.new_year_reform_year
-    if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS:
+    # The new-year month is Gregorian-side too, so a month of another grid
+    # cannot be compared with it.
+    if reform is None or rule.kind in _MONTH_SENSITIVE_KINDS or not rule.month_day_is_gregorian:
         return 0
     return 1 if local_year < reform and month < (rule.new_year_month or 1) else 0
 
