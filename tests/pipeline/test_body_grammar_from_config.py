@@ -332,3 +332,33 @@ def test_a_stray_opener_does_not_hide_the_closing_phrase(declared: Any) -> None:
     scan = _scan(text)
     bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
     assert bound.cut_at == text.index(CLOSING)
+
+
+def test_the_verbatim_fill_consumes_a_wrapped_marker(declared: Any) -> None:
+    from codify.pipeline.enrich.verbatim import fill_bodies_verbatim
+
+    text = "Section 5\nzter*\nFive ter, wrapped.\n\nSection 6\nSix.\n"
+    scan = _scan(text)
+    bodies = {b.eid: b for b in fill_bodies_verbatim(text, scan.anchors).bodies}
+    assert bodies["sec_5ter"].lines == ["Five ter, wrapped."], bodies["sec_5ter"]
+    assert bodies["sec_5ter"].heading is None
+
+
+def test_a_spaced_slash_still_keys_as_one_number(declared: Any) -> None:
+    scan = _scan("Section 7\nSeven.\n\nSection 7 / 1\nSeven one.\n\nSection 8\nEight.\n")
+    assert _sections(scan) == [("7", "sec_7"), ("7/1", "sec_7-1"), ("8", "sec_8")]
+
+
+def test_the_verbatim_lane_keeps_the_tail_out_of_the_body(declared: Any) -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    bluebell, _, _ = text_to_bluebell_verbatim("AN ACT\n\n" + TAIL, country=COUNTRY)
+    body = bluebell[bluebell.index("BODY") : bluebell.index("CONCLUSIONS")]
+    assert "Appended one." not in body and "Two." in body
+    assert "Appended one." in bluebell[bluebell.index("CONCLUSIONS") :]
+
+
+def test_a_prefix_caption_may_carry_a_long_punctuated_title(declared: Any) -> None:
+    title = "TABLE OF RATES, FEES AND OTHER DUTIES ON SEVEN COUNTED WORDS."
+    text = f"Section 1\nOne.\n\n{CLOSING}\n\n{title}\n1. Two coins.\n"
+    assert [a.heading for a in _scan(text).anchors if a.kind == "schedule"] == [title]

@@ -16,9 +16,9 @@ Breaks, in that the structurer's output changes for documents it already read:
    ends at the blank line before the next marker, and a marker whose number
    wraps onto the next line bounds a reversed quotation. 0.2.0 let a stray
    curly quote in a definitions block mask the provisions after it.
-4. A slashed insertion (`7/1`) is read as its own number, keyed as the parser's
+3. A slashed insertion (`7/1`) is read as its own number, keyed as the parser's
    `sec_7-1`; 0.2.0 read it as `7` and dropped one of the pair as a twin.
-3. Where a jurisdiction declares `closing_phrases`, the scan ends the body at the
+4. Where a jurisdiction declares `closing_phrases`, the scan ends the body at the
    first line opening with one: markers between it and the first attachment
    caption are dropped and counted (`tail_excluded`), the span is emitted verbatim
    as `CONCLUSIONS`, and an attachment caption before it titles a body table

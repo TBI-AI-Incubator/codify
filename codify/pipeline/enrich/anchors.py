@@ -748,6 +748,7 @@ def _normalise_num(num: str | None) -> str | None:
         base, idx = bis
         return f"{base} مكرر ({idx})" if idx else f"{base} مكرر"
     num = re.sub(r"\s*[-\u2013]\s*", "-", num)
+    num = re.sub(r"\s*/\s*", "/", num)
     if all(c in "IVXLCDMivxlcdmІіХх" for c in num):
         num = num.translate(_CYRILLIC_ROMAN)
     return num
@@ -1453,14 +1454,9 @@ def _exclude_closing_tail(
 
 def _closing_floor(text: str, country: str, after: int) -> int | None:
     """Offset of the jurisdiction's closing phrase past `after`, or None."""
-    from codify.pipeline.enrich.closing import closing_offset
+    from codify.pipeline.enrich.closing import closing_offset, closing_phrases_for
 
-    config = load_config(country) if country else None
-    if config is None:
-        return None
-    phrases = list(config.closing_phrases)
-    for era in config.legal_eras:
-        phrases.extend(era.closing_phrases)
+    phrases = closing_phrases_for(country)
     if not phrases:
         return None
     return closing_offset(text, phrases, after=after, quoted=_closed_quote_mask(text, country))
@@ -1556,8 +1552,8 @@ def _scan_unnumbered_annexes(
             )
         # Heading-likeness: a definitions line ("الجدول: يقصد به الجدول
         # المرفق.") is prose, not an annex heading; promoting it would pull
-        # the whole body inside an attachment.
-        if heading and (len(heading.split()) > 6 or re.search(r"[.؛،]", heading)):
+        # the whole body inside an attachment. A declared prefix already vouched.
+        if heading and not prefixed and (len(heading.split()) > 6 or re.search(r"[.؛،]", heading)):
             continue
         next_no += 1
         line = text.count("\n", 0, m.start()) + 1

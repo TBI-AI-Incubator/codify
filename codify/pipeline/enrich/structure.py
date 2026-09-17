@@ -343,16 +343,6 @@ class AnchorInvariantError(RuntimeError):
 _BASIC_UNIT_KINDS: tuple[str, ...] = ("article", "section", "rule")
 
 
-def _closing_phrases(config: JurisdictionConfig | None) -> list[str]:
-    """Every era's closing phrases: the structurer runs before the year is known."""
-    if config is None:
-        return []
-    phrases = list(config.closing_phrases)
-    for era in config.legal_eras:
-        phrases.extend(era.closing_phrases)
-    return phrases
-
-
 def basic_unit_kind(config: JurisdictionConfig | None, doctype: str) -> str | None:
     """The AKN element carrying the doctype's numbered provisions: first hierarchy entry
     whose ``akn_element`` is in ``_BASIC_UNIT_KINDS``, so the gate compares real
@@ -650,12 +640,12 @@ async def text_to_bluebell_scaffolded(
             _trace(fallback="invariant_gate")
             raise AnchorInvariantError(spans=blocking)
 
-    from codify.pipeline.enrich.closing import bound_body_at_closing
+    from codify.pipeline.enrich.closing import bound_body_at_closing, closing_phrases_for
     from codify.pipeline.enrich.enacting import split_opening_material
 
     # The signature ends the body: markers after it belong to an appended
     # instrument or a note, and the span itself becomes the conclusions.
-    bound = bound_body_at_closing(text, anchors, _closing_phrases(config), country=country)
+    bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
     text, anchors = bound.text, bound.anchors
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(

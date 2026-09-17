@@ -25,6 +25,19 @@ class BodyBound:
     excluded_chars: int = 0
 
 
+def closing_phrases_for(country: str) -> list[str]:
+    """Every era's closing phrases: the structurer runs before the year is known."""
+    from codify.jurisdictions import load_config
+
+    config = load_config(country) if country else None
+    if config is None:
+        return []
+    phrases = list(config.closing_phrases)
+    for era in config.legal_eras:
+        phrases.extend(era.closing_phrases)
+    return phrases
+
+
 def closing_offset(
     text: str, phrases: Iterable[str], *, after: int, quoted: Sequence[bool] = ()
 ) -> int | None:
