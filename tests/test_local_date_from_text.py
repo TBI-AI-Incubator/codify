@@ -489,3 +489,31 @@ def test_a_latin_grammar_reads_any_casing(text: str) -> None:
     patterns = compile_local_date_patterns(rule)
     assert patterns is not None
     assert _first_stated_date(text, patterns, rule, "xn") == date(2024, 5, 1)
+
+
+def test_a_spelling_the_pattern_matches_but_no_month_names_is_no_date() -> None:
+    """Case-blind matching lets a dotless ı stand for i, so the regex can match
+    a spelling the folded lookup does not hold; that is no date, not a crash."""
+    rule = CalendarConversion(
+        kind="buddhist",
+        month_names=ENGLISH_MONTHS,
+        month_day_is_gregorian=True,
+        date_cues=["dated"],
+        year_particles=["B.E."],
+    )
+    patterns = compile_local_date_patterns(rule)
+    assert patterns is not None
+    assert _first_stated_date("dated 1 Apr\u0131l 2567", patterns, rule, "xn") is None
+    assert _first_stated_date("dated 1 April 2567", patterns, rule, "xn") == date(2024, 4, 1)
+
+
+def test_month_names_differing_only_by_case_are_refused() -> None:
+    """The lookup folds its key, so two spellings of one name would leave one
+    slot unreachable; distinctness is judged on the folded form."""
+    with pytest.raises(ValidationError, match="distinct"):
+        CalendarConversion(
+            kind="buddhist",
+            month_names=["MAY", *ENGLISH_MONTHS[1:]],
+            month_day_is_gregorian=True,
+            date_cues=["dated"],
+        )

@@ -24,6 +24,7 @@ def calendar_configs(tmp_path, monkeypatch):
         "ir": {"kind": "hijri_solar"},
         "th": {"kind": "buddhist"},
         "tw": {"kind": "epoch_offset", "epoch_year": 1911},
+        "xnp": {"kind": "bikram_samvat"},
         "jp": {
             "kind": "era_table",
             "eras": [
@@ -756,9 +757,8 @@ class TestAMonthIsReadOnItsOwnGrid:
     def test_a_local_month_lands_in_the_year_the_calendar_says(
         self, kind: str, local_year: str, month: int, day: int | None, expected: int
     ) -> None:
-        assert (
-            _apply_rule(local_year, CalendarConversion(kind=kind), month=month, day=day) == expected
-        )
+        rule = CalendarConversion(kind=kind)
+        assert _apply_rule(local_year, rule, month=month, day=day, month_grid="local") == expected
 
     @pytest.mark.parametrize(
         ("kind", "local_year", "month", "day"),
@@ -773,29 +773,27 @@ class TestAMonthIsReadOnItsOwnGrid:
         self, kind: str, local_year: str, month: int, day: int | None
     ) -> None:
         rule = CalendarConversion(kind=kind)
-        assert _apply_rule(local_year, rule, month=month, day=day) == _apply_rule(
-            local_year, rule, month=None
-        )
+        assert _apply_rule(
+            local_year, rule, month=month, day=day, month_grid="local"
+        ) == _apply_rule(local_year, rule, month=None)
 
     @pytest.mark.parametrize(
         ("declared_gregorian", "month_grid", "expected"),
         [
             # The calendar's own grid, undeclared: January is Baisakh, 2023.
-            (False, None, 2023),
             (False, "local", 2023),
             # Named Gregorian, whatever the config declares: January, 2024.
             (False, "gregorian", 2024),
             (True, "gregorian", 2024),
             # A declared Gregorian grid makes the calendar's own months Gregorian.
-            (True, None, 2024),
             (True, "local", 2024),
         ],
     )
     def test_the_month_is_read_on_the_grid_the_caller_names(
-        self, declared_gregorian: bool, month_grid: str | None, expected: int
+        self, declared_gregorian: bool, month_grid: str, expected: int
     ) -> None:
-        """Which grid month 1 of BS 2080 is on decides the year; the keyword
-        names it, and the config's declaration stands in where it is absent."""
+        """Which grid month 1 of BS 2080 is on decides the year, and the
+        keyword names it."""
         rule = (
             self._gregorian_grid("bikram_samvat")
             if declared_gregorian
@@ -803,10 +801,17 @@ class TestAMonthIsReadOnItsOwnGrid:
         )
         assert _apply_rule("2080", rule, month=1, day=20, month_grid=month_grid) == expected
 
+    def test_a_bare_public_call_reads_the_month_as_gregorian(self) -> None:
+        """The public argument keeps the meaning it shipped with: a month named
+        by a caller that says nothing about the grid is a Gregorian month."""
+        assert _apply_rule("2080", CalendarConversion(kind="bikram_samvat"), month=1) == 2024
+        assert to_gregorian_year("2080", "xnp", month=1) == 2024
+
     def test_a_thirteenth_month_is_no_month_of_the_gregorian_grid(self) -> None:
         rule = self._gregorian_grid("bikram_samvat")
         assert _apply_rule("2080", rule, month=13, day=1) == _apply_rule("2080", rule, month=None)
-        assert _apply_rule("2016", CalendarConversion(kind="ethiopian"), month=13) == 2024
+        rule = CalendarConversion(kind="ethiopian")
+        assert _apply_rule("2016", rule, month=13, month_grid="local") == 2024
 
     def test_a_month_of_a_grid_no_table_describes_settles_nothing(self) -> None:
         rule = CalendarConversion(kind="buddhist", new_year_month=4, new_year_reform_year=2484)

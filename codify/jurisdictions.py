@@ -336,7 +336,8 @@ class CalendarConversion(BaseModel):
     def _date_grammar_is_usable(self) -> "CalendarConversion":
         """A blank month renumbers the calendar and a blank cue compiles to a
         pattern matching the start of every document."""
-        names = [n.strip() for n in self.month_names]
+        # On the folded form, since the lookup folds its key.
+        names = [n.strip().casefold() for n in self.month_names]
         if self.month_names and (not all(names) or len(set(names)) != len(names)):
             raise ValueError("month_names must be non-blank and distinct")
         if self.date_cues and not any(c.strip() for c in self.date_cues):

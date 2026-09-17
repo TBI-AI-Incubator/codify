@@ -25,7 +25,7 @@ class CalendarConversionError(ValueError):
 
 
 #: Which grid a month is on: the Gregorian one, or the calendar's own, which the
-#: config may declare to be Gregorian. None takes the config's declaration.
+#: config may declare to be Gregorian. A caller naming neither means Gregorian.
 MonthGrid = Literal["gregorian", "local"]
 
 
@@ -35,7 +35,7 @@ def to_gregorian_year(
     month: int | None = None,
     day: int | None = None,
     *,
-    month_grid: MonthGrid | None = None,
+    month_grid: MonthGrid = "gregorian",
 ) -> int:
     """Convert a local-calendar year to Gregorian. A named jurisdiction with no
     config raises: reading a Hijri year as Gregorian is a plausible wrong date."""
@@ -60,7 +60,7 @@ _GREGORIAN_TURN = {"bikram_samvat": (4, 12, 14), "ethiopian": (9, 10, 12)}
 
 
 def _in_the_earlier_gregorian_year(
-    rule: CalendarConversion, month: int | None, day: int | None, month_grid: MonthGrid | None
+    rule: CalendarConversion, month: int | None, day: int | None, month_grid: MonthGrid
 ) -> bool | None:
     """Whether the date falls in the earlier of the two Gregorian years its
     local year straddles, or None where the month, or the day, cannot say."""
@@ -112,7 +112,7 @@ def _apply_rule(
     *,
     month: int | None,
     day: int | None = None,
-    month_grid: MonthGrid | None = None,
+    month_grid: MonthGrid = "gregorian",
 ) -> int:
     kind = rule.kind
     # Every calendar here begins at one. Parse a numeric string before the check,
@@ -464,7 +464,10 @@ def _compose(
     country: str,
 ) -> date | None:
     """The Gregorian date a matched line states, or None when it states none."""
-    month = patterns.month_index[found.group("month").casefold()]
+    month = patterns.month_index.get(found.group("month").casefold())
+    if month is None:
+        # Case-blind matching reaches spellings the folded index does not hold.
+        return None
     local_year = int(found.group("year"))
     try:
         gregorian_year = _apply_rule(
