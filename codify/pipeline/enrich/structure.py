@@ -649,6 +649,8 @@ async def text_to_bluebell_scaffolded(
     _trace(scaffold=scaffold)
     windows = windows_from_anchors(text, anchors)
     if not windows:
+        # Containers only: nothing to fill, and the skeleton ships as the document.
+        logger.warning("body_fill_skipped", reason="no_basic_unit_anchors", anchors=len(anchors))
         return scaffold
 
     base_additions: list[str] = []

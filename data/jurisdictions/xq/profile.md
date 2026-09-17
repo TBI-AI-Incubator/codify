@@ -27,6 +27,6 @@ Laws are published in the Gaceta de Quivira. The enacting formula is
 
 ## Corpus
 
-Three laws, authored in Bluebell under `packages/codify/tests/fixtures/synthetic/xq/`.
+Three laws, authored in Bluebell under `tests/fixtures/synthetic/xq/`.
 One is amended by another, so the pair exercises the amendment and citation
 path rather than only the parser.

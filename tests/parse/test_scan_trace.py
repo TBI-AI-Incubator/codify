@@ -11,6 +11,7 @@ compared, and that a trace is emitted on the paths that produce no scaffold.
 from __future__ import annotations
 
 import pytest
+from structlog.testing import capture_logs
 
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import anchor_coverage, cached_regex, scan_anchors
@@ -464,3 +465,27 @@ async def test_markers_outside_the_boundary_still_fail_under_the_landing_policy(
             doctype="qanun",
             halt_policy="land",
         )
+
+
+_PARTS_ONLY = """PART I — PRELIMINARY
+
+Short title
+1.
+(1) This Act may be cited as the Example Act.
+
+PART II — THE AUTHORITY
+
+Establishment
+2.
+(1) There is established an Authority.
+"""
+
+
+async def test_a_scan_with_no_basic_unit_says_the_body_was_never_filled() -> None:
+    """A marginal-note layout anchors its parts and none of its sections. The
+    skeleton then ships as the document, which must not read as a clean run."""
+    with capture_logs() as logs:
+        out = await text_to_bluebell_scaffolded(_PARTS_ONLY, client=_NeverCalled(), country="xa")  # type: ignore[arg-type]
+    skipped = [r for r in logs if r["event"] == "body_fill_skipped"]
+    assert skipped and skipped[0]["reason"] == "no_basic_unit_anchors"
+    assert "PART I" in out and "This Act may be cited" not in out
