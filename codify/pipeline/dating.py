@@ -102,12 +102,15 @@ def _year_int(year: str) -> int | None:
 
 
 def _canonical_date(raw_date: str) -> str:
-    """The date with its year in four digits, as the URI carries it; a date-shaped
-    value whose year no date can hold is nothing. Anything else as written."""
-    stated = _ISO_DATE.match(raw_date)
-    if stated is not None and _year_int(stated.group(1)) is not None:
-        return f"{int(stated.group(1)):04d}{raw_date[stated.end(1) :]}"
-    return "" if re.match(r"[0-9]{5,}-", raw_date) else raw_date
+    """The date as a reader parses it, its year in the four digits the URI
+    carries, or "": a value that is not wholly a real date is no date."""
+    stated = _ISO_DATE.fullmatch(raw_date)
+    if stated is None or _year_int(stated.group(1)) is None:
+        return ""
+    try:
+        return date(*map(int, stated.groups())).isoformat()
+    except ValueError:
+        return ""
 
 
 def _segment(year: str) -> str:

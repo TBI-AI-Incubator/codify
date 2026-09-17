@@ -496,9 +496,9 @@ UNECHOED = {
     "date field naming no year": ("2511", ""),
     "unlabelled local date echoing the title": ("2511", "2511-09-09"),
     "unlabelled local date, month grid not Gregorian": ("2511", "2511-09-09"),
-    # Same: nothing marks it local, so it stays as the model wrote it. Whether a
-    # model date should be validated at all is a question for every calendar.
-    "unlabelled local date whose day does not exist": ("2511", "2511-04-31"),
+    # Nothing marks it local, so its year is read as written; the day does not
+    # exist on any grid, so no date is emitted.
+    "unlabelled local date whose day does not exist": ("2511", ""),
     "custom epoch, unlabelled echo": ("2478", "2478-09-09"),
     # Read as written and carried padded; only the grammar side converts it.
     "a three-digit year is carried padded": ("0999", ""),
@@ -544,11 +544,16 @@ def test_an_emitted_date_names_the_uri_year(
     expected_date: str,
 ) -> None:
     """A work date beside a URI year it contradicts classifies the document by
-    one year and files it under another; none is emitted, on either twin."""
+    one year and files it under another; none is emitted, on either twin. And
+    every date emitted, on every cell, is one a reader can parse."""
     for jurisdiction in (code, WITHOUT_IDENTITY[code]):
         desc = _resolve(jurisdiction, metadata, source)
         if desc.raw_date:
             assert desc.raw_date[:4] == desc.year, (case, jurisdiction)
+            assert date.fromisoformat(desc.raw_date).isoformat() == desc.raw_date, (
+                case,
+                jurisdiction,
+            )
 
 
 def test_a_supplied_title_is_evidence_and_a_filename_is_not() -> None:
@@ -750,6 +755,25 @@ EDGES = [
     ("source date, 999, no grammar", "xg2", {"title": UNDATED}, SOURCE_999, "0457", "0457-01-31"),
     ("source date, 12024", "xg", {"title": UNDATED}, SOURCE_12024, "", ""),
     ("source date, 12024, no grammar", "xg2", {"title": UNDATED}, SOURCE_12024, "", ""),
+    # A date-shaped value that is no date: the year run stands, the date does not.
+    ("an impossible date", "xg", {"title": UNDATED, "date": "2024-02-31"}, "", "2024", ""),
+    (
+        "an impossible date, no grammar",
+        "xg2",
+        {"title": UNDATED, "date": "2024-02-31"},
+        "",
+        "2024",
+        "",
+    ),
+    ("a suffixed date", "xg", {"title": UNDATED, "date": "2024-01-01junk"}, "", "2024", ""),
+    (
+        "a suffixed date, no grammar",
+        "xg2",
+        {"title": UNDATED, "date": "2024-01-01junk"},
+        "",
+        "2024",
+        "",
+    ),
 ]
 
 
@@ -771,8 +795,8 @@ def test_a_year_at_the_edge_is_canonical_or_nothing(
     desc = _resolve(code, metadata, source)
     assert (desc.year, desc.raw_date) == (expected_year, expected_date), case
     if desc.raw_date:
-        # Every date emitted is one a reader can parse.
-        assert date.fromisoformat(desc.raw_date), case
+        # Every date emitted is one a reader can parse, in the form it emits.
+        assert date.fromisoformat(desc.raw_date).isoformat() == desc.raw_date, case
     if source:
         # The helpers never see the source; the source-date rows test the
         # descriptor alone, as the grid does.
