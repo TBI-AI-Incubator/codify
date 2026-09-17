@@ -444,3 +444,32 @@ def test_every_line_ending_breaks_a_paragraph_the_same_way(
     """A carriage return is a line break, not whitespace: two of them end a
     paragraph as two newlines do, whichever convention wrote the file."""
     assert local_date_from_text(text, "xn") == expected
+
+
+ERAS = [{"name": "Reiwa", "abbrev": "令和", "start": "2019-05-01"}]
+
+
+def test_a_date_grammar_beside_an_era_table_is_refused_at_load() -> None:
+    """Both grammars capture a bare number, which an era table reads as a year
+    of its latest era; declaring them together is a config error, named."""
+    with pytest.raises(ValidationError, match="era_table.*date_cues"):
+        CalendarConversion(
+            kind="era_table",
+            eras=ERAS,
+            month_names=ENGLISH_MONTHS,
+            month_day_is_gregorian=True,
+            date_cues=["dated"],
+        )
+    assert CalendarConversion(kind="era_table", eras=ERAS).kind == "era_table"
+
+
+def test_a_title_grammar_beside_an_era_table_is_refused_at_load() -> None:
+    from codify.jurisdictions import FrbrConfig
+
+    with pytest.raises(ValidationError, match="era_table.*title_identity"):
+        FrbrConfig(
+            country_code="xj",
+            title_identity={"strip_prefixes": ["Act"], "year_particles": ["of"]},
+            calendar_conversion={"kind": "era_table", "eras": ERAS},
+        )
+    assert FrbrConfig(country_code="xj", calendar_conversion={"kind": "era_table", "eras": ERAS})

@@ -217,10 +217,13 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     )
     years = list(year_re.finditer(body)) if year_re else []
     year = years[-1].group(1) if years else ""
-    if years:
+    if years and year_re is not None:
         # From the last particle on is this document's own date; an earlier one
         # names another instrument and stays, telling two amendments apart.
         body = body[: years[-1].start()]
+        # Spelt the one declared way, as a retained edition is, or the alias
+        # the publisher chose forks the slug.
+        body = year_re.sub(lambda m: f"{rule.year_particles[0]} {m.group(1)}", body)
     body = body.strip()
     for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
         if _opens_with_prefix(body, prefix):

@@ -57,7 +57,7 @@ RULE = TitleIdentity(
         # instrument being amended and stays, telling two amendments apart.
         (
             "พระราชบัญญัติแก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน พ.ศ. 2477 (ฉบับที่ 5) พ.ศ. 2486",
-            "แก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน-พ-ศ-2477-ฉบับที่-5",
+            "แก้ไขเพิ่มเติมพระราชกำหนดว่าด้วยหมอกเงิน-พระพุทธศักราช-2477-ฉบับที่-5",
             "5",
             "2486",
         ),
@@ -372,3 +372,11 @@ def test_an_edition_after_a_republication_marker_leaves_the_base_too() -> None:
     assert identity_from_title("Act Foo (Update) (No. 7) of 1991", rule).slug == "foo"
     assert identity_from_title("Act Foo of 1991 (Update) (No. 7)", rule).slug == "foo"
     assert identity_from_title("Act Foo (No. 7) of 1991", rule).slug == "foo-no-7"
+
+
+@pytest.mark.parametrize("particle", ["พระพุทธศักราช", "พุทธศักราช", "พ.ศ."])
+def test_a_retained_year_is_spelt_with_the_canonical_particle(particle: str) -> None:
+    """A cited year stays in the base to tell two amendments apart, so its
+    particle must read the same whichever configured alias the title used."""
+    title = f"พระราชบัญญัติแก้ไขเพิ่มเติมมโหรีหลวง {particle} 2477 (ฉบับที่ 5) พ.ศ. 2486"
+    assert identity_from_title(title, RULE).slug == "แก้ไขเพิ่มเติมมโหรีหลวง-พระพุทธศักราช-2477-ฉบับที่-5"

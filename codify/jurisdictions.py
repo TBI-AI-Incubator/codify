@@ -355,6 +355,10 @@ class CalendarConversion(BaseModel):
             # Without one the shift can never fire, so the field reads as set
             # and does nothing.
             raise ValueError("new_year_reform_year needs new_year_month")
+        if self.kind == "era_table" and (self.month_names or self.date_cues):
+            # The grammar captures a bare number, which an era table reads as a
+            # year of its latest era.
+            raise ValueError("an era_table conversion cannot carry a date grammar (date_cues)")
         return self
 
 
@@ -422,6 +426,15 @@ class FrbrConfig(BaseModel):
     number_note: str | None = None
     number_extraction: str | dict[str, Any] | None = None
     sample_uris: list[Any] | dict[str, str] | None = None
+
+    @model_validator(mode="after")
+    def _grammars_suit_the_conversion(self) -> "FrbrConfig":
+        """A title grammar captures a bare number; an era table reads one as a
+        year of its latest era, so the two cannot be declared together."""
+        rule = self.calendar_conversion
+        if self.title_identity is not None and rule is not None and rule.kind == "era_table":
+            raise ValueError("an era_table conversion cannot carry a title_identity grammar")
+        return self
 
 
 class NumberingConfig(BaseModel):
