@@ -120,6 +120,12 @@ def normalise_digits(text: str) -> str:
     return text.translate(_DIGIT_TRANS)
 
 
+def number_run(digits: str) -> str:
+    """The number a digit run names: "03" and "3" are one ordinal, one year.
+    No run names nothing, and stays empty."""
+    return digits.lstrip("0") or ("0" if digits else "")
+
+
 def word_bounded(literal: str) -> str:
     """The literal as a pattern, bounded at each ASCII alphanumeric edge so a
     Latin word matches whole. A script written without spaces has no boundary."""

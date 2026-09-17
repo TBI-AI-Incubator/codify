@@ -576,6 +576,15 @@ def test_a_supplied_title_is_evidence_and_a_filename_is_not() -> None:
     assert (desc.year, desc.raw_date) == ("2511", "")
 
 
+def test_a_year_echoes_the_title_whatever_its_leading_zeros() -> None:
+    """The echo is on the number: a field spelling the title's year with a
+    leading zero is that local year read twice, and converts with it."""
+    title = "พระราชบัญญัติเครื่องร่อนสุริยะ พ.ศ. 999"
+    plain = _resolve("xg", {"title": title, "year": "999", "calendar": ""}, "")
+    padded = _resolve("xg", {"title": title, "year": "0999", "calendar": ""}, "")
+    assert (plain.year, padded.year) == ("0456", "0456")
+
+
 def test_a_padded_date_still_states_its_month() -> None:
     """A model pads the field. The month lookup matches on the canonical value,
     not on whatever whitespace came with it."""

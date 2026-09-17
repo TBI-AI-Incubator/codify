@@ -22,7 +22,7 @@ from codify.jurisdictions import (
     resolve_frbr_country,
     try_load_config,
 )
-from codify.lang import normalise_digits, word_bounded
+from codify.lang import normalise_digits, number_run, word_bounded
 
 logger = structlog.get_logger()
 
@@ -173,7 +173,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
             own = eligible[-1]
             # "03" and "3" are one edition. Stripped as text, so a number too
             # long for an int is unharmed.
-            edition = own.group(1).lstrip("0") or "0"
+            edition = number_run(own.group(1))
     body = text
     if edition_re is not None:
         # The document's own edition leaves the base, as does one after the
@@ -183,7 +183,7 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         def _edition(m: re.Match[str]) -> str:
             if m.span() == own_span or (marker is not None and m.start() > marker):
                 return " "
-            return f"({rule.edition_markers[0]} {m.group(1).lstrip('0') or '0'})"
+            return f"({rule.edition_markers[0]} {number_run(m.group(1))})"
 
         body = edition_re.sub(_edition, text)
     if consolidation_re is not None:
@@ -198,13 +198,14 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
         else None
     )
     years = list(year_re.finditer(body)) if year_re else []
-    year = years[-1].group(1) if years else ""
+    # A year is its number, as an edition is: a leading zero is typography.
+    year = number_run(years[-1].group(1)) if years else ""
     if years and year_re is not None:
         # Only the own year leaves; an earlier one names another instrument and
         # stays, spelt one way, as does any text after: undeclared is identity.
         own_year = years[-1]
         body = body[: own_year.start()] + " " + body[own_year.end() :]
-        body = year_re.sub(lambda m: f"{rule.year_particles[0]} {m.group(1)}", body)
+        body = year_re.sub(lambda m: f"{rule.year_particles[0]} {number_run(m.group(1))}", body)
     body = body.strip()
     for prefix in sorted(rule.strip_prefixes, key=len, reverse=True):
         if _opens_with_prefix(body, prefix):

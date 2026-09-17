@@ -27,7 +27,7 @@ from codify.calendar import (
 )
 from codify.frbr import identity_from_title
 from codify.jurisdictions import try_load_config
-from codify.lang import normalise_digits
+from codify.lang import normalise_digits, number_run
 
 logger = structlog.get_logger()
 
@@ -190,7 +190,7 @@ def resolve_dating(
     )
     # Carried only where date and title name one year: rebuilding a date
     # stating another on the title's would invent one neither states.
-    local_date_year = _date_year(raw_date)
+    local_date_year = number_run(_date_year(raw_date))
     if cal != "gregorian":
         raw_date = ""
     source_date: date | None = None
@@ -217,8 +217,8 @@ def resolve_dating(
     )
     # A field whose year run equals the title's is that local year read twice.
     # A date echoes only where the year field states nothing else.
-    year_run = sole_year_token(normalise_digits(str(metadata.get("year") or "")))
-    date_run = _date_year(stated_date)
+    year_run = number_run(sole_year_token(normalise_digits(str(metadata.get("year") or ""))))
+    date_run = number_run(_date_year(stated_date))
     converted_from_title = False
     local_year = identity.year if identity is not None else ""
     date_echoes_title = bool(local_year) and date_run == local_year and year_run in ("", local_year)

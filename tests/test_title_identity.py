@@ -351,3 +351,16 @@ def test_case_is_folded_not_lowered() -> None:
         "Act STRASSE of 1991", rule
     )
     assert identity_from_title("Act Straße of 1991", rule).body == "strasse"
+
+
+def test_a_year_is_its_number_not_its_typography() -> None:
+    """A leading zero on the year, own or cited, is typography, as it is on an
+    edition ordinal; two spellings of one year must reach one identity."""
+    rule = TitleIdentity(strip_prefixes=["Act"], year_particles=["of"], edition_markers=["No."])
+    assert identity_from_title("Act Widgets of 999", rule) == identity_from_title(
+        "Act Widgets of 0999", rule
+    )
+    assert identity_from_title("Act Widgets of 0999", rule).year == "999"
+    cited = identity_from_title("Act amending Foo of 0999 (No. 2) of 1991", rule)
+    assert cited == identity_from_title("Act amending Foo of 999 (No. 2) of 1991", rule)
+    assert cited.body == "amending-foo-of-999"
