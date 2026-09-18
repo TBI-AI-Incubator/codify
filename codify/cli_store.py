@@ -91,8 +91,8 @@ def _descriptors(doc: Document) -> tuple[str, int | None, str]:
     subtype = uri.subtype or uri.doctype
     doctype = _SUBTYPE_TO_DOCTYPE.get(subtype.split("-")[0], subtype)
     year = str(doc.work_date.year) if doc.work_date else uri.date[:4]
-    # An undated work carries the sentinel year in both the URI and the work date.
-    resolved = int(year) if year.isdigit() and int(year) != int(UNKNOWN_YEAR) else None
+    # An undated work carries a sentinel year: 0001 from the structurer, 0000 from the EU lane.
+    resolved = int(year) if year.isdigit() and int(year) > int(UNKNOWN_YEAR) else None
     return doctype, resolved, uri.number
 
 
