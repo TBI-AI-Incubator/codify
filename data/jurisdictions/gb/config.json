@@ -7,7 +7,7 @@
   "calendar": "gregorian",
   "languages": ["eng"],
   "authoritative_language": "eng",
-  "note": "Westminster Parliament legislates for the whole UK on reserved matters. England, Wales, Scotland, and Northern Ireland each have separate configs (gb-eng, gb-wls, gb-sct, gb-nir) covering devolved legislation. Scotland has a mixed common-law/civil-law tradition; that is captured in gb-sct. Welsh is co-official in Wales; that belongs on gb-wls. The UK has no codified constitution.",
+  "note": "Westminster Parliament legislates for the whole UK on reserved matters. Devolved legislation is covered here through the publisher's type tokens (asp, anaw, asc, nia, ssi, wsi, nisr and the rest), each a document class below. Scotland has a mixed common-law/civil-law tradition. Welsh is co-official in Wales. The UK has no codified constitution.",
   "document_classes": {
     "act": {
       "label": "Act of Parliament",
@@ -374,7 +374,7 @@
     "documents_examined": 5,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Validated against five legislation.gov.uk AKN exports (DPA 2018, Equality 2010, Housing 2004, Finance 2020, MLR 2017 SI) via the uk-gold structure/resolution/effects benchmarks; act + si hierarchies exercised end-to-end through the anchor scaffolder and Bluebell round-trip."
+    "note": "Validated against five legislation.gov.uk AKN exports (DPA 2018, Equality 2010, Housing 2004, Finance 2020, MLR 2017 SI) through the structure, resolution and effects benchmarks; act + si hierarchies exercised end-to-end through the anchor scaffolder and Bluebell round-trip."
   },
   "tier": 1,
   "status": "draft",

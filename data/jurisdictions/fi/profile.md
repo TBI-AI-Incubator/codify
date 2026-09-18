@@ -19,7 +19,7 @@
 
 ## Digital Presence: Tier 1 (pure AKN native)
 
-[Finlex Open Data](https://opendata.finlex.fi/) returns native Akoma Ntoso XML. Verified interactively 2026-07-05: `GET opendata.finlex.fi/finlex/avoindata/v1/akn/fi/act/statute/2000/731` returns `Content-Type: application/xml` with root element `<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">`, full `<FRBRWork>` / `<FRBRExpression>` blocks, and Finlex-namespaced attributes for parliamentary metadata. Finland joins Italy (Normattiva) and the UK (legislation.gov.uk) in the AKN-native top tier.
+[Finlex Open Data](https://opendata.finlex.fi/finlex/avoindata/v1/akn/fi/act/statute/2000/731) returns native Akoma Ntoso XML. `GET opendata.finlex.fi/finlex/avoindata/v1/akn/fi/act/statute/2000/731` returns `Content-Type: application/xml` with root element `<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">`, full `<FRBRWork>` / `<FRBRExpression>` blocks, and Finlex-namespaced attributes for parliamentary metadata. Finland joins Italy (Normattiva) and the UK (legislation.gov.uk) in the AKN-native top tier.
 
 The Finlex API returns _only_ AKN XML per its documentation: no PDF or HTML alternate, which makes this the strongest possible Tier 1 signal. Ingest is direct import, not extract-and-repair.
 
@@ -187,10 +187,10 @@ Same Eduskunta formula but the preamble records the constitutional procedure.
 | Alakohta (Sub-point)      | `subparagraph` | `SUBPARAGRAPH`   | Sub-items within a kohta                 |
 | Liite (Schedule/Appendix) | `attachment`   | `SCHEDULE`       | Bluebell SCHEDULE maps to AKN attachment |
 
-**Structuring prompt variant**: A Finland-specific prompt variant is recommended (`structure_fi.txt`) to:
+**Structuring prompt additions**: Finland-specific `structuring.prompt_additions`, which the structurer appends to its jurisdiction context, would:
 
 1. Reflect that `CHAPTER` (luku) is the primary higher division (not PART)
-2. Handle the § symbol as the article marker (the AI should normalise "5 §" to an ARTICLE heading)
+2. Handle the § symbol as the article marker (normalising "5 §" to an ARTICLE heading)
 3. Handle Finnish/Swedish bilingual structure; both language versions use identical hierarchy
 4. Correctly identify the Eduskunta enacting formula as the boundary between preamble and body
 
@@ -260,15 +260,15 @@ OASIS AKN standard, which defines its own naming-convention compliance levels.
 
 5. **Presidential Decree vs Government Decree pipeline differentiation**: Both TPA and VNA use the same säädöskokoelma numbering. The type can be detected from the document header ("Tasavallan presidentin asetus" vs "Valtioneuvoston asetus"). The pipeline should classify accordingly. URI subtype (`tpa` vs `vna`) needs to be assigned based on header detection, not number pattern.
 
-6. **Åland sub-jurisdiction**: Confirm whether `fi-ax` is the appropriate locality code or whether Åland should be modelled as a fully separate jurisdiction with country code `ax`. Under ISO 3166-1, Åland has its own alpha-2 code `AX`. Given that Åland has a fully separate legislature and legal system, treating it as `ax` rather than `fi-ax` may be more appropriate; but this mirrors the `mo` (Macau) vs `cn-mo` decision. Recommended: `ax`, the independent ISO 3166-1 code. Unresolved.
+6. **Åland sub-jurisdiction**: Confirm whether `fi-ax` is the appropriate locality code or whether Åland should be modelled as a fully separate jurisdiction with country code `ax`. Under ISO 3166-1, Åland has its own alpha-2 code `AX`. Given that Åland has a fully separate legislature and legal system, treating it as `ax` rather than `fi-ax` may be more appropriate. Recommended: `ax`, the independent ISO 3166-1 code. Unresolved.
 
-7. **English translations on Finlex**: Finlex hosts unofficial English translations for many major acts. They are not authoritative and must never be presented as such. Confirm metadata handling to mark `<FRBRtranslation>` and display appropriate disclaimer in review UI.
+7. **English translations on Finlex**: Finlex hosts unofficial English translations for many major acts. They are not authoritative and must never be presented as such. Confirm metadata handling to mark `<FRBRtranslation>` and display a disclaimer wherever they are shown.
 
 ## Notes
 
 - **Numbering direction**: Finnish statutory citation reads number-before-symbol: "5 §", not "§ 5". The pipeline should handle both input formats but canonicalise to the Finnish citation form.
 - **"Laki" vs "Asetus"**: Finnish distinguishes _laki_ (act of parliament) from _asetus_ (decree). Both are published in the säädöskokoelma. The pipeline classification step should distinguish these as different document subtypes.
-- **Finlex API**: Finlex provides structured HTML with clear section markers. For extraction, the DOM structure is more reliable than PDF OCR. An HTML extraction pathway (rather than full LLM pipeline) may be appropriate for Finlex documents. This is analogous to the note about Japan's JLS XML.
+- **Two Finlex surfaces**: the Open Data API above returns AKN XML and is the route to prefer. The finlex.fi website serves the same statutes as structured HTML with clear section markers; where only that is available, its DOM is more reliable than PDF OCR, and an HTML extraction pathway, rather than the full model pipeline, may be appropriate.
 - **Very long-lived acts**: The Finnish Criminal Code (rikoslaki 39/1889) has been in force since 1889 and has been amended hundreds of times. The FRBR Work URI `/akn/fi/act/1889/39` is correct; the expression URI will reflect the current consolidation date. Act numbers in 1889 were assigned in a pre-modern system; the `NNN/YYYY` system as it currently exists was formalised in the 20th century, in a year this profile has not established.
 - **Nordic harmony**: Finnish legislation frequently mirrors Danish, Norwegian, and Swedish equivalents due to Nordic legal cooperation via the Nordic Council. This may assist cross-jurisdiction quality checks.
 - **Repealed acts**: Finnish law is regularly consolidated and outdated provisions repealed. Finlex marks repealed provisions clearly, so repeal status is available as source metadata.
@@ -284,7 +284,3 @@ OASIS AKN standard, which defines its own naming-convention compliance levels.
 - Eur-lex.europa.eu: EU legislation applicable in Finland
 - Åland Islands official portal: www.regeringen.ax; Lagting acts and Ålands författningssamling
 - General knowledge of Finnish legislative structure, a well-documented jurisdiction. Where direct document inspection was not possible, the claim says so in place.
-
-## Verification pass
-
-2026-07-05: interactive tier audit moved this config from tier 2 to tier 1 under the 5-tier ladder (1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 none). The move was based on browser-grade probing of the Finlex Open Data endpoint's actual body-download response, not catalogue metadata, which had been unreliable elsewhere in the audit. `GET opendata.finlex.fi/finlex/avoindata/v1/akn/fi/act/statute/2000/731` was confirmed to return `Content-Type: application/xml` with a native `<akomaNtoso>` root and no PDF or HTML alternate. The Digital Presence section above already reflects this audited tier 1 value; no prose contradiction was found there.

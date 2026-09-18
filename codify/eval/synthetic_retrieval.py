@@ -1,6 +1,6 @@
 """Score the lexical arm over the synthetic corpora, on a checkout with no key.
 
-Needs `POSTGRES_URL`. See docs/eval/synthetic-retrieval.md.
+Needs `POSTGRES_URL` pointing at a disposable, migrated database.
 """
 
 from __future__ import annotations

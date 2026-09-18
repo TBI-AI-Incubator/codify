@@ -2,9 +2,9 @@
 
 **Full name**: United Kingdom of Great Britain and Northern Ireland  
 **Type**: National (sovereign state)  
-**Legal tradition**: Common law (dominant). Scotland's mixed civil-law element is on `gb-sct`.  
+**Legal tradition**: Common law (dominant); Scots law has a mixed civil-law element.  
 **Calendar**: Gregorian  
-**Languages**: English (`eng`). Welsh is co-official in Wales; see `gb-wls`.
+**Languages**: English (`eng`). Welsh is co-official in Wales.
 
 ---
 
@@ -21,14 +21,14 @@ Parliament legislates for the **whole UK** on reserved matters (defence, foreign
 
 ## Devolved legislatures
 
-Each nation has its own config covering devolved legislation:
+This configuration covers the whole statute book legislation.gov.uk publishes, devolved instruments included, through the publisher's type tokens (see FRBR URIs below). The legislatures:
 
-| Config   | Legislature                                                                                 | Territory                     |
-| -------- | ------------------------------------------------------------------------------------------- | ----------------------------- |
-| `gb-eng` | No separate assembly for England alone; English-only legislation passes through Westminster | England (and England & Wales) |
-| `gb-wls` | Senedd Cymru / Welsh Parliament                                                             | Wales                         |
-| `gb-sct` | Scottish Parliament                                                                         | Scotland                      |
-| `gb-nir` | Northern Ireland Assembly                                                                   | Northern Ireland              |
+| Legislature                                                                                 | Territory                     |
+| ------------------------------------------------------------------------------------------- | ----------------------------- |
+| No separate assembly for England alone; English-only legislation passes through Westminster | England (and England & Wales) |
+| Senedd Cymru / Welsh Parliament                                                             | Wales                         |
+| Scottish Parliament                                                                         | Scotland                      |
+| Northern Ireland Assembly                                                                   | Northern Ireland              |
 
 ---
 
@@ -91,6 +91,8 @@ legislation.gov.uk publishes AKN XML for the majority of UK legislation (from 19
 https://www.legislation.gov.uk/ukpga/2006/46/data.akn
 ```
 
+A smaller example, `https://www.legislation.gov.uk/ukpga/1978/30/data.akn` (Interpretation Act 1978), returns a document rooted at `akomaNtoso` in the `http://docs.oasis-open.org/legaldocml/ns/akn/3.0` namespace, with `uk:` and `ukl:` extension namespaces and an FRBR URI under `legislation.gov.uk/id/`.
+
 ---
 
 ## Supranational memberships
@@ -101,6 +103,7 @@ https://www.legislation.gov.uk/ukpga/2006/46/data.akn
 | Council of Europe (`council-of-europe`)             | 1949  | Founding member; ECHR incorporated via Human Rights Act 1998 |
 | Commonwealth of Nations (`commonwealth-of-nations`) | 1949  | Head of the Commonwealth                                     |
 | NATO (`nato`)                                       | 1949  | Founding member                                              |
+| World Trade Organization (`wto`)                    | 1995  | Founding member                                              |
 
 **EU**: The UK formally left the EU on **31 January 2020** (Brexit). The transition period ended 31 December 2020. EU membership is **not** modelled here. Retained EU law (REUL) was converted into UK domestic law by the European Union (Withdrawal) Act 2018 and subsequent instruments.
 
@@ -108,20 +111,10 @@ https://www.legislation.gov.uk/ukpga/2006/46/data.akn
 
 ## Official Gazette
 
-**The London Gazette**: published continuously since 1665. Statutory notices, Royal Proclamations, and official appointments are published here. The Edinburgh Gazette and Belfast Gazette serve Scotland and Northern Ireland respectively (modelled on `gb-sct` and `gb-nir`).
+**The London Gazette**: published continuously since 1665. Statutory notices, Royal Proclamations, and official appointments are published here. The Edinburgh Gazette and Belfast Gazette serve Scotland and Northern Ireland respectively.
 
 ---
 
 ## Amendment conventions
 
 UK Acts follow Commonwealth textual amendment style: substitution of words/phrases/sections with explicit "for X substitute Y" or "omit X" formulations. Cross-references use short title and year (e.g. "the Companies Act 2006"). Consolidation Acts are common.
-
----
-
-## Verification pass (2026-07-18)
-
-Checked the primary portal named in this profile: `https://www.legislation.gov.uk`, operated by The National Archives. The homepage responded normally, no non-browser-agent blocking observed, and confirmed it hosts UK Acts, SIs, and devolved legislation as described.
-
-Checked the AKN export path this profile documents, `/{source_path}/data.akn`. A fetch of the profile's own worked example, `https://www.legislation.gov.uk/ukpga/2006/46/data.akn` (Companies Act 2006), exceeded the fetch tool's 10 MB response-size limit rather than erroring; this reads as a large-document artifact of the tool, not a portal rejection. A smaller Act on the same path, `https://www.legislation.gov.uk/ukpga/1978/30/data.akn` (Interpretation Act 1978), returned a valid document with root element `akomaNtoso`, namespace `http://docs.oasis-open.org/legaldocml/ns/akn/3.0`, plus `uk:`/`ukl:` legislation.gov.uk extension namespaces, and an FRBR URI under `legislation.gov.uk/id/`.
-
-Tier 1 basis held: the portal is live and the `/data.akn` path serves genuine AKN 3.0 XML, matching the "AKN native" claim and the config's `tier: 1`. Nothing in this pass contradicts the digital-presence statement or the FRBR URI conventions described above; no changes made to config.json or the tier statement elsewhere in this file.

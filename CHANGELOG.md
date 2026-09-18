@@ -3,7 +3,7 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
-## 0.3.0 — 2026-09-18
+## 0.3.0 (2026-09-18)
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
 apply without a declaration. Under `VERSIONING.md` the minor moves while the
@@ -41,17 +41,18 @@ New config, additive:
   Lao, Khmer, Myanmar blocks) may follow a letter directly.
 - `attachments[].prefix`: a caption that opens a longer title on the same line.
 
-## 0.2.0 — 2026-09-17
+## 0.2.0 (2026-09-17)
 
-Eleven breaks, so the minor moves, as `VERSIONING.md` prescribes while the
-major is zero. Enumerated by running every year-resolution grid cell and edge
-row through the 0.1.0 and 0.2.0 callers (`resolve_year`, `gregorian_year`,
-`resolve_descriptors`) and grouping every differing cell; the raw table is on
-the pull request. Each line names the input shape that triggers it. Verified
-against the demo holdings on 17 September 2026: no jurisdiction with a
-non-Gregorian calendar (af, et, ir, jp, kp, ma, np, sa, th, tw) has any law
-stored, no stored law has a year below 1000, and no work URI carries a one- to
-three-digit year segment, so no shipped row moves.
+Thirteen breaks, so the minor moves, as `VERSIONING.md` prescribes while the
+major is zero. Items 1 to 11 are in year resolution, enumerated by running
+every year-resolution grid cell and edge row through the 0.1.0 and 0.2.0
+callers (`resolve_year`, `gregorian_year`, `resolve_descriptors`) and grouping
+every differing cell; each of those lines names the input shape that triggers
+it, and a stored row moves under them only where a jurisdiction with a
+non-Gregorian calendar has a law stored, a stored law has a year below 1000,
+or a work URI carries a one- to three-digit year segment. Items 12 and 13 are
+storage changes with no input shape: migration 0020 copies every existing
+`provision_embeddings` row into the partitioned table.
 
 1. A date field the model left unlabelled is read as written; 0.1.0 converted
    its year through the jurisdiction's calendar, filing a Gregorian `1968-09-09`
@@ -104,7 +105,7 @@ date converts with its month and the new-year reform where a Gregorian grid
 and a reform year are declared; and such a date's month and day carry into the
 work date.
 
-## 0.1.0 — 2026-09-09
+## 0.1.0 (2026-09-09)
 
 First version of the standalone library, before any published release or benchmark run.
 
@@ -119,6 +120,6 @@ First version of the standalone library, before any published release or benchma
 - Test fixtures and documentation have been adapted for a standalone checkout.
   Database and provider tests remain separate from the default offline CI.
 
-Prior monorepo benchmark numbers are not results for this candidate. The
+Benchmark numbers from before the split are not results for this version. The
 synthetic retrieval evaluator can be run separately against a disposable
 PostgreSQL database; it does not measure accuracy on a real statute book.

@@ -11,7 +11,8 @@ source scans, operational identifiers, credentials or private catalogue content.
 Public source availability alone does not establish redistribution permission.
 
 For configurations, see [adding a jurisdiction](docs/jurisdictions/adding-a-jurisdiction.md).
-Configuration packaging follows the `synthetic` and `public_reference` flags.
+Only configurations flagged `synthetic` or `public_reference` are packaged; the
+guide explains both flags.
 
 Use concise comments, British English prose and American English identifiers.
 Sign off contributions with `git commit -s` under the Developer Certificate of

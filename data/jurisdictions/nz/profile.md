@@ -98,7 +98,7 @@ Acts that affect Māori rights frequently include a Treaty of Waitangi preamble 
 
 ### 3. Waitangi Tribunal's Quasi-Judicial Role
 
-The Waitangi Tribunal issues reports (not judgments). Its findings are not court decisions, but they are cited extensively in Treaty litigation and administrative reviews. For AKN purposes, Tribunal reports are document class `doc` (not `act`), though profiling Tribunal reports is out of scope for the current pipeline iteration.
+The Waitangi Tribunal issues reports (not judgments). Its findings are not court decisions, but they are cited extensively in Treaty litigation and administrative reviews. For AKN purposes, Tribunal reports are document class `doc` (not `act`); they are not profiled here.
 
 ### 4. Schedule Hierarchies
 

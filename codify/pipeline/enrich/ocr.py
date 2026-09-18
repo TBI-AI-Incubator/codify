@@ -769,9 +769,9 @@ def _promote_rival_when_empty(page: PageResult) -> PageResult:
 
         A RECITATION refusal on famous legal text returns nothing (`finish_reason`
     `content_filter`), so a scanned page
-        reads as blank though the layout pass already transcribed it. The engine A/B
-        (`docs/log/2026-08-03-ocr-engine-ab.md`) put vision ahead wherever both engines
-        read, so this fires only on an empty read, never to override a real one.
+        reads as blank though the layout pass already transcribed it. A measured engine
+        A/B put vision ahead wherever both engines read, so this fires only on an empty
+        read, never to override a real one.
 
         Recorded rather than hidden: the empty vision read moves into `rival_text`, so
         the `page_reads` row still shows the primary engine returned nothing.

@@ -27,11 +27,11 @@ level is the **basic unit**, and most of the configuration hangs off it.
 ```
 data/jurisdictions/<your code>/
   config.json    what the pipeline reads. Required
-  profile.md     prose for a human, rendered in the product. Optional
+  profile.md     prose for a human reader. Optional
 ```
 
 Only `config.json` is required. `load_profile` returns `None` when `profile.md`
-is absent, and six of the twelve configs that ship today have none.
+is absent, and seven of the thirteen configs that ship have none.
 
 `xq` below is this guide's worked example and already exists, so read it rather
 than recreate it. For your own jurisdiction pick a code nothing else uses: every
@@ -89,7 +89,7 @@ Akoma Ntoso, and it is normally `act` whatever the local name.
 `akn_element` and `level`; `level` is one of `higher`, `basic`, `subdivision`,
 `grouping`, `presentational`, and exactly one entry should be `basic`.
 `bluebell_keyword` must come from Bluebell's own vocabulary (`PART`, `CHAPTER`,
-`ARTICLE`, `PARAGRAPH`, …); a plausible abbreviation is rejected.
+`ARTICLE`, `PARAGRAPH` and so on); a plausible abbreviation is rejected.
 
 **`languages`** are ISO 639-3, three letters. `authoritative_language` is the one
 the pipeline reads a document in when nothing else says.
@@ -99,7 +99,7 @@ the pipeline reads a document in when nothing else says.
 A real jurisdiction needs a registry entry before this passes. The registry is
 derived, so do not write one: run the script and let it catch up.
 
-From the `codify` package's own directory:
+From the repository root:
 
 ```
 uv run python scripts/build_registry.py
@@ -217,10 +217,10 @@ uv run codify ingest-one <file.pdf> --jurisdiction xq --out bundle/
 
 This is the full path: transcribe, scan for anchors, scaffold, fill bodies,
 parse, validate. It needs a model, so it is the step an outside contributor
-cannot run without a gateway. What it writes into `bundle/` is the point: the
-page images, every anchor with the pass that produced it, the coverage
-measurement with both number sets it compared, the scaffold before body-fill,
-the final AKN and the validator findings.
+cannot run without a model endpoint. What it writes into `bundle/` is the
+point: the page images, every anchor with the pass that produced it, the
+coverage measurement with both number sets it compared, the scaffold before
+body-fill, the final AKN and the validator findings.
 
 Read that bundle before believing any summary of what an ingest did. The run
 stream carries counts, and counts are what mislead.
@@ -262,7 +262,7 @@ rewrites it from the configs, which is why Step 2 runs it.
 
 Synthetic jurisdictions have no registry entry at all, and that is asserted rather
 than accidental: `test_registry_matches_jurisdiction_directories` excludes them on
-purpose. So the registry lists five of the twelve configs that ship, and a count
+purpose. So the registry lists six of the thirteen configs that ship, and a count
 that disagrees is the invariant working, not a gap.
 
 **Where the loader looks.** It prefers the nearest data. In a checkout it walks up
@@ -274,8 +274,8 @@ and an edit there is live.
 
 ## What a thin config leaves empty
 
-The minimum in Step 1 loads, and it is genuinely minimal. Six fields are set by
-every one of the twelve configs that ship and by none of the example above:
+The minimum in Step 1 loads. Six fields are set by every one of the thirteen
+configs that ship and by none of the example above:
 `calendar`, `enacting_formulae`, `amendments`, `core_tlcs`,
 `supranational_memberships` and `display`. None is required, and a config without
 them parses; `enacting_formulae` and `core_tlcs` come back as empty lists and
@@ -289,17 +289,16 @@ the local name is never consulted.
 
 **A relation keyed on the local name dangles.** The same normalisation bites
 manifests: `cites: /akn/xq/ley/2004/9` names nothing, because the law was minted
-at `/akn/xq/act/2004/9`. This guide's own fixture had that wrong until review
-caught it.
+at `/akn/xq/act/2004/9`.
 
 **Pass a year, not a date.** `parse_to_akn(date="2004-03-11")` mints
 `/akn/xq/act/2004-03-11/9`, which the validator reports as an uncitable work URI.
 `date="2004"` gives `/akn/xq/act/2004/9`.
 
-**A missing config is now an error rather than a default.** Naming a jurisdiction
-that has no config raises rather than falling back, because the fallback used to
-scan non-Latin documents with English keywords and return a document that looked
-thin rather than a run that had failed.
+**A missing config is an error, not a default.** Naming a jurisdiction that has
+no config raises rather than falling back: a fallback would scan non-Latin
+documents with English keywords and return a document that looked thin rather
+than a run that had failed.
 
 **One `basic` level.** Two, or none, and anchor scanning has no level to count
 coverage against.

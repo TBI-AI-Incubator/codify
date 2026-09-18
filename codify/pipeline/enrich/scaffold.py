@@ -159,8 +159,7 @@ def scaffold_from_anchors(
     for anchor in anchor_list:
         # Quoted-amendment anchors have no eid and are not emitted as peer headers, so
         # they surface as prose under the host article's body-fill. Bluebell
-        # <embeddedStructure> integration is deferred; see
-        # docs/log/2026-07-22-amendment-quoted-structure.md.
+        # <embeddedStructure> integration is deferred.
         if anchor.quoted_amendment:
             continue
         if closing and anchor.akn_eid in schedule_rooted:

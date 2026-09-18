@@ -1,22 +1,21 @@
 """Read what the pipeline did, one document at a time or across a whole corpus.
 
-Behind the API the only readable output is the persisted AKN and a stream of
-counts, which shows that an ingest produced nothing but not why.
-
     codify ingest-one gazette.pdf --jurisdiction xa --out bundle/
 
-writes a bundle instead: page images, every anchor with its producing pass, the
-coverage measurement with both number sets, the pre-body-fill scaffold, the
-final AKN and the validator findings. Every artifact is captured from the run,
-not recomputed. It needs a chat model behind an OpenAI-compatible endpoint
-(`LITELLM_BASE_URL` and `LITELLM_API_KEY`, read from the environment or the
-nearest `.env`); no database write, so no migration or deploy.
+runs one document through the pipeline and writes a bundle: page images, every
+anchor with its producing pass, the coverage measurement with both number sets,
+the pre-body-fill scaffold, the final AKN and the validator findings. Every
+artifact is captured from the run, not recomputed. It needs a chat model behind
+an OpenAI-compatible endpoint (`LITELLM_BASE_URL` and `LITELLM_API_KEY`, read
+from the environment or the nearest `.env`) and writes no database.
 
     codify scan-corpus ~/corpus --jurisdiction xa
 
-measures the anchor scan over raw sources instead, before anything is ingested,
-which is the only way to count a marker the scanner never claimed. It needs no
-gateway and no database.
+measures the anchor scan over raw sources before anything is ingested, which is
+the only way to count a marker the scanner never claimed. It needs no model and
+no database.
+
+The index-* subcommands build the acquisition indexes a bulk import reads.
 """
 
 from __future__ import annotations
@@ -565,7 +564,11 @@ def _load_env() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     _load_env()
-    parser = argparse.ArgumentParser(prog="codify", description=__doc__)
+    parser = argparse.ArgumentParser(
+        prog="codify",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     scan = sub.add_parser(
@@ -602,11 +605,7 @@ def main(argv: list[str] | None = None) -> int:
     one.add_argument(
         "--model",
         default=os.environ.get("LITELLM_MODEL", "gemini-3.7-flash"),
-        help=(
-            "body-fill model (default: %(default)s), which matches the deployed "
-            "pipeline. Pass --model to reproduce a run on another; the manifest "
-            "records which model ran."
-        ),
+        help="body-fill model (default: %(default)s); the manifest records which model ran",
     )
     one.add_argument(
         "--ocr-model",
@@ -636,9 +635,9 @@ def main(argv: list[str] | None = None) -> int:
 
     ee_idx = sub.add_parser(
         "index-ee-archive",
-        help="build index of active statutes from Estonian Riigi Teataja bulk XML zip",
+        help="index the statutes in force in a Riigi Teataja bulk XML zip",
     )
-    ee_idx.add_argument("archive", help="path to Estonian XML zip archive (e.g. xml.2026.zip)")
+    ee_idx.add_argument("archive", help="path to the Riigi Teataja XML zip (e.g. xml.2026.zip)")
     ee_idx.add_argument(
         "--out",
         default=None,
@@ -662,8 +661,8 @@ def main(argv: list[str] | None = None) -> int:
         help="index JSON to write (default: <ACQUISITION_INDEX_DIR>/<jurisdiction>/index.json)",
     )
     leg.add_argument("--types", default="", help="comma-separated type tokens; all when omitted")
-    leg.add_argument("--year-from", type=int, default=None)
-    leg.add_argument("--year-to", type=int, default=None)
+    leg.add_argument("--year-from", type=int, default=None, help="first year to list")
+    leg.add_argument("--year-to", type=int, default=None, help="last year to list")
     leg.add_argument("--quiet", action="store_true", help="suppress per-year progress")
     leg.add_argument(
         "--resume",

@@ -1,7 +1,8 @@
 # Working on Codify
 
-This is the standalone Python core. Do not import hosted application code or
-assume a neighbouring repository. Keep generic plugin interfaces independent
+Conventions for changing this repository, the standalone Python core published
+as `codify-core`. Do not import hosted application code or assume a
+neighbouring repository. Keep generic plugin interfaces independent
 of private detector implementations and catalogues.
 
 Use focused regression tests, strict source typing and the checks in
