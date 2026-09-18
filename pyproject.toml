@@ -46,6 +46,8 @@ dependencies = [
 # Running the core migration chain standalone (alembic.ini at the root).
 # A hosting service brings its own; a core-only install needs the extra.
 migrations = ["alembic>=1.14", "psycopg[binary]>=3.3.4"]
+# `codify serve`: the thin HTTP server over the library.
+serve = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9"]
 
 [project.scripts]
 codify = "codify.cli:main"
