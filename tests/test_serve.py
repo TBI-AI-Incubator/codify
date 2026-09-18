@@ -329,12 +329,14 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
     async with _client(None, app) as c:
         rid = await _enqueue(c, title=title)
         events = _sse((await c.get(f"/runs/{rid}/stream")).text)
-        assert events[-2][0] == "complete", events
+        result = (await c.get(f"/runs/{rid}")).json()["result"]
+        assert [k for k, _ in events[-3:]] == ["stored", "complete", "end"], events
         laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()["items"]
         law = (await c.get(f"/laws/{laws[0]['id']}")).json()
         version = (await c.get(f"/versions/{law['versions'][0]['id']}")).json()
 
     try:
+        assert result["version_id"] == version["id"] and result["law_id"] == law["id"]
         assert (law["title"], law["doctype"], law["year"], law["number"]) == (
             title,
             "act",
@@ -984,6 +986,88 @@ async def test_a_jurisdiction_config_is_served_by_alias() -> None:
 def test_a_plain_database_override_gets_the_async_driver() -> None:
     app = create_app(database="postgresql://u:p@h/d")
     assert str(app.state.sessions.kw["bind"].url) == "postgresql+asyncpg://u:***@h/d"
+
+
+@pytest.mark.integration
+async def test_a_law_pages_its_versions_and_a_version_serves_its_document() -> None:
+    """The reader's routes: a cursor-paged version list and the section tree."""
+    from sqlalchemy import select
+
+    from codify.storage import save_document
+    from codify.storage.models import Law, Version
+
+    xml = FIXTURE.read_text(encoding="utf-8")
+    title = f"Reader {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        for lang in ("eng", "fra", "deu"):
+            doc = parse_akn(
+                xml.replace("/eng", f"/{lang}").replace('language="eng"', f'language="{lang}"')
+            )
+            vid = await save_document(s, doc, jurisdiction_code="xa", law_title=title, akn_xml=xml)
+        law_id = (await s.execute(select(Version.law_id).where(Version.id == vid))).scalar_one()
+        await s.commit()
+
+    try:
+        async with _client(None, app) as c:
+            first = (await c.get(f"/laws/{law_id}/versions", params={"limit": 2})).json()
+            second = (
+                await c.get(
+                    f"/laws/{law_id}/versions", params={"limit": 2, "cursor": first["next_cursor"]}
+                )
+            ).json()
+            document = (await c.get(f"/versions/{vid}/document")).json()
+            assert (await c.get(f"/versions/{uuid.uuid4()}/document")).status_code == 404
+        assert [len(first["items"]), len(second["items"])] == [2, 1]
+        assert second["next_cursor"] is None
+        assert {"akn_xml"} & set(first["items"][0]) == set()
+        assert document["version_id"] == str(vid)
+        assert document["frbr_work_uri"] == "/akn/xa/act/1992/7"
+        assert document["sections"][0]["akn_eid"] == "part_I"
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.id == law_id))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
+@pytest.mark.integration
+async def test_a_search_match_names_its_law(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reader link needs the version, law and title behind a provision."""
+    import codify.retrieve.hybrid as hybrid
+    from codify.retrieve.hybrid import ProvisionMatch
+    from codify.storage import save_document
+    from codify.storage.models import Law, Provision
+
+    title = f"Matched {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        vid = await save_document(
+            s, _complete().document, jurisdiction_code="xa", law_title=title, akn_xml="<a/>"
+        )
+        await s.commit()
+        from sqlalchemy import select
+
+        pid = (
+            await s.execute(select(Provision.id).where(Provision.version_id == vid).limit(1))
+        ).scalar_one()
+
+    async def fake_retrieve(session: Any, q: str, **kw: Any) -> list[Any]:
+        return [ProvisionMatch(provision_id=pid, rrf_score=0.5, text="t", akn_eid="sec_1")]
+
+    monkeypatch.setattr(hybrid, "retrieve", fake_retrieve)
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://embeddings.test")
+    try:
+        async with _client(None, app) as c:
+            match = (await c.get("/search?q=x&jurisdiction=xa")).json()["matches"][0]
+        assert match["version_id"] == str(vid)
+        assert (match["law_title"], match["jurisdiction"]) == (title, "xa")
+        assert match["work_uri"] == "/akn/xa/act/1992/7"
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.title == title))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
 
 
 def test_serve_is_registered() -> None:

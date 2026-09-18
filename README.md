@@ -145,7 +145,8 @@ curl -N localhost:8000/runs/<run-id>/stream    # server-sent events until the ru
 ```
 
 Reads: `/jurisdictions`, `/jurisdictions/{code}`, `/laws`, `/laws/{id}`,
-`/versions/{id}` (with the AKN), `/search?q=&jurisdiction=`. Ingest: `POST /runs/ingest`
+`/laws/{id}/versions` (cursor-paged), `/versions/{id}` (with the AKN),
+`/versions/{id}/document` (the reader's section tree), `/search?q=&jurisdiction=`. Ingest: `POST /runs/ingest`
 (a file) or `POST /runs/ingest-url` (a URL) return a run at once; `/runs/{id}` is its
 state, `/runs/{id}/stream` replays every event so far and then follows it, and
 `/runs/{id}/cancel` and `/runs/{id}/retry` do what they say. A succeeded ingest is stored,
@@ -213,6 +214,33 @@ The tools, all reads:
 A failure reads back as the tool's error with a plain message. `--http` binds to
 localhost unless `--host` says otherwise; there is no authentication here either.
 
+## Web app
+
+A browser front end over `codify serve`: browse the jurisdictions the server
+ships, list and read laws, search provisions, upload a document and watch its
+run. It needs Node 22 and pnpm 11 (`corepack enable` gives you pnpm).
+
+```bash
+uv run codify serve                       # in one terminal, on :8000
+cd apps/web
+pnpm install
+pnpm dev                                  # http://localhost:5174, proxied to :8000
+```
+
+`VITE_API_URL` points the proxy at a server elsewhere. The screens: **Laws** lists
+one jurisdiction or all of them, filtered by title; a law opens in the **reader**,
+which renders the section tree from `/versions/{id}/document` and offers the AKN as
+a download; **Search** is the server's hybrid search over one jurisdiction, each
+match opening a preview and linking into the reader; **Ingest** uploads a file (or
+an EU publications URL under `eu`) and follows the run's events to the stored law.
+There is no sign-in: the app trusts whatever the server does.
+
+Its types come from the contract (`pnpm generate:contract` after `codify serve
+--openapi`); CI fails when the committed types drift. `pnpm typecheck`, `pnpm test`
+and `pnpm build` are the gates. Not carried over from the hosted platform: the
+world map, corpus tiers, the Bluebell source pane, text and original-file
+downloads, lenses, accounts and analytics.
+
 ## Configuration
 
 The CLI loads environment variables from a `.env` file in the working directory or parent
@@ -275,6 +303,9 @@ To add a jurisdiction, see `docs/jurisdictions/adding-a-jurisdiction.md`.
   and log redaction.
 - `codify/frbr.py`: FRBR URI generation and parsing.
 - `codify/jurisdictions.py`: Jurisdiction configuration loader and schema validator.
+- `codify/serve/`: The HTTP server over the library, its response models and in-memory runs.
+- `contract/openapi.json`: The server's schema, which the web app's types are generated from.
+- `apps/web/`: The browser front end over the server.
 
 ## Tests
 

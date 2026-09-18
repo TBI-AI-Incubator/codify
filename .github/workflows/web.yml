@@ -1,0 +1,31 @@
+# The web app's gates, run only when it or the contract it is typed from changes.
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/web/**', 'contract/openapi.json', '.github/workflows/web.yml']
+  pull_request:
+    paths: ['apps/web/**', 'contract/openapi.json', '.github/workflows/web.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      # The committed types must be the contract's.
+      - run: pnpm generate:contract && git diff --exit-code src/lib/contract.d.ts
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build

@@ -1,0 +1,5 @@
+/* Domain-aware tokens layered over the base theme. */
+
+@theme inline {
+  --font-legislative: var(--font-tbi-sans, ui-sans-serif), system-ui, sans-serif;
+}

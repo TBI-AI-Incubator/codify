@@ -18,8 +18,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.jurisdictions import JurisdictionConfig
-from codify.pipeline.events import Complete, IngestionEvent
-from codify.serve.runs import QueueFull, Run, RunTable
+from codify.pipeline.events import Complete
+from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored
 from codify.serve.schemas import (
     Cancelled,
     Health,
@@ -27,13 +27,16 @@ from codify.serve.schemas import (
     JurisdictionSummary,
     LawDetail,
     LawPage,
+    LawSummary,
     RunSnapshot,
     SearchMatch,
     SearchResult,
     VersionDetail,
+    VersionPage,
     VersionSummary,
 )
 from codify.settings import database_url
+from codify.storage.documents import VersionDocument
 
 SessionFactory = Callable[[], AsyncSession]
 _LIMIT = Query(50, ge=1, le=500)
@@ -70,14 +73,14 @@ class _Clients:
 
 def _ingest_runner(
     sessions: async_sessionmaker[AsyncSession], clients: _Clients
-) -> Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]]:
+) -> Callable[[dict[str, Any]], AsyncIterator[RunEvent]]:
     """Run the pipeline, then store what it produced so the reads can see it."""
 
-    async def run(params: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+    async def run(params: dict[str, Any]) -> AsyncIterator[RunEvent]:
         from codify.cli_store import _descriptors
         from codify.pipeline import ingest_document
         from codify.pipeline.events import MetadataExtracted
-        from codify.storage import save_document
+        from codify.storage import get_version, save_document
 
         llm = clients.llm()
         read_title = ""
@@ -87,7 +90,7 @@ def _ingest_runner(
             if isinstance(event, Complete):
                 doctype, year, number = _descriptors(event.document)
                 async with sessions() as session:
-                    await save_document(
+                    version_id = await save_document(
                         session,
                         event.document,
                         jurisdiction_code=params["jurisdiction"],
@@ -97,7 +100,9 @@ def _ingest_runner(
                         number=number,
                         akn_xml=event.akn_xml,
                     )
+                    law_id = (await get_version(session, version_id)).law_id  # type: ignore[union-attr]
                     await session.commit()
+                yield Stored(version_id=version_id, law_id=law_id)
             yield event
 
     return run
@@ -109,7 +114,7 @@ class EventStream(StreamingResponse):
 
 def create_app(
     *,
-    runner: Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]] | None = None,
+    runner: Callable[[dict[str, Any]], AsyncIterator[RunEvent]] | None = None,
     database: str | None = None,
 ) -> FastAPI:
     """`database` overrides `POSTGRES_URL`; nothing connects until a route needs to."""
@@ -197,7 +202,11 @@ def create_app(
                 limit=limit,
                 offset=offset,
             )
-        return LawPage(items=rows, limit=limit, offset=offset)
+        return LawPage(
+            items=[LawSummary.model_validate(r, from_attributes=True) for r in rows],
+            limit=limit,
+            offset=offset,
+        )
 
     @app.get("/laws/{law_id}")
     async def law(law_id: uuid.UUID) -> LawDetail:
@@ -236,11 +245,38 @@ def create_app(
             raise HTTPException(404, "no such version")
         return VersionDetail.model_validate(row, from_attributes=True)
 
+    @app.get("/versions/{version_id}/document")
+    async def version_document(version_id: uuid.UUID) -> VersionDocument:
+        """The version as the reader's section tree, not as AKN."""
+        from codify.storage.documents import get_version_document
+
+        async with sessions() as session:
+            document = await get_version_document(session, version_id)
+        if document is None:
+            raise HTTPException(404, "no such version")
+        return document
+
+    @app.get("/laws/{law_id}/versions")
+    async def law_versions(
+        law_id: uuid.UUID, limit: int = Query(100, ge=1, le=500), cursor: uuid.UUID | None = None
+    ) -> VersionPage:
+        from codify.storage import list_versions
+
+        async with sessions() as session:
+            rows, next_cursor = await list_versions(
+                session, law_id, limit=limit, cursor=cursor, with_akn=False
+            )
+        return VersionPage(
+            items=[VersionSummary.model_validate(v, from_attributes=True) for v in rows],
+            next_cursor=next_cursor,
+        )
+
     @app.get("/search")
     async def search(
         q: str, jurisdiction: str, k: int = Query(10, ge=1, le=100), language: str | None = None
     ) -> SearchResult:
         from codify.retrieve.hybrid import retrieve
+        from codify.storage.provisions import provision_contexts
 
         code = _jurisdiction(jurisdiction)
         try:
@@ -256,13 +292,23 @@ def create_app(
                 language=language,
                 k=k,
             )
+            where = await provision_contexts(session, [m.provision_id for m in matches])
         return SearchResult(
             query=q,
             matches=[
                 SearchMatch(
-                    provision_id=m.provision_id, eid=m.akn_eid, score=m.rrf_score, text=m.text
+                    provision_id=m.provision_id,
+                    eid=m.akn_eid,
+                    score=m.rrf_score,
+                    text=m.text,
+                    version_id=where[m.provision_id].version_id,
+                    law_id=where[m.provision_id].law_id,
+                    law_title=where[m.provision_id].law_title,
+                    work_uri=where[m.provision_id].frbr_work_uri,
+                    jurisdiction=where[m.provision_id].jurisdiction_code,
                 )
                 for m in matches
+                if m.provision_id in where
             ],
         )
 

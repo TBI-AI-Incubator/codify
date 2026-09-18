@@ -1,0 +1,455 @@
+@import 'tailwindcss';
+@import '../vendor/tbi-ui/index.css';
+@import '../vendor/stele/index.css';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+
+/* Font stack: values populated by @fontsource imports in src/main.tsx */
+:root {
+  --font-geist: 'Geist', 'Geist Sans', 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
+  /* Arabic/Hebrew faces for RTL legal text. Geist carries no Arabic/Hebrew
+     glyphs, so per-glyph fallback lands here while Latin stays on Geist. */
+  --font-rtl: 'Noto Sans Arabic', 'Noto Sans Hebrew', 'Geeza Pro', 'Arial';
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans:
+    'Geist', 'Geist Sans', 'Noto Sans', var(--font-rtl), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading:
+    'Geist', 'Geist Sans', 'Noto Sans', var(--font-rtl), ui-sans-serif, system-ui, sans-serif;
+  /* Legislative content uses the default sans: Geist: for cohesion with the
+   chrome. */
+  --font-legislative:
+    'Geist', 'Geist Sans', 'Noto Sans', var(--font-rtl), ui-sans-serif, system-ui, sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-confidence-high: var(--confidence-high);
+  --color-confidence-medium: var(--confidence-medium);
+  --color-confidence-low: var(--confidence-low);
+  --color-confidence-high-fg: var(--confidence-high-fg);
+  --color-confidence-medium-fg: var(--confidence-medium-fg);
+  --color-confidence-low-fg: var(--confidence-low-fg);
+  --color-ink-10: var(--ink-10);
+  --color-destructive-fg: var(--destructive-fg);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(0.995 0.003 250);
+  --foreground: oklch(0.145 0.006 250);
+  --card: oklch(0.995 0.003 250);
+  --card-foreground: oklch(0.145 0.006 250);
+  --popover: oklch(0.995 0.003 250);
+  --popover-foreground: oklch(0.145 0.006 250);
+  /* shadcn --primary tracks the vendored theme's --emphasis-strong by reference
+     so brand-styled and shadcn-styled affordances stay in lockstep. */
+  --primary: var(--emphasis-strong);
+  --primary-foreground: oklch(0.985 0.003 250);
+  --secondary: oklch(0.97 0.006 250);
+  --secondary-foreground: oklch(0.205 0.006 250);
+  --muted: oklch(0.97 0.006 250);
+  --muted-foreground: oklch(0.556 0.006 250);
+  --accent: oklch(0.97 0.006 250);
+  --accent-foreground: oklch(0.205 0.006 250);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0.006 250);
+  --input: oklch(0.922 0.006 250);
+  --ring: var(--emphasis-strong);
+  --confidence-high: oklch(0.65 0.2 145);
+  --confidence-medium: oklch(0.75 0.18 85);
+  --confidence-low: oklch(0.65 0.2 50);
+  /* Contrast-safe text variants: pair with the 15 percent tinted pill
+   backgrounds. */
+  --confidence-high-fg: oklch(0.4 0.15 145);
+  --confidence-medium-fg: oklch(0.45 0.15 85);
+  --confidence-low-fg: oklch(0.45 0.2 50);
+  --destructive-fg: oklch(0.45 0.2 27);
+  /* Lightest ink tint: table dividers, faint rules. */
+  --ink-10: oklch(0.94 0.003 250);
+  --chart-1: oklch(0.87 0.006 250);
+  --chart-2: oklch(0.556 0.006 250);
+  --chart-3: oklch(0.439 0.006 250);
+  --chart-4: oklch(0.371 0.006 250);
+  --chart-5: oklch(0.269 0.006 250);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0.003 250);
+  --sidebar-foreground: oklch(0.145 0.006 250);
+  --sidebar-primary: oklch(0.205 0.006 250);
+  --sidebar-primary-foreground: oklch(0.985 0.003 250);
+  --sidebar-accent: oklch(0.97 0.006 250);
+  --sidebar-accent-foreground: oklch(0.205 0.006 250);
+  --sidebar-border: oklch(0.922 0.006 250);
+  --sidebar-ring: oklch(0.708 0.006 250);
+}
+
+.dark {
+  --background: oklch(0.145 0.006 250);
+  --foreground: oklch(0.985 0.003 250);
+  --card: oklch(0.205 0.006 250);
+  --card-foreground: oklch(0.985 0.003 250);
+  --popover: oklch(0.205 0.006 250);
+  --popover-foreground: oklch(0.985 0.003 250);
+  --primary: var(--emphasis-strong);
+  --primary-foreground: oklch(0.145 0.006 250);
+  --secondary: oklch(0.269 0.006 250);
+  --secondary-foreground: oklch(0.985 0.003 250);
+  --muted: oklch(0.269 0.006 250);
+  --muted-foreground: oklch(0.708 0.006 250);
+  --accent: oklch(0.269 0.006 250);
+  --accent-foreground: oklch(0.985 0.003 250);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0.003 250 / 10%);
+  --input: oklch(1 0.003 250 / 15%);
+  --ring: var(--emphasis-strong);
+  --confidence-high: oklch(0.7 0.2 145);
+  --confidence-medium: oklch(0.78 0.18 85);
+  --confidence-low: oklch(0.7 0.2 50);
+  /* Dark-mode fg variants: light text on dark tinted pill backgrounds. */
+  --confidence-high-fg: oklch(0.85 0.18 145);
+  --confidence-medium-fg: oklch(0.88 0.16 85);
+  --confidence-low-fg: oklch(0.85 0.18 50);
+  --destructive-fg: oklch(0.85 0.18 27);
+  --ink-10: oklch(0.25 0.005 250);
+  --chart-1: oklch(0.87 0.006 250);
+  --chart-2: oklch(0.556 0.006 250);
+  --chart-3: oklch(0.439 0.006 250);
+  --chart-4: oklch(0.371 0.006 250);
+  --chart-5: oklch(0.269 0.006 250);
+  --sidebar: oklch(0.205 0.006 250);
+  --sidebar-foreground: oklch(0.985 0.003 250);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0.003 250);
+  --sidebar-accent: oklch(0.269 0.006 250);
+  --sidebar-accent-foreground: oklch(0.985 0.003 250);
+  --sidebar-border: oklch(1 0.003 250 / 10%);
+  --sidebar-ring: oklch(0.556 0.006 250);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer components {
+  /* Brief highlight when the SuggestionNavigator focuses a ghost-text
+     suggestion via J/K. */
+  [data-akn-decorator='suggestion'][data-akn-suggestion-active='true'] {
+    background-color: var(--emphasis-soft);
+    transition: background-color 0.18s ease-out;
+  }
+
+  /* Structural eyebrows on AKN elements rendered inside the Lexical author
+   surface. */
+  [data-akn-author] section[data-akn-type] > header[data-akn-eyebrow] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    margin-top: 2rem;
+    margin-bottom: 0.5rem;
+    user-select: none;
+  }
+  [data-akn-author] section[data-akn-type]:first-child > header[data-akn-eyebrow] {
+    margin-top: 0;
+  }
+  /* The micro-caps recipe, reached by attribute rather than class because the
+     AKN author surface is rendered from parsed XML with no className hook. */
+  [data-akn-author] [data-akn-eyebrow-label] {
+    @apply micro-caps;
+    color: var(--ink-60);
+  }
+  [data-akn-author] [data-akn-eyebrow-title] {
+    font-family: var(--font-legislative);
+    font-size: 1.0625rem;
+    color: var(--ink);
+  }
+  /* Top-level chapters and articles get more weight. */
+  [data-akn-author] section[data-akn-type='chapter'] > header [data-akn-eyebrow-title],
+  [data-akn-author] section[data-akn-type='article'] > header [data-akn-eyebrow-title] {
+    font-size: 1.25rem;
+  }
+  [data-akn-author] section[data-akn-type='article'] > header [data-akn-eyebrow-label] {
+    color: var(--emphasis-strong);
+  }
+  /* Subtle paper-sunken tint to differentiate author from read. */
+  [data-akn-author] {
+    background-color: color-mix(in oklch, var(--paper-sunken) 40%, var(--paper));
+    border-radius: 4px;
+    padding: 1.5rem 1.25rem;
+  }
+
+  .font-legislative {
+    font-family: var(--font-legislative);
+    font-feature-settings:
+      'liga' 1,
+      'kern' 1;
+    line-height: 1.7;
+  }
+
+  /* Editorial prose for jurisdiction profiles. Body and headings both in Geist;
+   vertical rhythm tuned for ~70ch. Token-driven so it tracks light/dark. */
+  .profile-prose {
+    color: var(--ink);
+    font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings:
+      'liga' 1,
+      'kern' 1;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    max-width: 70ch;
+  }
+  .profile-prose > * + * {
+    margin-top: 0.875rem;
+  }
+  .profile-prose h2,
+  .profile-prose h3,
+  .profile-prose h4 {
+    font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+    line-height: 1.3;
+  }
+  .profile-prose h2 {
+    font-size: 1.375rem;
+    font-weight: 600;
+    margin-top: 2.5rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  .profile-prose h3 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    margin-top: 1.75rem;
+    margin-bottom: 0.25rem;
+  }
+  .profile-prose h4 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-top: 1.25rem;
+    margin-bottom: 0.125rem;
+  }
+  .profile-prose > h2:first-child,
+  .profile-prose > h3:first-child {
+    margin-top: 0;
+  }
+  .profile-prose ul,
+  .profile-prose ol {
+    padding-left: 1.25rem;
+  }
+  .profile-prose ul {
+    list-style: disc;
+  }
+  .profile-prose ol {
+    list-style: decimal;
+  }
+  .profile-prose li + li {
+    margin-top: 0.25rem;
+  }
+  .profile-prose li > p {
+    margin: 0;
+  }
+  .profile-prose a {
+    color: var(--emphasis-strong);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-decoration-thickness: 0.06em;
+  }
+  .profile-prose strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .profile-prose em {
+    font-style: italic;
+  }
+  .profile-prose code {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.8125rem;
+    background-color: var(--paper-sunken);
+    padding: 0.05rem 0.25rem;
+    border-radius: 0.1875rem;
+  }
+  .profile-prose hr {
+    border: none;
+    border-top: 1px solid var(--ink-20);
+    margin: 2rem 0;
+  }
+  .profile-prose blockquote {
+    border-left: 1px solid var(--ink-20);
+    padding-left: 1rem;
+    color: var(--ink-60);
+    font-style: italic;
+  }
+  .profile-prose table {
+    width: 100%;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-collapse: collapse;
+    font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-feature-settings: 'tnum' 1;
+  }
+  .profile-prose thead {
+    border-bottom: 1px solid var(--ink-40);
+  }
+  .profile-prose tbody tr {
+    border-bottom: 1px solid var(--ink-20);
+  }
+  .profile-prose tbody tr:last-child {
+    border-bottom: none;
+  }
+  .profile-prose th,
+  .profile-prose td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    vertical-align: top;
+  }
+  .profile-prose th {
+    font-weight: 600;
+    color: var(--ink-60);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.6875rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Editor section bleed + read↔edit slot animation. The section width itself
+   isn't transitioned (banned); slot opacity + translate are. */
+[data-bleed='full'] {
+  margin-left: 0;
+  margin-right: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.editor-slot {
+  transition:
+    transform 280ms cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 220ms cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform, opacity;
+}
+.editor-slot[data-active='true'] {
+  opacity: 1;
+  transform: none;
+}
+.editor-slot[data-active='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.editor-slot[data-slot='edit'][data-active='false'] {
+  transform: translateX(-32px);
+}
+.editor-slot[data-slot='read'][data-active='false'] {
+  transform: translateX(24px);
+}
+
+/* Quick-answer streaming: each word resolves with a soft blur-and-fade as it
+   arrives. Runs once on mount (new words only); reduced-motion collapses it. */
+@keyframes qa-word-in {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+.qa-word {
+  display: inline-block;
+  white-space: pre-wrap;
+  animation: qa-word-in 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+/* Opener → thread: a same-document view transition glides the ask box from
+   centre stage to the composer slot; the rest of the page rises in under it. */
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+::view-transition-new(root) {
+  animation: vt-rise-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+::view-transition-group(research-ask) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(research-ask),
+::view-transition-new(research-ask) {
+  height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Slim, token-coloured scrollbar for long panel lists (sheet, rails). */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-20) transparent;
+  scrollbar-gutter: stable;
+}

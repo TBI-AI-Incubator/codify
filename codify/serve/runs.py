@@ -10,13 +10,26 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from pydantic import BaseModel
+
 from codify.pipeline.events import Complete, Failed, IngestionEvent
 
 Status = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 TERMINAL: frozenset[str] = frozenset({"succeeded", "failed", "cancelled"})
 
 # What a run does: given its params, yield pipeline events until Complete or Failed.
-Runner = Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]]
+
+
+class Stored(BaseModel):
+    """Where a succeeded ingest landed; the server's own event, after the pipeline's."""
+
+    kind: Literal["stored"] = "stored"
+    version_id: uuid.UUID
+    law_id: uuid.UUID
+
+
+RunEvent = IngestionEvent | Stored
+Runner = Callable[[dict[str, Any]], AsyncIterator[RunEvent]]
 
 
 @dataclass
@@ -50,7 +63,7 @@ class Run:
         }
 
 
-def _slim(event: IngestionEvent) -> dict[str, Any]:
+def _slim(event: RunEvent) -> dict[str, Any]:
     """The event as JSON, minus the document and AKN a Complete carries."""
     if isinstance(event, Complete):
         return {
@@ -162,12 +175,15 @@ class RunTable:
             # The verdict waits for the iterator to end: a lane may report a Failed
             # pass and still reach Complete, so the last of the two decides.
             outcome: Complete | Failed | None = None
+            stored: dict[str, Any] = {}
             async for event in self._runner(run.params):
                 self._publish(run, _slim(event))
                 if isinstance(event, Complete | Failed):
                     outcome = event
+                elif isinstance(event, Stored):  # the ids the result links by
+                    stored = {"version_id": str(event.version_id), "law_id": str(event.law_id)}
             if isinstance(outcome, Complete):
-                run.result = _slim(outcome)
+                run.result = {**_slim(outcome), **stored}
                 return "succeeded"
             run.error = (
                 f"{outcome.stage}: {outcome.error}"
