@@ -717,3 +717,31 @@ def test_the_verbatim_heading_never_carries_a_carriage_return(declared: Any) -> 
     bodies = {b.eid: b for b in fill_bodies_verbatim(text, scan.anchors).bodies}
     assert bodies["sec_5ter"].heading is None and bodies["sec_6"].heading is None
     assert bodies["sec_5ter"].lines == ["Five ter."]
+
+
+def test_a_keyword_less_unit_bounds_a_quotation(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = jurisdictions.load_config
+    base = original(COUNTRY)
+    act = base.document_classes["act"]
+    bare = act.model_copy(
+        update={
+            "hierarchy": [
+                jurisdictions.HierarchyEntry(
+                    local_term="Item",
+                    akn_element="section",
+                    level="basic",
+                    numbering="arabic_period",
+                    marker_form="arabic_period",
+                )
+            ]
+        }
+    )
+    config = base.model_copy(update={"document_classes": {**base.document_classes, "act": bare}})
+    monkeypatch.setattr(
+        anchors_mod, "load_config", lambda c: config if c == COUNTRY else original(c)
+    )
+    anchors_mod._basic_unit_line_re.cache_clear()
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    anchors_mod._basic_unit_line_re.cache_clear()
+    assert boundary is not None
+    assert boundary.search("2. Next provision") and boundary.search("prose 2. no") is None

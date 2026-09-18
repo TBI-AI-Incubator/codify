@@ -2657,27 +2657,33 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
         config = load_config(country)
     except Exception:  # noqa: BLE001, missing config -> no boundary to enforce
         return None
-    terms = {
-        form
+    entries = [
+        entry
         for doc_class in (config.document_classes or {}).values()
         for entry in doc_class.hierarchy
         if entry.akn_element in {"article", "section", "rule"}
-        for form in _alias_terms_for(entry)
-    }
-    if not terms:
+    ]
+    terms = {form for entry in entries for form in _alias_terms_for(entry)}
+    branches: list[str] = []
+    if terms:
+        alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
+        # The scanner's own separator and number grammar: what it would anchor is a
+        # provision heading here, and a keyword opening prose is not.
+        tolerances = set(config.structuring.marker_tolerances if config.structuring else ())
+        number = _num_pattern_with(
+            config.structuring.ordinal_words if config.structuring else {},
+            digit_glyphs="digit_glyph" in tolerances,
+            split_numbers="split_number" in tolerances,
+        )
+        branches.append(
+            rf"^[^\S\n]{{0,8}}(?:{alts}){_separator_for(tolerances)}{number}{_MARKER_NUM_END}"
+        )
+    # A keyword-less unit ("2. …") is a heading by its declared marker form.
+    for form in sorted({e.marker_form for e in entries if e.marker_form in _OUTLINE_RES}):
+        branches.append(_OUTLINE_RES[form].pattern.removeprefix("(?m)").replace("(?P<num>", "(?:"))
+    if not branches:
         return None
-    alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
-    # The scanner's own separator and number grammar: what it would anchor is a
-    # provision heading here, and a keyword opening prose is not.
-    tolerances = set(config.structuring.marker_tolerances if config.structuring else ())
-    number = _num_pattern_with(
-        config.structuring.ordinal_words if config.structuring else {},
-        digit_glyphs="digit_glyph" in tolerances,
-        split_numbers="split_number" in tolerances,
-    )
-    return re.compile(
-        rf"(?m)^[^\S\n]{{0,8}}(?:{alts}){_separator_for(tolerances)}{number}{_MARKER_NUM_END}"
-    )
+    return re.compile("(?m)" + "|".join(f"(?:{b})" for b in branches))
 
 
 def _quote_mask(text: str, country: str = "") -> tuple[bool, ...]:
