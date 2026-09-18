@@ -609,10 +609,8 @@ class StructuringConfig(BaseModel):
     # Ordinal words used as container numbers ("Bagian Kesatu" is part 1).
     # Declared in the source's own casing; matching is case-sensitive.
     ordinal_words: dict[str, int] = Field(default_factory=dict)
-    # Words that follow a keyword marker's number to mark an inserted unit ("5 bis"),
-    # each mapped to the ASCII form its eId carries; the number keeps its script.
-    # One table serves every jurisdiction, as `ordinal_words` does, so a word must
-    # be distinctive: never blank, a number, or a bare Latin letter ("5A" is a number).
+    # Words after a marker's number that mark an inserted unit ("5 bis"), mapped to the eId form.
+    # One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.
     insertion_suffixes: dict[str, str] = Field(default_factory=dict)
     # Words that, following a marker's number on its own line, make the line a
     # citation list rather than a provision ("Article 5 to Article 9 apply").

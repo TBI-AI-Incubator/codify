@@ -1,7 +1,5 @@
-"""Config-declared grammar the scan reads: inserted suffixes, citation runs, the
-closing boundary, and captions that open an attachment by their first word.
-
-Synthetic jurisdiction throughout: the shapes are the subject, not any corpus."""
+"""Config-declared grammar the scan reads: suffixes, citation runs, closing boundary,
+prefix captions. Synthetic jurisdiction throughout: the shapes are the subject."""
 
 from __future__ import annotations
 
