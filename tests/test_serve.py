@@ -699,6 +699,45 @@ async def test_laws_under_a_jurisdiction_validate_and_fold_the_code() -> None:
         await app.state.sessions.kw["bind"].dispose()
 
 
+async def test_a_run_is_never_terminal_before_it_is_complete() -> None:
+    """Status and completed_at move together, so nothing can retry a run in the
+    gap between its task returning and its done callback."""
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    while run.status in ("queued", "running"):
+        await asyncio.sleep(0)
+
+    assert run.status == "succeeded"
+    assert run.completed_at is not None
+
+
+async def test_jurisdiction_codes_fold_case_on_every_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The config path is case-sensitive on Linux, so the code is folded before the lookup;
+    this filesystem may not show it, so the lookup's argument is what is asserted."""
+    import codify.jurisdictions as jurisdictions
+
+    looked_up: list[str] = []
+    original = jurisdictions.load_config
+
+    def spy(code: str) -> Any:
+        looked_up.append(code)
+        return original(code)
+
+    monkeypatch.setattr(jurisdictions, "load_config", spy)
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        assert (await c.get("/jurisdictions/XA")).json()["code"] == "xa"
+
+    assert looked_up == ["xa"]
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

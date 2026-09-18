@@ -76,7 +76,7 @@ class RunTable:
         self._keep = keep
         self._max_queued = max_queued
         self._runs: dict[uuid.UUID, Run] = {}
-        self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
+        self._tasks: dict[uuid.UUID, asyncio.Task[Status]] = {}
         self._subscribers: dict[uuid.UUID, set[asyncio.Queue[dict[str, Any] | None]]] = {}
         self._gate = asyncio.Semaphore(concurrency)
 
@@ -148,7 +148,8 @@ class RunTable:
         for queue in self._subscribers[run.id]:
             queue.put_nowait(event)
 
-    async def _execute(self, run: Run) -> None:
+    async def _execute(self, run: Run) -> Status:
+        """Returns the verdict; `_finish` applies it, so status and completion move together."""
         async with self._gate:
             run.status = "running"
             run.started_at = datetime.now(UTC)
@@ -160,19 +161,24 @@ class RunTable:
                 if isinstance(event, Complete | Failed):
                     outcome = event
             if isinstance(outcome, Complete):
-                run.status, run.result = "succeeded", _slim(outcome)
-            elif isinstance(outcome, Failed):
-                run.status, run.error = "failed", f"{outcome.stage}: {outcome.error}"
-            else:
-                run.status, run.error = "failed", "the pipeline ended without Complete or Failed"
+                run.result = _slim(outcome)
+                return "succeeded"
+            run.error = (
+                f"{outcome.stage}: {outcome.error}"
+                if isinstance(outcome, Failed)
+                else "the pipeline ended without Complete or Failed"
+            )
+            return "failed"
 
-    def _finish(self, run: Run, task: asyncio.Task[None]) -> None:
+    def _finish(self, run: Run, task: asyncio.Task[Status]) -> None:
         """Runs when the task ends, however it ends: cancelled before its first step included."""
         if task.cancelled():
             run.status = "cancelled"
         elif (exc := task.exception()) is not None:
             run.status = "failed"
             run.error = f"{type(exc).__name__}: {exc}"
+        else:
+            run.status = task.result()
         run.completed_at = datetime.now(UTC)
         self._publish(run, None)
         self._forget_oldest()

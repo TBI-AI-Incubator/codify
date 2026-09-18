@@ -108,7 +108,7 @@ def create_app(
         from codify.jurisdictions import JurisdictionConfigError, load_config
 
         try:
-            config = load_config(code)
+            config = load_config(code.strip().lower())
         except JurisdictionConfigError as exc:  # missing or malformed: neither is ours
             raise HTTPException(404, str(exc)) from exc
         return config.model_dump(mode="json")
