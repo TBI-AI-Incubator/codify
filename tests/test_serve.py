@@ -670,6 +670,32 @@ async def test_law_detail_lists_every_version_past_the_first_page(
         await app.state.sessions.kw["bind"].dispose()
 
 
+@pytest.mark.integration
+async def test_laws_under_a_jurisdiction_validate_and_fold_the_code() -> None:
+    """`zz` is a 404, not an empty page; `XA` lists what `xa` lists."""
+    from codify.storage import save_document
+    from codify.storage.models import Law
+
+    title = f"Folded {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        await save_document(
+            s, _complete().document, jurisdiction_code="xa", law_title=title, akn_xml="<a/>"
+        )
+        await s.commit()
+
+    try:
+        async with _client(None, app) as c:
+            assert (await c.get("/jurisdictions/zz/laws")).status_code == 404
+            upper = (await c.get("/jurisdictions/XA/laws", params={"limit": 500})).json()["items"]
+        assert title in {law["title"] for law in upper}
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.title == title))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

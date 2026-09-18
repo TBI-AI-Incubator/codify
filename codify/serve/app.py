@@ -115,7 +115,7 @@ def create_app(
 
     @app.get("/jurisdictions/{code}/laws")
     async def laws_for(code: str, limit: int = _LIMIT, offset: int = _OFFSET) -> dict[str, Any]:
-        return await laws(jurisdiction=code, limit=limit, offset=offset)
+        return await laws(jurisdiction=_jurisdiction(code, 404), limit=limit, offset=offset)
 
     @app.get("/laws")
     async def laws(
@@ -164,7 +164,6 @@ def create_app(
             "versions": [_version_json(v, with_akn=False) for v in versions],
         }
 
-    @app.get("/laws/versions/{version_id}")
     @app.get("/versions/{version_id}")
     async def version(version_id: uuid.UUID) -> dict[str, Any]:
         from codify.storage import get_version
@@ -290,13 +289,13 @@ def create_app(
     return app
 
 
-def _jurisdiction(code: str) -> str:
-    """The canonical code of a shipped jurisdiction, or 422."""
+def _jurisdiction(code: str, status: int = 422) -> str:
+    """The canonical code of a shipped jurisdiction, or `status`."""
     from codify.jurisdictions import resolve_config
 
     resolved = resolve_config(code)
     if not resolved.found:
-        raise HTTPException(422, f"no jurisdiction config for {code!r}")
+        raise HTTPException(status, f"no jurisdiction config for {code!r}")
     return resolved.code
 
 
