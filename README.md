@@ -84,17 +84,21 @@ Pass `--quiet` to suppress per-event console output while retaining structured l
 
 ## Configuration
 
-The CLI reads `.env` from the working directory or any parent; an exported variable
-takes precedence. `pytest` and `alembic` read only the environment, so export what they
-need. `.env.example` lists every variable.
+The CLI loads environment variables from a `.env` file in the working directory or parent
+directories; explicitly exported shell variables take precedence. Note that `pytest` and
+`alembic` do not read `.env` files automatically and require variables to be exported in
+your environment. See `.env.example` for all available options.
 
-| Variable                                        | Purpose                                                  |
-| ----------------------------------------------- | -------------------------------------------------------- |
-| `LITELLM_BASE_URL`, `LITELLM_API_KEY`           | Chat endpoint and API key                                |
-| `LITELLM_MODEL`                                 | Body-fill model; `--model` overrides it per run          |
-| `POSTGRES_URL`                                  | Database tests and migrations; defaults to the compose DB |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` | Optional secondary OCR engine                            |
-| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`    | Optional tracing                                         |
+| Variable                | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `LITELLM_BASE_URL`      | Base URL for the OpenAI-compatible chat endpoint                          |
+| `LITELLM_API_KEY`       | API key for the chat endpoint                                             |
+| `LITELLM_MODEL`         | Default model used for body fill (overridden by `--model`)                |
+| `POSTGRES_URL`          | Postgres connection string for migrations and tests (defaults to local Compose service) |
+| `AZURE_OPENAI_ENDPOINT` | Endpoint for the optional secondary Azure AI Foundry OCR engine           |
+| `AZURE_OPENAI_API_KEY`  | API key for the optional Azure OCR engine                                 |
+| `LANGFUSE_PUBLIC_KEY`   | Public key for optional Langfuse tracing                                  |
+| `LANGFUSE_SECRET_KEY`   | Secret key for optional Langfuse tracing                                  |
 
 ## Jurisdictions
 
