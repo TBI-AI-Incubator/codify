@@ -70,6 +70,8 @@ dev = [
     "psycopg[binary]>=3.3.4",
     "numpy>=2.0",
     "alembic>=1.14",
+    "ipykernel>=6.29",
+    "nbclient>=0.10",
 ]
 
 [tool.pytest.ini_options]
