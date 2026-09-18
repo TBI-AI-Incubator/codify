@@ -3,6 +3,37 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
+## 0.4.0 (2026-09-18)
+
+The first published release. Everything after the bundle: a store, a server, a
+contract and an MCP surface, over the library that was already there. No
+structuring behaviour changes. Under `VERSIONING.md` the minor moves while the
+major is zero.
+
+New commands:
+
+- `codify load bundle/ --embed` writes a bundle, or a bare AKN file, into
+  Postgres and embeds its provisions; `codify search` runs the hybrid retrieval
+  over them; `codify compare` aligns two documents or two stored versions.
+- `codify serve` is a thin HTTP server over the same library calls: ten read and
+  run routes with in-memory runs and an SSE stream, `--openapi` prints the
+  schema, and `contract/openapi.json` is the committed copy a drift test guards.
+- `codify mcp` exposes seven read tools to an MCP client over stdio or
+  streamable HTTP, behind the `mcp` extra.
+
+Library, additive:
+
+- `storage.get_version` and `list_versions` take `with_akn=False` for a
+  metadata read that leaves the body unloaded; `get_version_akn_length`.
+- Every route answers with a Pydantic model; the server's response models are
+  `codify.serve.schemas`.
+- The EU fetcher resolves every hop, redirects included, through the address
+  guard.
+
+Repository: security policy, code of conduct, contributor guide, issue and pull
+request templates, and the boundary decision naming structure-preserving
+translation as core.
+
 ## 0.3.0 (2026-09-18)
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
