@@ -41,7 +41,7 @@ def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFill
         after = chunk[len(marker) :] if chunk.startswith(marker) else chunk
         after = _DECORATIONS_RE.sub("", after, count=1)
         first_line, _, rest = after.partition("\n")
-        heading = first_line.strip(" .-—:") or None
+        heading = first_line.strip(" .-—:\r") or None
         lines = [ln.strip() for ln in rest.splitlines() if ln.strip()]
         # A heading captured from the next source line (bare-keyword annex)
         # must not repeat as the first body paragraph.

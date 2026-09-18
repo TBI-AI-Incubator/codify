@@ -699,3 +699,21 @@ def test_the_container_probe_reads_the_cut_text(
     text, scan = seen[0]
     note = next(a for a in scan.anchors if a.kind == "schedule")
     assert text[note.char_offset :].lstrip().startswith("NOTE")
+
+
+def test_the_quote_boundary_reads_every_heading_shape_the_scanner_does(declared: Any) -> None:
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    assert boundary is not None
+    for heading in ("Section (2)", "Section. 2", "Section 2A", "Section\n5", "Section ii"):
+        assert boundary.search(heading + "\nText"), heading
+    assert boundary.search("Section continues as follows") is None
+
+
+def test_the_verbatim_heading_never_carries_a_carriage_return(declared: Any) -> None:
+    from codify.pipeline.enrich.verbatim import fill_bodies_verbatim
+
+    text = "Section 5\r\nzter*\r\nFive ter.\r\n\r\nSection 6\r\nSix.\r\n"
+    scan = _scan(text)
+    bodies = {b.eid: b for b in fill_bodies_verbatim(text, scan.anchors).bodies}
+    assert bodies["sec_5ter"].heading is None and bodies["sec_6"].heading is None
+    assert bodies["sec_5ter"].lines == ["Five ter."]

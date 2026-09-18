@@ -2667,10 +2667,17 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
     if not terms:
         return None
     alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
-    # A number must follow, on the line or wrapped onto the next as the scanner's
-    # separator allows: a digit, or a whole Roman numeral (Cyrillic homoglyphs too).
-    number = rf"(?=[{_MARKER_DIGITS}]|[IVXLCDMivxlcdmІіХх]+(?!\w))"
-    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})(?:[^\S\n]+|\r?\n[ \t]*){number}")
+    # The scanner's own separator and number grammar: what it would anchor is a
+    # provision heading here, and a keyword opening prose is not.
+    tolerances = set(config.structuring.marker_tolerances if config.structuring else ())
+    number = _num_pattern_with(
+        config.structuring.ordinal_words if config.structuring else {},
+        digit_glyphs="digit_glyph" in tolerances,
+        split_numbers="split_number" in tolerances,
+    )
+    return re.compile(
+        rf"(?m)^[^\S\n]{{0,8}}(?:{alts}){_separator_for(tolerances)}{number}{_MARKER_NUM_END}"
+    )
 
 
 def _quote_mask(text: str, country: str = "") -> tuple[bool, ...]:
