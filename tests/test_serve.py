@@ -50,11 +50,13 @@ def _client(runner: Any, app: FastAPI | None = None) -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app or _app(runner)), base_url="http://t")
 
 
-async def _enqueue(c: AsyncClient) -> str:
+async def _enqueue(c: AsyncClient, jurisdiction: str = "xa", title: str | None = None) -> str:
     r = await c.post(
-        "/runs/ingest-url", json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "xa"}
+        "/runs/ingest",
+        files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
+        data={"jurisdiction": jurisdiction, **({"title": title} if title else {})},
     )
-    assert r.status_code == 202
+    assert r.status_code == 202, r.text
     return str(r.json()["id"])
 
 
@@ -323,11 +325,8 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
 
     app = create_app()
     async with _client(None, app) as c:
-        r = await c.post(
-            "/runs/ingest-url",
-            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "xa", "title": title},
-        )
-        events = _sse((await c.get(f"/runs/{r.json()['id']}/stream")).text)
+        rid = await _enqueue(c, title=title)
+        events = _sse((await c.get(f"/runs/{rid}/stream")).text)
         assert events[-2][0] == "complete", events
         laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()["items"]
         law = (await c.get(f"/laws/{laws[0]['id']}")).json()
@@ -438,11 +437,7 @@ async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
         for _ in range(3):  # two run, one queues
             await _enqueue(c)
             await asyncio.sleep(0.01)
-        r = await c.post(
-            "/runs/ingest-url",
-            json={"url": "https://eur-lex.europa.eu/b.xml", "jurisdiction": "xa"},
-        )
-        assert r.status_code == 429
+        accepted = len(list(app.state.uploads.iterdir()))
         r = await c.post(
             "/runs/ingest",
             files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
@@ -450,6 +445,7 @@ async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
         )
         assert r.status_code == 429
         assert len((await c.get("/runs")).json()) == 3
+        assert len(list(app.state.uploads.iterdir())) == accepted  # the refused one is gone
         queued = app.state.runs.list()[0]
         assert queued.status == "queued"
         app.state.runs.cancel(queued.id)
@@ -459,7 +455,7 @@ async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
         for run in app.state.runs.list():
             app.state.runs.cancel(run.id)
 
-    assert list(app.state.uploads.iterdir()) == []
+    assert len(list(app.state.uploads.iterdir())) == accepted + 1  # one refill, none refused
 
 
 async def test_out_of_range_paging_and_k_are_422_not_500() -> None:
@@ -549,24 +545,31 @@ async def test_an_unknown_or_uncanonical_jurisdiction_is_422_or_folded() -> None
 
     async with _client(runner) as c:
         r = await c.post(
-            "/runs/ingest-url",
-            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "zz"},
-        )
-        assert r.status_code == 422
-        r = await c.post(
             "/runs/ingest",
             files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
             data={"jurisdiction": "zz"},
         )
         assert r.status_code == 422
-        r = await c.post(
-            "/runs/ingest-url",
-            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": " XA "},
-        )
-        assert r.status_code == 202
-        await c.get(f"/runs/{r.json()['id']}/stream")
+        rid = await _enqueue(c, jurisdiction=" XA ")
+        await c.get(f"/runs/{rid}/stream")
 
     assert seen == ["xa"]
+
+
+async def test_ingest_url_is_the_eu_lane_only() -> None:
+    """Only the EU lane fetches; core ships no eu config, so here the pair fails at
+    the config, and under CODIFY_DATA_ROOT with one it runs."""
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    url = "https://eur-lex.europa.eu/a.xml"
+    async with _client(runner) as c:
+        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "xa"})
+        assert r.status_code == 422 and "jurisdiction eu" in r.json()["detail"]
+        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "EU"})
+        assert r.status_code == 422 and "no jurisdiction config for 'EU'" in r.json()["detail"]
+        assert (await c.get("/runs")).json() == []
 
 
 async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPatch) -> None:

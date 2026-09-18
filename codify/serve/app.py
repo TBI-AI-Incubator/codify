@@ -232,10 +232,9 @@ def create_app(
     async def ingest_url(body: IngestUrl) -> dict[str, Any]:
         from codify.pipeline.formats import looks_like_eu
 
-        if not looks_like_eu(str(body.url)):  # the only lane that fetches a URL
-            raise HTTPException(
-                422, "only EU (eur-lex) URLs can be ingested by URL; upload the file"
-            )
+        # The EU lane is the only one that fetches; every other lane reads a path.
+        if not looks_like_eu(str(body.url)) or body.jurisdiction.strip().lower() != "eu":
+            raise HTTPException(422, "only an eur-lex URL under jurisdiction eu; upload the file")
         code = _jurisdiction(body.jurisdiction)
         try:
             run = runs.enqueue(
