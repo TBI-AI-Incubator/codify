@@ -175,12 +175,17 @@ def scaffold_from_anchors(
     return "\n".join(nest_pipe_tables(lines)) + "\n", eid_to_anchor
 
 
+# A line opening with an upper-case word reads as a Bluebell keyword; `\` makes it text.
+_KEYWORD_SHAPED_RE = re.compile(r"^[A-Z]{2,}(?:\s|$)")
+
+
 def _conclusions_lines(block: str | None) -> list[str]:
     """A CONCLUSIONS block of the source's own lines, paragraph breaks kept."""
     body: list[str] = []
     for line in (block or "").strip().splitlines():
-        if line.strip():
-            body.append(f"  {line.strip()}")
+        text = line.strip()
+        if text:
+            body.append("  " + ("\\" + text if _KEYWORD_SHAPED_RE.match(text) else text))
         elif body and body[-1]:
             body.append("")
     return ["CONCLUSIONS", *body, ""] if body else []

@@ -646,3 +646,25 @@ def test_a_blank_cue_word_is_refused(field: str) -> None:
     with pytest.raises(ValidationError):
         jurisdictions.StructuringConfig(**{field: ["to", ""]})
     assert getattr(jurisdictions.StructuringConfig(**{field: ["to"]}), field) == ["to"]
+
+
+def test_a_keyword_shaped_conclusion_line_stays_text(declared: Any) -> None:
+    """An appended instrument's upper-case marker in the conclusions is a paragraph."""
+    from codify.pipeline.enrich.bluebell import parse_to_akn
+
+    lines = scaffold_mod._conclusions_lines(f"{CLOSING}\nSECTION 9\nThe Warden")
+    assert lines[2] == "  \\SECTION 9"
+    bluebell = "BODY\n  SECTION 1\n    One.\n\n" + "\n".join(lines) + "\n"
+    akn = parse_to_akn(bluebell, country=COUNTRY, doctype="act", date="2020", number="1")
+    conclusions = akn[akn.index("<conclusions") : akn.index("</conclusions>")]
+    assert "SECTION 9" in conclusions and "<section" not in conclusions
+    assert akn[akn.index("<body") : akn.index("</body>")].count("<section ") == 1
+
+
+def test_an_excluded_tail_marker_is_not_reported_unclaimed(declared: Any) -> None:
+    text = f"Section 1\nOne.\n\n{CLOSING}\n\nAppended\nSection (1)\nAppended one.\n"
+    scan = _scan(text)
+    unclaimed = [
+        sp for sp in scan.ambiguity if sp.detail.get("reason") == "marker_shaped_line_unclaimed"
+    ]
+    assert unclaimed == [], unclaimed

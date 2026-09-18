@@ -849,9 +849,13 @@ def _declare_unclaimed_markers(
     # By offset, not line: the anchor regex consumes the leading newline, so an
     # anchor's recorded line can be one less than the marker's own.
     starts = sorted(a.char_offset for a in anchors)
+    # A marker the closing boundary set aside is classified, not unclaimed.
+    excluded = [(sp.start, sp.end) for sp in spans if sp.kind == "tail_excluded"]
     for m in _BARE_MARKER_LINE_RE.finditer(text):
         i = bisect_left(starts, m.start() - 2)
         if i < len(starts) and starts[i] <= m.end():
+            continue
+        if any(start <= m.start() < end for start, end in excluded):
             continue
         line = text.count("\n", 0, m.start()) + 1
         spans.append(

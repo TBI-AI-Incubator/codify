@@ -390,6 +390,14 @@ async def text_to_bluebell_scaffolded(
     regex = cached_regex(country, doctype)
     scan = scan_anchors_with_ambiguity(text, regex, country=country, doctype=doctype)
     anchors = scan.anchors
+    # Source offsets throughout: the trace's readers locate the source with them.
+    trace_anchors = anchors
+    # The signature ends the body: the span to the first attachment leaves the
+    # text every gate below reads and returns as the conclusions.
+    from codify.pipeline.enrich.closing import bound_body_at_closing, closing_phrases_for
+
+    bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
+    text, anchors = bound.text, bound.anchors
 
     if on_anchors:
         # The total counts the same population the summary does, or the trace
@@ -404,9 +412,6 @@ async def text_to_bluebell_scaffolded(
     container = container_coverage_probe(text, scan, config, country, doctype)
 
     halts: list[StructureHalt] = []
-
-    # Source offsets throughout, even after the closing span is cut below.
-    trace_anchors = anchors
 
     def _trace(scaffold: str | None = None, fallback: str | None = None) -> None:
         if on_scan:
@@ -643,14 +648,8 @@ async def text_to_bluebell_scaffolded(
             _trace(fallback="invariant_gate")
             raise AnchorInvariantError(spans=blocking)
 
-    from codify.pipeline.enrich.closing import bound_body_at_closing, closing_phrases_for
     from codify.pipeline.enrich.enacting import split_opening_material
 
-    # The signature ends the body: markers after it belong to an appended
-    # instrument or a note, and the span itself becomes the conclusions.
-    bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
-    # `trace_anchors` keeps the pre-cut list: the trace's readers locate the source.
-    text, anchors = bound.text, bound.anchors
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(
         anchors, preface=preface, preamble=preamble, country=country, conclusions=bound.conclusions
