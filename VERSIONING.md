@@ -14,8 +14,8 @@ below is the distribution's.
   removing or renaming a symbol, changing a parameter's name, order or meaning,
   inserting one ahead of an existing parameter, widening a return type.
 - **The command.** `codify`, and the output its subcommands write:
-  `ingest-one`, `scan-corpus`, `index-datadump`, `index-ee-archive` and
-  `index-legislation-gov-uk`.
+  `ingest-one`, `scan-corpus`, `load`, `search`, `compare`, `index-datadump`,
+  `index-ee-archive` and `index-legislation-gov-uk`.
   Breaks: removing a subcommand or a flag, changing a flag's meaning or the
   shape of the output.
 - **Jurisdiction config.** `JurisdictionConfig`, `ResolvedConfig` and the
