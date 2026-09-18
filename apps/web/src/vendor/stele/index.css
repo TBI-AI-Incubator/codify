@@ -1,12 +1,4 @@
-/*
- * Domain-aware tokens layered over the base theme.
- *
- * `font-legislative` is the semantic hook for legal-text reading-rhythm
- * tweaks, used by the law reader, translate view, and comparison cells. The
- * face itself is the app's default sans (Geist by default) so legislative
- * copy reads as part of a single cohesive system rather than a separate
- * publication.
- */
+/* Domain-aware tokens layered over the base theme. */
 
 @theme inline {
   --font-legislative: var(--font-tbi-sans, ui-sans-serif), system-ui, sans-serif;

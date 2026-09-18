@@ -5,7 +5,7 @@
 @import 'shadcn/tailwind.css';
 
 
-/* Font stack — values populated by @fontsource imports in src/main.tsx */
+/* Font stack: values populated by @fontsource imports in src/main.tsx */
 :root {
   --font-geist: 'Geist', 'Geist Sans', 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
   --font-geist-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
@@ -24,9 +24,8 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --font-heading:
     'Geist', 'Geist Sans', 'Noto Sans', var(--font-rtl), ui-sans-serif, system-ui, sans-serif;
-  /* Legislative content uses the default sans — Geist — for cohesion
-     with the chrome. The class survives as a semantic hook for the
-     reading-rhythm spacing tweaks that distinguish body from chrome. */
+  /* Legislative content uses the default sans: Geist: for cohesion with the
+   chrome. */
   --font-legislative:
     'Geist', 'Geist Sans', 'Noto Sans', var(--font-rtl), ui-sans-serif, system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -99,14 +98,13 @@
   --confidence-high: oklch(0.65 0.2 145);
   --confidence-medium: oklch(0.75 0.18 85);
   --confidence-low: oklch(0.65 0.2 50);
-  /* Contrast-safe text variants — pair with the 15 percent tinted pill
-     backgrounds. Same hue as their non-fg counterparts, lightness dropped to
-     ~0.4–0.45 so text clears WCAG AA (4.5:1) on the tinted surfaces. */
+  /* Contrast-safe text variants: pair with the 15 percent tinted pill
+   backgrounds. */
   --confidence-high-fg: oklch(0.4 0.15 145);
   --confidence-medium-fg: oklch(0.45 0.15 85);
   --confidence-low-fg: oklch(0.45 0.2 50);
   --destructive-fg: oklch(0.45 0.2 27);
-  /* Lightest ink tint — table dividers, faint rules. */
+  /* Lightest ink tint: table dividers, faint rules. */
   --ink-10: oklch(0.94 0.003 250);
   --chart-1: oklch(0.87 0.006 250);
   --chart-2: oklch(0.556 0.006 250);
@@ -187,9 +185,8 @@
     transition: background-color 0.18s ease-out;
   }
 
-  /* Structural eyebrows on AKN elements rendered inside the Lexical
-     author surface. Mirrors LawReader's read-mode typography so the
-     register matches across modes. */
+  /* Structural eyebrows on AKN elements rendered inside the Lexical author
+   surface. */
   [data-akn-author] section[data-akn-type] > header[data-akn-eyebrow] {
     display: flex;
     flex-wrap: wrap;
@@ -236,9 +233,8 @@
     line-height: 1.7;
   }
 
-  /* Editorial prose for jurisdiction profiles. Body and headings both in
-     Geist; vertical rhythm tuned for ~70ch. Token-driven so it tracks
-     light/dark. */
+  /* Editorial prose for jurisdiction profiles. Body and headings both in Geist;
+   vertical rhythm tuned for ~70ch. Token-driven so it tracks light/dark. */
   .profile-prose {
     color: var(--ink);
     font-family: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
@@ -374,10 +370,8 @@
   }
 }
 
-/* Editor section bleed + read↔edit slot animation. The section width
-   itself isn't transitioned (banned); slot opacity + translate are. The
-   section fills its container (grid cell in read, full-width main in
-   author); the inner reader owns the measure. */
+/* Editor section bleed + read↔edit slot animation. The section width itself
+   isn't transitioned (banned); slot opacity + translate are. */
 [data-bleed='full'] {
   margin-left: 0;
   margin-right: 0;

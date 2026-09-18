@@ -1,15 +1,5 @@
-/*
- * Tailwind v4 theme entry.
- *
- * Imports the raw token CSS variables, then registers them as Tailwind v4
- * theme tokens via @theme inline. Tailwind generates utilities from
- * --color-*, --font-*, --radius-* etc., so consumers get classes like
- * `bg-paper`, `text-ink-60`, `bg-emphasis-strong`, `text-coral`,
- * `font-tbi-sans` automatically.
- *
- * Multiple @theme inline blocks across imports merge in Tailwind v4, so
- * apps can layer their own tokens on top without conflicts.
- */
+/* Tailwind v4 theme entry. Imports the raw token CSS variables, then registers
+   them as Tailwind v4 theme tokens via @theme inline. */
 
 @import './tokens.css';
 
@@ -26,12 +16,12 @@
   --color-ink-20: var(--ink-20);
   --color-ink-10: var(--ink-10);
 
-  /* Emphasis — ink, not a brand accent */
+  /* Emphasis: ink, not a brand accent */
   --color-emphasis: var(--emphasis);
   --color-emphasis-strong: var(--emphasis-strong);
   --color-emphasis-soft: var(--emphasis-soft);
 
-  /* Domain accents — status / chart */
+  /* Domain accents: status / chart */
   --color-teal: var(--teal);
   --color-teal-strong: var(--teal-strong);
   --color-teal-soft: var(--teal-soft);
@@ -48,7 +38,7 @@
   --color-draft-strong: var(--draft-strong);
   --color-draft-soft: var(--draft-soft);
 
-  /* Confidence — paired with shape per DESIGN §2 Colour-Plus-Shape Rule. */
+  /* Confidence: always paired with a glyph or percentage, never colour alone. */
   --color-confidence-high: var(--confidence-high);
   --color-confidence-medium: var(--confidence-medium);
   --color-confidence-low: var(--confidence-low);
@@ -60,18 +50,12 @@
   --font-tbi-sans: var(--tbi-font-sans);
   --font-tbi-mono: var(--tbi-font-mono);
 
-  /* Elevation — transient surfaces only. Map Tailwind's --shadow-*
-     namespace to the tbi-prefixed root values to avoid a self-referential
-     resolution. */
+  /* Elevation: transient surfaces only. Map Tailwind's --shadow-* namespace to
+   the tbi-prefixed root values to avoid a self-referential resolution. */
   --shadow-popover-whisper: var(--tbi-shadow-popover-whisper);
   --shadow-transient-lift: var(--tbi-shadow-transient-lift);
 
-  /* Shadcn-shaped semantic colour utilities. These let base-ui / shadcn
-     primitives wrapped by tbi-ui (button, dialog, sheet, select, tabs,
-     toast, input) resolve `bg-popover`, `text-muted-foreground`,
-     `ring-ring` etc. against TBI tokens when the package is consumed
-     standalone. Host apps that ship their own shadcn config (e.g.
-     apps/web/src/styles/globals.css) override these. */
+  /* Shadcn-shaped semantic colour utilities. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -93,19 +77,8 @@
   --color-ring: var(--ring);
 }
 
-/*
- * Micro-caps — the mono, letterspaced, all-caps micro-label. Gutter labels,
- * dt cells, section eyebrows, mode toggles, table headers.
- *
- * Defined here rather than in the app because this is the one stylesheet all
- * three consumers load: the app via globals.css, and both package Storybooks
- * via their own preview.css. In the app it would be invisible to Storybook,
- * and stele's components use it.
- *
- * Size and tracking are baked in deliberately — they are the decision. Colour,
- * spacing and state stay at the call site. Before this existed the recipe was
- * retyped 97 times and had drifted to six tracking values.
- */
+/* Micro-caps: the mono, letterspaced, all-caps micro-label. Gutter labels, dt
+   cells, section eyebrows, mode toggles, table headers. */
 @utility micro-caps {
   font-family: var(--tbi-font-mono);
   font-size: 0.6875rem;
