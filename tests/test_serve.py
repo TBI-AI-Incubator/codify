@@ -931,17 +931,18 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
 
 
 OPENAPI = Path(__file__).parent.parent / "contract" / "openapi.json"
+SCHEMA_ONLY = "postgresql://schema-only"  # the schema needs no database, like --openapi
 
 
 def test_the_committed_openapi_schema_matches_the_server() -> None:
     """`codify serve --openapi > contract/openapi.json` after any route change."""
-    live = json.dumps(_app(None).openapi(), indent=2, sort_keys=True) + "\n"
+    live = json.dumps(create_app(database=SCHEMA_ONLY).openapi(), indent=2, sort_keys=True) + "\n"
     assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
 
 
 def test_every_success_response_names_a_schema() -> None:
     """A UI type is only generated for a response the schema describes."""
-    paths = _app(None).openapi()["paths"]
+    paths = create_app(database=SCHEMA_ONLY).openapi()["paths"]
     for path, ops in paths.items():
         for method, op in ops.items():
             successes = [r for code, r in op["responses"].items() if code.startswith("2")]
@@ -951,7 +952,8 @@ def test_every_success_response_names_a_schema() -> None:
                     assert list(ok["content"]) == ["text/event-stream"], f"{method} {path}"
                     continue
                 schema = ok["content"]["application/json"]["schema"]
-                assert "$ref" in schema or "$ref" in schema.get("items", {}), f"{method} {path}"
+                ref = schema.get("$ref") or schema.get("items", {}).get("$ref", "")
+                assert ref.startswith("#/components/schemas/"), f"{method} {path}: {schema}"
 
 
 def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -> None:
