@@ -154,9 +154,9 @@ def create_app(
             if found is None:
                 raise HTTPException(404, "no such law")
             row, code = found
-            versions, cursor = await list_versions(session, law_id)
+            versions, cursor = await list_versions(session, law_id, with_akn=False)
             while cursor is not None:  # every version, not the first page
-                page, cursor = await list_versions(session, law_id, cursor=cursor)
+                page, cursor = await list_versions(session, law_id, cursor=cursor, with_akn=False)
                 versions.extend(page)
         return {
             **_law_json(row),
@@ -231,6 +231,12 @@ def create_app(
 
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> dict[str, Any]:
+        from codify.pipeline.formats import looks_like_eu
+
+        if not looks_like_eu(str(body.url)):  # the only lane that fetches a URL
+            raise HTTPException(
+                422, "only EU (eur-lex) URLs can be ingested by URL; upload the file"
+            )
         code = _jurisdiction(body.jurisdiction)
         try:
             run = runs.enqueue(

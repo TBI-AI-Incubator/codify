@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, inspect
 
 from codify.akn.io import parse_akn
 from codify.cli import main
@@ -52,7 +52,7 @@ def _client(runner: Any, app: FastAPI | None = None) -> AsyncClient:
 
 async def _enqueue(c: AsyncClient) -> str:
     r = await c.post(
-        "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": "xa"}
+        "/runs/ingest-url", json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "xa"}
     )
     assert r.status_code == 202
     return str(r.json()["id"])
@@ -325,7 +325,7 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
     async with _client(None, app) as c:
         r = await c.post(
             "/runs/ingest-url",
-            json={"url": "https://example.test/a.xml", "jurisdiction": "xa", "title": title},
+            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "xa", "title": title},
         )
         events = _sse((await c.get(f"/runs/{r.json()['id']}/stream")).text)
         assert events[-2][0] == "complete", events
@@ -353,7 +353,12 @@ async def test_ingest_url_refuses_anything_but_a_url() -> None:
         yield _complete()
 
     async with _client(runner) as c:
-        for source in ("/etc/passwd", "etc/passwd", "file:///etc/passwd"):
+        for source in (
+            "/etc/passwd",
+            "etc/passwd",
+            "file:///etc/passwd",
+            "https://example.test/a.pdf",
+        ):
             r = await c.post("/runs/ingest-url", json={"url": source, "jurisdiction": "xa"})
             assert r.status_code == 422, source
         assert (await c.get("/runs")).json() == []
@@ -434,7 +439,8 @@ async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
             await _enqueue(c)
             await asyncio.sleep(0.01)
         r = await c.post(
-            "/runs/ingest-url", json={"url": "https://example.test/b.xml", "jurisdiction": "xa"}
+            "/runs/ingest-url",
+            json={"url": "https://eur-lex.europa.eu/b.xml", "jurisdiction": "xa"},
         )
         assert r.status_code == 429
         r = await c.post(
@@ -543,7 +549,8 @@ async def test_an_unknown_or_uncanonical_jurisdiction_is_422_or_folded() -> None
 
     async with _client(runner) as c:
         r = await c.post(
-            "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": "zz"}
+            "/runs/ingest-url",
+            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": "zz"},
         )
         assert r.status_code == 422
         r = await c.post(
@@ -553,7 +560,8 @@ async def test_an_unknown_or_uncanonical_jurisdiction_is_422_or_folded() -> None
         )
         assert r.status_code == 422
         r = await c.post(
-            "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": " XA "}
+            "/runs/ingest-url",
+            json={"url": "https://eur-lex.europa.eu/a.xml", "jurisdiction": " XA "},
         )
         assert r.status_code == 202
         await c.get(f"/runs/{r.json()['id']}/stream")
@@ -624,9 +632,13 @@ async def test_law_detail_lists_every_version_past_the_first_page(
 
     # Pages of two, so three stored versions need the cursor followed.
     original = versions_module.list_versions
+    calls: list[dict[str, Any]] = []
 
     async def two_per_page(session: Any, law_id: Any, **kw: Any) -> Any:
-        return await original(session, law_id, limit=2, cursor=kw.get("cursor"))
+        calls.append(kw)
+        return await original(
+            session, law_id, limit=2, cursor=kw.get("cursor"), with_akn=kw.get("with_akn", True)
+        )
 
     monkeypatch.setattr("codify.storage.list_versions", two_per_page)
     xml = FIXTURE.read_text(encoding="utf-8")
@@ -645,6 +657,12 @@ async def test_law_detail_lists_every_version_past_the_first_page(
         async with _client(None, app) as c:
             law = (await c.get(f"/laws/{law_id}")).json()
         assert sorted(v["language"] for v in law["versions"]) == ["deu", "eng", "fra"]
+        assert calls and all(
+            c.get("with_akn") is False for c in calls
+        )  # the route asks for no bodies
+        async with app.state.sessions() as s:
+            rows, _ = await original(s, law_id, with_akn=False)
+        assert all("akn_xml" in inspect(row).unloaded for row in rows)
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.id == law_id))

@@ -12,6 +12,7 @@ from sqlalchemy import ARRAY, bindparam, func, or_, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from codify.akn.elements import ElementBase
 from codify.storage.models import Jurisdiction, Law, Version
@@ -113,10 +114,13 @@ async def list_versions(
     *,
     limit: int = 100,
     cursor: uuid.UUID | None = None,
+    with_akn: bool = True,
 ) -> tuple[list[Version], uuid.UUID | None]:
-    """Cursor-paginated. Order: expression_date DESC, ingested_at DESC, id ASC."""
+    """Cursor-paginated. Order: expression_date DESC, ingested_at DESC, id ASC.
+    `with_akn=False` leaves the document body unloaded for a metadata listing."""
     stmt = (
         select(Version)
+        .options(*([] if with_akn else [defer(Version.akn_xml)]))
         .where(Version.law_id == law_id)
         .order_by(
             Version.expression_date.desc(),
