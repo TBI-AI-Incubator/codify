@@ -1,11 +1,8 @@
 
 import type {
-  AnchorsData, DependencyData, DocMetadataData, Kind, PageData, ResultData,
-  RunData, RunStageData, Status, ValidationIssueData,
-} from '@codify/core-ts/run_events';
-
-export type RunKind = Kind;
-export type RunStatus = Status;
+  AnchorsData, DependencyData, DocMetadataData, PageData, ResultData,
+  RunData, RunPart, RunStageData, ValidationIssueData,
+} from '@/lib/run-events';
 
 
 export interface CodifyDataParts {
@@ -19,7 +16,7 @@ export interface CodifyDataParts {
   dependency: DependencyData;
 }
 
-export type RunParts = Array<{ type: string; id?: string; data?: unknown }>;
+export type RunParts = RunPart[];
 
 export function dataParts<K extends keyof CodifyDataParts>(
   parts: RunParts,

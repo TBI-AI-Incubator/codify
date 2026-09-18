@@ -1,6 +1,6 @@
 import { LawReader, type VersionDocument as SteleVersionDocument } from '../vendor/stele';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router';
+import { useLocation, useParams, useSearchParams } from 'react-router';
 
 import { LawDownloadDialog } from '@/components/law/law-download-dialog';
 import { getLaw, getVersionDocument, listLawVersions } from '@/lib/api-laws';
@@ -24,13 +24,12 @@ export default function LawReaderRoute() {
     enabled: !!id && !!requestedVersionId,
   });
 
+  const latest = law.data?.versions[0] ?? null; // newest expression first
   const versionSummary = requestedVersionId
     ? (versions.data?.items.find((v) => v.id === requestedVersionId) ?? null)
-    : (law.data?.latest_version ?? null);
+    : latest;
   const versionMismatched = !!requestedVersionId && !versions.isLoading && versionSummary === null;
-  const effectiveVersionSummary = versionMismatched
-    ? (law.data?.latest_version ?? null)
-    : versionSummary;
+  const effectiveVersionSummary = versionMismatched ? latest : versionSummary;
   const versionId = effectiveVersionSummary?.id ?? undefined;
 
   const doc = useQuery({
@@ -63,16 +62,7 @@ export default function LawReaderRoute() {
           <button className="text-sm text-ink-60 hover:underline" onClick={() => window.print()}>
             Print
           </button>
-          <Link
-            to={versionId ? `/laws/${id}/compare?v=${versionId}` : `/laws/${id}/compare`}
-            className="text-sm text-ink-60 hover:underline"
-          >
-            Compare with source
-          </Link>
-          <LawDownloadDialog
-            versionId={versionId}
-            hasSourceFile={effectiveVersionSummary?.has_source_file ?? false}
-          />
+          <LawDownloadDialog versionId={versionId} />
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto">

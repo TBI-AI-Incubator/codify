@@ -1,34 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
-import ReactMarkdown from 'react-markdown';
 import { Link, useParams } from 'react-router';
-import remarkGfm from 'remark-gfm';
 
-import { getJurisdictionProfile } from '@/lib/api-jurisdictions';
-import { listLawsCorpus } from '@/lib/api-misc';
+import { getJurisdiction } from '@/lib/api-jurisdictions';
+import { listLaws } from '@/lib/api-misc';
 
 export default function JurisdictionDetailRoute() {
   const { code = '' } = useParams<{ code: string }>();
 
-  const profile = useQuery({
-    queryKey: ['jurisdiction-profile', code],
-    queryFn: () => getJurisdictionProfile(code),
+  const config = useQuery({
+    queryKey: ['jurisdiction', code],
+    queryFn: () => getJurisdiction(code),
     enabled: !!code,
   });
   const laws = useQuery({
     queryKey: ['jurisdiction-laws', code],
-    queryFn: () => listLawsCorpus({ jurisdictions: [code], limit: 50 }),
+    queryFn: () => listLaws({ jurisdiction: code, limit: 50 }),
     enabled: !!code,
   });
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
-      <h1 className="mb-6 text-xl font-semibold uppercase tracking-tight text-ink">{code}</h1>
-
-      {profile.data?.profile_md ? (
-        <article className="prose prose-sm mb-10 max-w-none text-ink">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{profile.data.profile_md}</ReactMarkdown>
-        </article>
-      ) : null}
+      <h1 className="mb-1 text-xl font-semibold tracking-tight text-ink">
+        {config.data?.name ?? code.toUpperCase()}
+      </h1>
+      <p className="mb-6 text-sm text-ink-60">
+        {config.data ? `${config.data.type} · ${config.data.languages.join(', ')}` : ''}
+      </p>
 
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-60">Laws</h2>
       {laws.isLoading ? (

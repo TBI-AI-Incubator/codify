@@ -31,9 +31,9 @@ export default function IngestRoute() {
     setSubmitting(true);
     setError('');
     try {
-      const created = await startIngestRun(file, { jurisdiction_code: country });
+      const created = await startIngestRun(file, { jurisdiction: country });
       navigate(
-        `/runs/${created.run_id}?source=${encodeURIComponent(file.name)}&jurisdiction=${country}`,
+        `/runs/${created.id}?source=${encodeURIComponent(file.name)}&jurisdiction=${country}`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : t('Ingest could not be started.'));
@@ -58,11 +58,11 @@ export default function IngestRoute() {
     setError('');
     try {
       const created = await startIngestUrlRun({
-        source_url: url.trim(),
-        jurisdiction_code: country,
+        url: url.trim(),
+        jurisdiction: country,
       });
       navigate(
-        `/runs/${created.run_id}?source=${encodeURIComponent(url.trim())}&jurisdiction=${country}`,
+        `/runs/${created.id}?source=${encodeURIComponent(url.trim())}&jurisdiction=${country}`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : t('Ingest could not be started.'));

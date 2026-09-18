@@ -1,7 +1,7 @@
 
 import { ISO1_TO_ISO3 } from './iso-languages';
 
-import type { VersionSummary } from '@codify/core-ts/api';
+import type { VersionSummary } from '@/lib/api-laws';
 
 const REGIONAL_FALLBACK: Record<string, string> = {
   jv: 'ind',

@@ -1,7 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 
 import AppShell from '@/components/app-shell';
-import CompareRoute from '@/routes/compare';
 import Home from '@/routes/home';
 import JurisdictionDetailRoute from '@/routes/jurisdictions/detail';
 import JurisdictionsRoute from '@/routes/jurisdictions/index';
@@ -18,12 +17,10 @@ export const router = createBrowserRouter([
       { path: '/', Component: Home },
       { path: '/laws', Component: LawsListRoute },
       { path: '/laws/:id', Component: LawReaderRoute },
-      { path: '/laws/:id/compare', Component: CompareRoute },
       { path: '/jurisdictions', Component: JurisdictionsRoute },
       { path: '/jurisdictions/:code', Component: JurisdictionDetailRoute },
       { path: '/jurisdictions/:code/laws', Component: LawsListRoute },
       { path: '/jurisdictions/:code/laws/:id', Component: LawReaderRoute },
-      { path: '/jurisdictions/:code/laws/:id/compare', Component: CompareRoute },
       { path: '/search', Component: SearchRoute },
       { path: '/ingest', Component: IngestRoute },
       { path: '/runs/:id', Component: RunRoute },

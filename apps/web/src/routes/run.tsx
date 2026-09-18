@@ -24,7 +24,7 @@ export default function RunRoute() {
   const retry = async () => {
     const created = await retryRun(id);
     navigate(
-      `/runs/${created.run_id}?source=${encodeURIComponent(sourceLabel)}&jurisdiction=${country}`,
+      `/runs/${created.id}?source=${encodeURIComponent(sourceLabel)}&jurisdiction=${country}`,
     );
   };
 

@@ -15,6 +15,5 @@ export function useTranslatedLawTitle(lawId: string, enabled = true): string | n
     enabled: enabled && wanted !== null,
   });
   if (!wanted || !data) return null;
-  const translated = data.title_translations?.[wanted];
-  return translated && translated !== data.title ? translated : null;
+  return null; // the server carries one title per law
 }

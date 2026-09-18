@@ -1300,9 +1300,7 @@ export interface components {
         };
         /**
          * LawSummary
-         * @description Listing-friendly projection of a Law row. `lens_coverage` is opt-in: the
-         *     corpus-wide `/laws` route always populates it, the per-jurisdiction listing
-         *     only on `?include=coverage`, and callers that skip it read `None`.
+         * @description The listing row, without the hosted platform's lens and translation fields.
          */
         LawSummary: {
             /** Doctype */
@@ -1320,12 +1318,6 @@ export interface components {
             latest_expression_date: string | null;
             /** Latest Ingested At */
             latest_ingested_at?: string | null;
-            /** Lens Coverage */
-            lens_coverage?: {
-                [key: string]: {
-                    [key: string]: unknown;
-                };
-            } | null;
             /** Number */
             number: string | null;
             /** Short Title */
@@ -1334,13 +1326,6 @@ export interface components {
             status: string;
             /** Title */
             title: string;
-            /**
-             * Title Translations
-             * @default {}
-             */
-            title_translations: {
-                [key: string]: string;
-            };
             /** Year */
             year: number | null;
         };
@@ -1512,6 +1497,15 @@ export interface components {
         SearchMatch: {
             /** Eid */
             eid: string;
+            /** Jurisdiction */
+            jurisdiction: string;
+            /**
+             * Law Id
+             * Format: uuid
+             */
+            law_id: string;
+            /** Law Title */
+            law_title: string;
             /**
              * Provision Id
              * Format: uuid
@@ -1521,6 +1515,13 @@ export interface components {
             score: number;
             /** Text */
             text: string;
+            /**
+             * Version Id
+             * Format: uuid
+             */
+            version_id: string;
+            /** Work Uri */
+            work_uri: string;
         };
         /** SearchResult */
         SearchResult: {

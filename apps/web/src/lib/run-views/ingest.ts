@@ -1,7 +1,7 @@
 
 import type { TFunction } from 'i18next';
 
-import type { RunStageData } from '@codify/core-ts/run_events';
+import type { RunStageData } from '@/lib/run-events';
 
 import { capitalize } from '../../vendor/tbi-ui';
 

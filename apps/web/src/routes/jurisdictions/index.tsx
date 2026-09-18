@@ -1,19 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
-import { JurisdictionTable } from '@/components/corpus/jurisdiction-table';
-import { WorldMap } from '@/components/corpus/world-map';
-import { getCorpusSummary } from '@/lib/api-misc';
-import { useState } from 'react';
+import { CountryFlag } from '../../vendor/tbi-ui';
 
+import { listJurisdictions } from '@/lib/api-jurisdictions';
+
+/* The jurisdictions the server ships, as a list; the map and tiers are the platform's. */
 export default function JurisdictionsRoute() {
   const { data, isLoading, error } = useQuery({
-    queryKey: ['corpus-summary'],
-    queryFn: getCorpusSummary,
+    queryKey: ['jurisdictions'],
+    queryFn: listJurisdictions,
     staleTime: 5 * 60 * 1000,
   });
-  const navigate = useNavigate();
-  const [tradFilter, setTradFilter] = useState('');
 
   if (isLoading) return <p className="p-6 text-sm text-ink-70">Loading…</p>;
   if (error) {
@@ -25,25 +23,20 @@ export default function JurisdictionsRoute() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-3xl px-6 py-10">
       <h1 className="mb-1 text-xl font-semibold tracking-tight text-ink">Jurisdictions</h1>
-      <p className="mb-6 text-sm text-ink-60">
-        {data?.total ?? 0} jurisdictions · {data?.total_documents_examined ?? 0} documents
-      </p>
-      <section className="mb-12">
-        <WorldMap
-          jurisdictions={data?.jurisdictions ?? []}
-          bodies={data?.bodies ?? []}
-          selectedBody=""
-          onSelect={(code) => navigate(`/jurisdictions/${code}`)}
-        />
-      </section>
-      <JurisdictionTable
-        jurisdictions={data?.jurisdictions ?? []}
-        onSelect={(code) => navigate(`/jurisdictions/${code}`)}
-        tradFilter={tradFilter}
-        onTradFilterChange={setTradFilter}
-      />
+      <p className="mb-6 text-sm text-ink-60">{data?.length ?? 0} configured</p>
+      <ul className="divide-y divide-ink-20">
+        {(data ?? []).map((j) => (
+          <li key={j.code} className="flex items-center gap-3 py-3">
+            <CountryFlag code={j.code} size="sm" />
+            <Link to={`/jurisdictions/${j.code}/laws`} className="text-sm font-medium text-ink hover:underline">
+              {j.name}
+            </Link>
+            <span className="ml-auto font-mono text-xs uppercase text-ink-60">{j.languages.join(' · ')}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

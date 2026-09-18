@@ -4,10 +4,10 @@ import { useMemo } from 'react';
 
 import { listJurisdictions } from '@/lib/api-jurisdictions';
 import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
-import type { JurisdictionListItem } from '@codify/core-ts/api';
+import type { JurisdictionSummary } from '@/lib/api-jurisdictions';
 
 export function useAllowedJurisdictions(): {
-  items: JurisdictionListItem[];
+  items: JurisdictionSummary[];
   isPending: boolean;
   isError: boolean;
 } {
@@ -19,7 +19,7 @@ export function useAllowedJurisdictions(): {
   });
 
   const items = useMemo(() => {
-    const all = data?.items ?? [];
+    const all = data ?? [];
     const scoped = allowed.includes('*') ? all : all.filter((j) => allowed.includes(j.code));
     return [...scoped].sort((a, b) => a.name.localeCompare(b.name));
   }, [data, allowed]);
