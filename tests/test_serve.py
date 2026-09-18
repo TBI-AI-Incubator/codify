@@ -4,10 +4,12 @@ retry and replay through the HTTP surface, with a scripted runner for the pipeli
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import shutil
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
@@ -926,6 +928,62 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
     await clients.close()
 
     assert (_Chat.built, _Transport.closed) == (1, 1)
+
+
+OPENAPI = Path(__file__).parent.parent / "contract" / "openapi.json"
+SCHEMA_ONLY = "postgresql://schema-only"  # the schema needs no database, like --openapi
+
+
+def test_the_committed_openapi_schema_matches_the_server() -> None:
+    """`codify serve --openapi > contract/openapi.json` after any route change."""
+    live = json.dumps(create_app(database=SCHEMA_ONLY).openapi(), indent=2, sort_keys=True) + "\n"
+    assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
+
+
+def test_every_success_response_names_a_schema() -> None:
+    """A UI type is only generated for a response the schema describes."""
+    paths = create_app(database=SCHEMA_ONLY).openapi()["paths"]
+    for path, ops in paths.items():
+        for method, op in ops.items():
+            successes = [r for code, r in op["responses"].items() if code.startswith("2")]
+            assert successes, f"{method} {path}"
+            for ok in successes:
+                if path.endswith("/stream"):
+                    assert list(ok["content"]) == ["text/event-stream"], f"{method} {path}"
+                    continue
+                schema = ok["content"]["application/json"]["schema"]
+                ref = schema.get("$ref") or schema.get("items", {}).get("$ref", "")
+                assert ref.startswith("#/components/schemas/"), f"{method} {path}: {schema}"
+
+
+def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("POSTGRES_URL", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")  # where an unset URL is an error
+    out = io.StringIO()
+
+    with redirect_stdout(out):  # not capsys: the CLI's log setup would keep its stream
+        assert main(["serve", "--openapi"]) == 0
+
+    assert out.getvalue() == OPENAPI.read_text()  # the command is how the file is made
+
+
+async def test_a_jurisdiction_config_is_served_by_alias() -> None:
+    """The wire shape is the schema's: `from`, `to` and `class`, not the field names."""
+    from codify.jurisdictions import load_config
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        wire = (await c.get("/jurisdictions/xa")).json()
+
+    assert wire == json.loads(load_config("xa").model_dump_json(by_alias=True))
+    assert wire != load_config("xa").model_dump(mode="json")
+
+
+def test_a_plain_database_override_gets_the_async_driver() -> None:
+    app = create_app(database="postgresql://u:p@h/d")
+    assert str(app.state.sessions.kw["bind"].url) == "postgresql+asyncpg://u:***@h/d"
 
 
 def test_serve_is_registered() -> None:

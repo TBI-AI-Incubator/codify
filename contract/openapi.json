@@ -1,0 +1,4238 @@
+{
+  "components": {
+    "schemas": {
+      "AknSource": {
+        "additionalProperties": false,
+        "description": "One upstream that yields documents convertible to AKN.\n\nDistinct from `SourceAdapter`, the acquisition substrate keyed by adapter kind:\nthis is a format-and-protocol pairing declared in `config.json#akn_sources`.\nBoth coexist during the schema migration and `effective_tier` walks both; legacy\nconfigs without `format`/`protocol` default to PDF over HTTP.",
+        "properties": {
+          "auth_env_var": {
+            "default": "",
+            "title": "Auth Env Var",
+            "type": "string"
+          },
+          "auth_scheme": {
+            "default": "none",
+            "enum": [
+              "none",
+              "token",
+              "bearer",
+              "api_key",
+              "operator_code",
+              "basic",
+              "soap_session",
+              "email_registration"
+            ],
+            "title": "Auth Scheme",
+            "type": "string"
+          },
+          "coverage": {
+            "default": "unknown",
+            "enum": [
+              "complete",
+              "partial",
+              "stub",
+              "unknown"
+            ],
+            "title": "Coverage",
+            "type": "string"
+          },
+          "coverage_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Note"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "fallback_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "akn_xml",
+                  "akn_xml_v2",
+                  "bespoke_xml",
+                  "structured_html",
+                  "html",
+                  "pdf",
+                  "pdf_scanned",
+                  "docx",
+                  "rtf",
+                  "json",
+                  "csv",
+                  "rdf"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Format"
+          },
+          "format": {
+            "default": "pdf",
+            "enum": [
+              "akn_xml",
+              "akn_xml_v2",
+              "bespoke_xml",
+              "structured_html",
+              "html",
+              "pdf",
+              "pdf_scanned",
+              "docx",
+              "rtf",
+              "json",
+              "csv",
+              "rdf"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "protocol": {
+            "default": "http",
+            "enum": [
+              "http",
+              "rest",
+              "odata",
+              "sru",
+              "oai_pmh",
+              "soap",
+              "sparql",
+              "bulk_dump"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "requires_token": {
+            "default": false,
+            "title": "Requires Token",
+            "type": "boolean"
+          },
+          "schema_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Id"
+          },
+          "schema_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Url"
+          },
+          "url_template": {
+            "title": "Url Template",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "url_template"
+        ],
+        "title": "AknSource",
+        "type": "object"
+      },
+      "AmendmentConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "amending_body_structure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amending Body Structure"
+          },
+          "amendment_item_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amendment Item Kind"
+          },
+          "cross_reference_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cross Reference Format"
+          },
+          "phrasing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phrasing"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "trigger_phrases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trigger Phrases",
+            "type": "array"
+          }
+        },
+        "title": "AmendmentConfig",
+        "type": "object"
+      },
+      "AttachmentCaption": {
+        "additionalProperties": true,
+        "description": "A caption line opening an attachment. AKN models a schedule and a\nmandatory companion alike, so legal force is declared per caption.",
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "hierarchy": {
+            "items": {
+              "$ref": "#/components/schemas/HierarchyEntry"
+            },
+            "title": "Hierarchy",
+            "type": "array"
+          },
+          "normative": {
+            "default": true,
+            "title": "Normative",
+            "type": "boolean"
+          },
+          "prefix": {
+            "default": false,
+            "title": "Prefix",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "caption"
+        ],
+        "title": "AttachmentCaption",
+        "type": "object"
+      },
+      "BindingRegime": {
+        "additionalProperties": false,
+        "description": "Non-membership binding regime, treaty frameworks, bilateral regimes,\nconstitutional annexes. Used for things like the Dayton Framework (BA),\nthe Compact of Free Association (PW/MH), and the Lateran Concordat (VA)\nwhich are legally binding on a jurisdiction but are not memberships in an\ninternational organisation.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "direct_effect": {
+            "default": "none",
+            "enum": [
+              "override",
+              "direct",
+              "indirect_transposition",
+              "procedural",
+              "operational",
+              "advisory",
+              "none"
+            ],
+            "title": "Direct Effect",
+            "type": "string"
+          },
+          "in_force_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Force From"
+          },
+          "in_force_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Force Until"
+          },
+          "kind": {
+            "enum": [
+              "treaty_framework",
+              "bilateral_regime",
+              "constitutional_annex",
+              "security_council_resolution"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "renewable": {
+            "default": false,
+            "title": "Renewable",
+            "type": "boolean"
+          },
+          "reporting_cadence": {
+            "anyOf": [
+              {
+                "enum": [
+                  "monthly",
+                  "quarterly",
+                  "six_monthly",
+                  "annual",
+                  "ad_hoc"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporting Cadence"
+          },
+          "superseded_subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Superseded Subjects",
+            "type": "array"
+          },
+          "territories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Territories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "kind"
+        ],
+        "title": "BindingRegime",
+        "type": "object"
+      },
+      "Body_ingest_runs_ingest_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "file",
+          "jurisdiction"
+        ],
+        "title": "Body_ingest_runs_ingest_post",
+        "type": "object"
+      },
+      "CalendarConversion": {
+        "additionalProperties": false,
+        "description": "Deterministic conversion rule for non-Gregorian local calendars.\n\nkind selects which optional fields apply:\n\n- epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,\n                where epoch_year is an integer offset (ROC 1911, Juche 1911,\n                Buddhist -543).\n- era_table     named era segments with boundaries.\n- hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.\n- hijri_solar   Iranian Hijri, Gregorian year length.\n- ethiopian     ~7-8 year offset, 13-month year.\n- buddhist      Thai/Lao, epoch_year -543.\n- bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the\n                mid-April new year).",
+        "properties": {
+          "date_cues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Date Cues",
+            "type": "array"
+          },
+          "epoch_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Epoch Year"
+          },
+          "eras": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eras"
+          },
+          "kind": {
+            "enum": [
+              "epoch_offset",
+              "era_table",
+              "hijri_lunar",
+              "hijri_solar",
+              "ethiopian",
+              "buddhist",
+              "bikram_samvat"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "month_day_is_gregorian": {
+            "default": false,
+            "title": "Month Day Is Gregorian",
+            "type": "boolean"
+          },
+          "month_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Month Names",
+            "type": "array"
+          },
+          "new_year_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Year Day"
+          },
+          "new_year_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Year Month"
+          },
+          "new_year_reform_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Year Reform Year"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offset"
+          },
+          "year_particles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Year Particles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "CalendarConversion",
+        "type": "object"
+      },
+      "Cancelled": {
+        "properties": {
+          "cancelled": {
+            "format": "uuid",
+            "title": "Cancelled",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cancelled"
+        ],
+        "title": "Cancelled",
+        "type": "object"
+      },
+      "ClassificationRule": {
+        "additionalProperties": false,
+        "description": "Deterministic rule for assigning a document class from the incoming header or\nmetadata. Tried in descending priority; the first match wins. No match falls back to\n`default_document_class` and to whatever heuristics `StructuringConfig.prompt_additions`\nstill carries.\n\nsignal          what `pattern` is tested against\n  date_range      nothing; the match is `date_from`/`date_until` alone, for laws\n                  post-dating a regime change (PS `qarar_bi_qanun` from 2007-06-14)\n  preamble_match  the preamble or enacting-formula text\n  issuer_role     the enacting body's role (\"Pope\", \"Council of Ministers\", \"OHR\")\n  gazette_series  the official gazette series the document was published in\n  title_regex     the document title (\"Basic Law:\", \"Motu Proprio\")",
+        "properties": {
+          "date_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date From"
+          },
+          "date_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Until"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "pattern": {
+            "default": "",
+            "title": "Pattern",
+            "type": "string"
+          },
+          "pattern_flags": {
+            "default": "",
+            "title": "Pattern Flags",
+            "type": "string"
+          },
+          "priority": {
+            "default": 0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "signal": {
+            "enum": [
+              "date_range",
+              "preamble_match",
+              "issuer_role",
+              "gazette_series",
+              "title_regex"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "target_document_class": {
+            "title": "Target Document Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "target_document_class"
+        ],
+        "title": "ClassificationRule",
+        "type": "object"
+      },
+      "DiscoveryConfig": {
+        "additionalProperties": false,
+        "description": "Config-driven discovery for adapters that support it. The *basket\ndefinition* (which acts to find) lives here as per-doctype query strings;\nthe portal mechanics (request shape, facets) stay in the adapter.",
+        "properties": {
+          "max_total": {
+            "default": 5000,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Total",
+            "type": "integer"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "queries": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Queries",
+            "type": "object"
+          }
+        },
+        "title": "DiscoveryConfig",
+        "type": "object"
+      },
+      "DisplayConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "amendment_markers": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Amendment Markers",
+            "type": "array"
+          },
+          "font_preference": {
+            "default": "serif",
+            "title": "Font Preference",
+            "type": "string"
+          },
+          "heading_case": {
+            "default": "title_case",
+            "title": "Heading Case",
+            "type": "string"
+          },
+          "heading_type": {
+            "default": "marginal_note",
+            "title": "Heading Type",
+            "type": "string"
+          },
+          "rtl": {
+            "default": false,
+            "title": "Rtl",
+            "type": "boolean"
+          },
+          "script": {
+            "default": "latin",
+            "title": "Script",
+            "type": "string"
+          }
+        },
+        "title": "DisplayConfig",
+        "type": "object"
+      },
+      "DocumentClass": {
+        "additionalProperties": true,
+        "properties": {
+          "akn_element": {
+            "default": "act",
+            "title": "Akn Element",
+            "type": "string"
+          },
+          "akn_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Subtype"
+          },
+          "authoritative_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authoritative Language"
+          },
+          "basic_unit": {
+            "default": "section",
+            "title": "Basic Unit",
+            "type": "string"
+          },
+          "bluebell_compatible": {
+            "default": true,
+            "title": "Bluebell Compatible",
+            "type": "boolean"
+          },
+          "direct_effect": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Effect"
+          },
+          "extends": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extends"
+          },
+          "frbr_subtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frbr Subtype"
+          },
+          "hcontainers": {
+            "items": {
+              "$ref": "#/components/schemas/HContainer"
+            },
+            "title": "Hcontainers",
+            "type": "array"
+          },
+          "hierarchy": {
+            "items": {
+              "$ref": "#/components/schemas/HierarchyEntry"
+            },
+            "title": "Hierarchy",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "local_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Label"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "number_has_year_prefix": {
+            "default": false,
+            "title": "Number Has Year Prefix",
+            "type": "boolean"
+          },
+          "prompt_variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Variant"
+          },
+          "search_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Search Rank"
+          },
+          "short_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Label"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "DocumentClass",
+        "type": "object"
+      },
+      "EnactingFormula": {
+        "additionalProperties": true,
+        "properties": {
+          "applies_to": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applies To"
+          },
+          "document_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Class"
+          },
+          "enacting_body_tlc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enacting Body Tlc"
+          },
+          "era": {
+            "default": "",
+            "title": "Era",
+            "type": "string"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "instrument_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Type"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "position": {
+            "default": "preamble",
+            "title": "Position",
+            "type": "string"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "transliteration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transliteration"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "title": "EnactingFormula",
+        "type": "object"
+      },
+      "FrbrConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "calendar_conversion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarConversion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "date_calendar": {
+            "default": "gregorian",
+            "enum": [
+              "gregorian",
+              "lunar_hijri",
+              "solar_hijri",
+              "ethiopian",
+              "japanese_era",
+              "minguo",
+              "buddhist_era",
+              "dual"
+            ],
+            "title": "Date Calendar",
+            "type": "string"
+          },
+          "date_calendar_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Calendar Note"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "number_extraction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Extraction"
+          },
+          "number_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Format"
+          },
+          "number_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number Note"
+          },
+          "sample_uris": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Uris"
+          },
+          "title_identity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TitleIdentity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uri_patterns": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Uri Patterns",
+            "type": "object"
+          }
+        },
+        "required": [
+          "country_code"
+        ],
+        "title": "FrbrConfig",
+        "type": "object"
+      },
+      "HContainer": {
+        "additionalProperties": true,
+        "properties": {
+          "akn_element": {
+            "anyOf": [
+              {
+                "enum": [
+                  "book",
+                  "part",
+                  "title",
+                  "subtitle",
+                  "tome",
+                  "chapter",
+                  "subchapter",
+                  "section",
+                  "subsection",
+                  "division",
+                  "subdivision",
+                  "subpart",
+                  "article",
+                  "paragraph",
+                  "subparagraph",
+                  "clause",
+                  "subclause",
+                  "point",
+                  "indent",
+                  "alinea",
+                  "rule",
+                  "subrule",
+                  "item",
+                  "attachment",
+                  "hcontainer",
+                  "proviso"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Element"
+          },
+          "bluebell_keyword": {
+            "anyOf": [
+              {
+                "enum": [
+                  "BOOK",
+                  "PART",
+                  "TITLE",
+                  "SUBTITLE",
+                  "TOME",
+                  "CHAPTER",
+                  "SUBCHAPTER",
+                  "SECTION",
+                  "SUBSECTION",
+                  "DIVISION",
+                  "SUBDIVISION",
+                  "SUBPART",
+                  "ARTICLE",
+                  "PARAGRAPH",
+                  "SUBPARAGRAPH",
+                  "CLAUSE",
+                  "SUBCLAUSE",
+                  "POINT",
+                  "INDENT",
+                  "ALINEA",
+                  "RULE",
+                  "SUBRULE",
+                  "PROVISO",
+                  "TRANSITIONAL",
+                  "CROSSHEADING",
+                  "PART_HEADING"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bluebell Keyword"
+          },
+          "bluebell_proxy": {
+            "default": "SUBSECTION",
+            "enum": [
+              "BOOK",
+              "PART",
+              "TITLE",
+              "SUBTITLE",
+              "TOME",
+              "CHAPTER",
+              "SUBCHAPTER",
+              "SECTION",
+              "SUBSECTION",
+              "DIVISION",
+              "SUBDIVISION",
+              "SUBPART",
+              "ARTICLE",
+              "PARAGRAPH",
+              "SUBPARAGRAPH",
+              "CLAUSE",
+              "SUBCLAUSE",
+              "POINT",
+              "INDENT",
+              "ALINEA",
+              "RULE",
+              "SUBRULE",
+              "PROVISO",
+              "TRANSITIONAL",
+              "CROSSHEADING",
+              "PART_HEADING"
+            ],
+            "title": "Bluebell Proxy",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "local_term": {
+            "title": "Local Term",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbering"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "requires_postprocessing": {
+            "default": true,
+            "title": "Requires Postprocessing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "local_term",
+          "name"
+        ],
+        "title": "HContainer",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "HierarchyEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "akn_element": {
+            "enum": [
+              "book",
+              "part",
+              "title",
+              "subtitle",
+              "tome",
+              "chapter",
+              "subchapter",
+              "section",
+              "subsection",
+              "division",
+              "subdivision",
+              "subpart",
+              "article",
+              "paragraph",
+              "subparagraph",
+              "clause",
+              "subclause",
+              "point",
+              "indent",
+              "alinea",
+              "rule",
+              "subrule",
+              "item",
+              "attachment",
+              "hcontainer",
+              "proviso"
+            ],
+            "title": "Akn Element",
+            "type": "string"
+          },
+          "akn_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Name"
+          },
+          "bluebell_keyword": {
+            "anyOf": [
+              {
+                "enum": [
+                  "BOOK",
+                  "PART",
+                  "TITLE",
+                  "SUBTITLE",
+                  "TOME",
+                  "CHAPTER",
+                  "SUBCHAPTER",
+                  "SECTION",
+                  "SUBSECTION",
+                  "DIVISION",
+                  "SUBDIVISION",
+                  "SUBPART",
+                  "ARTICLE",
+                  "PARAGRAPH",
+                  "SUBPARAGRAPH",
+                  "CLAUSE",
+                  "SUBCLAUSE",
+                  "POINT",
+                  "INDENT",
+                  "ALINEA",
+                  "RULE",
+                  "SUBRULE",
+                  "PROVISO",
+                  "TRANSITIONAL",
+                  "CROSSHEADING",
+                  "PART_HEADING"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bluebell Keyword"
+          },
+          "captions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Captions",
+            "type": "array"
+          },
+          "eid_abbrev": {
+            "default": "",
+            "title": "Eid Abbrev",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "higher",
+              "basic",
+              "subdivision",
+              "grouping",
+              "presentational"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "local_term": {
+            "title": "Local Term",
+            "type": "string"
+          },
+          "local_terms": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Terms"
+          },
+          "marker_form": {
+            "anyOf": [
+              {
+                "enum": [
+                  "caption",
+                  "bracketed_decimal",
+                  "upper_letter_period",
+                  "upper_roman_period",
+                  "lower_letter_period",
+                  "arabic_period",
+                  "arabic_closing_paren",
+                  "lower_letter_closing_paren",
+                  "parenthesized_arabic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marker Form"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numbering"
+          }
+        },
+        "required": [
+          "local_term",
+          "akn_element",
+          "level"
+        ],
+        "title": "HierarchyEntry",
+        "type": "object"
+      },
+      "IdentificationConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "eli_base": {
+            "default": "",
+            "title": "Eli Base",
+            "type": "string"
+          },
+          "pattern": {
+            "default": "",
+            "title": "Pattern",
+            "type": "string"
+          },
+          "system": {
+            "default": "",
+            "title": "System",
+            "type": "string"
+          }
+        },
+        "title": "IdentificationConfig",
+        "type": "object"
+      },
+      "IngestUrl": {
+        "properties": {
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "jurisdiction"
+        ],
+        "title": "IngestUrl",
+        "type": "object"
+      },
+      "JurisdictionConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "adoption_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Adoption Markers",
+            "type": "array"
+          },
+          "akn_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Profile"
+          },
+          "akn_sources": {
+            "items": {
+              "$ref": "#/components/schemas/AknSource"
+            },
+            "title": "Akn Sources",
+            "type": "array"
+          },
+          "amendments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AmendmentConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentCaption"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "authoritative_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authoritative Language"
+          },
+          "binding_regimes": {
+            "items": {
+              "$ref": "#/components/schemas/BindingRegime"
+            },
+            "title": "Binding Regimes",
+            "type": "array"
+          },
+          "calendar": {
+            "default": "gregorian",
+            "enum": [
+              "gregorian",
+              "lunar_hijri",
+              "solar_hijri",
+              "ethiopian",
+              "japanese_era",
+              "minguo",
+              "buddhist_era",
+              "dual"
+            ],
+            "title": "Calendar",
+            "type": "string"
+          },
+          "closing_phrases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Closing Phrases",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "core_tlcs": {
+            "items": {
+              "$ref": "#/components/schemas/TLCEntry"
+            },
+            "title": "Core Tlcs",
+            "type": "array"
+          },
+          "coverage_status": {
+            "default": "in_scope",
+            "enum": [
+              "in_scope",
+              "subsumed",
+              "no_corpus",
+              "deferred"
+            ],
+            "title": "Coverage Status",
+            "type": "string"
+          },
+          "default_document_class": {
+            "default": "act",
+            "title": "Default Document Class",
+            "type": "string"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisplayConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "document_classes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DocumentClass"
+            },
+            "title": "Document Classes",
+            "type": "object"
+          },
+          "effective_tier": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tier actually achievable in the current environment.\n\nWalks both `source_adapters` and the legacy `akn_sources`, taking the best\n(lowest) tier. Token-gated entries with an unset env var are skipped unless the\nsource declares a `fallback_format`, whose tier contributes instead.",
+            "readOnly": true,
+            "title": "Effective Tier"
+          },
+          "enacting_formula_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enacting Formula Markers",
+            "type": "array"
+          },
+          "enacting_formulae": {
+            "items": {
+              "$ref": "#/components/schemas/EnactingFormula"
+            },
+            "title": "Enacting Formulae",
+            "type": "array"
+          },
+          "footnote_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Footnote Markers",
+            "type": "array"
+          },
+          "frbr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrbrConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "furniture_inline_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Furniture Inline Patterns",
+            "type": "array"
+          },
+          "furniture_line_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Furniture Line Patterns",
+            "type": "array"
+          },
+          "identification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdentificationConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "legal_eras": {
+            "items": {
+              "$ref": "#/components/schemas/LegalEra"
+            },
+            "title": "Legal Eras",
+            "type": "array"
+          },
+          "lexicon_words": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lexicon Words",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "min_anchor_coverage": {
+            "default": 0.8,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Anchor Coverage",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "name_en": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name En"
+          },
+          "name_local": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Local"
+          },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Name Translations",
+            "type": "object"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "numbering": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NumberingConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ocr_header_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ocr Header Patterns",
+            "type": "array"
+          },
+          "opening_material_terminators": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Opening Material Terminators",
+            "type": "array"
+          },
+          "placeholders": {
+            "items": {
+              "$ref": "#/components/schemas/PlaceholderMarker"
+            },
+            "title": "Placeholders",
+            "type": "array"
+          },
+          "public_reference": {
+            "default": false,
+            "title": "Public Reference",
+            "type": "boolean"
+          },
+          "residual_legal_systems": {
+            "items": {
+              "$ref": "#/components/schemas/ResidualLaw"
+            },
+            "title": "Residual Legal Systems",
+            "type": "array"
+          },
+          "source_adapters": {
+            "items": {
+              "$ref": "#/components/schemas/SourceAdapter"
+            },
+            "title": "Source Adapters",
+            "type": "array"
+          },
+          "source_truncation_floor": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Source Truncation Floor",
+            "type": "number"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "production",
+                  "draft",
+                  "stub"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "structuring": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StructuringConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subsumed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subsumed By"
+          },
+          "supranational_memberships": {
+            "items": {
+              "$ref": "#/components/schemas/SupranationalMembership"
+            },
+            "title": "Supranational Memberships",
+            "type": "array"
+          },
+          "synthetic": {
+            "default": false,
+            "title": "Synthetic",
+            "type": "boolean"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "tradition": {
+            "items": {
+              "enum": [
+                "civil_law",
+                "common_law",
+                "islamic",
+                "customary",
+                "hindu",
+                "confucian",
+                "jewish",
+                "socialist",
+                "sui_generis"
+              ],
+              "type": "string"
+            },
+            "title": "Tradition",
+            "type": "array"
+          },
+          "type": {
+            "default": "national",
+            "enum": [
+              "national",
+              "supranational",
+              "subnational",
+              "crown_dependency"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "validation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidationConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "tradition",
+          "languages",
+          "effective_tier"
+        ],
+        "title": "JurisdictionConfig",
+        "type": "object"
+      },
+      "JurisdictionSummary": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Languages",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "languages"
+        ],
+        "title": "JurisdictionSummary",
+        "type": "object"
+      },
+      "LawDetail": {
+        "properties": {
+          "doctype": {
+            "title": "Doctype",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "short_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Title"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/VersionSummary"
+            },
+            "title": "Versions",
+            "type": "array"
+          },
+          "work_uri": {
+            "title": "Work Uri",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "id",
+          "jurisdiction",
+          "title",
+          "short_title",
+          "doctype",
+          "status",
+          "year",
+          "number",
+          "work_uri",
+          "versions"
+        ],
+        "title": "LawDetail",
+        "type": "object"
+      },
+      "LawPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LawSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "LawPage",
+        "type": "object"
+      },
+      "LawSummary": {
+        "description": "Listing-friendly projection of a Law row. `lens_coverage` is opt-in: the\ncorpus-wide `/laws` route always populates it, the per-jurisdiction listing\nonly on `?include=coverage`, and callers that skip it read `None`.",
+        "properties": {
+          "doctype": {
+            "title": "Doctype",
+            "type": "string"
+          },
+          "frbr_work_uri": {
+            "title": "Frbr Work Uri",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "jurisdiction_code": {
+            "title": "Jurisdiction Code",
+            "type": "string"
+          },
+          "latest_expression_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Expression Date"
+          },
+          "latest_ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Ingested At"
+          },
+          "lens_coverage": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lens Coverage"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "short_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Title"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "title_translations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Title Translations",
+            "type": "object"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "id",
+          "jurisdiction_code",
+          "title",
+          "doctype",
+          "status",
+          "year",
+          "number",
+          "frbr_work_uri",
+          "latest_expression_date"
+        ],
+        "title": "LawSummary",
+        "type": "object"
+      },
+      "LegalEra": {
+        "additionalProperties": true,
+        "description": "A period whose documents share a drafting convention and authority.\n\nStructural quality tracks era more than jurisdiction, so it is reported per era.\n``from_``/``to`` are inclusive ISO dates, either may be open, and the field is\nspelled ``from`` in the config files.",
+        "properties": {
+          "authority_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authority Patterns",
+            "type": "array"
+          },
+          "calendar": {
+            "anyOf": [
+              {
+                "enum": [
+                  "gregorian",
+                  "lunar_hijri",
+                  "solar_hijri",
+                  "ethiopian",
+                  "japanese_era",
+                  "minguo",
+                  "buddhist_era",
+                  "dual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calendar"
+          },
+          "closing_phrases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Closing Phrases",
+            "type": "array"
+          },
+          "document_class": {
+            "default": "",
+            "title": "Document Class",
+            "type": "string"
+          },
+          "enacting_authority": {
+            "default": "",
+            "title": "Enacting Authority",
+            "type": "string"
+          },
+          "footnote_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Footnote Markers",
+            "type": "array"
+          },
+          "from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "LegalEra",
+        "type": "object"
+      },
+      "NumberingConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "act_citation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Act Citation"
+          },
+          "act_citation_alt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Act Citation Alt"
+          },
+          "article_numbering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Numbering"
+          },
+          "citations": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Citations",
+            "type": "object"
+          },
+          "insertion_example": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insertion Example"
+          },
+          "insertion_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insertion Note"
+          },
+          "insertion_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insertion Style"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "numbers_unique_across_years": {
+            "default": false,
+            "title": "Numbers Unique Across Years",
+            "type": "boolean"
+          }
+        },
+        "title": "NumberingConfig",
+        "type": "object"
+      },
+      "PlaceholderMarker": {
+        "additionalProperties": false,
+        "description": "A whole-string pattern a publisher writes where content is missing or\nstruck, and the AKN status the unit should carry for it.",
+        "properties": {
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PlaceholderStatus",
+            "default": "incomplete"
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "title": "PlaceholderMarker",
+        "type": "object"
+      },
+      "PlaceholderStatus": {
+        "description": "The AKN `@status` a placeholder unit should carry; named so the generated\ncontract keeps a stable alias rather than a numbered `Status`.",
+        "enum": [
+          "incomplete",
+          "removed",
+          "editorial"
+        ],
+        "title": "PlaceholderStatus",
+        "type": "string"
+      },
+      "ResidualLaw": {
+        "additionalProperties": false,
+        "description": "Another jurisdiction's corpus that is still residually applicable here.\n\nUsed for layered legal systems where pre-independence or foreign law\ncontinues in force alongside native legislation. Examples:\n  - VA: Italian law as suppletive in Vatican City State.\n  - SY, IQ, LB: Ottoman Mejelle for general private law.\n  - ZA, LS, SZ, NA: Roman-Dutch common law (but usually too embedded\n        to carve out as discrete residuals).\n\n`source_jurisdiction` is a Codify code that must resolve to an existing\nconfig. Downstream consolidation/amendment agents can traverse these to\nfind the source corpus.",
+        "properties": {
+          "in_force_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Force From"
+          },
+          "in_force_until": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Force Until"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "territorial",
+              "subject_matter",
+              "personal_status",
+              "general"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "source_jurisdiction": {
+            "title": "Source Jurisdiction",
+            "type": "string"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array"
+          },
+          "superseded_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Superseded By",
+            "type": "array"
+          },
+          "territories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Territories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source_jurisdiction",
+          "label",
+          "scope"
+        ],
+        "title": "ResidualLaw",
+        "type": "object"
+      },
+      "RunSnapshot": {
+        "properties": {
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "events": {
+            "title": "Events",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "lost_on_restart": {
+            "title": "Lost On Restart",
+            "type": "boolean"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "retry_of": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Of"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "created_at",
+          "started_at",
+          "completed_at",
+          "result",
+          "error",
+          "retry_of",
+          "events",
+          "lost_on_restart"
+        ],
+        "title": "RunSnapshot",
+        "type": "object"
+      },
+      "SearchMatch": {
+        "properties": {
+          "eid": {
+            "title": "Eid",
+            "type": "string"
+          },
+          "provision_id": {
+            "format": "uuid",
+            "title": "Provision Id",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provision_id",
+          "eid",
+          "score",
+          "text"
+        ],
+        "title": "SearchMatch",
+        "type": "object"
+      },
+      "SearchResult": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/SearchMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "matches"
+        ],
+        "title": "SearchResult",
+        "type": "object"
+      },
+      "SourceAdapter": {
+        "additionalProperties": false,
+        "description": "One upstream portal for this jurisdiction; multiple permitted.\n\nurl_template placeholders: {country} {doctype} {year} {number} {frbr_uri}. Auth\ntokens resolve from the env var named by auth_env_var, never stored here.",
+        "properties": {
+          "auth_env_var": {
+            "default": "",
+            "title": "Auth Env Var",
+            "type": "string"
+          },
+          "auth_scheme": {
+            "default": "none",
+            "enum": [
+              "none",
+              "token",
+              "bearer",
+              "oauth"
+            ],
+            "title": "Auth Scheme",
+            "type": "string"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "discovery": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "akn_native",
+              "eurlex_cellar",
+              "html_portal",
+              "pdf_gazette",
+              "paragraf_propisi",
+              "sparql",
+              "bulk_xml_archive"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "licence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "parser": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parser"
+          },
+          "rate_limit_per_minute": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Limit Per Minute"
+          },
+          "robots_respect": {
+            "default": true,
+            "title": "Robots Respect",
+            "type": "boolean"
+          },
+          "url_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Template"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "SourceAdapter",
+        "type": "object"
+      },
+      "StructuringConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "body_opens_with_container": {
+            "default": false,
+            "title": "Body Opens With Container",
+            "type": "boolean"
+          },
+          "citation_articles": {
+            "description": "Articles that may sit between the clause and the name (`the`). Language data: most languages have none, and no article is assumed.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Articles",
+            "type": "array"
+          },
+          "citation_lead_ins": {
+            "description": "Phrases introducing a law's own short name (`may be cited as`), the common-law short-title device.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Lead Ins",
+            "type": "array"
+          },
+          "citation_subjects": {
+            "description": "How an instrument refers to itself when it declares its short name (`This Act`). Required alongside `citation_lead_ins`: the same phrasing names the schools and offices a law creates, so an unanchored clause takes the school's name for the law's.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Subjects",
+            "type": "array"
+          },
+          "citation_successors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Successors",
+            "type": "array"
+          },
+          "classification_rules": {
+            "items": {
+              "$ref": "#/components/schemas/ClassificationRule"
+            },
+            "title": "Classification Rules",
+            "type": "array"
+          },
+          "designation_rule": {
+            "anyOf": [
+              {
+                "const": "eu_instrument",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Derives a short name from the title's own grammar where the tradition declares no short title. EU acts are cited by form and number.",
+            "title": "Designation Rule"
+          },
+          "example_markers": {
+            "description": "Lead-ins that introduce specimen legislation in a drafting manual (`Contoh`), whose markers are displayed rather than enacted.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Example Markers",
+            "type": "array"
+          },
+          "insertion_suffixes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Insertion Suffixes",
+            "type": "object"
+          },
+          "long_title_lead_ins": {
+            "description": "Openings of the document's own long title (`An Act`), marked up as `<longTitle>` so the official title comes from the text rather than from a filename.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Long Title Lead Ins",
+            "type": "array"
+          },
+          "marker_boundary": {
+            "default": "relaxed",
+            "enum": [
+              "relaxed",
+              "line_anchored"
+            ],
+            "title": "Marker Boundary",
+            "type": "string"
+          },
+          "marker_tolerances": {
+            "items": {
+              "enum": [
+                "missing_separator",
+                "keyword_glyph",
+                "digit_glyph",
+                "split_number"
+              ],
+              "type": "string"
+            },
+            "title": "Marker Tolerances",
+            "type": "array"
+          },
+          "ordinal_words": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Ordinal Words",
+            "type": "object"
+          },
+          "prompt_additions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Additions"
+          },
+          "prompt_variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Variant"
+          },
+          "prose_precursors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prose Precursors",
+            "type": "array"
+          },
+          "reference_nouns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reference Nouns",
+            "type": "array"
+          },
+          "sameline_precursors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sameline Precursors",
+            "type": "array"
+          }
+        },
+        "title": "StructuringConfig",
+        "type": "object"
+      },
+      "SupranationalMembership": {
+        "additionalProperties": true,
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "direct_effect": {
+            "default": "none",
+            "enum": [
+              "override",
+              "direct",
+              "indirect_transposition",
+              "procedural",
+              "operational",
+              "advisory",
+              "none"
+            ],
+            "title": "Direct Effect",
+            "type": "string"
+          },
+          "direct_effect_instruments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Direct Effect Instruments",
+            "type": "array"
+          },
+          "direct_effect_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Effect Note"
+          },
+          "excluded_instruments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Instruments",
+            "type": "array"
+          },
+          "excluded_subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Subjects",
+            "type": "array"
+          },
+          "member_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Since"
+          },
+          "member_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Until"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "protocol_references": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Protocol References",
+            "type": "array"
+          },
+          "rejoined_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejoined On"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "member",
+                  "suspended",
+                  "former",
+                  "candidate",
+                  "potential_candidate",
+                  "associate",
+                  "observer",
+                  "special_status",
+                  "never_member"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "superseded_subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Superseded Subjects",
+            "type": "array"
+          },
+          "suspension_periods": {
+            "items": {
+              "$ref": "#/components/schemas/SuspensionPeriod"
+            },
+            "title": "Suspension Periods",
+            "type": "array"
+          },
+          "transposition_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transposition Required"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "SupranationalMembership",
+        "type": "object"
+      },
+      "SuspensionPeriod": {
+        "additionalProperties": false,
+        "description": "One period of suspension from a supranational body.\n\nUsed inside `SupranationalMembership.suspension_periods` to record the\nstart and (optional) end of a suspension, plus its scope. A list is the\nright shape because several jurisdictions have cycled through multiple\nsuspensions (Fiji at the PIF/Commonwealth; Pakistan at the Commonwealth;\ncoup states at AU/ECOWAS).",
+        "properties": {
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "scope": {
+            "default": "full",
+            "enum": [
+              "full",
+              "decision_making",
+              "meetings",
+              "voting"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "suspended_from": {
+            "title": "Suspended From",
+            "type": "string"
+          },
+          "suspended_until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suspended Until"
+          }
+        },
+        "required": [
+          "suspended_from"
+        ],
+        "title": "SuspensionPeriod",
+        "type": "object"
+      },
+      "TLCEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "class": {
+            "enum": [
+              "TLCPerson",
+              "TLCOrganization",
+              "TLCRole",
+              "TLCObject",
+              "TLCConcept",
+              "TLCEvent",
+              "TLCLocation",
+              "TLCProcess",
+              "TLCTerm",
+              "TLCReference"
+            ],
+            "title": "Class",
+            "type": "string"
+          },
+          "eId": {
+            "minLength": 1,
+            "pattern": "^[A-Za-z][A-Za-z0-9-]*$",
+            "title": "Eid",
+            "type": "string"
+          },
+          "href": {
+            "title": "Href",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "showAs": {
+            "title": "Showas",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eId",
+          "class",
+          "href",
+          "showAs"
+        ],
+        "title": "TLCEntry",
+        "type": "object"
+      },
+      "TitleIdentity": {
+        "additionalProperties": false,
+        "description": "How a jurisdiction that numbers nothing derives an identity from a title.\nEvery field is a literal `codify.frbr.identity_from_title` reads.",
+        "properties": {
+          "consolidation_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consolidation Markers",
+            "type": "array"
+          },
+          "edition_markers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Edition Markers",
+            "type": "array"
+          },
+          "strip_prefixes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Strip Prefixes",
+            "type": "array"
+          },
+          "year_particles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Year Particles",
+            "type": "array"
+          }
+        },
+        "title": "TitleIdentity",
+        "type": "object"
+      },
+      "ValidationConfig": {
+        "additionalProperties": true,
+        "properties": {
+          "ambiguities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ambiguities",
+            "type": "array"
+          },
+          "bluebell_tested": {
+            "default": false,
+            "title": "Bluebell Tested",
+            "type": "boolean"
+          },
+          "documents_examined": {
+            "default": 0,
+            "title": "Documents Examined",
+            "type": "integer"
+          },
+          "documents_examined_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documents Examined Note"
+          },
+          "laws_africa_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laws Africa Reference"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "status": {
+            "default": "draft",
+            "enum": [
+              "production",
+              "draft",
+              "stub"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unresolved_ambiguities": {
+            "default": 0,
+            "title": "Unresolved Ambiguities",
+            "type": "integer"
+          }
+        },
+        "title": "ValidationConfig",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "VersionDetail": {
+        "properties": {
+          "akn_xml": {
+            "title": "Akn Xml",
+            "type": "string"
+          },
+          "expression_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression Date"
+          },
+          "expression_uri": {
+            "title": "Expression Uri",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingested At"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "law_id": {
+            "format": "uuid",
+            "title": "Law Id",
+            "type": "string"
+          },
+          "structural_quality_grade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Quality Grade"
+          }
+        },
+        "required": [
+          "id",
+          "law_id",
+          "expression_uri",
+          "language",
+          "expression_date",
+          "ingested_at",
+          "structural_quality_grade",
+          "akn_xml"
+        ],
+        "title": "VersionDetail",
+        "type": "object"
+      },
+      "VersionSummary": {
+        "properties": {
+          "expression_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression Date"
+          },
+          "expression_uri": {
+            "title": "Expression Uri",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingested At"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "law_id": {
+            "format": "uuid",
+            "title": "Law Id",
+            "type": "string"
+          },
+          "structural_quality_grade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Quality Grade"
+          }
+        },
+        "required": [
+          "id",
+          "law_id",
+          "expression_uri",
+          "language",
+          "expression_date",
+          "ingested_at",
+          "structural_quality_grade"
+        ],
+        "title": "VersionSummary",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "codify",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/jurisdictions": {
+      "get": {
+        "operationId": "jurisdictions_jurisdictions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JurisdictionSummary"
+                  },
+                  "title": "Response Jurisdictions Jurisdictions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Jurisdictions"
+      }
+    },
+    "/jurisdictions/{code}": {
+      "get": {
+        "operationId": "jurisdiction_jurisdictions__code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JurisdictionConfig"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jurisdiction"
+      }
+    },
+    "/jurisdictions/{code}/laws": {
+      "get": {
+        "operationId": "laws_for_jurisdictions__code__laws_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Laws For"
+      }
+    },
+    "/laws": {
+      "get": {
+        "operationId": "laws_laws_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jurisdiction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jurisdiction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "doctype",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Doctype"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Laws"
+      }
+    },
+    "/laws/{law_id}": {
+      "get": {
+        "operationId": "law_laws__law_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "law_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Law Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LawDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Law"
+      }
+    },
+    "/runs": {
+      "get": {
+        "operationId": "list_runs_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunSnapshot"
+                  },
+                  "title": "Response List Runs Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Runs"
+      }
+    },
+    "/runs/ingest": {
+      "post": {
+        "operationId": "ingest_runs_ingest_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_ingest_runs_ingest_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest"
+      }
+    },
+    "/runs/ingest-url": {
+      "post": {
+        "operationId": "ingest_url_runs_ingest_url_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestUrl"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Url"
+      }
+    },
+    "/runs/{run_id}": {
+      "get": {
+        "operationId": "run_state_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run State"
+      }
+    },
+    "/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cancelled"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel"
+      }
+    },
+    "/runs/{run_id}/retry": {
+      "post": {
+        "operationId": "retry_runs__run_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry"
+      }
+    },
+    "/runs/{run_id}/stream": {
+      "get": {
+        "operationId": "run_stream_runs__run_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Stream"
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "search_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jurisdiction",
+            "required": true,
+            "schema": {
+              "title": "Jurisdiction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "k",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "K",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search"
+      }
+    },
+    "/versions/{version_id}": {
+      "get": {
+        "operationId": "version_versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Version"
+      }
+    }
+  }
+}
