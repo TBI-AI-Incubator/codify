@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from codify import jurisdictions
+from codify.akn import AKN_NS
 from codify.pipeline.enrich import anchors as anchors_mod
 from codify.pipeline.enrich import scaffold as scaffold_mod
 from codify.pipeline.enrich import structure as structure_mod
@@ -618,6 +619,8 @@ def test_a_wrapped_roman_heading_bounds_a_quotation(declared: Any) -> None:
     [
         {"": "bis"},
         {" zib": "bis"},
+        {"z ib": "bis"},
+        {"foo_bar": "bis"},
         {"A": "bis"},
         {"12": "bis"},
         {"z2": "bis"},
@@ -752,3 +755,43 @@ def test_a_suffix_is_matched_at_the_end_of_a_lettered_base() -> None:
         assert jurisdictions.fold_inserted_suffix("IVzib") == "IVbis"
         assert jurisdictions.fold_inserted_suffix("zib") is None
         assert jurisdictions.fold_inserted_suffix("5 zibber") is None
+
+
+def test_a_direct_conclusions_block_still_groups_the_signatory(declared: Any) -> None:
+    from lxml import etree
+
+    from codify.pipeline.enrich.bluebell import parse_to_akn
+    from codify.pipeline.enrich.conclusions import emit_conclusions
+    from codify.pipeline.enrich.regions import RegionVocabulary
+
+    lines = scaffold_mod._conclusions_lines(f"{CLOSING}\nThe Warden\nHarbour Clerk")
+    akn = parse_to_akn(
+        "BODY\n  SECTION 1\n    One.\n\n" + "\n".join(lines) + "\n",
+        country=COUNTRY,
+        doctype="act",
+        date="2020",
+        number="1",
+    )
+    out = emit_conclusions(akn, vocab=RegionVocabulary(closing_phrases=(CLOSING,)))
+    block = etree.fromstring(out.encode()).find(
+        f".//{{{AKN_NS}}}conclusions/{{{AKN_NS}}}blockContainer"
+    )
+    assert block is not None and block.get("eId") == "sig_1"
+    assert [" ".join(p.itertext()) for p in block] == ["The Warden", "Harbour Clerk"]
+
+
+def test_a_long_conclusions_block_is_not_regrouped(declared: Any) -> None:
+    from codify.pipeline.enrich.bluebell import parse_to_akn
+    from codify.pipeline.enrich.conclusions import emit_conclusions
+    from codify.pipeline.enrich.regions import RegionVocabulary
+
+    body = "\n".join(f"Appended line {i} of the instrument" for i in range(12))
+    lines = scaffold_mod._conclusions_lines(f"{CLOSING}\nThe Warden\n{body}")
+    akn = parse_to_akn(
+        "BODY\n  SECTION 1\n    One.\n\n" + "\n".join(lines) + "\n",
+        country=COUNTRY,
+        doctype="act",
+        date="2020",
+        number="1",
+    )
+    assert emit_conclusions(akn, vocab=RegionVocabulary(closing_phrases=(CLOSING,))) == akn

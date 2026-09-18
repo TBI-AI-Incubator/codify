@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import structlog
 from lxml import etree
@@ -30,7 +31,17 @@ def emit_conclusions(
 
     root = etree.fromstring(akn_xml.encode("utf-8"))
     act = _act(root)
-    if act is None or act.find("akn:conclusions", NS) is not None:
+    if act is None:
+        return akn_xml
+    existing = act.find("akn:conclusions", NS)
+    if existing is not None:
+        # A block the structurer wrote from the closing span still gets the
+        # signatory grouping, where it is a signature and not an appended instrument.
+        if existing.find("akn:blockContainer", NS) is None and (
+            len(existing.findall("akn:p", NS)) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS
+        ):
+            _regroup_signatory(existing)
+            return cast(str, etree.tostring(root, encoding="unicode"))
         return akn_xml
 
     container, start = find_displaced_attestation(root, vocab.closing_phrases)
@@ -124,6 +135,9 @@ def _attestation_start(
 
 # Place, date, name and role are short lines. A sentence of obligations is not.
 _ATTESTATION_MAX_WORDS = 14
+# A signature block: the phrase, a name, a role, a date or place. Longer is an
+# appended instrument the boundary set aside, which carries no signatory to group.
+_SIGNATURE_BLOCK_MAX_PARAGRAPHS = 8
 _HAS_DIGIT = re.compile(r"[\d٠-٩۰-۹]")
 
 
