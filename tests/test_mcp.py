@@ -226,11 +226,15 @@ async def test_get_law_carries_its_versions_without_xml(monkeypatch: pytest.Monk
 
     law = _law()
     version = _version(law.id)
+    asked: list[dict[str, Any]] = []
 
     async def fake_get(session: Any, law_id: uuid.UUID) -> tuple[Law, str] | None:
         return (law, "xa") if law_id == law.id else None
 
-    async def fake_versions(session: Any, law_id: uuid.UUID) -> tuple[list[Version], None]:
+    async def fake_versions(
+        session: Any, law_id: uuid.UUID, **kw: Any
+    ) -> tuple[list[Version], None]:
+        asked.append(kw)
         return [version], None
 
     monkeypatch.setattr(laws, "get_law_with_jurisdiction", fake_get)
@@ -253,6 +257,7 @@ async def test_get_law_carries_its_versions_without_xml(monkeypatch: pytest.Monk
     assert [v["id"] for v in out["versions"]] == [str(version.id)]
     assert out["versions"][0]["expression_date"] == "1992-01-01"
     assert "akn_xml" not in out["versions"][0]
+    assert [kw.get("with_akn") for kw in asked] == [False]  # the bodies stay unloaded
     assert missing.is_error and "no law" in missing.content[0].text
     assert malformed.is_error and "not a law id" in malformed.content[0].text
 
@@ -264,19 +269,22 @@ async def test_get_law_follows_every_version_page(monkeypatch: pytest.MonkeyPatc
     law = _law()
     pages = [[_version(law.id) for _ in range(3)] for _ in range(3)]
     asked: list[uuid.UUID | None] = []
+    bodies: list[bool | None] = []
 
     async def fake_get(session: Any, law_id: uuid.UUID) -> tuple[Law, str]:
         return law, "xa"
 
     async def fake_versions(
-        session: Any, law_id: uuid.UUID, *, cursor: uuid.UUID | None = None, **_: Any
+        session: Any, law_id: uuid.UUID, *, cursor: uuid.UUID | None = None, **kw: Any
     ) -> tuple[list[Version], uuid.UUID | None]:
         asked.append(cursor)
+        bodies.append(kw.get("with_akn"))
         index = (
             0 if cursor is None else next(i for i, p in enumerate(pages) if p[-1].id == cursor) + 1
         )
         page = pages[index]
-        return page, page[-1].id if index < len(pages) - 1 else None
+        # A fresh list, as the store returns: the tool extends what it is handed.
+        return list(page), page[-1].id if index < len(pages) - 1 else None
 
     monkeypatch.setattr(laws, "get_law_with_jurisdiction", fake_get)
     monkeypatch.setattr(codify.storage, "list_versions", fake_versions)
@@ -286,6 +294,7 @@ async def test_get_law_follows_every_version_page(monkeypatch: pytest.MonkeyPatc
     ids = [v["id"] for v in result.structured_content["versions"]]
     assert ids == [str(v.id) for page in pages for v in page]
     assert asked == [None, pages[0][-1].id, pages[1][-1].id]
+    assert bodies == [False, False, False]
 
 
 async def test_get_version_respects_the_xml_cap(monkeypatch: pytest.MonkeyPatch) -> None:
