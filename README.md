@@ -1,7 +1,7 @@
 # codify
 
 Codify turns a statute book into law a machine can read: each act structured as
-[Akoma Ntoso 3.0](https://docs.oasis-open.org/legaldocml/akn-core/v1.0/os/part1-vocabulary/akn-core-v1.0-os-part1-vocabulary.html),
+[Akoma Ntoso 3.0](http://akomantoso.info/?page_id=27),
 the open standard for legal documents, addressable by
 [FRBR](https://repository.ifla.org/items/54925d49-b08d-4aeb-807c-1b509ec40b55) URI and
 citable to the provision, with quoted amending text lifted out of the prose into markup a
