@@ -388,7 +388,7 @@ async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.Monkey
     app = _app(None)
     events = [
         e
-        async for e in _ingest_runner(app.state.sessions)(
+        async for e in _ingest_runner(app.state.sessions, app.state.clients)(
             {"source": str(FIXTURE), "jurisdiction": "xa"}
         )
     ]
@@ -861,6 +861,71 @@ async def test_a_retry_keeps_the_upload_its_original_was_evicted_with() -> None:
             await asyncio.sleep(0)
 
     assert not source.exists()
+
+
+async def test_one_embeddings_client_serves_every_search_and_closes_at_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import codify.retrieve.hybrid as hybrid
+    from codify import cli_store
+
+    class _Transport:
+        closed = 0
+
+        async def close(self) -> None:
+            _Transport.closed += 1
+
+    class _Embeddings:
+        built = 0
+
+        def __init__(self) -> None:
+            _Embeddings.built += 1
+            self.client = _Transport()
+
+    async def fake_retrieve(session: Any, q: str, **kw: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(cli_store, "_embedding_client", _Embeddings)
+    monkeypatch.setattr(hybrid, "retrieve", fake_retrieve)
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    app = _app(runner)
+    async with app.router.lifespan_context(app), _client(runner, app) as c:
+        for _ in range(3):
+            assert (await c.get("/search?q=x&jurisdiction=xa")).status_code == 200
+
+    assert (_Embeddings.built, _Transport.closed) == (1, 1)
+
+
+async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codify import cli_store
+    from codify.serve.app import _Clients
+
+    class _Transport:
+        closed = 0
+
+        async def close(self) -> None:
+            _Transport.closed += 1
+
+    class _Chat:
+        built = 0
+
+        def __init__(self) -> None:
+            _Chat.built += 1
+            self.client = _Transport()
+
+    monkeypatch.setenv("LITELLM_BASE_URL", "http://gateway.test")
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: _Chat())
+    clients = _Clients()
+
+    assert clients.llm() is clients.llm()  # two runs, one client
+    await clients.close()
+
+    assert (_Chat.built, _Transport.closed) == (1, 1)
 
 
 def test_serve_is_registered() -> None:

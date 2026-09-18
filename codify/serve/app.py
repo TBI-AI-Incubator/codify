@@ -33,19 +33,46 @@ class IngestUrl(BaseModel):
     title: str | None = None
 
 
+class _Clients:
+    """One chat and one embeddings client per process, built on first use, closed at shutdown."""
+
+    def __init__(self) -> None:
+        self._built: dict[str, Any] = {}
+
+    def llm(self) -> Any:
+        from codify.cli_store import _env, _llm_client
+
+        # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
+        if "llm" not in self._built:
+            self._built["llm"] = _llm_client(None) if _env("LITELLM_BASE_URL") else None
+        return self._built["llm"]
+
+    def embeddings(self) -> Any:
+        from codify.cli_store import _embedding_client
+
+        if "embeddings" not in self._built:
+            self._built["embeddings"] = _embedding_client()
+        return self._built["embeddings"]
+
+    async def close(self) -> None:
+        for built in self._built.values():
+            if built is not None:
+                await built.client.close()
+        self._built.clear()
+
+
 def _ingest_runner(
-    sessions: async_sessionmaker[AsyncSession],
+    sessions: async_sessionmaker[AsyncSession], clients: _Clients
 ) -> Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]]:
     """Run the pipeline, then store what it produced so the reads can see it."""
 
     async def run(params: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
-        from codify.cli_store import _descriptors, _env, _llm_client
+        from codify.cli_store import _descriptors
         from codify.pipeline import ingest_document
         from codify.pipeline.events import MetadataExtracted
         from codify.storage import save_document
 
-        # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
-        llm = _llm_client(params.get("model")) if _env("LITELLM_BASE_URL") else None
+        llm = clients.llm()
         read_title = ""
         async for event in ingest_document(params["source"], params["jurisdiction"], llm=llm):
             if isinstance(event, MetadataExtracted):
@@ -85,19 +112,22 @@ def create_app(
         ):
             source.unlink(missing_ok=True)
 
-    runs: RunTable = RunTable(runner or _ingest_runner(sessions), on_forget=drop_upload)
+    clients = _Clients()
+    runs: RunTable = RunTable(runner or _ingest_runner(sessions, clients), on_forget=drop_upload)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
         await runs.shutdown()
         uploads.cleanup()
+        await clients.close()
         await engine.dispose()
 
     app = FastAPI(title="codify", docs_url="/docs", lifespan=lifespan)
     app.state.sessions = sessions
     app.state.runs = runs
     app.state.uploads = Path(uploads.name)
+    app.state.clients = clients
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -191,12 +221,11 @@ def create_app(
     async def search(
         q: str, jurisdiction: str, k: int = Query(10, ge=1, le=100), language: str | None = None
     ) -> dict[str, Any]:
-        from codify.cli_store import _embedding_client
         from codify.retrieve.hybrid import retrieve
 
         code = _jurisdiction(jurisdiction)
         try:
-            embedding_client = _embedding_client()
+            embedding_client = clients.embeddings()
         except SystemExit as exc:  # the CLI helper's way of saying "not configured"
             raise HTTPException(503, str(exc)) from exc
         async with sessions() as session:
