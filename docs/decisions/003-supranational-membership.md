@@ -24,9 +24,10 @@ Supranational membership is modelled in two places, both data:
 
 2. **Per-jurisdiction memberships**: every `data/jurisdictions/<code>/config.json`
    carries a `supranational_memberships[]` array; each entry names a `body` (a
-   registry code), a lifecycle `status` (`MembershipStatus`: member / candidate /
-   potential_candidate / associate / observer / suspended / former, implicitly
-   `member` when absent), and optional `direct_effect` / `superseded_subjects`.
+   registry code), a lifecycle `status` (`MembershipStatus`: member, candidate,
+   potential_candidate, associate, observer, suspended, former, special_status or
+   never_member; implicitly `member` when absent), and optional `direct_effect` /
+   `superseded_subjects`.
 
 Identity is resolved through `canonicalise_body()` over an alias map built from the
 registry; an unknown body is returned unchanged so the validator's `UNKNOWN_BODY`
