@@ -182,10 +182,17 @@ REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 
 ## Standards
 
-Codify targets Akoma Ntoso 3.0 and validates output against the schema. FRBR URIs
-identify works, expressions and manifestations. Schema validity does not guarantee an
-accurate transcription or compatibility with every downstream tool; see
-[interoperability scope](docs/akn4eu-divergences.md).
+Codify targets the Akoma Ntoso 3.0 specification and validates all generated documents
+against the official schema, using FRBR URIs to uniquely identify works, expressions, and
+manifestations down to the individual provision.
+
+Schema validity alone does not guarantee semantic fidelity to the source text or seamless
+compatibility with external tooling. Internal structural conventions, such as how annex
+content is inlined, can diverge from specific downstream profiles like AKN4EU or platforms
+such as Indigo. You should validate intended interchange workflows using representative
+documents directly within the consuming system. For details on compatibility boundaries
+and known profile differences, see the
+[interoperability scope](docs/akn4eu-divergences.md) documentation.
 
 ## More
 
@@ -197,5 +204,6 @@ accurate transcription or compatibility with every downstream tool; see
 - `AGENTS.md`: conventions for coding agents working in this repository
 
 Codify is built by CentreAI at the
-[Tony Blair Institute for Global Change](https://institute.global). The hosted product
-wraps this core with tenancy, access control, an audit trail and support.
+[Tony Blair Institute for Global Change](https://institute.global). For more information
+on the vision and access to a hosted version, visit
+[codify.centreai.global](https://codify.centreai.global).
