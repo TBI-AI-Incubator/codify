@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import (
     anchor_coverage,
@@ -335,3 +337,48 @@ def test_the_denominator_hides_a_uk_replacement_block_as_the_scan_does() -> None
     assert [a.number for a in scan.anchors if a.kind == "section"] == ["1", "2", "3"]
     coverage = anchor_coverage(UK_REPLACEMENT, scan.anchors, load_config("gb"), "act", "section")
     assert (coverage.ratio, sorted(coverage.expected)) == (1.0, ["1", "2", "3"])
+
+
+class _EchoBodyFill:
+    """Offline body-fill: one fixed line per eId the scaffold names."""
+
+    _EID_RE = __import__("re").compile(r"eid=(\S+)")
+
+    async def chat_schema(self, prompt, schema, system=None, model=None):
+        from codify.pipeline.enrich.scaffold import BodyBlock, BodyFillResponse
+
+        eids = self._EID_RE.findall(prompt)
+        return BodyFillResponse(bodies=[BodyBlock(eid=e, lines=[f"Body of {e}."]) for e in eids])
+
+
+@pytest.mark.asyncio
+async def test_the_transcription_structures_to_twenty_filled_sections() -> None:
+    """The anchors reach the scaffold and the fill: every section comes out with
+    its note as heading and a body, and the document validates."""
+    from lxml import etree
+
+    from codify.pipeline.enrich.bluebell import parse_to_akn
+    from codify.pipeline.enrich.structure import text_to_bluebell_scaffolded
+    from codify.pipeline.enrich.validator import validate_akn
+
+    bluebell = await text_to_bluebell_scaffolded(
+        TRANSCRIPTION,
+        client=_EchoBodyFill(),  # type: ignore[arg-type]
+        country="xa",
+        doctype="act",
+    )
+    akn = parse_to_akn(bluebell, "xa", doctype="act", date="1992", number="7")
+    ns = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
+    sections = etree.fromstring(akn.encode()).iterfind(".//a:section", ns)
+    got = {
+        s.get("eId").rsplit("__", 1)[-1]: (
+            s.findtext("a:heading", namespaces=ns),
+            " ".join(s.xpath("string(.//a:content)", namespaces=ns).split()),
+        )
+        for s in sections
+    }
+    assert sorted(got, key=lambda e: int(e[4:])) == [f"sec_{n}" for n in range(1, 21)]
+    assert got["sec_1"] == ("Short title and commencement", "Body of part_I__sec_1.")
+    assert all(heading and body for heading, body in got.values()), got
+    faults = [f for f in validate_akn(akn) if f.get("severity") in {"error", "fault", "blocking"}]
+    assert not faults, faults
