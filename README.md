@@ -72,7 +72,8 @@ or requiring a database, run the skeleton pass directly:
 codify scan-corpus <dir> --jurisdiction xa
 ```
 
-Pass `--quiet` to suppress per-event console output while retaining structured logs.
+The summary is JSON on stdout; findings about individual files go to stderr, so
+`2>/dev/null` leaves the summary alone.
 
 **Log messages.**
 
