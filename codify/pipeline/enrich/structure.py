@@ -7,7 +7,7 @@ import hashlib
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -409,7 +409,9 @@ async def text_to_bluebell_scaffolded(
     # Guarded heading-vs-container probe from this same scan; the ingest probe
     # turns a below-floor ratio into a container_coverage warning. Independent of
     # the coverage gate, so measured once here and carried on every trace.
-    container = container_coverage_probe(text, scan, config, country, doctype)
+    container = container_coverage_probe(
+        text, replace(scan, anchors=anchors), config, country, doctype
+    )
 
     halts: list[StructureHalt] = []
 

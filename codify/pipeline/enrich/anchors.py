@@ -2667,11 +2667,10 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
     if not terms:
         return None
     alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
-    # The number may wrap onto the next line, as the scanner's own separator
-    # allows; a bare keyword ending a line is prose.
-    # A digit, or a whole Roman numeral in either case or the Cyrillic homoglyphs.
-    wrapped = rf"\r?\n[ \t]*(?=[{_MARKER_DIGITS}]|[IVXLCDMivxlcdmІіХх]+(?!\w))"
-    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})(?:[^\S\n]|{wrapped})")
+    # A number must follow, on the line or wrapped onto the next as the scanner's
+    # separator allows: a digit, or a whole Roman numeral (Cyrillic homoglyphs too).
+    number = rf"(?=[{_MARKER_DIGITS}]|[IVXLCDMivxlcdmІіХх]+(?!\w))"
+    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})(?:[^\S\n]+|\r?\n[ \t]*){number}")
 
 
 def _quote_mask(text: str, country: str = "") -> tuple[bool, ...]:

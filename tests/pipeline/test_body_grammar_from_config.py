@@ -668,3 +668,34 @@ def test_an_excluded_tail_marker_is_not_reported_unclaimed(declared: Any) -> Non
         sp for sp in scan.ambiguity if sp.detail.get("reason") == "marker_shaped_line_unclaimed"
     ]
     assert unclaimed == [], unclaimed
+
+
+def test_a_keyword_opening_prose_on_its_line_is_not_a_quote_boundary(declared: Any) -> None:
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    assert boundary is not None
+    assert boundary.search("Section continues as follows") is None
+    assert boundary.search("Section 12 Heading")
+
+
+def test_the_container_probe_reads_the_cut_text(
+    declared: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The probe pairs anchors with text; after the cut it must get the rebased list."""
+    seen: list[Any] = []
+    real = structure_mod.container_coverage_probe
+
+    def spy(text: str, scan: Any, *args: Any) -> Any:
+        seen.append((text, scan))
+        return real(text, scan, *args)
+
+    monkeypatch.setattr(structure_mod, "container_coverage_probe", spy)
+
+    async def run() -> None:
+        await structure_mod.text_to_bluebell_scaffolded(
+            "AN ACT\n\n" + TAIL, client=_EmptyFillClient(), country=COUNTRY, doctype="act"
+        )
+
+    asyncio.run(run())
+    text, scan = seen[0]
+    note = next(a for a in scan.anchors if a.kind == "schedule")
+    assert text[note.char_offset :].lstrip().startswith("NOTE")
