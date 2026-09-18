@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/laws/{law_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Law Versions */
+        get: operations["law_versions_laws__law_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs": {
         parameters: {
             query?: never;
@@ -251,6 +268,26 @@ export interface paths {
         };
         /** Version */
         get: operations["version_versions__version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/versions/{version_id}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Version Document
+         * @description The version as the reader's section tree, not as AKN.
+         */
+        get: operations["version_document_versions__version_id__document_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -634,6 +671,135 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /**
+         * DocumentProvision
+         * @description Leaf-level legal text, paragraph / subparagraph / point.
+         *
+         *     `text` remains the plain-text shadow for search / fallback rendering;
+         *     `blocks` is the rich AST built from the AKN sub-tree.
+         */
+        DocumentProvision: {
+            /** Akn Eid */
+            akn_eid: string;
+            /** Akn Type */
+            akn_type: string;
+            /** Blocks */
+            blocks?: components["schemas"]["DocumentProvisionBlock"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Normative
+             * @default true
+             */
+            normative: boolean;
+            /** Num */
+            num?: string | null;
+            /** Position */
+            position: number;
+            /** Text */
+            text: string;
+        };
+        /**
+         * DocumentProvisionBlock
+         * @description One row in a nested-provision tree (paragraph / subparagraph / …).
+         *
+         *     Carries its own number, optional heading, intro inline run, nested
+         *     blocks, and trailing wrap-up so renderers can present a hanging
+         *     numbered hierarchy rather than a flattened paragraph. `table` is set
+         *     (and everything else empty) when `akn_type == "table"`.
+         */
+        DocumentProvisionBlock: {
+            /** Akn Eid */
+            akn_eid: string;
+            /** Akn Type */
+            akn_type: string;
+            /** Blocks */
+            blocks?: components["schemas"]["DocumentProvisionBlock"][];
+            /** Heading */
+            heading?: string | null;
+            /** Intro */
+            intro?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /** Num */
+            num?: string | null;
+            table?: components["schemas"]["DocumentTable"] | null;
+            /** Wrap Up */
+            wrap_up?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+        };
+        /**
+         * DocumentSection
+         * @description Hierarchical container, title / chapter / part / article / etc.
+         *
+         *     Holds child sections and provisions in their persisted `position` order.
+         *     Top-level provisions (those without an enclosing section) hang off the
+         *     `VersionDocument.provisions` list instead.
+         */
+        DocumentSection: {
+            /** Akn Eid */
+            akn_eid: string;
+            /** Akn Type */
+            akn_type: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Num */
+            num?: string | null;
+            /** Position */
+            position: number;
+            /** Provisions */
+            provisions?: components["schemas"]["DocumentProvision"][];
+            /** Sections */
+            sections?: components["schemas"]["DocumentSection"][];
+            /** Title */
+            title: string | null;
+        };
+        /**
+         * DocumentTable
+         * @description An AKN `<table>`, eId-keyed like every other citable unit.
+         */
+        DocumentTable: {
+            /** Akn Eid */
+            akn_eid: string;
+            /** DocumentTableRows */
+            rows?: components["schemas"]["DocumentTableRow"][];
+        };
+        /**
+         * DocumentTableCell
+         * @description One `<th>`/`<td>`; `content` is the same inline AST as any other cell of
+         *     legal text, so refs/terms/citations inside a table cell still render.
+         */
+        DocumentTableCell: {
+            /** Akn Eid */
+            akn_eid?: string | null;
+            /**
+             * Colspan
+             * @default 1
+             */
+            colspan: number;
+            /** Content */
+            content?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Header
+             * @default false
+             */
+            header: boolean;
+            /**
+             * Rowspan
+             * @default 1
+             */
+            rowspan: number;
+        };
+        /** DocumentTableRow */
+        DocumentTableRow: {
+            /** Akn Eid */
+            akn_eid?: string | null;
+            /** DocumentTableCells */
+            cells?: components["schemas"]["DocumentTableCell"][];
+        };
         /** EnactingFormula */
         EnactingFormula: {
             /** Applies To */
@@ -843,6 +1009,111 @@ export interface components {
              * Format: uri
              */
             url: string;
+        };
+        /** InlineCitation */
+        InlineCitation: {
+            /** Href */
+            href?: string | null;
+            /**
+             * Kind
+             * @default citation
+             * @constant
+             */
+            kind: "citation";
+            /** Text */
+            text: string;
+            /** Uri */
+            uri: string;
+        };
+        /** InlineEmph */
+        InlineEmph: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Kind
+             * @default emph
+             * @constant
+             */
+            kind: "emph";
+        };
+        /**
+         * InlineMod
+         * @description An amending instruction's quoted words.
+         */
+        InlineMod: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Kind
+             * @default mod
+             * @constant
+             */
+            kind: "mod";
+        };
+        /**
+         * InlineNote
+         * @description A footnote bound to the provision it annotates, not part of its prose.
+         */
+        InlineNote: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Inferred
+             * @default false
+             */
+            inferred: boolean;
+            /**
+             * Kind
+             * @default note
+             * @constant
+             */
+            kind: "note";
+        };
+        /** InlineRef */
+        InlineRef: {
+            /** Href */
+            href?: string | null;
+            /**
+             * Kind
+             * @default ref
+             * @constant
+             */
+            kind: "ref";
+            /** Text */
+            text: string;
+        };
+        /** InlineStrong */
+        InlineStrong: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Kind
+             * @default strong
+             * @constant
+             */
+            kind: "strong";
+        };
+        /** InlineTerm */
+        InlineTerm: {
+            /**
+             * Kind
+             * @default term
+             * @constant
+             */
+            kind: "term";
+            /** Text */
+            text: string;
+        };
+        /** InlineText */
+        InlineText: {
+            /**
+             * Kind
+             * @default text
+             * @constant
+             */
+            kind: "text";
+            /** Text */
+            text: string;
         };
         /** JurisdictionConfig */
         JurisdictionConfig: {
@@ -1554,6 +1825,52 @@ export interface components {
             /** Structural Quality Grade */
             structural_quality_grade: string | null;
         };
+        /**
+         * VersionDocument
+         * @description Full body of a single version, rendered as a tree.
+         */
+        VersionDocument: {
+            /** Amendment Markers */
+            amendment_markers?: string[];
+            /** Conclusions */
+            conclusions?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /**
+             * Expression Date
+             * Format: date
+             */
+            expression_date: string;
+            /** Frbr Expression Uri */
+            frbr_expression_uri: string;
+            /** Frbr Work Uri */
+            frbr_work_uri: string;
+            /** Language */
+            language: string;
+            /**
+             * Law Id
+             * Format: uuid
+             */
+            law_id: string;
+            /** Preamble */
+            preamble?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /** Preface */
+            preface?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /** Provisions */
+            provisions?: components["schemas"]["DocumentProvision"][];
+            /** Sections */
+            sections?: components["schemas"]["DocumentSection"][];
+            /**
+             * Version Id
+             * Format: uuid
+             */
+            version_id: string;
+        };
+        /** VersionPage */
+        VersionPage: {
+            /** Items */
+            items: components["schemas"]["VersionSummary"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+        };
         /** VersionSummary */
         VersionSummary: {
             /** Expression Date */
@@ -1745,6 +2062,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LawDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    law_versions_laws__law_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                law_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionPage"];
                 };
             };
             /** @description Validation Error */
@@ -2020,6 +2371,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    version_document_versions__version_id__document_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionDocument"];
                 };
             };
             /** @description Validation Error */

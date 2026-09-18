@@ -15,7 +15,6 @@ import { Link, useSearchParams } from 'react-router';
 import { FacetPill } from '@/components/facets/facet-pill';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { track } from '@/lib/analytics';
 import { listLawsCorpus, searchProvisions } from '@/lib/api-misc';
 import { aknEidLabel } from '@/lib/citation';
 import { countryName } from '@/lib/countries';
@@ -136,40 +135,6 @@ export default function SearchPage() {
     pinnedTab != null ||
     ((lawsQuery.data != null || lawsQuery.error != null) && (data != null || error != null));
 
-  const reported = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!q || !tabSettled || armFetching || (!armReady && !armFailed)) return;
-    const key = [q, jurisdiction, language, doctype, aknType, offset, arm].join('|');
-    if (reported.current.has(key)) return;
-    reported.current.add(key);
-    track('search_performed', {
-      query: q,
-      query_length: q.length,
-      arm,
-      failed: armFailed,
-      result_count: armFailed ? null : armCount,
-      zero_results: armFailed ? null : armCount === 0,
-      corpus_unreachable: armFailed ? null : armUnreachable,
-      jurisdiction: jurisdiction ?? null,
-      language: language ?? null,
-      doctype: doctype ?? null,
-      page: offset / (arm === 'tables' ? ROWS_PER_PAGE : LAWS_PER_PAGE),
-    });
-  }, [
-    q,
-    arm,
-    armFetching,
-    armReady,
-    armFailed,
-    tabSettled,
-    armCount,
-    armUnreachable,
-    jurisdiction,
-    language,
-    doctype,
-    aknType,
-    offset,
-  ]);
 
   const patch = (next: Record<string, string | undefined>) => {
     const p = new URLSearchParams(params);
@@ -383,10 +348,6 @@ export default function SearchPage() {
                           group={g}
                           query={q}
                           onOpen={(provision) => {
-                            track('search_result_opened', {
-                              jurisdiction: jurisdiction ?? null,
-                              rank: offset + rank,
-                            });
                             setPreview(provision);
                           }}
                         />

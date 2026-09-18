@@ -1,7 +1,4 @@
 
-import { reportApiFailure } from '@/lib/analytics';
-import { authHeaders } from '@/lib/auth';
-
 export const BASE = '/api/proxy';
 
 export interface JsonInit extends Omit<RequestInit, 'headers'> {
@@ -31,7 +28,6 @@ export function buildRequest(
   const url = buildUrl(path, query);
   const finalHeaders: Record<string, string> = {
     Accept: accept,
-    ...authHeaders(),
     ...(headers ?? {}),
   };
   let body = rest.body as BodyInit | undefined;
@@ -53,7 +49,6 @@ export class ApiError extends Error {
     method: string,
     url: string,
     body: string,
-    expectedStatuses?: number[],
   ) {
     super(`${status} ${method} ${url}: ${body}`);
     this.name = 'ApiError';
@@ -61,7 +56,6 @@ export class ApiError extends Error {
     this.method = method;
     this.url = url;
     this.body = body;
-    if (!expectedStatuses?.includes(status)) reportApiFailure(status, method, url);
   }
 }
 
@@ -70,7 +64,7 @@ export async function fetchJson<T>(path: string, init: JsonInit = {}): Promise<T
   const res = await fetch(url, req);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new ApiError(res.status, req.method ?? 'GET', url, text, init.expectedStatuses);
+    throw new ApiError(res.status, req.method ?? 'GET', url, text);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

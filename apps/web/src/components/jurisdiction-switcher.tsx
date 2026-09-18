@@ -6,7 +6,7 @@ import { Check, Search as SearchIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 
-import { useAuth } from '@/lib/auth-context';
+import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import { countryName } from '@/lib/countries';
 import { rescopePath } from '@/lib/jurisdiction-path';
 import { useAllowedJurisdictions } from '@/lib/use-allowed-jurisdictions';
@@ -20,7 +20,7 @@ export function JurisdictionSwitcher({ currentCode }: JurisdictionSwitcherProps)
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { setJurisdictionPin } = useAuth();
+  const { setJurisdictionPin } = useJurisdictionPin();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const [prevOpen, setPrevOpen] = React.useState(open);

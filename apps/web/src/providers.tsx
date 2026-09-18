@@ -2,7 +2,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@ta
 import { ThemeProvider } from 'next-themes';
 import { useState } from 'react';
 
-import { AuthProvider } from '@/lib/auth-context';
+import { JurisdictionPinProvider } from '@/lib/jurisdiction-pin';
 import { JurisdictionProvider } from '@/lib/jurisdiction-context';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -25,9 +25,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <AuthProvider>
+        <JurisdictionPinProvider>
           <JurisdictionProvider>{children}</JurisdictionProvider>
-        </AuthProvider>
+        </JurisdictionPinProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

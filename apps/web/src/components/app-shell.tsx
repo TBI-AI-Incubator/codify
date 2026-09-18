@@ -36,7 +36,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/lib/auth-context';
+import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import { parseJurisdictionPath, resolveCountry } from '@/lib/jurisdiction-path';
 
 function AppSidebar() {
@@ -45,7 +45,7 @@ function AppSidebar() {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const mcpUrl = `${window.location.origin}/mcp/`;
-  const { jurisdictionPin, jurisdictions } = useAuth();
+  const { jurisdictionPin, jurisdictions } = useJurisdictionPin();
   const currentCode =
     parseJurisdictionPath(pathname)?.code ??
     new URLSearchParams(location.search).get('jurisdiction') ??

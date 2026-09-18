@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { listJurisdictions } from '@/lib/api-jurisdictions';
-import { useAuth } from '@/lib/auth-context';
+import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import type { JurisdictionListItem } from '@codify/core-ts/api';
 
 export function useAllowedJurisdictions(): {
@@ -11,7 +11,7 @@ export function useAllowedJurisdictions(): {
   isPending: boolean;
   isError: boolean;
 } {
-  const { jurisdictions: allowed } = useAuth();
+  const { jurisdictions: allowed } = useJurisdictionPin();
   const { data, isPending, isError } = useQuery({
     queryKey: ['jurisdictions'],
     queryFn: () => listJurisdictions(),

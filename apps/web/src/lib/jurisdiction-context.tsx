@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo } from 'react';
 
-import { useAuth } from '@/lib/auth-context';
+import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import { FALLBACK_COUNTRY, resolveCountry } from '@/lib/jurisdiction-path';
 
 interface JurisdictionContextValue {
@@ -12,7 +12,7 @@ export const JurisdictionContext = createContext<JurisdictionContextValue>({
 });
 
 export function JurisdictionProvider({ children }: { children: React.ReactNode }) {
-  const { jurisdictionPin, jurisdictions } = useAuth();
+  const { jurisdictionPin, jurisdictions } = useJurisdictionPin();
 
   const country = useMemo(
     () => resolveCountry(jurisdictionPin, jurisdictions),
