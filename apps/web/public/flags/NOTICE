@@ -1,0 +1,39 @@
+Circle Flags — https://github.com/HatScripts/circle-flags
+Copyright (c) HatScripts, MIT licence.
+
+MIT License
+
+Copyright (c) HatScripts
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Vendored rather than fetched from a CDN at render time. Three reasons: a
+ministry's browser should not tell a third-party host which countries it is
+looking at; sovereign and air-gapped deployments have no egress; and the
+enforced CSP would otherwise have to name a host we do not control.
+
+The set is the ISO 3166-1 alpha-2 codes i18n-iso-countries resolves, which is
+what CountryFlag renders, plus `eu`, the library's `xx` fallback, and the five
+non-ISO codes the jurisdiction registry can pass straight to CircleFlag
+(gb-eng, gb-nir, gb-sct, gb-wls, un). Those five matter: several call sites
+hand it a raw jurisdiction code rather than an ISO one, so vendoring only the
+ISO set would have broken flags that render today.
+
+Eleven registry jurisdictions have no upstream flag at all and never rendered
+one; that is unchanged. Refresh by re-running the same selection.
