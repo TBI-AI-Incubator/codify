@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 if TYPE_CHECKING:
     import pytest
 
-_DEFAULT_LOCAL_URL = "postgresql://codify:codify@localhost:5432/codify"
 _DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 
 
@@ -78,25 +77,10 @@ def apply_db_gate(
 
 
 def postgres_url() -> str:
-    """Return `POSTGRES_URL` normalised to `postgresql+asyncpg://`.
+    """`POSTGRES_URL` normalised to `postgresql+asyncpg://`; see `settings.database_url`."""
+    from codify.settings import database_url
 
-    Defaults to a local-dev URL when the env is unset and `ENVIRONMENT` is
-    localhost/development. Raises `RuntimeError` in non-local environments
-    where the default would silently bind tests to the wrong cluster.
-    """
-    raw = os.environ.get("POSTGRES_URL")
-    if not raw:
-        env = os.environ.get("ENVIRONMENT")
-        if env in {None, "", "localhost", "development"}:
-            raw = _DEFAULT_LOCAL_URL
-        else:
-            raise RuntimeError(
-                "POSTGRES_URL must be set when ENVIRONMENT is not localhost/development",
-            )
-    url = make_url(raw)
-    if url.drivername in {"postgres", "postgresql"}:
-        url = url.set(drivername="postgresql+asyncpg")
-    return url.render_as_string(hide_password=False)
+    return database_url()
 
 
 def ollama_host() -> str:
