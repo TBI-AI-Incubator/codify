@@ -139,9 +139,10 @@ Reads: `/jurisdictions`, `/jurisdictions/{code}`, `/laws`, `/laws/{id}`,
 (a file) or `POST /runs/ingest-url` (a URL) return a run at once; `/runs/{id}` is its
 state, `/runs/{id}/stream` replays every event so far and then follows it, and
 `/runs/{id}/cancel` and `/runs/{id}/retry` do what they say. A succeeded ingest is stored,
-so the reads see it. Runs live in the server's memory: a restart forgets them, and each
-run says so (`lost_on_restart`). There is no authentication; bind it to localhost or put
-it behind something that has.
+so the reads see it. `ingest-url` takes a URL only, and only the EU XML lane fetches one;
+a PDF goes through `ingest`. Runs live in the server's memory: a restart forgets them, each
+run says so (`lost_on_restart`), and the 200 most recent finished runs stay readable. There
+is no authentication; bind it to localhost or put it behind something that has.
 
 ## Configuration
 

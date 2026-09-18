@@ -53,7 +53,9 @@ def _client(runner: Any, app: FastAPI | None = None) -> AsyncClient:
 
 
 async def _enqueue(c: AsyncClient) -> str:
-    r = await c.post("/runs/ingest-url", json={"url": "x", "jurisdiction": "xa"})
+    r = await c.post(
+        "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": "xa"}
+    )
     assert r.status_code == 202
     return str(r.json()["id"])
 
@@ -324,7 +326,8 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
     app = create_app()
     async with _client(None, app) as c:
         r = await c.post(
-            "/runs/ingest-url", json={"url": "x", "jurisdiction": "xa", "title": title}
+            "/runs/ingest-url",
+            json={"url": "https://example.test/a.xml", "jurisdiction": "xa", "title": title},
         )
         events = _sse((await c.get(f"/runs/{r.json()['id']}/stream")).text)
         assert events[-2][0] == "complete", events
@@ -343,6 +346,56 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.id == uuid.UUID(law["id"])))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
+async def test_ingest_url_refuses_anything_but_a_url() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        for source in ("/etc/passwd", "etc/passwd", "file:///etc/passwd"):
+            r = await c.post("/runs/ingest-url", json={"url": source, "jurisdiction": "xa"})
+            assert r.status_code == 422, source
+        assert (await c.get("/runs")).json() == []
+
+
+async def test_finished_runs_beyond_keep_are_forgotten_oldest_first() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    table = RunTable(runner, keep=2, concurrency=1)
+    first = table.enqueue("ingest", {})
+    await asyncio.sleep(0.02)
+    second, third = table.enqueue("ingest", {}), table.enqueue("ingest", {})
+    await asyncio.sleep(0.05)
+
+    assert {r.id for r in table.list()} == {second.id, third.id}
+    assert table.get(first.id) is None
+    assert table.retry(first.id) is None
+
+
+@pytest.mark.integration
+async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The native-AKN lane is deterministic; an unset gateway must not stop it."""
+    from codify.serve.app import _ingest_runner
+    from codify.storage.models import Law
+
+    monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    app = _app(None)
+    events = [
+        e
+        async for e in _ingest_runner(app.state.sessions)(
+            {"source": str(FIXTURE), "jurisdiction": "xa"}
+        )
+    ]
+
+    try:
+        assert events[-1].kind == "complete", events[-1]
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.frbr_work_uri == "/akn/xa/act/1992/7"))
             await s.commit()
         await app.state.sessions.kw["bind"].dispose()
 

@@ -16,7 +16,7 @@ from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.pipeline.events import Complete, IngestionEvent
@@ -27,7 +27,7 @@ SessionFactory = Callable[[], AsyncSession]
 
 
 class IngestUrl(BaseModel):
-    url: str
+    url: HttpUrl  # a URL only: a local path is the upload endpoint's job
     jurisdiction: str
     title: str | None = None
 
@@ -38,13 +38,13 @@ def _ingest_runner(
     """Run the pipeline, then store what it produced so the reads can see it."""
 
     async def run(params: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
-        from codify.cli_store import _descriptors, _llm_client
+        from codify.cli_store import _descriptors, _env, _llm_client
         from codify.pipeline import ingest_document
         from codify.storage import save_document
 
-        async for event in ingest_document(
-            params["source"], params["jurisdiction"], llm=_llm_client(params.get("model"))
-        ):
+        # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
+        llm = _llm_client(params.get("model")) if _env("LITELLM_BASE_URL") else None
+        async for event in ingest_document(params["source"], params["jurisdiction"], llm=llm):
             if isinstance(event, Complete):
                 doctype, year, number = _descriptors(event.document)
                 async with sessions() as session:
@@ -213,7 +213,8 @@ def create_app(
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> dict[str, Any]:
         run = runs.enqueue(
-            "ingest", {"source": body.url, "jurisdiction": body.jurisdiction, "title": body.title}
+            "ingest",
+            {"source": str(body.url), "jurisdiction": body.jurisdiction, "title": body.title},
         )
         return run.snapshot()
 

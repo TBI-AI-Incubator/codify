@@ -67,10 +67,12 @@ def _slim(event: IngestionEvent) -> dict[str, Any]:
 
 
 class RunTable:
-    """Enqueue, watch, cancel and retry runs; `concurrency` bounds how many execute at once."""
+    """Enqueue, watch, cancel and retry runs; `concurrency` bounds how many execute at
+    once, `keep` how many finished runs stay readable before the oldest is forgotten."""
 
-    def __init__(self, runner: Runner, *, concurrency: int = 2) -> None:
+    def __init__(self, runner: Runner, *, concurrency: int = 2, keep: int = 200) -> None:
         self._runner = runner
+        self._keep = keep
         self._runs: dict[uuid.UUID, Run] = {}
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
         self._subscribers: dict[uuid.UUID, set[asyncio.Queue[dict[str, Any] | None]]] = {}
@@ -159,3 +161,13 @@ class RunTable:
             run.error = f"{type(exc).__name__}: {exc}"
         run.completed_at = datetime.now(UTC)
         self._publish(run, None)
+        self._forget_oldest()
+
+    def _forget_oldest(self) -> None:
+        done = sorted(
+            (r for r in self._runs.values() if r.status in TERMINAL),
+            key=lambda r: r.completed_at or r.created_at,
+        )
+        for old in done[: max(0, len(done) - self._keep)]:
+            for table in (self._runs, self._tasks, self._subscribers):
+                table.pop(old.id, None)
