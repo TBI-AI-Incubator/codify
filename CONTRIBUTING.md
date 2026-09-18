@@ -1,5 +1,7 @@
 # Contributing
 
+Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).
+
 Use Python 3.12 or newer and install with
 `uv sync --group dev --extra migrations`. Run the offline tests described in
 [the test guide](docs/offline-suite.md). CI also checks Ruff, strict source typing
