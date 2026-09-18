@@ -154,6 +154,27 @@ async def test_search_returns_matches_best_first(monkeypatch: pytest.MonkeyPatch
     assert isinstance(seen["embedding_client"], _UnitVectors)
 
 
+async def test_an_unknown_jurisdiction_is_refused_before_any_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """As the HTTP routes: a code with no config is an error, not an empty answer."""
+    import codify.retrieve.hybrid as hybrid
+    import codify.storage
+
+    async def never(*_: Any, **__: Any) -> Any:
+        raise AssertionError("the store was read for an unknown jurisdiction")
+
+    monkeypatch.setattr(hybrid, "retrieve", never)
+    monkeypatch.setattr(codify.storage, "list_laws", never)
+    server = create_server(sessions=_no_session, embedding_client=_UnitVectors)
+
+    search = await _call(server, "search_provisions", query="x", jurisdiction="zz")
+    laws = await _call(server, "list_laws", jurisdiction="zz")
+
+    assert search.is_error and "no jurisdiction config for 'zz'" in search.content[0].text
+    assert laws.is_error and "no jurisdiction config for 'zz'" in laws.content[0].text
+
+
 async def test_out_of_range_k_limit_and_offset_are_refused() -> None:
     server = create_server(sessions=_no_session, embedding_client=_UnitVectors)
     for name, key, value in (
@@ -558,6 +579,38 @@ def test_the_default_engine_is_disposed_when_the_server_stops(
     asyncio.run(run())
 
     assert len(disposed) == 1
+
+
+async def test_one_embeddings_client_serves_every_search_and_closes_when_the_server_stops(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import codify.retrieve.hybrid as hybrid
+
+    class _Transport:
+        closed = 0
+
+        async def close(self) -> None:
+            _Transport.closed += 1
+
+    class _Embeddings:
+        built = 0
+
+        def __init__(self) -> None:
+            _Embeddings.built += 1
+            self.client = _Transport()
+
+    async def fake_retrieve(session: Any, query: str, **kw: Any) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(hybrid, "retrieve", fake_retrieve)
+
+    async with Client(create_server(sessions=_no_session, embedding_client=_Embeddings)) as c:
+        for _ in range(3):
+            result = await c.call_tool("search_provisions", {"query": "x", "jurisdiction": "xa"})
+            assert not result.is_error
+        assert (_Embeddings.built, _Transport.closed) == (1, 0)
+
+    assert (_Embeddings.built, _Transport.closed) == (1, 1)
 
 
 @pytest.mark.integration

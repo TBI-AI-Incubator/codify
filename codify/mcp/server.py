@@ -69,12 +69,27 @@ def _llm_client() -> Any:
     return _llm_client(None)
 
 
-def _configured(factory: ClientFactory) -> Any:
-    """The client, or the CLI helper's "not configured" message as a tool error."""
-    try:
-        return factory()
-    except SystemExit as exc:
-        raise ToolError(str(exc)) from None
+class _Clients:
+    """One client per factory for the process, built on first use, closed at shutdown."""
+
+    def __init__(self) -> None:
+        self._built: dict[ClientFactory, Any] = {}
+
+    def get(self, factory: ClientFactory) -> Any:
+        """The client, or the CLI helper's "not configured" message as a tool error."""
+        if factory not in self._built:
+            try:
+                self._built[factory] = factory()
+            except SystemExit as exc:
+                raise ToolError(str(exc)) from None
+        return self._built[factory]
+
+    async def close(self) -> None:
+        for built in self._built.values():
+            transport = getattr(built, "client", None)  # the library clients own one
+            if transport is not None:
+                await transport.close()
+        self._built.clear()
 
 
 def _id(value: str, what: str) -> uuid.UUID:
@@ -86,6 +101,16 @@ def _id(value: str, what: str) -> uuid.UUID:
 
 def _no_data() -> ToolError:
     return ToolError("this installation carries no jurisdiction data")
+
+
+def _jurisdiction(code: str) -> str:
+    """The canonical code of a shipped jurisdiction, as the HTTP routes resolve it."""
+    from codify.jurisdictions import resolve_config
+
+    resolved = resolve_config(code)
+    if not resolved.found:
+        raise ToolError(f"no jurisdiction config for {code!r}")
+    return resolved.code
 
 
 def create_server(
@@ -103,11 +128,14 @@ def create_server(
         engine = create_async_engine(database_url())
         sessions = async_sessionmaker(engine, expire_on_commit=False)
 
+    clients = _Clients()
+
     @asynccontextmanager
     async def lifespan(_: MCPServer[None]) -> AsyncIterator[None]:
         try:
             yield None
         finally:
+            await clients.close()
             if engine is not None:
                 await engine.dispose()
 
@@ -127,13 +155,14 @@ def create_server(
     ) -> dict[str, Any]:
         from codify.retrieve.hybrid import retrieve
 
-        client = _configured(embedding_client)
+        code = _jurisdiction(jurisdiction)
+        client = clients.get(embedding_client)
         async with sessions() as session:
             matches = await retrieve(
                 session,
                 query,
                 embedding_client=client,
-                jurisdiction_code=jurisdiction.strip().lower(),
+                jurisdiction_code=code,
                 language=language,
                 k=k,
             )
@@ -167,7 +196,7 @@ def create_server(
         async with sessions() as session:
             rows, _ = await list_laws(
                 session,
-                jurisdictions=[jurisdiction.strip().lower()] if jurisdiction else None,
+                jurisdictions=[_jurisdiction(jurisdiction)] if jurisdiction else None,
                 doctype=doctype,
                 year=year,
                 q=q,
@@ -296,8 +325,8 @@ def create_server(
                 f"the reference has {count} assessable provisions; this tool compares "
                 f"at most {compare_cap}"
             )
-        llm = _configured(llm_client)
-        embeddings = _configured(embedding_client)
+        llm = clients.get(llm_client)
+        embeddings = clients.get(embedding_client)
         report = await compare(docs[0], docs[1], llm=llm, embedding_client=embeddings)
         return report.model_dump(mode="json")
 
