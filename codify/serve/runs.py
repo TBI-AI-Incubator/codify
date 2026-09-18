@@ -70,10 +70,17 @@ class RunTable:
     once, `keep` how many finished runs stay readable before the oldest is forgotten."""
 
     def __init__(
-        self, runner: Runner, *, concurrency: int = 2, keep: int = 200, max_queued: int = 100
+        self,
+        runner: Runner,
+        *,
+        concurrency: int = 2,
+        keep: int = 200,
+        max_queued: int = 100,
+        on_forget: Callable[[Run], None] | None = None,
     ) -> None:
         self._runner = runner
         self._keep = keep
+        self._on_forget = on_forget
         self._max_queued = max_queued
         self._runs: dict[uuid.UUID, Run] = {}
         self._tasks: dict[uuid.UUID, asyncio.Task[Status]] = {}
@@ -112,8 +119,7 @@ class RunTable:
         run = self._runs.get(run_id)
         if task is None or run is None or run.status in TERMINAL:
             return False
-        task.cancel()
-        return True
+        return task.cancel()  # False once the task has ended, verdict pending or not
 
     async def shutdown(self) -> None:
         """Cancel what is running and wait for every task to end."""
@@ -193,3 +199,5 @@ class RunTable:
         for old in done[: max(0, len(done) - self._keep)]:
             for table in (self._runs, self._tasks, self._subscribers):
                 table.pop(old.id, None)
+            if self._on_forget is not None:
+                self._on_forget(old)

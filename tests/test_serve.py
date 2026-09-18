@@ -490,6 +490,7 @@ async def test_search_without_an_embeddings_endpoint_is_503(
 
     async with _client(runner) as c:
         r = await c.get("/search?q=x&jurisdiction=xa")
+        assert (await c.get("/search?q=x&jurisdiction=zz")).status_code == 422
 
     assert r.status_code == 503
     assert "EMBEDDING_BASE_URL" in r.json()["detail"]
@@ -691,7 +692,10 @@ async def test_laws_under_a_jurisdiction_validate_and_fold_the_code() -> None:
         async with _client(None, app) as c:
             assert (await c.get("/jurisdictions/zz/laws")).status_code == 404
             upper = (await c.get("/jurisdictions/XA/laws", params={"limit": 500})).json()["items"]
+            assert (await c.get("/laws", params={"jurisdiction": "zz"})).status_code == 422
+            filtered = (await c.get("/laws", params={"jurisdiction": " XA ", "limit": 500})).json()
         assert title in {law["title"] for law in upper}
+        assert title in {law["title"] for law in filtered["items"]}
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.title == title))
@@ -736,6 +740,94 @@ async def test_jurisdiction_codes_fold_case_on_every_route(monkeypatch: pytest.M
         assert (await c.get("/jurisdictions/XA")).json()["code"] == "xa"
 
     assert looked_up == ["xa"]
+
+
+@pytest.mark.integration
+async def test_search_folds_the_jurisdiction_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    import codify.retrieve.hybrid as hybrid
+
+    seen: list[str] = []
+
+    async def fake_retrieve(session: Any, q: str, **kw: Any) -> list[Any]:
+        seen.append(kw["jurisdiction_code"])
+        return []
+
+    monkeypatch.setattr(hybrid, "retrieve", fake_retrieve)
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://embeddings.test")
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        assert (await c.get("/search?q=x&jurisdiction=XA")).status_code == 200
+
+    assert seen == ["xa"]
+
+
+async def test_cancel_after_the_task_ended_is_refused() -> None:
+    """The task can be done while its verdict waits on the callback; that is not cancellable."""
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    task = table._tasks[run.id]
+    while not task.done():
+        await asyncio.sleep(0)
+
+    assert run.status == "running"  # the verdict is still queued
+    assert table.cancel(run.id) is False
+    while run.status == "running":
+        await asyncio.sleep(0)
+    assert run.status == "succeeded"
+
+
+async def test_a_forgotten_runs_upload_is_removed() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    app = _app(runner)
+    app.state.runs._keep = 0
+    async with _client(runner, app) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        while app.state.runs.get(uuid.UUID(rid)) is not None:
+            await asyncio.sleep(0)
+
+    assert list(app.state.uploads.iterdir()) == []
+
+
+@pytest.mark.integration
+async def test_an_untitled_ingest_takes_the_title_the_pipeline_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import codify.pipeline
+    from codify import cli_store
+    from codify.pipeline.events import MetadataExtracted
+    from codify.storage.models import Law
+
+    read = f"Read title {uuid.uuid4().hex[:8]}"
+
+    async def fake_ingest(*_: Any, **__: Any) -> AsyncIterator[IngestionEvent]:
+        yield MetadataExtracted(metadata={"title": read})
+        yield _complete()
+
+    monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    app = create_app()
+    async with _client(None, app) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": read})).json()["items"]
+
+    try:
+        assert [law["title"] for law in laws] == [read]
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.title == read))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
 
 
 def test_serve_is_registered() -> None:

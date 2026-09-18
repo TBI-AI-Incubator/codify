@@ -19,7 +19,7 @@ from pydantic import BaseModel, HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.pipeline.events import Complete, IngestionEvent
-from codify.serve.runs import QueueFull, RunTable
+from codify.serve.runs import QueueFull, Run, RunTable
 from codify.settings import database_url
 
 SessionFactory = Callable[[], AsyncSession]
@@ -41,11 +41,15 @@ def _ingest_runner(
     async def run(params: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
         from codify.cli_store import _descriptors, _env, _llm_client
         from codify.pipeline import ingest_document
+        from codify.pipeline.events import MetadataExtracted
         from codify.storage import save_document
 
         # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
         llm = _llm_client(params.get("model")) if _env("LITELLM_BASE_URL") else None
+        read_title = ""
         async for event in ingest_document(params["source"], params["jurisdiction"], llm=llm):
+            if isinstance(event, MetadataExtracted):
+                read_title = str(event.metadata.get("title") or "")
             if isinstance(event, Complete):
                 doctype, year, number = _descriptors(event.document)
                 async with sessions() as session:
@@ -53,7 +57,7 @@ def _ingest_runner(
                         session,
                         event.document,
                         jurisdiction_code=params["jurisdiction"],
-                        law_title=params.get("title") or event.document.frbr_work_uri,
+                        law_title=params.get("title") or read_title or event.document.frbr_work_uri,
                         doctype=doctype,
                         year=year,
                         number=number,
@@ -70,9 +74,15 @@ def create_app(
 ) -> FastAPI:
     engine = create_async_engine(database_url())
     sessions = async_sessionmaker(engine, expire_on_commit=False)
-    runs = RunTable(runner or _ingest_runner(sessions))
-    # Uploads live as long as the runs that read them: the process.
+    # Uploads live as long as the runs that read them, and go when the run is forgotten.
     uploads = tempfile.TemporaryDirectory(prefix="codify-uploads-")
+
+    def drop_upload(run: Run) -> None:
+        source = Path(str(run.params.get("source", "")))
+        if source.parent == Path(uploads.name):
+            source.unlink(missing_ok=True)
+
+    runs = RunTable(runner or _ingest_runner(sessions), on_forget=drop_upload)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -131,7 +141,7 @@ def create_app(
         async with sessions() as session:
             rows, _ = await list_laws(
                 session,
-                jurisdictions=[jurisdiction] if jurisdiction else None,
+                jurisdictions=[_jurisdiction(jurisdiction)] if jurisdiction else None,
                 doctype=doctype,
                 year=year,
                 q=q,
@@ -181,6 +191,7 @@ def create_app(
         from codify.cli_store import _embedding_client
         from codify.retrieve.hybrid import retrieve
 
+        code = _jurisdiction(jurisdiction)
         try:
             embedding_client = _embedding_client()
         except SystemExit as exc:  # the CLI helper's way of saying "not configured"
@@ -190,7 +201,7 @@ def create_app(
                 session,
                 q,
                 embedding_client=embedding_client,
-                jurisdiction_code=jurisdiction,
+                jurisdiction_code=code,
                 language=language,
                 k=k,
             )
