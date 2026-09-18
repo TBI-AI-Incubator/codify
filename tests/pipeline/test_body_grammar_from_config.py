@@ -745,3 +745,12 @@ def test_a_keyword_less_unit_bounds_a_quotation(monkeypatch: pytest.MonkeyPatch)
     anchors_mod._basic_unit_line_re.cache_clear()
     assert boundary is not None
     assert boundary.search("2. Next provision") and boundary.search("prose 2. no") is None
+
+
+def test_a_suffix_is_matched_at_the_end_of_a_lettered_base() -> None:
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(jurisdictions, "insertion_suffix_folds", lambda: dict(SUFFIXES))
+        assert jurisdictions.fold_inserted_suffix("IV zib") == "IVbis"
+        assert jurisdictions.fold_inserted_suffix("IVzib") == "IVbis"
+        assert jurisdictions.fold_inserted_suffix("zib") is None
+        assert jurisdictions.fold_inserted_suffix("5 zibber") is None

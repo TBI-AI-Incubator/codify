@@ -1576,19 +1576,17 @@ def insertion_suffix_folds() -> dict[str, str]:
     return out
 
 
-_INSERTED_NUMBER_RE = re.compile(r"^(?P<base>\S+?)\s*(?P<word>\D+?)$")
-
-
 def fold_inserted_suffix(num: str) -> str | None:
-    """`"5 bis"` as `"5bis"` when the word is a declared suffix, else None."""
-    m = _INSERTED_NUMBER_RE.match(num.strip())
-    if m is None:
-        return None
-    folded = insertion_suffix_folds().get(m.group("word").strip())
-    if not folded:
-        return None
-    # A slashed base keys the way the parser writes it.
-    return re.sub(r"(?<=\d)/(?=\d)", "-", m.group("base")) + folded
+    """`"5 bis"` as `"5bis"` when the number ends in a declared suffix, else None."""
+    value = num.strip()
+    folds = insertion_suffix_folds()
+    # Longest word first: the suffix is matched at the end, never inferred.
+    for word in sorted(folds, key=lambda w: (-len(w), w)):
+        base = value[: -len(word)].rstrip() if value.endswith(word) else ""
+        if base:
+            # A slashed base keys the way the parser writes it.
+            return re.sub(r"(?<=\d)/(?=\d)", "-", base) + folds[word]
+    return None
 
 
 @lru_cache(maxsize=32)
