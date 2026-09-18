@@ -232,6 +232,14 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     serve.add_argument("--openapi", action="store_true", help="print the OpenAPI schema and exit")
     serve.set_defaults(func=_serve)
 
+    mcp = sub.add_parser(
+        "mcp", help="run the read tools as an MCP server over stdio (needs the mcp extra)"
+    )
+    mcp.add_argument("--http", action="store_true", help="streamable HTTP at /mcp instead")
+    mcp.add_argument("--host", default="127.0.0.1")
+    mcp.add_argument("--port", type=int, default=8001)
+    mcp.set_defaults(func=_mcp)
+
 
 def _serve(args: argparse.Namespace) -> int:
     try:
@@ -245,4 +253,17 @@ def _serve(args: argparse.Namespace) -> int:
         print(json.dumps(schema, indent=2, sort_keys=True))
         return 0
     uvicorn.run(create_app(), host=args.host, port=args.port)
+    return 0
+
+
+def _mcp(args: argparse.Namespace) -> int:
+    try:
+        from codify.mcp import create_server
+    except ImportError as exc:
+        raise SystemExit(f"{exc}; install the mcp extra: uv sync --extra mcp") from exc
+    server = create_server()
+    if args.http:
+        server.run("streamable-http", host=args.host, port=args.port)
+    else:
+        server.run("stdio")
     return 0

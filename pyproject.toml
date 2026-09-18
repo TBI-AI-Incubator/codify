@@ -48,6 +48,8 @@ dependencies = [
 migrations = ["alembic>=1.14", "psycopg[binary]>=3.3.4"]
 # `codify serve`: the thin HTTP server over the library.
 serve = ["fastapi>=0.115", "uvicorn>=0.30", "python-multipart>=0.0.9"]
+# `codify mcp`: the read tools over the library as an MCP server.
+mcp = ["mcp>=2.2.0,<3"]
 
 [project.scripts]
 codify = "codify.cli:main"

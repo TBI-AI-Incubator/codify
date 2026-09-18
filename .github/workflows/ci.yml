@@ -36,7 +36,7 @@ jobs:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: 'uv.lock'
-      - run: uv sync --frozen --group dev --extra migrations --extra serve
+      - run: uv sync --frozen --group dev --extra migrations --extra serve --extra mcp
       # lxml is ignored rather than stubbed; lxml-stubs takes this to 127 errors.
       - run: |
           uv run --frozen --with 'mypy==2.1.0' --with 'types-PyYAML==6.0.12.20260408' \
@@ -52,7 +52,7 @@ jobs:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: 'uv.lock'
-      - run: uv sync --frozen --group dev --extra migrations --extra serve
+      - run: uv sync --frozen --group dev --extra migrations --extra serve --extra mcp
       # Check the included synthetic configuration before collecting tests.
       - name: the source tree resolves its configs
         run: |

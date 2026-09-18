@@ -40,9 +40,22 @@ RECOVERY_ORDER_SQL = recovery_order_sql()
 _LEAF_KINDS = frozenset({"article", "paragraph", "subparagraph", "point"})
 
 
-async def get_version(session: AsyncSession, version_id: uuid.UUID) -> Version | None:
-    result = await session.execute(select(Version).where(Version.id == version_id))
+async def get_version(
+    session: AsyncSession, version_id: uuid.UUID, *, with_akn: bool = True
+) -> Version | None:
+    """`with_akn=False` leaves the document body unloaded for a metadata read."""
+    stmt = select(Version).options(*([] if with_akn else [defer(Version.akn_xml)]))
+    result = await session.execute(stmt.where(Version.id == version_id))
     return result.scalar_one_or_none()
+
+
+async def get_version_akn_length(session: AsyncSession, version_id: uuid.UUID) -> int | None:
+    """The body's length in characters, measured in the database; None for no such version."""
+    result = await session.execute(
+        select(func.length(Version.akn_xml)).where(Version.id == version_id)
+    )
+    length = result.scalar_one_or_none()
+    return None if length is None else int(length)
 
 
 async def count_versions_for_law(session: AsyncSession, law_id: uuid.UUID) -> int:
@@ -565,6 +578,7 @@ __all__ = [
     "count_embedded_versions",
     "count_versions_for_law",
     "get_version",
+    "get_version_akn_length",
     "get_version_source_text",
     "retain_source",
     "save_version_source_text",
