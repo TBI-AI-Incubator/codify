@@ -330,6 +330,7 @@ and known profile differences, see the
 
 ## More
 
+- `docs/notebooks/`: four notebooks, Codify 101 to 301, from one act to configuration, search and comparison
 - `docs/architecture.md`
 - `docs/ocr-cascade.md`
 - `docs/decisions/`: architecture decision records
