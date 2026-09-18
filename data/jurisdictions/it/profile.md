@@ -216,7 +216,7 @@ For Decreto Legge (emergency decree):
 | Numero     | `INDENT`         | Numbered sub-items: 1), 2), 3)                                  |
 | Allegato   | `SCHEDULE`       | Attachments block                                               |
 
-**Bluebell limitation note**: Bluebell uses `PARAGRAPH` for comma, but Italian commas are numbered (1, 2, 3) rather than using the unmumbered `alinea` pattern of French law. The pipeline must ensure comma numbers are preserved in the `<num>` element of each `<paragraph>` rather than treating them as unnumbered alinee.
+**Bluebell limitation note**: Bluebell uses `PARAGRAPH` for comma, but Italian commas are numbered (1, 2, 3) rather than using the unnumbered `alinea` pattern of French law. The pipeline must ensure comma numbers are preserved in the `<num>` element of each `<paragraph>` rather than treating them as unnumbered alinee.
 
 **Prompt additions**: Italian legislation would need jurisdiction-specific `structuring.prompt_additions`, which the structurer appends to its jurisdiction context, because:
 
@@ -294,7 +294,7 @@ OASIS AKN standard, which defines its own naming-convention compliance levels.
 
 1. **Decreto Legge subtype URI collision**: D.L. and D.Lgs. both abbreviated to `dl` in the proposed URI pattern. Recommend: use `dlgs` for Decreto Legislativo and `dl` for Decreto Legge. Needs a definitive decision before bulk ingest. Current proposal: `dl_emergency` for D.L., `dl` for D.Lgs.; review against normattiva.it URI conventions for alignment.
 
-2. **Comma → AKN element mapping**: Italian commas are numbered (1., 2., 3.) and occupy the same structural role as French alinée (unnumbered paragraphs). Comparative hierarchy tables list `alinea` for French and `paragraph` for Italian at this level. However, `alinea` produces an unnumbered element in AKN, while `paragraph` expects a `<num>` element. Italian commas ARE numbered, so `paragraph` with `<num>` is the correct mapping, but the Bluebell `PARAGRAPH` keyword must be used carefully. Confirm with a Bluebell parse test.
+2. **Comma → AKN element mapping**: Italian commas are numbered (1., 2., 3.) and occupy the same structural role as the French alinea (unnumbered paragraphs). Comparative hierarchy tables list `alinea` for French and `paragraph` for Italian at this level. However, `alinea` produces an unnumbered element in AKN, while `paragraph` expects a `<num>` element. Italian commas ARE numbered, so `paragraph` with `<num>` is the correct mapping, but the Bluebell `PARAGRAPH` keyword must be used carefully. Confirm with a Bluebell parse test.
 
 3. **Sezione as higher division vs. basic unit**: Comparative hierarchy tables map Italian "Sezione" to `section` used as a higher division above articles. This is confirmed for codes. However, some shorter Italian statutes have no intermediate hierarchy and go directly from the act title to articles; Sezione may occasionally appear as a grouping device in these. The profile models Sezione as always a higher division. Verify against short acts without codes.
 

@@ -154,14 +154,13 @@ def test_invalid_action_type_is_skipped() -> None:
 
 
 class TestQuotedAmendmentPipeline:
-    """PR-D end-to-end: PS-shape amendment text with a `تعدل المادة` trigger
+    """End to end: amendment text with a `تعدل المادة` trigger
     lands as a top-level article for the amending instrument plus a
     `<mod>` + `<quotedStructure>` for the embedded content."""
 
     def test_ps_taadel_shape_marks_and_skips_from_scaffold(self) -> None:
-        """PR-D lands anchor marking + scaffold skip. `<mod><quotedStructure>`
-        emission (Bluebell integration) is deferred; see
-        docs/log/2026-07-22-amendment-quoted-structure.md."""
+        """Anchors are marked and the scaffold skips them; `<mod><quotedStructure>`
+        emission (Bluebell integration) is deferred."""
         from codify.jurisdictions import load_config
         from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors
         from codify.pipeline.enrich.scaffold import scaffold_from_anchors
