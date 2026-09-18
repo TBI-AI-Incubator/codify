@@ -617,7 +617,18 @@ def test_a_wrapped_roman_heading_bounds_a_quotation(declared: Any) -> None:
 
 @pytest.mark.parametrize(
     "suffixes",
-    [{"": "bis"}, {" zib": "bis"}, {"A": "bis"}, {"12": "bis"}, {"zib": ""}, {"zib": "b is"}],
+    [
+        {"": "bis"},
+        {" zib": "bis"},
+        {"A": "bis"},
+        {"12": "bis"},
+        {"z2": "bis"},
+        {"zib": ""},
+        {"zib": "b is"},
+        {"zib": "bis/evil"},
+        {"zib": "bis__p_1"},
+        {"zib": "Bis"},
+    ],
 )
 def test_a_suffix_declaration_must_be_a_distinctive_word(suffixes: dict[str, str]) -> None:
     from pydantic import ValidationError

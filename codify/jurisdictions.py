@@ -623,9 +623,10 @@ class StructuringConfig(BaseModel):
     def _suffixes_are_distinctive_words(cls, value: dict[str, str]) -> dict[str, str]:
         for word, form in value.items():
             bare_latin = len(word) == 1 and word.isascii()
-            if not word.strip() or word.strip() != word or word.isdigit() or bare_latin:
+            has_digit = any(ch.isdigit() for ch in word)
+            if not word.strip() or word.strip() != word or has_digit or bare_latin:
                 raise ValueError(f"insertion suffix {word!r} is not a distinctive word")
-            if not form or form.strip() != form or not form.isascii() or " " in form:
+            if not re.fullmatch(r"[a-z]+", form):
                 raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")
         return value
 
