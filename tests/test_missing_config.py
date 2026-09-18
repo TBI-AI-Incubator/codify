@@ -199,3 +199,35 @@ def route_configs(tmp_path, monkeypatch):
     }
     with isolated_configs(monkeypatch, tmp_path / "data" / "jurisdictions", configs):
         yield
+
+
+def test_the_manifest_carries_what_the_model_read(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`codify load` files the law under the manifest's metadata, so the fields the
+    pipeline read must reach it, and only those."""
+    import codify.cli as cli
+    from codify.pipeline.events import Failed, MetadataExtracted
+
+    read = {"title": "The Act", "year": "1992", "number": "7", "date": "1992-03-04", "chapter": "x"}
+
+    async def fake_ingest(*_: object, **__: object):  # type: ignore[no-untyped-def]
+        yield MetadataExtracted(metadata=read)
+        yield Failed(stage="structure", error="stopped after metadata")
+
+    monkeypatch.setattr(cli, "ingest_text", fake_ingest)
+    monkeypatch.setattr(cli, "create_llm_client", lambda *a, **k: object())
+    source = tmp_path / "doc.txt"
+    source.write_text("Article 1\n(1) Text.\n", encoding="utf-8")
+    out = tmp_path / "bundle"
+
+    asyncio.run(_run(_args(source, out, "gb")))
+    manifest = json.loads((out / "manifest.json").read_text())
+
+    assert manifest["metadata"] == {
+        "title": "The Act",
+        "doctype": None,
+        "year": "1992",
+        "number": "7",
+        "date": "1992-03-04",
+    }

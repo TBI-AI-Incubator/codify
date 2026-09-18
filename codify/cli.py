@@ -38,7 +38,7 @@ from codify.core.llm import create_llm_client
 from codify.jurisdictions import JURISDICTIONS_DIR, resolve_config
 from codify.pipeline.enrich.ocr import PageResult, combine_page_texts
 from codify.pipeline.enrich.structure import ScanTrace
-from codify.pipeline.events import Complete, Failed, ValidationIssued
+from codify.pipeline.events import Complete, Failed, MetadataExtracted, ValidationIssued
 from codify.pipeline.formats.pdf import ingest, ingest_text
 
 logger = structlog.get_logger()
@@ -184,6 +184,7 @@ async def _run(args: argparse.Namespace) -> int:
     findings: list[dict[str, Any]] = []
     events: list[str] = []
     akn_xml = ""
+    metadata: dict[str, Any] = {}
     failure: dict[str, str] | None = None
     started = time.monotonic()
 
@@ -212,6 +213,8 @@ async def _run(args: argparse.Namespace) -> int:
             events.append(event.model_dump_json())
             if isinstance(event, ValidationIssued):
                 findings.append(event.issue)
+            elif isinstance(event, MetadataExtracted):
+                metadata = event.metadata
             elif isinstance(event, Complete):
                 akn_xml = event.akn_xml
             elif isinstance(event, Failed):
@@ -265,6 +268,8 @@ async def _run(args: argparse.Namespace) -> int:
         # look up `GB`, find nothing on a case-sensitive filesystem, and fall
         # back to defaults, which is the failure this whole change prevents.
         "jurisdiction": config.code,
+        # What the model read off the document, so `codify load` needs no flags.
+        "metadata": {k: metadata.get(k) for k in ("title", "doctype", "year", "number", "date")},
         # The config this run actually resolved, by path and digest. The code
         # alone cannot distinguish two runs against a config that changed
         # between them, and cannot show that one was found at all.
@@ -433,7 +438,11 @@ def _run_scan_corpus(args: argparse.Namespace) -> int:
     if not scans:
         # Print nothing: the documented workflow redirects stdout over a pinned
         # baseline, and a redirect keeps the file whatever the exit code says.
-        print(f"no .txt sources under {root}", file=sys.stderr)
+        print(
+            f"no scannable sources under {root} "
+            f"(unreadable {sweep.unreadable}, no text layer {sweep.no_text_layer})",
+            file=sys.stderr,
+        )
         return 1
     if args.per_document:
         rows = "\n".join(json.dumps(asdict(s), ensure_ascii=False) for s in scans)
@@ -565,7 +574,7 @@ def main(argv: list[str] | None = None) -> int:
     scan = sub.add_parser(
         "scan-corpus", help="measure the anchor scan over a directory of raw sources"
     )
-    scan.add_argument("root", help="directory searched recursively for .txt sources")
+    scan.add_argument("root", help="directory searched recursively for .txt and .pdf sources")
     scan.add_argument("--jurisdiction", required=True, help="jurisdiction code, e.g. xa")
     scan.add_argument("--per-document", help="write one JSON row per document to this path")
     scan.add_argument(
@@ -661,6 +670,10 @@ def main(argv: list[str] | None = None) -> int:
         help="continue the build at --out (same types and years); otherwise --out is overwritten",
     )
     leg.set_defaults(func=_run_index_legislation_gov_uk)
+
+    from codify.cli_store import register as _register_store
+
+    _register_store(sub)
 
     args = parser.parse_args(argv)
     # Pipeline logs go to stderr so the manifest on stdout stays machine-readable.

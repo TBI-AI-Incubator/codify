@@ -10,7 +10,7 @@ machine can address.
 This repository provides all the components of the core pipeline: acquisition,
 transcription, anchor-driven structuring, retrieval and comparison. Documents converted
 from scans include coverage metrics and validation reports, while pre-existing Akoma Ntoso
-documents run through validation alone.
+documents skip the scan passes and are normalised (identifiers, unique eIds) and validated.
 
 The code is Apache 2.0 and fully standalone. While TBI offers commercial services built on
 top of it, this core pipeline requires no external proprietary services and can be run
@@ -51,7 +51,7 @@ The generated `bundle/` directory contains:
 | `coverage.json`     | Provision count metrics (expected vs. captured)                |
 | `scaffold.bluebell` | Structural skeleton generated prior to filling provision text  |
 | `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                             |
-| `validator.json`    | Schema and structural validation results                       |
+| `validator.json`    | Structural validation findings                                 |
 | `manifest.json`     | Run metadata, including model identifiers and config hashes    |
 
 Structuring follows an anchor-driven model: a deterministic skeleton is parsed using the
@@ -65,8 +65,8 @@ preserves the source text unparsed. (Note: the bundled `xa` fixture places secti
 in the margin, which the parser does not currently extract; it anchors six parts but no
 sections.)
 
-**Dry runs.** To inspect detected anchors across `.txt` files without making model calls
-or requiring a database, run the skeleton pass directly:
+**Dry runs.** To inspect detected anchors across `.txt` and text-layer `.pdf` files
+without making model calls or requiring a database, run the skeleton pass directly:
 
 ```bash
 codify scan-corpus <dir> --jurisdiction xa
@@ -80,8 +80,48 @@ The summary is JSON on stdout; findings about individual files go to stderr, so
 - `layout_pass_failed ... OcrNotConfigured`: the optional secondary OCR engine (Azure AI
   Foundry) is not configured. The pipeline reads the scan once via the model's vision
   endpoint rather than twice, and the run otherwise proceeds.
-- `page_diverted_to_ocr`: the PDF page lacked an extractable text layer and was
-  rasterised for OCR.
+- `page_diverted_to_ocr`: the page's extracted text layer was rejected (the event's
+  `reason` names the test it failed: too short, garbled, letter-spaced, presentation
+  forms, divergent from the scan, or a visible annotation) and the page was rasterised
+  for OCR.
+
+## Store, search, compare
+
+The bundle is the end of `ingest-one`. To search it, or set it beside another version,
+load it into Postgres. The compose file builds one with pgvector and pg_textsearch:
+
+```bash
+docker compose up -d --wait postgres          # first build takes a minute or two
+uv run alembic -c alembic.ini upgrade head
+uv run codify load bundle/ --embed
+uv run codify search "right of access" --jurisdiction xa
+```
+
+`load` reads `final.akn.xml` and `manifest.json` from a bundle and writes the law, its
+version and its provisions; the jurisdiction and the title come from the manifest, so a
+bundle needs no flags. A bare `.akn.xml` has no manifest and needs `--jurisdiction` and
+`--title`. `--embed` also embeds the provisions, which `search` needs. Loading the same
+file twice returns the version it already holds.
+`search` runs the hybrid retrieval (lexical and vector, fused) and prints one JSON match
+per line, best first, with the provision's eId, score and text; it exits 1 when nothing
+matched.
+
+Embeddings go to an OpenAI-compatible embeddings endpoint. `EMBEDDING_BASE_URL`,
+`EMBEDDING_API_KEY` and `EMBEDDING_MODEL` name it; unset, the `LITELLM_*` chat settings
+are used, so one gateway can serve both.
+
+```bash
+uv run codify compare a.akn.xml b.akn.xml --out report.json
+uv run codify compare <version-id> <version-id>
+```
+
+`compare` aligns the second document's provisions against the first, article by
+article, through the chat model, and writes a report with a summary (aligned, partial,
+gap) and every alignment. Either side is an AKN file or a stored version id. It costs a
+model call per provision.
+
+`POSTGRES_URL` names the database. Unset, it is the compose one while `ENVIRONMENT` is
+unset, `localhost` or `development`; under any other value an unset URL is an error.
 
 ## Configuration
 
@@ -113,8 +153,8 @@ either `synthetic` or `public_reference` to true. This filtering is enforced by
 - **Public reference configurations**: cover jurisdictions that publish their legal texts
   openly.
 
-By default, local source checkouts read from `./data/`, while installed package
-distributions read bundled package data. To supply a custom dataset, set
+A source checkout reads the repository's `data/` directory, wherever the command is
+run from; an installed wheel reads the data bundled inside the package. To supply a custom dataset, set
 `CODIFY_DATA_ROOT` to an absolute path containing `jurisdictions/` and `frameworks/`
 directories before starting Python. Relative paths are rejected, and custom data roots
 completely replace bundled data.
@@ -160,8 +200,9 @@ uv run pytest tests -m "not integration and not live_llm" -q
 This runs roughly 4,000 tests in about a minute and matches the standard CI check. Tests
 for unbundled jurisdictions are skipped automatically.
 
-**Note:** Integration tests require a Postgres instance with the pgvector and
-pg_textsearch extensions:
+**Note:** Integration tests require the same Postgres as
+[Store, search, compare](#store-search-compare), with the pgvector and pg_textsearch
+extensions:
 
 ```bash
 # Start test database and apply schema migrations
@@ -178,15 +219,18 @@ REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 - **Live LLM tests:** Tests marked `live_llm` issue requests to the configured
   OpenAI-compatible gateway and incur API charges.
 - **CI checks:** In addition to unit tests, CI enforces formatting, type checking, and
-  wheel builds via Ruff, strict mypy, and Hatch (see `.github/workflows/ci.yml`).
+  wheel builds via Ruff, strict mypy, and `uv build` with the Hatchling backend (see
+  `.github/workflows/ci.yml`).
 
 ## Standards
 
-Codify targets the Akoma Ntoso 3.0 specification and validates all generated documents
-against the official schema, using FRBR URIs to uniquely identify works, expressions, and
-manifestations down to the individual provision.
+Codify targets the Akoma Ntoso 3.0 specification. Generated documents pass a structural
+validator whose findings ride the bundle and the run; the OASIS schema is checked on one
+acquisition route only, not on every output.
+FRBR URIs identify works, expressions and manifestations, and eIds address the individual
+provision within them.
 
-Schema validity alone does not guarantee semantic fidelity to the source text or seamless
+Structural validity alone does not guarantee semantic fidelity to the source text or seamless
 compatibility with external tooling. Internal structural conventions, such as how annex
 content is inlined, can diverge from specific downstream profiles like AKN4EU or platforms
 such as Indigo. You should validate intended interchange workflows using representative
