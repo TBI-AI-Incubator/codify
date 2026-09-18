@@ -84,12 +84,16 @@ def _descriptors(doc: Document) -> tuple[str, int | None, str]:
     from cobalt import FrbrUri
 
     from codify.frbr import UNKNOWN_YEAR
+    from codify.pipeline.formats.eu_directive import _SUBTYPE_TO_DOCTYPE
 
     uri = FrbrUri.parse(doc.frbr_work_uri)
+    # EU works are /act/dir, /act/reg-del and so on; the stored doctype is the long form.
+    subtype = uri.subtype or uri.doctype
+    doctype = _SUBTYPE_TO_DOCTYPE.get(subtype.split("-")[0], subtype)
     year = str(doc.work_date.year) if doc.work_date else uri.date[:4]
     # An undated work carries the sentinel year in both the URI and the work date.
     resolved = int(year) if year.isdigit() and int(year) != int(UNKNOWN_YEAR) else None
-    return uri.subtype or uri.doctype, resolved, uri.number
+    return doctype, resolved, uri.number
 
 
 async def _load(args: argparse.Namespace) -> int:

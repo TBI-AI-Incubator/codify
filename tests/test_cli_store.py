@@ -60,6 +60,12 @@ def test_descriptors_come_from_the_work_uri_with_the_unknown_year_folded() -> No
 
     assert cli_store._descriptors(doc("/akn/al/act/vendim/2021/285")) == ("vendim", 2021, "285")
     assert cli_store._descriptors(doc("/akn/xa/act/0001/abc")) == ("act", None, "abc")
+    assert cli_store._descriptors(doc("/akn/eu/act/dir/2019/1024")) == ("directive", 2019, "1024")
+    assert cli_store._descriptors(doc("/akn/eu/act/reg-del/2016/679")) == (
+        "regulation",
+        2016,
+        "679",
+    )
     assert cli_store._descriptors(doc("/akn/xa/act/1992/7", date(1991, 12, 31))) == (
         "act",
         1991,
