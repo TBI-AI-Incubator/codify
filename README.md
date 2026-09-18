@@ -65,8 +65,8 @@ preserves the source text unparsed. (Note: the bundled `xa` fixture places secti
 in the margin, which the parser does not currently extract; it anchors six parts but no
 sections.)
 
-**Dry runs.** To inspect detected anchors across `.txt` files without making model calls
-or requiring a database, run the skeleton pass directly:
+**Dry runs.** To inspect detected anchors across `.txt` and text-layer `.pdf` files
+without making model calls or requiring a database, run the skeleton pass directly:
 
 ```bash
 codify scan-corpus <dir> --jurisdiction xa
@@ -82,6 +82,44 @@ The summary is JSON on stdout; findings about individual files go to stderr, so
   endpoint rather than twice, and the run otherwise proceeds.
 - `page_diverted_to_ocr`: the PDF page lacked an extractable text layer and was
   rasterised for OCR.
+
+## Store, search, compare
+
+The bundle is the end of `ingest-one`. To search it, or set it beside another version,
+load it into Postgres. The compose file builds one with pgvector and pg_textsearch:
+
+```bash
+docker compose up -d --wait postgres          # first build takes a minute or two
+uv run alembic -c alembic.ini upgrade head
+uv run codify load bundle/ --embed
+uv run codify search "right of access" --jurisdiction xa
+```
+
+`load` reads `final.akn.xml` and `manifest.json` from a bundle and writes the law, its
+version and its provisions; the jurisdiction and the title come from the manifest, so a
+bundle needs no flags. A bare `.akn.xml` has no manifest and needs `--jurisdiction` and
+`--title`. `--embed` also embeds the provisions, which `search` needs. Loading the same
+file twice returns the version it already holds.
+`search` runs the hybrid retrieval (lexical and vector, fused) and prints one JSON match
+per line, best first, with the provision's eId, score and text; it exits 1 when nothing
+matched.
+
+Embeddings go to an OpenAI-compatible embeddings endpoint. `EMBEDDING_BASE_URL`,
+`EMBEDDING_API_KEY` and `EMBEDDING_MODEL` name it; unset, the `LITELLM_*` chat settings
+are used, so one gateway can serve both.
+
+```bash
+uv run codify compare a.akn.xml b.akn.xml --out report.json
+uv run codify compare <version-id> <version-id>
+```
+
+`compare` aligns the second document's provisions against the first, article by
+article, through the chat model, and writes a report with a summary (aligned, partial,
+gap) and every alignment. Either side is an AKN file or a stored version id. It costs a
+model call per provision.
+
+`POSTGRES_URL` names the database. Unset, it is the compose one while `ENVIRONMENT` is
+unset, `localhost` or `development`; under any other value an unset URL is an error.
 
 ## Configuration
 
@@ -160,8 +198,9 @@ uv run pytest tests -m "not integration and not live_llm" -q
 This runs roughly 4,000 tests in about a minute and matches the standard CI check. Tests
 for unbundled jurisdictions are skipped automatically.
 
-**Note:** Integration tests require a Postgres instance with the pgvector and
-pg_textsearch extensions:
+**Note:** Integration tests require the same Postgres as
+[Store, search, compare](#store-search-compare), with the pgvector and pg_textsearch
+extensions:
 
 ```bash
 # Start test database and apply schema migrations
