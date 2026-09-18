@@ -122,21 +122,28 @@ To add a jurisdiction, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
 ## Layout
 
-| Module                | Responsibility                                                            |
-| --------------------- | ------------------------------------------------------------------------- |
-| `codify/akn/`         | Akoma Ntoso 3.0 element model, parsing and emitting, eIds, references, schema validation |
-| `codify/pipeline/`    | Source bytes to Akoma Ntoso; format dispatchers in `formats/`, enrichment passes in `enrich/` |
-| `codify/acquisition/` | Per-jurisdiction source adapters, manifests, rate limiting                |
-| `codify/embed/`       | Embedding client over an OpenAI-compatible endpoint                       |
-| `codify/retrieve/`    | Hybrid retrieval over provisions (dense and BM25, fused by reciprocal rank) |
-| `codify/compare/`     | Compliance comparator: alignment, prompts, validated model output         |
-| `codify/storage/`     | Typed Postgres access                                                     |
-| `codify/lenses/`      | Plugin types and the lens registry                                        |
-| `codify/repair/`      | Repair agent: per-finding grounding, transactional edits                  |
-| `codify/translate/`   | Anchored translation: batching, clause parity, quality grading            |
-| `codify/core/`        | Shared model client, tracing, i18n, log redaction                         |
-| `frbr.py`             | FRBR URI construction                                                     |
-| `jurisdictions.py`    | Jurisdiction configuration loading                                        |
+- `codify/akn/`: AKN 3.0 element models, parsing, rendering, eId generation, reference
+  resolution, and schema validation
+- `codify/pipeline/`: End-to-end ingestion from raw bytes to AKN. Contains input format
+  parsers (`formats/`) and structural enrichment passes (`enrich/`).
+- `codify/acquisition/`: Source adapters, scrape manifests, and rate limiting for
+  jurisdiction data sources.
+- `codify/embed/`: Provider-agnostic text embedding client over OpenAI-compatible
+  endpoints.
+- `codify/retrieve/`: Hybrid retrieval over statutory provisions using dense embeddings
+  and BM25 fused via Reciprocal Rank Fusion (RRF).
+- `codify/compare/`: Statutory compliance comparator, including alignment logic, prompt
+  templates, and schema-validated model outputs.
+- `codify/storage/`: Typed PostgreSQL data access layer.
+- `codify/lenses/`: Analysis plugins and the extensible lens registry.
+- `codify/repair/`: Automated AKN repair agent performing finding-grounded, transactional
+  XML edits.
+- `codify/translate/`: Structure-preserving legal translation with batching, clause parity
+  checks, and quality scoring.
+- `codify/core/`: Shared LLM client, OpenTelemetry/Langfuse tracing, internationalization,
+  and log redaction.
+- `codify/frbr.py`: FRBR URI generation and parsing.
+- `codify/jurisdictions.py`: Jurisdiction configuration loader and schema validator.
 
 ## Tests
 
