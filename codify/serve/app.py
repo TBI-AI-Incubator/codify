@@ -113,7 +113,7 @@ def create_app(
     database: str | None = None,
 ) -> FastAPI:
     """`database` overrides `POSTGRES_URL`; nothing connects until a route needs to."""
-    engine = create_async_engine(database or database_url())
+    engine = create_async_engine(database_url(database))
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     # Uploads live as long as the runs that read them, and go when the run is forgotten.
     uploads = tempfile.TemporaryDirectory(prefix="codify-uploads-")

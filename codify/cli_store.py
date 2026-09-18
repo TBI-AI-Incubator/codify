@@ -241,7 +241,7 @@ def _serve(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise SystemExit(f"{exc}; install the serve extra: uv sync --extra serve") from exc
     if args.openapi:  # the schema needs no database, so none is required
-        schema = create_app(database="postgresql+asyncpg://schema-only").openapi()
+        schema = create_app(database="postgresql://schema-only").openapi()
         print(json.dumps(schema, indent=2, sort_keys=True))
         return 0
     uvicorn.run(create_app(), host=args.host, port=args.port)

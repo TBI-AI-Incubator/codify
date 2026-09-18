@@ -3,14 +3,14 @@
 EMBEDDING_BATCH_SIZE = 100
 
 
-def database_url() -> str:
-    """`POSTGRES_URL` with the asyncpg driver; unset, the compose database, but only
-    where `ENVIRONMENT` is local or development, and an error anywhere else."""
+def database_url(override: str | None = None) -> str:
+    """`override` or `POSTGRES_URL`, with the asyncpg driver; unset, the compose database,
+    but only where `ENVIRONMENT` is local or development, and an error anywhere else."""
     import os
 
     from sqlalchemy.engine import make_url
 
-    raw = os.environ.get("POSTGRES_URL")
+    raw = override or os.environ.get("POSTGRES_URL")
     if not raw:
         if os.environ.get("ENVIRONMENT") not in {None, "", "localhost", "development"}:
             raise RuntimeError(

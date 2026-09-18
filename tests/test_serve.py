@@ -4,10 +4,12 @@ retry and replay through the HTTP surface, with a scripted runner for the pipeli
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import shutil
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
@@ -931,7 +933,7 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
 OPENAPI = Path(__file__).parent.parent / "contract" / "openapi.json"
 
 
-def test_the_committed_openapi_schema_is_the_servers() -> None:
+def test_the_committed_openapi_schema_matches_the_server() -> None:
     """`codify serve --openapi > contract/openapi.json` after any route change."""
     live = json.dumps(_app(None).openapi(), indent=2, sort_keys=True) + "\n"
     assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
@@ -942,23 +944,30 @@ def test_every_success_response_names_a_schema() -> None:
     paths = _app(None).openapi()["paths"]
     for path, ops in paths.items():
         for method, op in ops.items():
-            ok = next(r for code, r in op["responses"].items() if code.startswith("2"))
-            if path.endswith("/stream"):
-                assert list(ok["content"]) == ["text/event-stream"], f"{method} {path}"
-                continue
-            schema = ok["content"]["application/json"]["schema"]
-            assert "$ref" in schema or "$ref" in schema.get("items", {}), f"{method} {path}"
+            successes = [r for code, r in op["responses"].items() if code.startswith("2")]
+            assert successes, f"{method} {path}"
+            for ok in successes:
+                if path.endswith("/stream"):
+                    assert list(ok["content"]) == ["text/event-stream"], f"{method} {path}"
+                    continue
+                schema = ok["content"]["application/json"]["schema"]
+                assert "$ref" in schema or "$ref" in schema.get("items", {}), f"{method} {path}"
 
 
-def test_the_schema_prints_without_a_database(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("POSTGRES_URL", raising=False)
     monkeypatch.setenv("ENVIRONMENT", "production")  # where an unset URL is an error
+    out = io.StringIO()
 
-    assert main(["serve", "--openapi"]) == 0
+    with redirect_stdout(out):  # not capsys: the CLI's log setup would keep its stream
+        assert main(["serve", "--openapi"]) == 0
 
-    assert json.loads(capsys.readouterr().out)["openapi"].startswith("3.")
+    assert json.loads(out.getvalue())["openapi"].startswith("3.")
+
+
+def test_a_plain_database_override_gets_the_async_driver() -> None:
+    app = create_app(database="postgresql://u:p@h/d")
+    assert str(app.state.sessions.kw["bind"].url) == "postgresql+asyncpg://u:***@h/d"
 
 
 def test_serve_is_registered() -> None:
