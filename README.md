@@ -106,7 +106,8 @@ article, through the chat model, and writes a report with a summary (aligned, pa
 gap) and every alignment. Either side is an AKN file or a stored version id. It costs a
 model call per provision.
 
-`POSTGRES_URL` names the database; unset, it is the compose one.
+`POSTGRES_URL` names the database. Unset, it is the compose one while `ENVIRONMENT` is
+unset, `localhost` or `development`; under any other value an unset URL is an error.
 
 ## Configuration
 

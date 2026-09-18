@@ -1,6 +1,5 @@
-"""`codify load`, `search` and `compare` are plumbing over the library; these
-pin the plumbing. The bundle reader and the environment fallbacks run without
-a database; the round trip from load to search runs against Postgres."""
+"""`codify load`, `search` and `compare` are plumbing over the library; these pin it.
+The bundle reader and environment fallbacks run offline; the round trips need Postgres."""
 
 from __future__ import annotations
 
@@ -21,7 +20,7 @@ from codify.akn.document import Document
 from codify.akn.io import parse_akn
 from codify.cli import main
 from codify.settings import database_url
-from codify.storage.models import Law, Version
+from codify.storage.models import Jurisdiction, Law, Version
 
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-atlantis-1992.akn.xml"
 OTHER_FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-zerzura-1994.akn.xml"
@@ -154,14 +153,16 @@ def test_load_then_search_round_trips(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     title = f"Round trip {uuid.uuid4().hex[:8]}"
 
-    code, out = _run(["load", str(FIXTURE), "--jurisdiction", "xa", "--title", title, "--embed"])
+    code, out = _run(["load", str(FIXTURE), "--jurisdiction", "XA", "--title", title, "--embed"])
     loaded = json.loads(out.strip().splitlines()[-1])
     version_id = uuid.UUID(loaded["version_id"])
 
     try:
         assert code == 0
         assert loaded["embedded"] > 0
-        code, out = _run(["search", "official text", "--jurisdiction", "xa", "-k", "3"])
+        assert asyncio.run(_embedded_at(version_id)) is not None
+        assert asyncio.run(_jurisdiction_code_of(version_id)) == "xa"
+        code, out = _run(["search", "official text", "--jurisdiction", "XA", "-k", "3"])
         hits = [json.loads(line) for line in out.strip().splitlines()]
         assert code == 0
         assert hits and all({"eid", "score", "text"} <= set(h) for h in hits)
@@ -206,9 +207,18 @@ def test_a_bare_file_without_flags_says_what_is_missing(tmp_path: Path) -> None:
         main(["load", str(f), "--jurisdiction", "xa"])
 
 
-def test_search_requires_a_jurisdiction() -> None:
+def test_search_requires_a_jurisdiction_and_a_positive_k() -> None:
     with pytest.raises(SystemExit):
         main(["search", "anything"])
+    for k in ("-1", "0", "x"):
+        with pytest.raises(SystemExit) as refused:
+            main(["search", "anything", "--jurisdiction", "xa", "-k", k])
+        assert refused.value.code == 2, k  # argparse, before any client or database
+
+
+def test_compare_names_a_reference_that_is_neither_file_nor_id(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="neither a file nor a version id"):
+        main(["compare", str(tmp_path / "missing.akn.xml"), str(FIXTURE)])
 
 
 def test_an_absent_url_is_an_error_outside_local(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -249,6 +259,27 @@ def test_a_bundle_loads_with_no_flags_and_its_descriptors_come_from_the_uri(
         asyncio.run(_delete_law_of(version_id))
 
 
+async def _embedded_at(version_id: uuid.UUID) -> object:
+    engine = create_async_engine(database_url())
+    async with async_sessionmaker(engine)() as s:
+        stamp = (
+            await s.execute(select(Version.embedded_at).where(Version.id == version_id))
+        ).scalar_one()
+    await engine.dispose()
+    return stamp
+
+
+async def _jurisdiction_code_of(version_id: uuid.UUID) -> str:
+    engine = create_async_engine(database_url())
+    async with async_sessionmaker(engine)() as s:
+        law = await _law_of(version_id)
+        code = (
+            await s.execute(select(Jurisdiction.code).where(Jurisdiction.id == law.jurisdiction_id))
+        ).scalar_one()
+    await engine.dispose()
+    return str(code)
+
+
 async def _law_of(version_id: uuid.UUID) -> Law:
     engine = create_async_engine(database_url())
     async with async_sessionmaker(engine)() as s:
@@ -275,26 +306,53 @@ def test_each_command_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> No
     assert len(disposed) == 1
 
 
+@pytest.mark.integration
+def test_compare_reads_a_stored_version_by_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: _GapLlm())
+    monkeypatch.setattr(cli_store, "_embedding_client", _UnitVectors)
+    title = f"Stored side {uuid.uuid4().hex[:8]}"
+    version_id = json.loads(
+        _run(["load", str(OTHER_FIXTURE), "--jurisdiction", "xz", "--title", title])[1]
+        .strip()
+        .splitlines()[-1]
+    )["version_id"]
+    out = tmp_path / "report.json"
+
+    try:
+        code, _ = _run(["compare", str(FIXTURE), version_id, "--out", str(out)])
+        report = json.loads(out.read_text())
+        assert code == 0
+        assert report["summary"]["total"] > 0
+        with pytest.raises(SystemExit, match="no stored version"):
+            main(["compare", str(FIXTURE), str(uuid.uuid4())])
+    finally:
+        asyncio.run(_delete_law_of(uuid.UUID(version_id)))
+
+
+class _GapLlm:
+    async def chat_json(self, prompt: str, **_: object) -> dict[str, object]:
+        return {
+            "verdict": "gap",
+            "confidence": 0.9,
+            "note": "n",
+            "citations": [],
+            "actionable": True,
+            "provision_kind": "obligation",
+            "clause_method": "normal",
+        }
+
+
+class _UnitVectors(_FixedVectors):
+    async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
+        return [[float(j == i % _DIM) for j in range(_DIM)] for i in range(len(items))]
+
+
 def test_compare_writes_a_report_from_two_akn_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class _Llm:
-        async def chat_json(self, prompt: str, **_: object) -> dict[str, object]:
-            return {
-                "verdict": "gap",
-                "confidence": 0.9,
-                "note": "n",
-                "citations": [],
-                "actionable": True,
-                "provision_kind": "obligation",
-                "clause_method": "normal",
-            }
-
-    class _UnitVectors(_FixedVectors):
-        async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
-            return [[float(j == i % _DIM) for j in range(_DIM)] for i in range(len(items))]
-
-    monkeypatch.setattr(cli_store, "_llm_client", lambda model: _Llm())
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: _GapLlm())
     monkeypatch.setattr(cli_store, "_embedding_client", _UnitVectors)
     out = tmp_path / "report.json"
 

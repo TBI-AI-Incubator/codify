@@ -1,9 +1,5 @@
-"""`codify load`, `codify search` and `codify compare`: the library behind a prompt.
-
-`ingest-one` writes a bundle and stops. These three take it the rest of the way:
-into Postgres, out through hybrid search, and side by side with another version.
-Nothing here is new logic; each command is one library call and its plumbing.
-"""
+"""`codify load`, `search` and `compare`: the library behind a prompt.
+Each command is one library call and its plumbing; `ingest-one` writes the bundle."""
 
 from __future__ import annotations
 
@@ -43,11 +39,7 @@ def _env(*names: str) -> str | None:
 
 
 def _embedding_client() -> Any:
-    """An OpenAI-compatible embeddings client from the environment.
-
-    `EMBEDDING_*` win; the `LITELLM_*` chat settings are the fallback so one
-    gateway serves both.
-    """
+    """Embeddings client from `EMBEDDING_*`, else the `LITELLM_*` chat settings."""
     from codify.embed.client import EmbeddingClient
 
     base_url = _env("EMBEDDING_BASE_URL", "LITELLM_BASE_URL")
@@ -106,7 +98,7 @@ async def _load(args: argparse.Namespace) -> int:
 
     akn_xml, manifest = _bundle_akn(Path(args.path))
     meta = manifest.get("metadata") or {}
-    jurisdiction = args.jurisdiction or manifest.get("jurisdiction")
+    jurisdiction = (args.jurisdiction or manifest.get("jurisdiction") or "").strip().lower()
     if not jurisdiction:
         raise SystemExit("no jurisdiction in the bundle's manifest; pass --jurisdiction")
     title = args.title or meta.get("title")
@@ -128,10 +120,10 @@ async def _load(args: argparse.Namespace) -> int:
         )
         embedded = 0
         if args.embed:
-            from codify.storage.embeddings import embed_version_provisions
+            from codify.storage.embeddings import embed_and_stamp
 
-            embedded = await embed_version_provisions(
-                session, version_id, client=_embedding_client()
+            embedded = await embed_and_stamp(
+                session, version_id, client=_embedding_client(), path_context=False
             )
         await session.commit()
     print(
@@ -150,7 +142,7 @@ async def _search(args: argparse.Namespace) -> int:
             session,
             args.query,
             embedding_client=_embedding_client(),
-            jurisdiction_code=args.jurisdiction,
+            jurisdiction_code=args.jurisdiction.strip().lower(),
             language=args.language,
             k=args.k,
         )
@@ -168,8 +160,12 @@ async def _compare(args: argparse.Namespace) -> int:
         path = Path(ref)
         if path.exists():
             return parse_akn(_bundle_akn(path)[0])
+        try:
+            version_id = uuid.UUID(ref)
+        except ValueError:
+            raise SystemExit(f"{ref} is neither a file nor a version id") from None
         async with _session() as session:
-            version = await get_version(session, uuid.UUID(ref))
+            version = await get_version(session, version_id)
             if version is None or not version.akn_xml:
                 raise SystemExit(f"no stored version {ref}")
             return parse_akn(version.akn_xml)
@@ -184,6 +180,12 @@ async def _compare(args: argparse.Namespace) -> int:
     else:
         sys.stdout.write(out + "\n")
     return 0
+
+
+def _positive(value: str) -> int:
+    if not value.isdigit() or int(value) < 1:
+        raise argparse.ArgumentTypeError(f"{value} is not a positive integer")
+    return int(value)
 
 
 def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -205,7 +207,7 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     search.add_argument("query")
     search.add_argument("--jurisdiction", required=True)
     search.add_argument("--language")
-    search.add_argument("-k", type=int, default=10, help="matches to return")
+    search.add_argument("-k", type=_positive, default=10, help="matches to return")
     search.set_defaults(func=lambda a: asyncio.run(_search(a)))
 
     cmp = sub.add_parser(

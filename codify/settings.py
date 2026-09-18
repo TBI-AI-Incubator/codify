@@ -4,10 +4,8 @@ EMBEDDING_BATCH_SIZE = 100
 
 
 def database_url() -> str:
-    """`POSTGRES_URL` with the asyncpg driver.
-
-    Unset, it is the compose database, but only where `ENVIRONMENT` says local;
-    anywhere else an absent URL is an error rather than a silent default."""
+    """`POSTGRES_URL` with the asyncpg driver; unset, the compose database, but only
+    where `ENVIRONMENT` is local or development, and an error anywhere else."""
     import os
 
     from sqlalchemy.engine import make_url
