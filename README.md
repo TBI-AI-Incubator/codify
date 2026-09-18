@@ -38,7 +38,8 @@ You need:
 - Docker, only for the database tests
 
 To use the library from your own project, `uv add codify-core` (or `pip install
-codify-core`); the extras are `serve` and `mcp`. To work in this repository:
+codify-core`); the extras are `serve`, `mcp` and `migrations`. To work in this
+repository:
 
 ```bash
 uv sync

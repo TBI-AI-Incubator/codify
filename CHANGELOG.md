@@ -25,8 +25,8 @@ Library, additive:
 
 - `storage.get_version` and `list_versions` take `with_akn=False` for a
   metadata read that leaves the body unloaded; `get_version_akn_length`.
-- Every route answers with a Pydantic model; the server's response models are
-  `codify.serve.schemas`.
+- Every JSON route answers with a Pydantic model, `codify.serve.schemas`; the run
+  stream is server-sent events.
 - The EU fetcher resolves every hop, redirects included, through the address
   guard.
 
