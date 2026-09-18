@@ -79,10 +79,13 @@ def create_app(
 
     def drop_upload(run: Run) -> None:
         source = Path(str(run.params.get("source", "")))
-        if source.parent == Path(uploads.name):
+        # A retry shares its source with the run it retries; the file goes with the last of them.
+        if source.parent == Path(uploads.name) and not any(
+            str(source) == r.params.get("source") for r in runs.list()
+        ):
             source.unlink(missing_ok=True)
 
-    runs = RunTable(runner or _ingest_runner(sessions), on_forget=drop_upload)
+    runs: RunTable = RunTable(runner or _ingest_runner(sessions), on_forget=drop_upload)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -245,7 +248,9 @@ def create_app(
 
         # The EU lane is the only one that fetches; every other lane reads a path.
         if not looks_like_eu(str(body.url)) or body.jurisdiction.strip().lower() != "eu":
-            raise HTTPException(422, "only an eur-lex URL under jurisdiction eu; upload the file")
+            raise HTTPException(
+                422, "only an EU publications URL (eur-lex or publications.europa.eu) under eu"
+            )
         code = _jurisdiction(body.jurisdiction)
         try:
             run = runs.enqueue(

@@ -566,8 +566,9 @@ async def test_ingest_url_is_the_eu_lane_only() -> None:
 
     url = "https://eur-lex.europa.eu/a.xml"
     async with _client(runner) as c:
-        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "xa"})
-        assert r.status_code == 422 and "jurisdiction eu" in r.json()["detail"]
+        for host_url in (url, "https://publications.europa.eu/a.xml"):
+            r = await c.post("/runs/ingest-url", json={"url": host_url, "jurisdiction": "xa"})
+            assert r.status_code == 422 and "publications.europa.eu" in r.json()["detail"]
         r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "EU"})
         assert r.status_code == 422 and "no jurisdiction config for 'EU'" in r.json()["detail"]
         assert (await c.get("/runs")).json() == []
@@ -742,7 +743,6 @@ async def test_jurisdiction_codes_fold_case_on_every_route(monkeypatch: pytest.M
     assert looked_up == ["xa"]
 
 
-@pytest.mark.integration
 async def test_search_folds_the_jurisdiction_code(monkeypatch: pytest.MonkeyPatch) -> None:
     import codify.retrieve.hybrid as hybrid
 
@@ -828,6 +828,39 @@ async def test_an_untitled_ingest_takes_the_title_the_pipeline_read(
             await s.execute(delete(Law).where(Law.title == read))
             await s.commit()
         await app.state.sessions.kw["bind"].dispose()
+
+
+async def test_a_retry_keeps_the_upload_its_original_was_evicted_with() -> None:
+    gate = asyncio.Event()
+
+    async def runner(p: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        if p.get("wait"):
+            await gate.wait()
+        yield _complete()
+
+    app = _app(runner)
+    app.state.runs._keep = 1
+    async with _client(runner, app) as c:
+        first = await _enqueue(c)
+        await c.get(f"/runs/{first}/stream")
+        source = Path(app.state.runs.get(uuid.UUID(first)).params["source"])
+        retry = app.state.runs.retry(uuid.UUID(first))
+        assert retry is not None
+        retry.params["wait"] = True  # holds the retry open while its original is evicted
+        await asyncio.sleep(0.02)
+        other = await _enqueue(c)
+        await c.get(f"/runs/{other}/stream")
+        assert app.state.runs.get(uuid.UUID(first)) is None  # evicted
+        assert source.exists()
+        gate.set()
+        await c.get(f"/runs/{retry.id}/stream")
+        assert retry.status == "succeeded"
+        last = await _enqueue(c)
+        await c.get(f"/runs/{last}/stream")
+        while app.state.runs.get(retry.id) is not None:
+            await asyncio.sleep(0)
+
+    assert not source.exists()
 
 
 def test_serve_is_registered() -> None:
