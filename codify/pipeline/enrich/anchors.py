@@ -3959,9 +3959,25 @@ def _marker_numbers(
     # Unioned, not returned alone: the scan counts both spellings, and one of
     # them alone scores a document against a fraction of what it captured.
     declared_found = _scan_declared_markers(text, 0, declared, config.code)[0]
-    floor: int | None = None
-    if declared_found:
-        floor = _closing_floor(text, config.code, min(a.char_offset for a in declared_found))
+    aliases: list[str] = []
+    for entry in doc_class.hierarchy:
+        if entry.akn_element != kind:
+            continue
+        aliases.extend(_alias_terms_for(entry))
+    pattern = (
+        _compile_anchor_regex(
+            {kind: aliases}, config, boundary="column_only", case_insensitive=True
+        )
+        if aliases
+        else None
+    )
+    # One floor for both grammars, from the earliest marker either reads: the
+    # body may use the keyword form and an appended instrument the bare one.
+    first_alias = next((m.start() for m in pattern.finditer(text)), None) if pattern else None
+    candidates = [a.char_offset for a in declared_found]
+    if first_alias is not None:
+        candidates.append(first_alias)
+    floor = _closing_floor(text, config.code, min(candidates)) if candidates else None
     from_declared = {
         _normalise_number(a.number)
         for a in declared_found
@@ -3970,20 +3986,12 @@ def _marker_numbers(
         and _line_start(text, a.char_offset) not in exclude_starts
         and (floor is None or a.char_offset < floor)
     }
-    aliases: list[str] = []
-    for entry in doc_class.hierarchy:
-        if entry.akn_element != kind:
-            continue
-        aliases.extend(_alias_terms_for(entry))
-    if not aliases:
+    if pattern is None:
         return from_declared
     # Composes the scanner's own grammar, so declaring an ordinal word or a
     # damage tolerance cannot read as lost coverage: a denominator on the strict
     # grammar would let a recovered marker raise `captured` without raising
     # `expected`. A number after the keyword is what marks a structural header.
-    pattern = _compile_anchor_regex(
-        {kind: aliases}, config, boundary="column_only", case_insensitive=True
-    )
     # Distinct provision numbers, under the scanner's own prose filter. Raw
     # occurrences over-count TOC entries and cross-references, so a raw
     # denominator makes improved filtering read as lost coverage. A provision
@@ -3997,9 +4005,7 @@ def _marker_numbers(
         if _partial_decimal_number(text, m):
             continue
         # Past the closing phrase is not the body, for the denominator either.
-        if floor is None:
-            floor = _closing_floor(text, config.code if config else "", m.start()) or -1
-        if 0 <= floor <= m.start():
+        if floor is not None and floor <= m.start():
             break
         # The scanner's matches begin on the preceding newline, which is
         # what lets the prose window read a wrapped line's tail.

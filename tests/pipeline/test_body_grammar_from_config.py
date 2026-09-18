@@ -473,3 +473,39 @@ def test_declared_markers_in_the_denominator_stop_at_the_closing_phrase(
     text = f"1. One.\n\n2. Two.\n\n{CLOSING}\n\n5. Five.\n\n6. Six.\n"
     expected = _marker_numbers(text, config, "act", "section")
     assert expected == {"1", "2"}, expected
+
+
+def test_one_floor_serves_the_keyword_and_bare_grammars(
+    declared: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The body uses the keyword form and the appended instrument the bare one; the
+    bare markers, all past the closing phrase, must not set the floor after themselves."""
+    from codify.pipeline.enrich.anchors import _marker_numbers
+
+    config = jurisdictions.load_config(COUNTRY)
+    act = config.document_classes["act"]
+    entries = list(act.hierarchy) + [
+        jurisdictions.HierarchyEntry(
+            local_term="Item",
+            akn_element="section",
+            level="basic",
+            numbering="arabic_period",
+            marker_form="arabic_period",
+        )
+    ]
+    marked = act.model_copy(update={"hierarchy": entries})
+    config = config.model_copy(
+        update={"document_classes": {**config.document_classes, "act": marked}}
+    )
+    original = jurisdictions.load_config
+    monkeypatch.setattr(
+        anchors_mod, "load_config", lambda c: config if c == COUNTRY else original(c)
+    )
+    text = f"Section 1\nOne.\n\nSection 2\nTwo.\n\n{CLOSING}\n\n5. Five.\n\n6. Six.\n"
+    expected = _marker_numbers(text, config, "act", "section")
+    assert expected == {"1", "2"}, expected
+
+
+def test_conclusions_keep_their_paragraph_breaks(declared: Any) -> None:
+    lines = scaffold_mod._conclusions_lines(f"  {CLOSING}\n\n\nThe Warden\n  Clerk\n\n")
+    assert lines == ["CONCLUSIONS", f"  {CLOSING}", "", "  The Warden", "  Clerk", ""]

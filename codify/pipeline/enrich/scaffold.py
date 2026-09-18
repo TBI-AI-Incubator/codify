@@ -139,7 +139,7 @@ def scaffold_from_anchors(
 
     ``preface`` carries title/cover matter, ``preamble`` the recital chain +
     enacting formula; Bluebell maps the keywords to distinct AKN elements.
-    ``conclusions`` is emitted verbatim before the first attachment."""
+    ``conclusions`` is emitted line by line before the first attachment."""
     lines: list[str] = []
     leads = long_title_lead_ins(country)
     for keyword, block in (("PREFACE", preface), ("PREAMBLE", preamble)):
@@ -176,9 +176,14 @@ def scaffold_from_anchors(
 
 
 def _conclusions_lines(block: str | None) -> list[str]:
-    """A CONCLUSIONS block of the source's own lines, or nothing."""
-    body = [line.strip() for line in (block or "").splitlines() if line.strip()]
-    return ["CONCLUSIONS", *(f"  {line}" for line in body), ""] if body else []
+    """A CONCLUSIONS block of the source's own lines, paragraph breaks kept."""
+    body: list[str] = []
+    for line in (block or "").strip().splitlines():
+        if line.strip():
+            body.append(f"  {line.strip()}")
+        elif body and body[-1]:
+            body.append("")
+    return ["CONCLUSIONS", *body, ""] if body else []
 
 
 _WRAP_TERMINAL = (".", ":", ";", "!", "?", ")", "]", "»", "”", '"', "。")
