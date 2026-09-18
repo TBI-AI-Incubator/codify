@@ -169,6 +169,24 @@ def test_a_mistargeted_root_exits_non_zero_without_printing(
     assert main(["scan-corpus", str(tmp_path / "nope.txt"), "--jurisdiction", "ps"]) == 2
 
 
+def test_an_unscannable_corpus_says_why_on_stderr(
+    capsys, tmp_path: Path, _restore_structlog: None
+) -> None:
+    from pypdf import PdfWriter
+
+    from codify.cli import main
+
+    blank = PdfWriter()
+    blank.add_blank_page(width=10, height=10)
+    blank.write(tmp_path / "scan.pdf")
+    (tmp_path / "broken.pdf").write_bytes(b"not a pdf")
+    (tmp_path / "law.en.txt").write_text("Article 1", encoding="utf-8")
+    assert main(["scan-corpus", str(tmp_path), "--jurisdiction", "xa"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "unreadable 1, no text layer 1, derived exports 1" in captured.err
+
+
 def test_the_structuring_pass_asks_for_the_counts_the_bundle_writes() -> None:
     """The artifact reads whatever that pass measured, so a field can be wired
     end to end and still always zero if the pass never asks for it. That is

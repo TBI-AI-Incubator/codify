@@ -440,8 +440,8 @@ def _run_scan_corpus(args: argparse.Namespace) -> int:
         # Print nothing: the documented workflow redirects stdout over a pinned
         # baseline, and a redirect keeps the file whatever the exit code says.
         print(
-            f"no scannable sources under {root} "
-            f"(unreadable {sweep.unreadable}, no text layer {sweep.no_text_layer})",
+            f"no scannable sources under {root} (unreadable {sweep.unreadable}, "
+            f"no text layer {sweep.no_text_layer}, derived exports {sweep.excluded_derived})",
             file=sys.stderr,
         )
         return 1

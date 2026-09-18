@@ -66,10 +66,10 @@ in the margin, which the parser does not currently extract; it anchors six parts
 sections.)
 
 **Dry runs.** To inspect detected anchors across `.txt` and text-layer `.pdf` files
-without making model calls or requiring a database, run the skeleton pass directly:
+without making model calls or requiring a database, run the anchor scan directly:
 
 ```bash
-codify scan-corpus <dir> --jurisdiction xa
+uv run codify scan-corpus <dir> --jurisdiction xa
 ```
 
 The summary is JSON on stdout; findings about individual files go to stderr, so
@@ -197,7 +197,7 @@ uv sync --group dev --extra migrations
 uv run pytest tests -m "not integration and not live_llm" -q
 ```
 
-This runs roughly 4,000 tests in about a minute and matches the standard CI check. Tests
+This runs about 4,600 tests in about a minute and matches the standard CI check. Tests
 for unbundled jurisdictions are skipped automatically.
 
 **Note:** Integration tests require the same Postgres as
