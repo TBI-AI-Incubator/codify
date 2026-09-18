@@ -964,7 +964,21 @@ def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -
     with redirect_stdout(out):  # not capsys: the CLI's log setup would keep its stream
         assert main(["serve", "--openapi"]) == 0
 
-    assert json.loads(out.getvalue())["openapi"].startswith("3.")
+    assert out.getvalue() == OPENAPI.read_text()  # the command is how the file is made
+
+
+async def test_a_jurisdiction_config_is_served_by_alias() -> None:
+    """The wire shape is the schema's: `from`, `to` and `class`, not the field names."""
+    from codify.jurisdictions import load_config
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        wire = (await c.get("/jurisdictions/xa")).json()
+
+    assert wire == json.loads(load_config("xa").model_dump_json(by_alias=True))
+    assert wire != load_config("xa").model_dump(mode="json")
 
 
 def test_a_plain_database_override_gets_the_async_driver() -> None:

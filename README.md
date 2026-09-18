@@ -147,8 +147,9 @@ is no authentication; bind it to localhost or put it behind something that has.
 
 ### Contract
 
-`contract/openapi.json` is the server's OpenAPI schema, generated from the response
-models in `codify/serve/schemas.py`; a test fails when it drifts. After a route change:
+`contract/openapi.json` is the server's OpenAPI schema, generated from the routes'
+response models (`codify/serve/schemas.py` and the library models they carry, such as
+`JurisdictionConfig`); a test fails when it drifts. After a route change:
 
 ```bash
 uv run codify serve --openapi > contract/openapi.json
