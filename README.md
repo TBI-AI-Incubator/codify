@@ -145,6 +145,18 @@ a PDF goes through `ingest`. Runs live in the server's memory: a restart forgets
 run says so (`lost_on_restart`), and the 200 most recent finished runs stay readable. There
 is no authentication; bind it to localhost or put it behind something that has.
 
+### Contract
+
+`contract/openapi.json` is the server's OpenAPI schema, generated from the response
+models in `codify/serve/schemas.py`; a test fails when it drifts. After a route change:
+
+```bash
+uv run codify serve --openapi > contract/openapi.json
+```
+
+A client generates its types from that file (the UI does, with `openapi-typescript`),
+so the schema is the one place the two agree.
+
 ## Configuration
 
 The CLI loads environment variables from a `.env` file in the working directory or parent

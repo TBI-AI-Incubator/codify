@@ -928,6 +928,27 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
     assert (_Chat.built, _Transport.closed) == (1, 1)
 
 
+OPENAPI = Path(__file__).parent.parent / "contract" / "openapi.json"
+
+
+def test_the_committed_openapi_schema_is_the_servers() -> None:
+    """`codify serve --openapi > contract/openapi.json` after any route change."""
+    live = json.dumps(_app(None).openapi(), indent=2, sort_keys=True) + "\n"
+    assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
+
+
+def test_every_success_response_names_a_schema() -> None:
+    """A UI type is only generated for a response the schema describes."""
+    paths = _app(None).openapi()["paths"]
+    for path, ops in paths.items():
+        for method, op in ops.items():
+            if path.endswith("/stream"):
+                continue  # server-sent events, not JSON
+            ok = next(r for code, r in op["responses"].items() if code.startswith("2"))
+            schema = ok["content"]["application/json"]["schema"]
+            assert "$ref" in schema or "$ref" in schema.get("items", {}), f"{method} {path}"
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

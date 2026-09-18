@@ -15,22 +15,29 @@ from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from codify.jurisdictions import JurisdictionConfig
 from codify.pipeline.events import Complete, IngestionEvent
 from codify.serve.runs import QueueFull, Run, RunTable
+from codify.serve.schemas import (
+    Cancelled,
+    Health,
+    IngestUrl,
+    JurisdictionSummary,
+    LawDetail,
+    LawPage,
+    RunSnapshot,
+    SearchMatch,
+    SearchResult,
+    VersionDetail,
+    VersionSummary,
+)
 from codify.settings import database_url
 
 SessionFactory = Callable[[], AsyncSession]
 _LIMIT = Query(50, ge=1, le=500)
 _OFFSET = Query(0, ge=0)
-
-
-class IngestUrl(BaseModel):
-    url: HttpUrl  # a URL only: a local path is the upload endpoint's job
-    jurisdiction: str
-    title: str | None = None
 
 
 class _Clients:
@@ -130,11 +137,11 @@ def create_app(
     app.state.clients = clients
 
     @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    async def health() -> Health:
+        return Health(status="ok")
 
     @app.get("/jurisdictions")
-    async def jurisdictions() -> list[dict[str, Any]]:
+    async def jurisdictions() -> list[JurisdictionSummary]:
         from codify.jurisdictions import JURISDICTIONS_DIR, load_config
 
         out = []
@@ -142,22 +149,24 @@ def create_app(
             if (entry / "config.json").exists():
                 config = load_config(entry.name)
                 out.append(
-                    {"code": config.code, "name": config.name, "languages": list(config.languages)}
+                    JurisdictionSummary(
+                        code=config.code, name=config.name, languages=list(config.languages)
+                    )
                 )
         return out
 
     @app.get("/jurisdictions/{code}")
-    async def jurisdiction(code: str) -> dict[str, Any]:
+    async def jurisdiction(code: str) -> JurisdictionConfig:
         from codify.jurisdictions import JurisdictionConfigError, load_config
 
         try:
             config = load_config(code.strip().lower())
         except JurisdictionConfigError as exc:  # missing or malformed: neither is ours
             raise HTTPException(404, str(exc)) from exc
-        return config.model_dump(mode="json")
+        return config
 
     @app.get("/jurisdictions/{code}/laws")
-    async def laws_for(code: str, limit: int = _LIMIT, offset: int = _OFFSET) -> dict[str, Any]:
+    async def laws_for(code: str, limit: int = _LIMIT, offset: int = _OFFSET) -> LawPage:
         return await laws(jurisdiction=_jurisdiction(code, 404), limit=limit, offset=offset)
 
     @app.get("/laws")
@@ -168,7 +177,7 @@ def create_app(
         q: str | None = None,
         limit: int = _LIMIT,
         offset: int = _OFFSET,
-    ) -> dict[str, Any]:
+    ) -> LawPage:
         from codify.storage import list_laws
 
         async with sessions() as session:
@@ -181,14 +190,10 @@ def create_app(
                 limit=limit,
                 offset=offset,
             )
-        return {
-            "items": [r.model_dump(mode="json") for r in rows],
-            "limit": limit,
-            "offset": offset,
-        }
+        return LawPage(items=rows, limit=limit, offset=offset)
 
     @app.get("/laws/{law_id}")
-    async def law(law_id: uuid.UUID) -> dict[str, Any]:
+    async def law(law_id: uuid.UUID) -> LawDetail:
         from codify.storage import list_versions
         from codify.storage.laws import get_law_with_jurisdiction
 
@@ -201,26 +206,33 @@ def create_app(
             while cursor is not None:  # every version, not the first page
                 page, cursor = await list_versions(session, law_id, cursor=cursor, with_akn=False)
                 versions.extend(page)
-        return {
-            **_law_json(row),
-            "jurisdiction": code,
-            "versions": [_version_json(v, with_akn=False) for v in versions],
-        }
+        return LawDetail(
+            id=row.id,
+            jurisdiction=code,
+            title=row.title,
+            short_title=row.short_title,
+            doctype=row.doctype,
+            status=row.status,
+            year=row.year,
+            number=row.number,
+            work_uri=row.frbr_work_uri,
+            versions=[VersionSummary.model_validate(v, from_attributes=True) for v in versions],
+        )
 
     @app.get("/versions/{version_id}")
-    async def version(version_id: uuid.UUID) -> dict[str, Any]:
+    async def version(version_id: uuid.UUID) -> VersionDetail:
         from codify.storage import get_version
 
         async with sessions() as session:
             row = await get_version(session, version_id)
         if row is None:
             raise HTTPException(404, "no such version")
-        return _version_json(row, with_akn=True)
+        return VersionDetail.model_validate(row, from_attributes=True)
 
     @app.get("/search")
     async def search(
         q: str, jurisdiction: str, k: int = Query(10, ge=1, le=100), language: str | None = None
-    ) -> dict[str, Any]:
+    ) -> SearchResult:
         from codify.retrieve.hybrid import retrieve
 
         code = _jurisdiction(jurisdiction)
@@ -237,23 +249,20 @@ def create_app(
                 language=language,
                 k=k,
             )
-        return {
-            "query": q,
-            "matches": [
-                {
-                    "provision_id": str(m.provision_id),
-                    "eid": m.akn_eid,
-                    "score": m.rrf_score,
-                    "text": m.text,
-                }
+        return SearchResult(
+            query=q,
+            matches=[
+                SearchMatch(
+                    provision_id=m.provision_id, eid=m.akn_eid, score=m.rrf_score, text=m.text
+                )
                 for m in matches
             ],
-        }
+        )
 
     @app.post("/runs/ingest", status_code=202)
     async def ingest(
         file: UploadFile = File(...), jurisdiction: str = Form(...), title: str | None = Form(None)
-    ) -> dict[str, Any]:
+    ) -> RunSnapshot:
         code = _jurisdiction(jurisdiction)
         suffix = Path(file.filename or "upload").suffix or ".pdf"
         source = Path(uploads.name) / f"{uuid.uuid4()}{suffix}"
@@ -269,10 +278,10 @@ def create_app(
         except BaseException:  # a file no run will read is not kept
             source.unlink(missing_ok=True)
             raise
-        return run.snapshot()
+        return _snapshot(run)
 
     @app.post("/runs/ingest-url", status_code=202)
-    async def ingest_url(body: IngestUrl) -> dict[str, Any]:
+    async def ingest_url(body: IngestUrl) -> RunSnapshot:
         from codify.pipeline.formats import looks_like_eu
 
         # The EU lane is the only one that fetches; every other lane reads a path.
@@ -287,18 +296,18 @@ def create_app(
             )
         except QueueFull as exc:
             raise HTTPException(429, str(exc)) from exc
-        return run.snapshot()
+        return _snapshot(run)
 
     @app.get("/runs")
-    async def list_runs() -> list[dict[str, Any]]:
-        return [r.snapshot() for r in runs.list()]
+    async def list_runs() -> list[RunSnapshot]:
+        return [_snapshot(r) for r in runs.list()]
 
     @app.get("/runs/{run_id}")
-    async def run_state(run_id: uuid.UUID) -> dict[str, Any]:
+    async def run_state(run_id: uuid.UUID) -> RunSnapshot:
         run = runs.get(run_id)
         if run is None:
             raise HTTPException(404, "no such run")
-        return run.snapshot()
+        return _snapshot(run)
 
     @app.get("/runs/{run_id}/stream")
     async def run_stream(run_id: uuid.UUID, request: Request) -> StreamingResponse:
@@ -315,20 +324,20 @@ def create_app(
         return StreamingResponse(body(), media_type="text/event-stream")
 
     @app.post("/runs/{run_id}/cancel")
-    async def cancel(run_id: uuid.UUID) -> dict[str, Any]:
+    async def cancel(run_id: uuid.UUID) -> Cancelled:
         if not runs.cancel(run_id):
             raise HTTPException(409, "not running")
-        return {"cancelled": str(run_id)}
+        return Cancelled(cancelled=run_id)
 
     @app.post("/runs/{run_id}/retry", status_code=202)
-    async def retry(run_id: uuid.UUID) -> dict[str, Any]:
+    async def retry(run_id: uuid.UUID) -> RunSnapshot:
         try:
             run = runs.retry(run_id)
         except QueueFull as exc:
             raise HTTPException(429, str(exc)) from exc
         if run is None:
             raise HTTPException(409, "only a finished run can be retried")
-        return run.snapshot()
+        return _snapshot(run)
 
     return app
 
@@ -343,29 +352,5 @@ def _jurisdiction(code: str, status: int = 422) -> str:
     return resolved.code
 
 
-def _law_json(row: Any) -> dict[str, Any]:
-    return {
-        "id": str(row.id),
-        "title": row.title,
-        "short_title": row.short_title,
-        "doctype": row.doctype,
-        "status": row.status,
-        "year": row.year,
-        "number": row.number,
-        "work_uri": row.frbr_work_uri,
-    }
-
-
-def _version_json(row: Any, *, with_akn: bool) -> dict[str, Any]:
-    out = {
-        "id": str(row.id),
-        "law_id": str(row.law_id),
-        "expression_uri": row.expression_uri,
-        "language": row.language,
-        "expression_date": row.expression_date.isoformat() if row.expression_date else None,
-        "ingested_at": row.ingested_at.isoformat() if row.ingested_at else None,
-        "structural_quality_grade": row.structural_quality_grade,
-    }
-    if with_akn:
-        out["akn_xml"] = row.akn_xml
-    return out
+def _snapshot(run: Run) -> RunSnapshot:
+    return RunSnapshot(**run.snapshot())

@@ -229,6 +229,7 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     )
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
+    serve.add_argument("--openapi", action="store_true", help="print the OpenAPI schema and exit")
     serve.set_defaults(func=_serve)
 
 
@@ -239,5 +240,8 @@ def _serve(args: argparse.Namespace) -> int:
         from codify.serve import create_app
     except ImportError as exc:
         raise SystemExit(f"{exc}; install the serve extra: uv sync --extra serve") from exc
+    if args.openapi:
+        print(json.dumps(create_app().openapi(), indent=2, sort_keys=True))
+        return 0
     uvicorn.run(create_app(), host=args.host, port=args.port)
     return 0
