@@ -621,8 +621,9 @@ class StructuringConfig(BaseModel):
     def _suffixes_are_distinctive_words(cls, value: dict[str, str]) -> dict[str, str]:
         for word, form in value.items():
             bare_latin = len(word) == 1 and word.isascii()
-            broken = any(ch.isdigit() or ch.isspace() or ch == "_" for ch in word)
-            if not word or broken or bare_latin:
+            # Letters and marks only: a decoration such as `**` or `-` is never a word.
+            lettered = all(unicodedata.category(ch)[0] in "LM" for ch in word)
+            if not word or not lettered or bare_latin:
                 raise ValueError(f"insertion suffix {word!r} is not a distinctive word")
             if not re.fullmatch(r"[a-z]+", form):
                 raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")

@@ -37,9 +37,7 @@ def emit_conclusions(
     if existing is not None:
         # A block the structurer wrote from the closing span still gets the
         # signatory grouping, where it is a signature and not an appended instrument.
-        if existing.find("akn:blockContainer", NS) is None and (
-            len(existing.findall("akn:p", NS)) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS
-        ):
+        if _is_direct_signature(existing, vocab.closing_phrases):
             _regroup_signatory(existing)
             return cast(str, etree.tostring(root, encoding="unicode"))
         return akn_xml
@@ -158,6 +156,15 @@ def _keep_tail(element: etree._Element) -> None:
         if parent is not None:
             parent.text = (parent.text or "") + tail
     element.tail = None
+
+
+def _is_direct_signature(conclusions: etree._Element, phrases: tuple[str, ...]) -> bool:
+    """A short block opening on a closing phrase, with no signatory grouped yet."""
+    paragraphs = conclusions.findall("akn:p", NS)
+    if not paragraphs or conclusions.find("akn:blockContainer", NS) is not None:
+        return False
+    first = "".join(paragraphs[0].itertext())
+    return len(paragraphs) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS and any(p in first for p in phrases)
 
 
 def _regroup_signatory(conclusions: etree._Element) -> None:

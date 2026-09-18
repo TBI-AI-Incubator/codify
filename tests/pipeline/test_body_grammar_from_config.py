@@ -621,6 +621,8 @@ def test_a_wrapped_roman_heading_bounds_a_quotation(declared: Any) -> None:
         {" zib": "bis"},
         {"z ib": "bis"},
         {"foo_bar": "bis"},
+        {"**": "bis"},
+        {"z-b": "bis"},
         {"A": "bis"},
         {"12": "bis"},
         {"z2": "bis"},
@@ -793,5 +795,18 @@ def test_a_long_conclusions_block_is_not_regrouped(declared: Any) -> None:
         doctype="act",
         date="2020",
         number="1",
+    )
+    assert emit_conclusions(akn, vocab=RegionVocabulary(closing_phrases=(CLOSING,))) == akn
+
+
+def test_a_foreign_conclusions_block_is_left_alone(declared: Any) -> None:
+    from codify.pipeline.enrich.conclusions import emit_conclusions
+    from codify.pipeline.enrich.regions import RegionVocabulary
+
+    akn = (
+        f'<akomaNtoso xmlns="{AKN_NS}"><act name="act"><body><section eId="sec_1">'
+        "<num>1</num><content><p>One.</p></content></section></body><conclusions>"
+        "<p>Made by another parser.</p><p>The Warden</p><p>Harbour Clerk</p>"
+        "</conclusions></act></akomaNtoso>"
     )
     assert emit_conclusions(akn, vocab=RegionVocabulary(closing_phrases=(CLOSING,))) == akn
