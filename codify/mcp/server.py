@@ -1,5 +1,5 @@
-"""Read tools for an MCP client: every tool is the library call the HTTP server
-makes for the same read, so there is one implementation behind both."""
+"""Read tools for an MCP client: each read is the library call the HTTP server makes
+for it, and compare_versions is the CLI's compare; one implementation behind every surface."""
 
 from __future__ import annotations
 

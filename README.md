@@ -160,7 +160,7 @@ so the schema is the one place the two agree.
 
 ### MCP server
 
-The same reads as tools for an agent, over the Model Context Protocol:
+The same reads, and `compare`, as tools for an agent over the Model Context Protocol:
 
 ```bash
 uv sync --extra mcp

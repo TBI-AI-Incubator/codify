@@ -666,13 +666,13 @@ async def test_one_embeddings_client_serves_every_search_and_closes_when_the_ser
 @pytest.mark.integration
 async def test_a_metadata_read_leaves_the_body_in_the_database() -> None:
     """The real store: `with_akn=False` defers the body; the length is measured where it lies."""
-    from sqlalchemy import delete, inspect
+    from sqlalchemy import delete, inspect, select
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
     from codify.akn.io import parse_akn
     from codify.settings import database_url
     from codify.storage import get_version, get_version_akn_length, save_document
-    from codify.storage.models import Law
+    from codify.storage.models import Law, Version
 
     xml = FIXTURE.read_text(encoding="utf-8")
     engine = create_async_engine(database_url())
@@ -681,6 +681,7 @@ async def test_a_metadata_read_leaves_the_body_in_the_database() -> None:
         vid = await save_document(
             s, parse_akn(xml), jurisdiction_code="xa", law_title="Deferred", akn_xml=xml
         )
+        law_id = (await s.execute(select(Version.law_id).where(Version.id == vid))).scalar_one()
         await s.commit()
     try:
         async with sessions() as s:
@@ -693,7 +694,7 @@ async def test_a_metadata_read_leaves_the_body_in_the_database() -> None:
             assert await get_version_akn_length(s, uuid.uuid4()) is None
     finally:
         async with sessions() as s:
-            await s.execute(delete(Law).where(Law.id == whole.law_id))
+            await s.execute(delete(Law).where(Law.id == law_id))
             await s.commit()
         await engine.dispose()
 
