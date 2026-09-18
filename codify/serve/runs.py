@@ -66,13 +66,20 @@ def _slim(event: IngestionEvent) -> dict[str, Any]:
     return event.model_dump(mode="json")
 
 
+class QueueFull(Exception):
+    """More runs are waiting than the table admits; try again later."""
+
+
 class RunTable:
     """Enqueue, watch, cancel and retry runs; `concurrency` bounds how many execute at
     once, `keep` how many finished runs stay readable before the oldest is forgotten."""
 
-    def __init__(self, runner: Runner, *, concurrency: int = 2, keep: int = 200) -> None:
+    def __init__(
+        self, runner: Runner, *, concurrency: int = 2, keep: int = 200, max_queued: int = 100
+    ) -> None:
         self._runner = runner
         self._keep = keep
+        self._max_queued = max_queued
         self._runs: dict[uuid.UUID, Run] = {}
         self._tasks: dict[uuid.UUID, asyncio.Task[None]] = {}
         self._subscribers: dict[uuid.UUID, set[asyncio.Queue[dict[str, Any] | None]]] = {}
@@ -87,6 +94,9 @@ class RunTable:
     def enqueue(
         self, kind: str, params: dict[str, Any], *, retry_of: uuid.UUID | None = None
     ) -> Run:
+        queued = sum(r.status == "queued" for r in self._runs.values())
+        if queued >= self._max_queued:
+            raise QueueFull(f"{queued} runs already queued")
         run = Run(kind=kind, params=params, retry_of=retry_of)
         self._runs[run.id] = run
         self._subscribers[run.id] = set()
@@ -128,7 +138,8 @@ class RunTable:
             while (queued := await queue.get()) is not None:
                 yield queued
         finally:
-            self._subscribers[run_id].discard(queue)
+            # The run may have been forgotten while this subscriber was draining.
+            self._subscribers.get(run_id, set()).discard(queue)
 
     def _publish(self, run: Run, event: dict[str, Any] | None) -> None:
         if event is not None:

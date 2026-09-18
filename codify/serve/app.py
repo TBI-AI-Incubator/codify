@@ -7,6 +7,7 @@ the only state is the in-memory run table, which a restart empties.
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -14,16 +15,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.pipeline.events import Complete, IngestionEvent
-from codify.serve.runs import RunTable
+from codify.serve.runs import QueueFull, RunTable
 from codify.settings import database_url
 
 SessionFactory = Callable[[], AsyncSession]
+_LIMIT = Query(50, ge=1, le=500)
+_OFFSET = Query(0, ge=0)
 
 
 class IngestUrl(BaseModel):
@@ -82,6 +85,7 @@ def create_app(
     app = FastAPI(title="codify", docs_url="/docs", lifespan=lifespan)
     app.state.sessions = sessions
     app.state.runs = runs
+    app.state.uploads = Path(uploads.name)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -111,7 +115,7 @@ def create_app(
         return config.model_dump(mode="json")
 
     @app.get("/jurisdictions/{code}/laws")
-    async def laws_for(code: str, limit: int = 50, offset: int = 0) -> dict[str, Any]:
+    async def laws_for(code: str, limit: int = _LIMIT, offset: int = _OFFSET) -> dict[str, Any]:
         return await laws(jurisdiction=code, limit=limit, offset=offset)
 
     @app.get("/laws")
@@ -120,8 +124,8 @@ def create_app(
         doctype: str | None = None,
         year: int | None = None,
         q: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
+        limit: int = _LIMIT,
+        offset: int = _OFFSET,
     ) -> dict[str, Any]:
         from codify.storage import list_laws
 
@@ -171,16 +175,20 @@ def create_app(
 
     @app.get("/search")
     async def search(
-        q: str, jurisdiction: str, k: int = 10, language: str | None = None
+        q: str, jurisdiction: str, k: int = Query(10, ge=1, le=100), language: str | None = None
     ) -> dict[str, Any]:
         from codify.cli_store import _embedding_client
         from codify.retrieve.hybrid import retrieve
 
+        try:
+            embedding_client = _embedding_client()
+        except SystemExit as exc:  # the CLI helper's way of saying "not configured"
+            raise HTTPException(503, str(exc)) from exc
         async with sessions() as session:
             matches = await retrieve(
                 session,
                 q,
-                embedding_client=_embedding_client(),
+                embedding_client=embedding_client,
                 jurisdiction_code=jurisdiction,
                 language=language,
                 k=k,
@@ -204,18 +212,26 @@ def create_app(
     ) -> dict[str, Any]:
         suffix = Path(file.filename or "upload").suffix or ".pdf"
         source = Path(uploads.name) / f"{uuid.uuid4()}{suffix}"
-        source.write_bytes(await file.read())
-        run = runs.enqueue(
-            "ingest", {"source": str(source), "jurisdiction": jurisdiction, "title": title}
-        )
+        with source.open("wb") as out:
+            shutil.copyfileobj(file.file, out)
+        try:
+            run = runs.enqueue(
+                "ingest", {"source": str(source), "jurisdiction": jurisdiction, "title": title}
+            )
+        except QueueFull as exc:
+            source.unlink()
+            raise HTTPException(429, str(exc)) from exc
         return run.snapshot()
 
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> dict[str, Any]:
-        run = runs.enqueue(
-            "ingest",
-            {"source": str(body.url), "jurisdiction": body.jurisdiction, "title": body.title},
-        )
+        try:
+            run = runs.enqueue(
+                "ingest",
+                {"source": str(body.url), "jurisdiction": body.jurisdiction, "title": body.title},
+            )
+        except QueueFull as exc:
+            raise HTTPException(429, str(exc)) from exc
         return run.snapshot()
 
     @app.get("/runs")

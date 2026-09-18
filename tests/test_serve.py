@@ -400,6 +400,95 @@ async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.Monkey
         await app.state.sessions.kw["bind"].dispose()
 
 
+async def test_a_subscriber_outlives_its_forgotten_run() -> None:
+    gate = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        await gate.wait()
+        yield _complete()
+
+    table = RunTable(runner, keep=0)
+    run = table.enqueue("ingest", {})
+
+    async def watch() -> list[str]:
+        seen = []
+        async for e in table.stream(run.id):
+            seen.append(e["kind"])
+        return seen
+
+    task = asyncio.create_task(watch())
+    await asyncio.sleep(0.02)
+    gate.set()
+
+    assert await asyncio.wait_for(task, 5) == ["complete"]
+    assert table.get(run.id) is None
+
+
+async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        await asyncio.sleep(30)
+        yield _complete()
+
+    app = _app(runner)
+    app.state.runs._max_queued = 1
+    async with _client(runner, app) as c:
+        for _ in range(3):  # two run, one queues
+            await _enqueue(c)
+            await asyncio.sleep(0.01)
+        r = await c.post(
+            "/runs/ingest-url", json={"url": "https://example.test/b.xml", "jurisdiction": "xa"}
+        )
+        assert r.status_code == 429
+        r = await c.post(
+            "/runs/ingest",
+            files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
+            data={"jurisdiction": "xa"},
+        )
+        assert r.status_code == 429
+        assert len((await c.get("/runs")).json()) == 3
+        for run in app.state.runs.list():
+            app.state.runs.cancel(run.id)
+
+    assert list(app.state.uploads.iterdir()) == []
+
+
+async def test_out_of_range_paging_and_k_are_422_not_500() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        for path in (
+            "/laws?limit=-1",
+            "/laws?limit=0",
+            "/laws?offset=-1",
+            "/laws?limit=501",
+            "/jurisdictions/xa/laws?limit=-1",
+        ):
+            assert (await c.get(path)).status_code == 422, path
+        for path in (
+            "/search?q=x&jurisdiction=xa&k=-1",
+            "/search?q=x&jurisdiction=xa&k=0",
+            "/search?q=x&jurisdiction=xa&k=101",
+        ):
+            assert (await c.get(path)).status_code == 422, path
+
+
+async def test_search_without_an_embeddings_endpoint_is_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        r = await c.get("/search?q=x&jurisdiction=xa")
+
+    assert r.status_code == 503
+    assert "EMBEDDING_BASE_URL" in r.json()["detail"]
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])
