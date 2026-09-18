@@ -446,6 +446,12 @@ async def test_a_full_queue_is_429_and_keeps_no_upload() -> None:
         )
         assert r.status_code == 429
         assert len((await c.get("/runs")).json()) == 3
+        queued = app.state.runs.list()[0]
+        assert queued.status == "queued"
+        app.state.runs.cancel(queued.id)
+        await c.get(f"/runs/{queued.id}/stream")
+        await _enqueue(c)  # the freed slot refills
+        assert (await c.post(f"/runs/{queued.id}/retry")).status_code == 429
         for run in app.state.runs.list():
             app.state.runs.cancel(run.id)
 

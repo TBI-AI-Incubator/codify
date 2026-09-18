@@ -6,6 +6,7 @@ the only state is the in-memory run table, which a restart empties.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import shutil
 import tempfile
@@ -213,7 +214,7 @@ def create_app(
         suffix = Path(file.filename or "upload").suffix or ".pdf"
         source = Path(uploads.name) / f"{uuid.uuid4()}{suffix}"
         with source.open("wb") as out:
-            shutil.copyfileobj(file.file, out)
+            await asyncio.to_thread(shutil.copyfileobj, file.file, out)
         try:
             run = runs.enqueue(
                 "ingest", {"source": str(source), "jurisdiction": jurisdiction, "title": title}
@@ -267,7 +268,10 @@ def create_app(
 
     @app.post("/runs/{run_id}/retry", status_code=202)
     async def retry(run_id: uuid.UUID) -> dict[str, Any]:
-        run = runs.retry(run_id)
+        try:
+            run = runs.retry(run_id)
+        except QueueFull as exc:
+            raise HTTPException(429, str(exc)) from exc
         if run is None:
             raise HTTPException(409, "only a finished run can be retried")
         return run.snapshot()
