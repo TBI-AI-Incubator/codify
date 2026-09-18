@@ -1,11 +1,16 @@
 # Building the per-jurisdiction vector indexes
 
 `provision_embeddings` is partitioned by `jurisdiction_id` (core migration 0020).
-The parent index `provision_embeddings_hnsw_idx` is partitioned too: a partition
-created after it, by the trigger on `jurisdictions`, gets its own HNSW at creation.
-Partitions that existed when 0020 ran do not, because a build over millions of
-vectors takes hours and a migration must not hold that lock. Until a partition's
+The parent index `provision_embeddings_hnsw_idx` is partitioned too. The DEFAULT
+partition, created after it, carries its own HNSW from the start; partitions for
+the jurisdictions that existed when 0020 ran do not, because a build over millions
+of vectors takes hours and a migration must not hold that lock. Until a partition's
 index is attached, searches on it fall back to the exact scan they ran before.
+
+A jurisdiction created after 0020 writes to DEFAULT. When it is large enough to
+want its own partition, a migration runs `codify.storage.partitions.promote_sql`
+in one transaction with writers drained: the ATTACH clones the parent's foreign
+keys under a lock that waits on every open writer of `provisions`.
 
 Each step below runs outside a transaction (`CONCURRENTLY` demands it), so run
 it from `psql` with autocommit, not from a migration. Time it away from deploys
