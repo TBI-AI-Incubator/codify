@@ -1,5 +1,8 @@
 # Changelog
 
+Dates are cut dates. A version is released when its tag exists; the first tag is
+the launch tag.
+
 ## 0.3.0 — 2026-09-18
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
