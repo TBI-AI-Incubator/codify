@@ -1966,13 +1966,8 @@ def _scan_marginal_note_units(
     end: int | None = None,
     in_quote: Sequence[bool] | None = None,
 ) -> list[StructuralAnchor]:
-    """Basic units whose number stands alone under a marginal note, before `end`.
-
-    The note above must read as a heading and not already anchor a container;
-    the body, beside the number or on the next line, must open like a sentence;
-    and numbers must climb, so a page number or a list restarting at 1 between
-    paragraphs never becomes a provision.
-    """
+    """Basic units whose number stands alone under a marginal note, before `end`;
+    the guards below are each named by a test."""
     out: list[StructuralAnchor] = []
     last = 0
     for m in _MARGINAL_NUMBER_RE.finditer(text, toc_end, len(text) if end is None else end):

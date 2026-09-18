@@ -480,9 +480,8 @@ There is established an Authority.
 
 
 async def test_a_scan_with_no_basic_unit_says_the_body_was_never_filled() -> None:
-    """Sections printed with no number at all anchor their parts and nothing
-    below. The skeleton then ships as the document, which must not read as a
-    clean run."""
+    """Unnumbered sections anchor their parts and nothing below; the skeleton
+    then ships as the document, which must not read as a clean run."""
     with capture_logs() as logs:
         out = await text_to_bluebell_scaffolded(_PARTS_ONLY, client=_NeverCalled(), country="xa")  # type: ignore[arg-type]
     skipped = [r for r in logs if r["event"] == "body_fill_skipped"]
