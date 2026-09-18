@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
+import shutil
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -43,7 +43,6 @@ def _sse(text: str) -> list[tuple[str, dict[str, Any]]]:
 
 
 def _app(runner: Any) -> FastAPI:
-    os.environ.setdefault("POSTGRES_URL", "postgresql://x:y@localhost:5432/unused")
     return create_app(runner=runner)
 
 
@@ -518,6 +517,68 @@ async def test_a_failed_pass_before_complete_does_not_end_the_run() -> None:
 
     assert await asyncio.wait_for(watch(), 5) == ["failed", "complete"]
     assert run.status == "succeeded" and run.error is None
+
+
+async def test_shutdown_cancels_running_runs_before_cleanup() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        await asyncio.sleep(30)
+        yield _complete()
+
+    app = _app(runner)
+    async with app.router.lifespan_context(app), _client(runner, app) as c:
+        rid = await _enqueue(c)
+        await asyncio.sleep(0.02)
+
+    run = app.state.runs.get(uuid.UUID(rid))
+    assert run is not None and run.status == "cancelled"
+    assert not app.state.uploads.exists()
+
+
+async def test_an_unknown_or_uncanonical_jurisdiction_is_422_or_folded() -> None:
+    seen: list[str] = []
+
+    async def runner(p: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        seen.append(p["jurisdiction"])
+        yield _complete()
+
+    async with _client(runner) as c:
+        r = await c.post(
+            "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": "zz"}
+        )
+        assert r.status_code == 422
+        r = await c.post(
+            "/runs/ingest",
+            files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
+            data={"jurisdiction": "zz"},
+        )
+        assert r.status_code == 422
+        r = await c.post(
+            "/runs/ingest-url", json={"url": "https://example.test/a.xml", "jurisdiction": " XA "}
+        )
+        assert r.status_code == 202
+        await c.get(f"/runs/{r.json()['id']}/stream")
+
+    assert seen == ["xa"]
+
+
+async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    def broken(*_: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(shutil, "copyfileobj", broken)
+    app = _app(runner)
+    async with _client(runner, app) as c:
+        with pytest.raises(OSError, match="disk full"):
+            await c.post(
+                "/runs/ingest",
+                files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
+                data={"jurisdiction": "xa"},
+            )
+
+    assert list(app.state.uploads.iterdir()) == []
 
 
 def test_serve_is_registered() -> None:

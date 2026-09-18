@@ -115,6 +115,12 @@ class RunTable:
         task.cancel()
         return True
 
+    async def shutdown(self) -> None:
+        """Cancel what is running and wait for every task to end."""
+        for run_id in list(self._tasks):
+            self.cancel(run_id)
+        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+
     async def stream(self, run_id: uuid.UUID) -> AsyncIterator[dict[str, Any]]:
         """Every event so far, then each new one, until the run ends."""
         run = self._runs.get(run_id)

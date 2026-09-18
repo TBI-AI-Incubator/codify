@@ -77,6 +77,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
+        await runs.shutdown()
         uploads.cleanup()
         await engine.dispose()
 
@@ -208,25 +209,29 @@ def create_app(
     async def ingest(
         file: UploadFile = File(...), jurisdiction: str = Form(...), title: str | None = Form(None)
     ) -> dict[str, Any]:
+        code = _jurisdiction(jurisdiction)
         suffix = Path(file.filename or "upload").suffix or ".pdf"
         source = Path(uploads.name) / f"{uuid.uuid4()}{suffix}"
-        with source.open("wb") as out:
-            await asyncio.to_thread(shutil.copyfileobj, file.file, out)
         try:
+            with source.open("wb") as out:
+                await asyncio.to_thread(shutil.copyfileobj, file.file, out)
             run = runs.enqueue(
-                "ingest", {"source": str(source), "jurisdiction": jurisdiction, "title": title}
+                "ingest", {"source": str(source), "jurisdiction": code, "title": title}
             )
         except QueueFull as exc:
-            source.unlink()
+            source.unlink(missing_ok=True)
             raise HTTPException(429, str(exc)) from exc
+        except BaseException:  # a file no run will read is not kept
+            source.unlink(missing_ok=True)
+            raise
         return run.snapshot()
 
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> dict[str, Any]:
+        code = _jurisdiction(body.jurisdiction)
         try:
             run = runs.enqueue(
-                "ingest",
-                {"source": str(body.url), "jurisdiction": body.jurisdiction, "title": body.title},
+                "ingest", {"source": str(body.url), "jurisdiction": code, "title": body.title}
             )
         except QueueFull as exc:
             raise HTTPException(429, str(exc)) from exc
@@ -274,6 +279,16 @@ def create_app(
         return run.snapshot()
 
     return app
+
+
+def _jurisdiction(code: str) -> str:
+    """The canonical code of a shipped jurisdiction, or 422."""
+    from codify.jurisdictions import resolve_config
+
+    resolved = resolve_config(code)
+    if not resolved.found:
+        raise HTTPException(422, f"no jurisdiction config for {code!r}")
+    return resolved.code
 
 
 def _law_json(row: Any) -> dict[str, Any]:
