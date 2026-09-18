@@ -31,9 +31,11 @@ from codify.serve.schemas import (
     SearchMatch,
     SearchResult,
     VersionDetail,
+    VersionPage,
     VersionSummary,
 )
 from codify.settings import database_url
+from codify.storage.documents import VersionDocument
 
 SessionFactory = Callable[[], AsyncSession]
 _LIMIT = Query(50, ge=1, le=500)
@@ -235,6 +237,32 @@ def create_app(
         if row is None:
             raise HTTPException(404, "no such version")
         return VersionDetail.model_validate(row, from_attributes=True)
+
+    @app.get("/versions/{version_id}/document")
+    async def version_document(version_id: uuid.UUID) -> VersionDocument:
+        """The version as the reader's section tree, not as AKN."""
+        from codify.storage.documents import get_version_document
+
+        async with sessions() as session:
+            document = await get_version_document(session, version_id)
+        if document is None:
+            raise HTTPException(404, "no such version")
+        return document
+
+    @app.get("/laws/{law_id}/versions")
+    async def law_versions(
+        law_id: uuid.UUID, limit: int = Query(100, ge=1, le=500), cursor: uuid.UUID | None = None
+    ) -> VersionPage:
+        from codify.storage import list_versions
+
+        async with sessions() as session:
+            rows, next_cursor = await list_versions(
+                session, law_id, limit=limit, cursor=cursor, with_akn=False
+            )
+        return VersionPage(
+            items=[VersionSummary.model_validate(v, from_attributes=True) for v in rows],
+            next_cursor=next_cursor,
+        )
 
     @app.get("/search")
     async def search(

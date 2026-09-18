@@ -986,6 +986,49 @@ def test_a_plain_database_override_gets_the_async_driver() -> None:
     assert str(app.state.sessions.kw["bind"].url) == "postgresql+asyncpg://u:***@h/d"
 
 
+@pytest.mark.integration
+async def test_a_law_pages_its_versions_and_a_version_serves_its_document() -> None:
+    """The reader's routes: a cursor-paged version list and the section tree."""
+    from sqlalchemy import select
+
+    from codify.storage import save_document
+    from codify.storage.models import Law, Version
+
+    xml = FIXTURE.read_text(encoding="utf-8")
+    title = f"Reader {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        for lang in ("eng", "fra", "deu"):
+            doc = parse_akn(
+                xml.replace("/eng", f"/{lang}").replace('language="eng"', f'language="{lang}"')
+            )
+            vid = await save_document(s, doc, jurisdiction_code="xa", law_title=title, akn_xml=xml)
+        law_id = (await s.execute(select(Version.law_id).where(Version.id == vid))).scalar_one()
+        await s.commit()
+
+    try:
+        async with _client(None, app) as c:
+            first = (await c.get(f"/laws/{law_id}/versions", params={"limit": 2})).json()
+            second = (
+                await c.get(
+                    f"/laws/{law_id}/versions", params={"limit": 2, "cursor": first["next_cursor"]}
+                )
+            ).json()
+            document = (await c.get(f"/versions/{vid}/document")).json()
+            assert (await c.get(f"/versions/{uuid.uuid4()}/document")).status_code == 404
+        assert [len(first["items"]), len(second["items"])] == [2, 1]
+        assert second["next_cursor"] is None
+        assert {"akn_xml"} & set(first["items"][0]) == set()
+        assert document["version_id"] == str(vid)
+        assert document["frbr_work_uri"] == "/akn/xa/act/1992/7"
+        assert document["sections"][0]["akn_eid"] == "part_I"
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.id == law_id))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

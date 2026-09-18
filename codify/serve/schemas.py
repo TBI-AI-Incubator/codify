@@ -44,6 +44,11 @@ class VersionDetail(VersionSummary):
     akn_xml: str
 
 
+class VersionPage(BaseModel):
+    items: list[VersionSummary]
+    next_cursor: uuid.UUID | None  # pass back as `cursor` for the next page
+
+
 class LawDetail(BaseModel):
     id: uuid.UUID
     jurisdiction: str

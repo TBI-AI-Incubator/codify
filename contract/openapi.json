@@ -835,6 +835,363 @@
         "title": "DocumentClass",
         "type": "object"
       },
+      "DocumentProvision": {
+        "description": "Leaf-level legal text, paragraph / subparagraph / point.\n\n`text` remains the plain-text shadow for search / fallback rendering;\n`blocks` is the rich AST built from the AKN sub-tree.",
+        "properties": {
+          "akn_eid": {
+            "title": "Akn Eid",
+            "type": "string"
+          },
+          "akn_type": {
+            "title": "Akn Type",
+            "type": "string"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentProvisionBlock"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "normative": {
+            "default": true,
+            "title": "Normative",
+            "type": "boolean"
+          },
+          "num": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "akn_eid",
+          "akn_type",
+          "text",
+          "position"
+        ],
+        "title": "DocumentProvision",
+        "type": "object"
+      },
+      "DocumentProvisionBlock": {
+        "description": "One row in a nested-provision tree (paragraph / subparagraph / \u2026).\n\nCarries its own number, optional heading, intro inline run, nested\nblocks, and trailing wrap-up so renderers can present a hanging\nnumbered hierarchy rather than a flattened paragraph. `table` is set\n(and everything else empty) when `akn_type == \"table\"`.",
+        "properties": {
+          "akn_eid": {
+            "title": "Akn Eid",
+            "type": "string"
+          },
+          "akn_type": {
+            "title": "Akn Type",
+            "type": "string"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentProvisionBlock"
+            },
+            "title": "Blocks",
+            "type": "array"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "intro": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Intro",
+            "type": "array"
+          },
+          "num": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num"
+          },
+          "table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DocumentTable"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wrap_up": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Wrap Up",
+            "type": "array"
+          }
+        },
+        "required": [
+          "akn_eid",
+          "akn_type"
+        ],
+        "title": "DocumentProvisionBlock",
+        "type": "object"
+      },
+      "DocumentSection": {
+        "description": "Hierarchical container, title / chapter / part / article / etc.\n\nHolds child sections and provisions in their persisted `position` order.\nTop-level provisions (those without an enclosing section) hang off the\n`VersionDocument.provisions` list instead.",
+        "properties": {
+          "akn_eid": {
+            "title": "Akn Eid",
+            "type": "string"
+          },
+          "akn_type": {
+            "title": "Akn Type",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "num": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "provisions": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentProvision"
+            },
+            "title": "Provisions",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "akn_eid",
+          "akn_type",
+          "title",
+          "position"
+        ],
+        "title": "DocumentSection",
+        "type": "object"
+      },
+      "DocumentTable": {
+        "description": "An AKN `<table>`, eId-keyed like every other citable unit.",
+        "properties": {
+          "akn_eid": {
+            "title": "Akn Eid",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentTableRow"
+            },
+            "title": "DocumentTableRows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "akn_eid"
+        ],
+        "title": "DocumentTable",
+        "type": "object"
+      },
+      "DocumentTableCell": {
+        "description": "One `<th>`/`<td>`; `content` is the same inline AST as any other cell of\nlegal text, so refs/terms/citations inside a table cell still render.",
+        "properties": {
+          "akn_eid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Eid"
+          },
+          "colspan": {
+            "default": 1,
+            "title": "Colspan",
+            "type": "integer"
+          },
+          "content": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Content",
+            "type": "array"
+          },
+          "header": {
+            "default": false,
+            "title": "Header",
+            "type": "boolean"
+          },
+          "rowspan": {
+            "default": 1,
+            "title": "Rowspan",
+            "type": "integer"
+          }
+        },
+        "title": "DocumentTableCell",
+        "type": "object"
+      },
+      "DocumentTableRow": {
+        "properties": {
+          "akn_eid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Akn Eid"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentTableCell"
+            },
+            "title": "DocumentTableCells",
+            "type": "array"
+          }
+        },
+        "title": "DocumentTableRow",
+        "type": "object"
+      },
       "EnactingFormula": {
         "additionalProperties": true,
         "properties": {
@@ -1570,6 +1927,292 @@
           "jurisdiction"
         ],
         "title": "IngestUrl",
+        "type": "object"
+      },
+      "InlineCitation": {
+        "properties": {
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "kind": {
+            "const": "citation",
+            "default": "citation",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "uri": {
+            "title": "Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "uri"
+        ],
+        "title": "InlineCitation",
+        "type": "object"
+      },
+      "InlineEmph": {
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "kind": {
+            "const": "emph",
+            "default": "emph",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "InlineEmph",
+        "type": "object"
+      },
+      "InlineMod": {
+        "description": "An amending instruction's quoted words.",
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "kind": {
+            "const": "mod",
+            "default": "mod",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "InlineMod",
+        "type": "object"
+      },
+      "InlineNote": {
+        "description": "A footnote bound to the provision it annotates, not part of its prose.",
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "inferred": {
+            "default": false,
+            "title": "Inferred",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "note",
+            "default": "note",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "InlineNote",
+        "type": "object"
+      },
+      "InlineRef": {
+        "properties": {
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "kind": {
+            "const": "ref",
+            "default": "ref",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "InlineRef",
+        "type": "object"
+      },
+      "InlineStrong": {
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "kind": {
+            "const": "strong",
+            "default": "strong",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "title": "InlineStrong",
+        "type": "object"
+      },
+      "InlineTerm": {
+        "properties": {
+          "kind": {
+            "const": "term",
+            "default": "term",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "InlineTerm",
+        "type": "object"
+      },
+      "InlineText": {
+        "properties": {
+          "kind": {
+            "const": "text",
+            "default": "text",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "InlineText",
         "type": "object"
       },
       "JurisdictionConfig": {
@@ -3486,6 +4129,196 @@
         "title": "VersionDetail",
         "type": "object"
       },
+      "VersionDocument": {
+        "description": "Full body of a single version, rendered as a tree.",
+        "properties": {
+          "amendment_markers": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Amendment Markers",
+            "type": "array"
+          },
+          "conclusions": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "expression_date": {
+            "format": "date",
+            "title": "Expression Date",
+            "type": "string"
+          },
+          "frbr_expression_uri": {
+            "title": "Frbr Expression Uri",
+            "type": "string"
+          },
+          "frbr_work_uri": {
+            "title": "Frbr Work Uri",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "law_id": {
+            "format": "uuid",
+            "title": "Law Id",
+            "type": "string"
+          },
+          "preamble": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Preamble",
+            "type": "array"
+          },
+          "preface": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Preface",
+            "type": "array"
+          },
+          "provisions": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentProvision"
+            },
+            "title": "Provisions",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version_id",
+          "law_id",
+          "frbr_work_uri",
+          "frbr_expression_uri",
+          "language",
+          "expression_date"
+        ],
+        "title": "VersionDocument",
+        "type": "object"
+      },
+      "VersionPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VersionSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "VersionPage",
+        "type": "object"
+      },
       "VersionSummary": {
         "properties": {
           "expression_date": {
@@ -3860,6 +4693,75 @@
         "summary": "Law"
       }
     },
+    "/laws/{law_id}/versions": {
+      "get": {
+        "operationId": "law_versions_laws__law_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "law_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Law Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Law Versions"
+      }
+    },
     "/runs": {
       "get": {
         "operationId": "list_runs_runs_get",
@@ -4232,6 +5134,47 @@
           }
         },
         "summary": "Version"
+      }
+    },
+    "/versions/{version_id}/document": {
+      "get": {
+        "description": "The version as the reader's section tree, not as AKN.",
+        "operationId": "version_document_versions__version_id__document_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDocument"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Version Document"
       }
     }
   }
