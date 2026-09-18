@@ -603,6 +603,55 @@ async def test_two_runs_ending_on_one_tick_both_reach_their_subscribers() -> Non
     assert first.completed_at and second.completed_at
 
 
+async def test_a_malformed_jurisdiction_code_is_404_not_500() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    async with _client(runner) as c:
+        for code in ("..", "%2E%2E", "a/b", "zz"):
+            assert (await c.get(f"/jurisdictions/{code}")).status_code == 404, code
+
+
+@pytest.mark.integration
+async def test_law_detail_lists_every_version_past_the_first_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from sqlalchemy import select
+
+    from codify.storage import save_document
+    from codify.storage import versions as versions_module
+    from codify.storage.models import Law, Version
+
+    # Pages of two, so three stored versions need the cursor followed.
+    original = versions_module.list_versions
+
+    async def two_per_page(session: Any, law_id: Any, **kw: Any) -> Any:
+        return await original(session, law_id, limit=2, cursor=kw.get("cursor"))
+
+    monkeypatch.setattr("codify.storage.list_versions", two_per_page)
+    xml = FIXTURE.read_text(encoding="utf-8")
+    title = f"Paged {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        for lang in ("eng", "fra", "deu"):
+            doc = parse_akn(
+                xml.replace("/eng", f"/{lang}").replace('language="eng"', f'language="{lang}"')
+            )
+            vid = await save_document(s, doc, jurisdiction_code="xa", law_title=title, akn_xml=xml)
+        law_id = (await s.execute(select(Version.law_id).where(Version.id == vid))).scalar_one()
+        await s.commit()
+
+    try:
+        async with _client(None, app) as c:
+            law = (await c.get(f"/laws/{law_id}")).json()
+        assert sorted(v["language"] for v in law["versions"]) == ["deu", "eng", "fra"]
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.id == law_id))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

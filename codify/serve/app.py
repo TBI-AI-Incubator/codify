@@ -105,11 +105,11 @@ def create_app(
 
     @app.get("/jurisdictions/{code}")
     async def jurisdiction(code: str) -> dict[str, Any]:
-        from codify.jurisdictions import JurisdictionDataMissing, load_config
+        from codify.jurisdictions import JurisdictionConfigError, load_config
 
         try:
             config = load_config(code)
-        except JurisdictionDataMissing as exc:
+        except JurisdictionConfigError as exc:  # missing or malformed: neither is ours
             raise HTTPException(404, str(exc)) from exc
         return config.model_dump(mode="json")
 
@@ -154,7 +154,10 @@ def create_app(
             if found is None:
                 raise HTTPException(404, "no such law")
             row, code = found
-            versions, _ = await list_versions(session, law_id)
+            versions, cursor = await list_versions(session, law_id)
+            while cursor is not None:  # every version, not the first page
+                page, cursor = await list_versions(session, law_id, cursor=cursor)
+                versions.extend(page)
         return {
             **_law_json(row),
             "jurisdiction": code,
