@@ -133,9 +133,9 @@ def _attestation_start(
 
 # Place, date, name and role are short lines. A sentence of obligations is not.
 _ATTESTATION_MAX_WORDS = 14
-# A signature block: the phrase, a name, a role, a date or place. Longer is an
-# appended instrument the boundary set aside, which carries no signatory to group.
-_SIGNATURE_BLOCK_MAX_PARAGRAPHS = 8
+# Lines after the phrase in a signature block: a rank, a name, a role. More, or a
+# digit, is an appended instrument the boundary set aside, with no signatory to group.
+_SIGNATURE_BLOCK_MAX_PARAGRAPHS = 4
 _HAS_DIGIT = re.compile(r"[\d٠-٩۰-۹]")
 
 
@@ -159,12 +159,18 @@ def _keep_tail(element: etree._Element) -> None:
 
 
 def _is_direct_signature(conclusions: etree._Element, phrases: tuple[str, ...]) -> bool:
-    """A short block opening on a closing phrase, with no signatory grouped yet."""
+    """A block that is a signature and nothing else: the closing phrase, then a
+    few digit-free lines (rank, name, role), with no signatory grouped yet."""
     paragraphs = conclusions.findall("akn:p", NS)
     if not paragraphs or conclusions.find("akn:blockContainer", NS) is not None:
         return False
-    first = "".join(paragraphs[0].itertext())
-    return len(paragraphs) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS and any(p in first for p in phrases)
+    texts = ["".join(p.itertext()) for p in paragraphs]
+    if not any(phrase in texts[0] for phrase in phrases):
+        return False
+    following = texts[1:]
+    return 2 <= len(following) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS and not any(
+        _HAS_DIGIT.search(t) for t in following
+    )
 
 
 def _regroup_signatory(conclusions: etree._Element) -> None:

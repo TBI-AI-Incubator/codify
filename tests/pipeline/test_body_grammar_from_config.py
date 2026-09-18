@@ -782,13 +782,14 @@ def test_a_direct_conclusions_block_still_groups_the_signatory(declared: Any) ->
     assert [" ".join(p.itertext()) for p in block] == ["The Warden", "Harbour Clerk"]
 
 
-def test_a_long_conclusions_block_is_not_regrouped(declared: Any) -> None:
+def test_a_block_holding_an_appended_instrument_is_not_regrouped(declared: Any) -> None:
     from codify.pipeline.enrich.bluebell import parse_to_akn
     from codify.pipeline.enrich.conclusions import emit_conclusions
     from codify.pipeline.enrich.regions import RegionVocabulary
 
-    body = "\n".join(f"Appended line {i} of the instrument" for i in range(12))
-    lines = scaffold_mod._conclusions_lines(f"{CLOSING}\nThe Warden\n{body}")
+    lines = scaffold_mod._conclusions_lines(
+        f"{CLOSING}\nThe Warden\nAppended instrument\nSECTION 1\nAppended one."
+    )
     akn = parse_to_akn(
         "BODY\n  SECTION 1\n    One.\n\n" + "\n".join(lines) + "\n",
         country=COUNTRY,
