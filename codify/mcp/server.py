@@ -246,14 +246,17 @@ def create_server(
         "and flagged when cut."
     )
     async def get_version(version_id: str, include_xml: bool = False) -> dict[str, Any]:
-        from codify.storage import get_version
+        from codify.storage import get_version, get_version_akn_length
 
+        key = _id(version_id, "version")
         async with sessions() as session:
-            row = await get_version(session, _id(version_id, "version"))
-        if row is None:
-            raise ToolError(f"no version {version_id}")
+            # The body is loaded only when asked for; its length is measured in the database.
+            row = await get_version(session, key, with_akn=include_xml)
+            if row is None:
+                raise ToolError(f"no version {version_id}")
+            length = len(row.akn_xml) if include_xml else await get_version_akn_length(session, key)
         out = _version_json(row)
-        out["akn_xml_length"] = len(row.akn_xml)
+        out["akn_xml_length"] = length
         if include_xml:
             out["akn_xml"] = row.akn_xml[:xml_cap]
             out["akn_xml_truncated"] = len(row.akn_xml) > xml_cap

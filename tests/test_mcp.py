@@ -323,11 +323,17 @@ async def test_get_version_respects_the_xml_cap(monkeypatch: pytest.MonkeyPatch)
 
     xml = "<akomaNtoso>" + "x" * 500 + "</akomaNtoso>"
     version = _version(uuid.uuid4(), xml)
+    bodies: list[bool | None] = []
 
-    async def fake_get(session: Any, version_id: uuid.UUID) -> Version | None:
+    async def fake_get(session: Any, version_id: uuid.UUID, **kw: Any) -> Version | None:
+        bodies.append(kw.get("with_akn"))
         return version if version_id == version.id else None
 
+    async def fake_length(session: Any, version_id: uuid.UUID) -> int | None:
+        return 4321  # not len(xml): a metadata read measures in the database, not the row
+
     monkeypatch.setattr(codify.storage, "get_version", fake_get)
+    monkeypatch.setattr(codify.storage, "get_version_akn_length", fake_length)
     server = create_server(sessions=_no_session, xml_cap=100)
 
     bare = await _call(server, "get_version", version_id=str(version.id))
@@ -336,8 +342,9 @@ async def test_get_version_respects_the_xml_cap(monkeypatch: pytest.MonkeyPatch)
 
     assert not bare.is_error
     assert "akn_xml" not in bare.structured_content
-    assert bare.structured_content["akn_xml_length"] == len(xml)
+    assert bare.structured_content["akn_xml_length"] == 4321
     assert bare.structured_content["structural_quality_grade"] == "clean"
+    assert bodies == [False, True, False]  # the body is loaded only when asked for
     out = capped.structured_content
     assert out["akn_xml"] == xml[:100]
     assert out["akn_xml_truncated"] is True
@@ -352,7 +359,7 @@ async def test_get_version_under_the_cap_is_whole_and_says_so(
 
     version = _version(uuid.uuid4())
 
-    async def fake_get(session: Any, version_id: uuid.UUID) -> Version | None:
+    async def fake_get(session: Any, version_id: uuid.UUID, **kw: Any) -> Version | None:
         return version
 
     monkeypatch.setattr(codify.storage, "get_version", fake_get)
@@ -557,6 +564,49 @@ def test_the_command_serves_the_tools_over_stdio(monkeypatch: pytest.MonkeyPatch
     assert one["code"] == "xa"
 
 
+def test_the_command_serves_the_tools_over_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The real transport: `--http` as a subprocess, spoken to at /mcp as a client would."""
+    import socket
+    import subprocess
+    import time
+
+    monkeypatch.setenv("POSTGRES_URL", "postgresql://x:y@localhost:5432/unused")
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            f"from codify.cli import main; main(['mcp', '--http', '--port', '{port}'])",
+        ]
+    )
+
+    async def run() -> tuple[set[str], Any]:
+        async with Client(f"http://127.0.0.1:{port}/mcp", read_timeout_seconds=60) as c:
+            names = {t.name for t in (await c.list_tools()).tools}
+            one = await c.call_tool("get_jurisdiction", {"code": "xa"})
+        return names, one.structured_content
+
+    try:
+        deadline = time.monotonic() + 60
+        while True:  # the port answers once uvicorn is listening
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=1).close()
+                break
+            except OSError:
+                assert proc.poll() is None, "the server exited before listening"
+                assert time.monotonic() < deadline, "the server never listened"
+                time.sleep(0.1)
+        names, one = asyncio.run(run())
+    finally:
+        proc.terminate()
+        proc.wait(timeout=30)
+
+    assert names == TOOL_NAMES
+    assert one["code"] == "xa"
+
+
 def test_the_default_engine_is_disposed_when_the_server_stops(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -611,6 +661,41 @@ async def test_one_embeddings_client_serves_every_search_and_closes_when_the_ser
         assert (_Embeddings.built, _Transport.closed) == (1, 0)
 
     assert (_Embeddings.built, _Transport.closed) == (1, 1)
+
+
+@pytest.mark.integration
+async def test_a_metadata_read_leaves_the_body_in_the_database() -> None:
+    """The real store: `with_akn=False` defers the body; the length is measured where it lies."""
+    from sqlalchemy import delete, inspect
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from codify.akn.io import parse_akn
+    from codify.settings import database_url
+    from codify.storage import get_version, get_version_akn_length, save_document
+    from codify.storage.models import Law
+
+    xml = FIXTURE.read_text(encoding="utf-8")
+    engine = create_async_engine(database_url())
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with sessions() as s:
+        vid = await save_document(
+            s, parse_akn(xml), jurisdiction_code="xa", law_title="Deferred", akn_xml=xml
+        )
+        await s.commit()
+    try:
+        async with sessions() as s:
+            bare = await get_version(s, vid, with_akn=False)
+            assert bare is not None and "akn_xml" in inspect(bare).unloaded
+            length = await get_version_akn_length(s, vid)
+            whole = await get_version(s, vid)  # the same identity: this loads the body
+            assert whole is not None and "akn_xml" not in inspect(whole).unloaded
+            assert length == len(whole.akn_xml) == len(xml)
+            assert await get_version_akn_length(s, uuid.uuid4()) is None
+    finally:
+        async with sessions() as s:
+            await s.execute(delete(Law).where(Law.id == whole.law_id))
+            await s.commit()
+        await engine.dispose()
 
 
 @pytest.mark.integration
