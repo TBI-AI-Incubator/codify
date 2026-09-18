@@ -103,10 +103,17 @@ def _ingest_runner(
     return run
 
 
+class EventStream(StreamingResponse):
+    media_type = "text/event-stream"
+
+
 def create_app(
-    *, runner: Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]] | None = None
+    *,
+    runner: Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]] | None = None,
+    database: str | None = None,
 ) -> FastAPI:
-    engine = create_async_engine(database_url())
+    """`database` overrides `POSTGRES_URL`; nothing connects until a route needs to."""
+    engine = create_async_engine(database or database_url())
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     # Uploads live as long as the runs that read them, and go when the run is forgotten.
     uploads = tempfile.TemporaryDirectory(prefix="codify-uploads-")
@@ -309,8 +316,8 @@ def create_app(
             raise HTTPException(404, "no such run")
         return _snapshot(run)
 
-    @app.get("/runs/{run_id}/stream")
-    async def run_stream(run_id: uuid.UUID, request: Request) -> StreamingResponse:
+    @app.get("/runs/{run_id}/stream", response_class=EventStream)
+    async def run_stream(run_id: uuid.UUID, request: Request) -> EventStream:
         if runs.get(run_id) is None:
             raise HTTPException(404, "no such run")
 
@@ -321,7 +328,7 @@ def create_app(
                 yield f"event: {event.get('kind', 'event')}\ndata: {json.dumps(event)}\n\n".encode()
             yield b"event: end\ndata: {}\n\n"
 
-        return StreamingResponse(body(), media_type="text/event-stream")
+        return EventStream(body())
 
     @app.post("/runs/{run_id}/cancel")
     async def cancel(run_id: uuid.UUID) -> Cancelled:

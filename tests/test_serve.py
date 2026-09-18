@@ -942,11 +942,23 @@ def test_every_success_response_names_a_schema() -> None:
     paths = _app(None).openapi()["paths"]
     for path, ops in paths.items():
         for method, op in ops.items():
-            if path.endswith("/stream"):
-                continue  # server-sent events, not JSON
             ok = next(r for code, r in op["responses"].items() if code.startswith("2"))
+            if path.endswith("/stream"):
+                assert list(ok["content"]) == ["text/event-stream"], f"{method} {path}"
+                continue
             schema = ok["content"]["application/json"]["schema"]
             assert "$ref" in schema or "$ref" in schema.get("items", {}), f"{method} {path}"
+
+
+def test_the_schema_prints_without_a_database(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("POSTGRES_URL", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")  # where an unset URL is an error
+
+    assert main(["serve", "--openapi"]) == 0
+
+    assert json.loads(capsys.readouterr().out)["openapi"].startswith("3.")
 
 
 def test_serve_is_registered() -> None:
