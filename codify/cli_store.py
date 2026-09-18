@@ -94,9 +94,10 @@ def _descriptors(doc: Document) -> tuple[str, int | None, str]:
     from codify.frbr import UNKNOWN_YEAR
 
     uri = FrbrUri.parse(doc.frbr_work_uri)
-    year = uri.date[:4]
-    resolved = int(year) if year.isdigit() and year != UNKNOWN_YEAR else None
-    return uri.subtype or uri.doctype, doc.work_date.year if doc.work_date else resolved, uri.number
+    year = str(doc.work_date.year) if doc.work_date else uri.date[:4]
+    # An undated work carries the sentinel year in both the URI and the work date.
+    resolved = int(year) if year.isdigit() and int(year) != int(UNKNOWN_YEAR) else None
+    return uri.subtype or uri.doctype, resolved, uri.number
 
 
 async def _load(args: argparse.Namespace) -> int:

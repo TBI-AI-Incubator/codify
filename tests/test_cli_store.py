@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 
 from codify import cli_store
 from codify.akn.document import Document
+from codify.akn.io import parse_akn
 from codify.cli import main
 from codify.settings import database_url
 from codify.storage.models import Law, Version
@@ -65,6 +66,19 @@ def test_descriptors_come_from_the_work_uri_with_the_unknown_year_folded() -> No
         1991,
         "7",
     )
+
+
+def test_an_undated_work_loads_with_no_year() -> None:
+    """The placeholder work date the AKN carries for an unknown year is not a year."""
+    xml = FIXTURE.read_text(encoding="utf-8").replace("/akn/xa/act/1992/7", "/akn/xa/act/0001/7")
+    xml = xml.replace(
+        'FRBRdate date="1992-01-01" name="Generation"',
+        'FRBRdate date="0001-01-01" name="Generation"',
+    )
+    doc = parse_akn(xml)
+    assert doc.work_date == date(1, 1, 1)
+
+    assert cli_store._descriptors(doc) == ("act", None, "7")
 
 
 def test_the_first_set_variable_wins(monkeypatch: pytest.MonkeyPatch) -> None:
