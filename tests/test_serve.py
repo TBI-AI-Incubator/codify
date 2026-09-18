@@ -581,6 +581,28 @@ async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPat
     assert list(app.state.uploads.iterdir()) == []
 
 
+async def test_two_runs_ending_on_one_tick_both_reach_their_subscribers() -> None:
+    """The first run's eviction pass must not forget a run whose task has returned
+    but whose done callback has not yet published the end sentinel."""
+    gate = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        await gate.wait()
+        yield _complete()
+
+    table = RunTable(runner, keep=0)
+    first, second = table.enqueue("ingest", {}), table.enqueue("ingest", {})
+    await asyncio.sleep(0.02)
+    watchers = [asyncio.create_task(_collect(table, r.id)) for r in (first, second)]
+    await asyncio.sleep(0.02)
+    gate.set()
+
+    events = await asyncio.wait_for(asyncio.gather(*watchers), 5)
+
+    assert [[e["kind"] for e in run] for run in events] == [["complete"], ["complete"]]
+    assert first.completed_at and second.completed_at
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])

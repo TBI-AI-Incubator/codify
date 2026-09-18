@@ -178,8 +178,10 @@ class RunTable:
         self._forget_oldest()
 
     def _forget_oldest(self) -> None:
+        # Only runs whose done callback has run: a task that has returned but not
+        # yet called _finish still needs its maps to publish the end sentinel.
         done = sorted(
-            (r for r in self._runs.values() if r.status in TERMINAL),
+            (r for r in self._runs.values() if r.completed_at is not None),
             key=lambda r: r.completed_at or r.created_at,
         )
         for old in done[: max(0, len(done) - self._keep)]:
