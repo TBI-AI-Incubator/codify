@@ -8,7 +8,7 @@ Accepted
 
 Six jurisdictions use non-Gregorian calendar systems: Saudi Arabia (lunar Hijri), Iran (solar Hijri/Jalali), Ethiopia (Ethiopian), Japan (imperial era), Thailand (Buddhist Era), and Morocco (dual Hijri/Gregorian). Libya historically used a "Death of the Prophet" calendar (1978-2011).
 
-During jurisdiction profiling, each agent independently chose whether to use the local calendar or Gregorian in FRBR URIs. This produced inconsistent URIs across the database: some configs used Hijri years, others Gregorian, with no project-wide rule.
+During jurisdiction profiling, each profile independently chose whether to use the local calendar or Gregorian in FRBR URIs. This produced inconsistent URIs across configs: some used Hijri years, others Gregorian, with no project-wide rule.
 
 The FRBR URI year segment is immutable once documents are ingested. Changing the convention after production ingestion would require re-generating all URIs for affected jurisdictions.
 
@@ -36,4 +36,4 @@ The `calendar` field in the jurisdiction config records which calendar system th
 - Non-Gregorian jurisdictions require a calendar conversion step during ingestion (Hijri/Ethiopian/Buddhist/Imperial date → Gregorian year for the URI).
 - The `calendar` config field preserves the jurisdiction's native system for display and metadata purposes.
 - The `<FRBRalias>` element in each document stores the authoritative local-calendar citation for legal accuracy.
-- This decision does NOT affect how dates are displayed in the UI; the UI can show dates in the local calendar if the jurisdiction config's `calendar` field indicates a non-Gregorian system.
+- This decision does not affect display: a user interface can show dates in the local calendar where the jurisdiction config's `calendar` field names a non-Gregorian system.

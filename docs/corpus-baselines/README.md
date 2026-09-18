@@ -19,4 +19,4 @@ uv run pytest tests/quality/test_fixture_baseline.py -q
 ```
 
 Review the measurement diff before accepting a new baseline. Successful
-regeneration alone does not establish that changed behavior is correct.
+regeneration alone does not establish that changed behaviour is correct.

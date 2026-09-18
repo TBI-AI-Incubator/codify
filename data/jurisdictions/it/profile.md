@@ -218,7 +218,7 @@ For Decreto Legge (emergency decree):
 
 **Bluebell limitation note**: Bluebell uses `PARAGRAPH` for comma, but Italian commas are numbered (1, 2, 3) rather than using the unmumbered `alinea` pattern of French law. The pipeline must ensure comma numbers are preserved in the `<num>` element of each `<paragraph>` rather than treating them as unnumbered alinee.
 
-**Prompt variant required**: Italian legislation requires a jurisdiction-specific Bluebell structuring prompt (`structure_it.txt`) because:
+**Prompt variant**: Italian legislation would need a jurisdiction-specific `structuring.prompt_variant` because:
 
 1. The basic unit is `ARTICLE` not `SECTION`
 2. `SECTION` (Sezione) is a higher division above articles, not the basic unit
@@ -294,9 +294,9 @@ OASIS AKN standard, which defines its own naming-convention compliance levels.
 
 1. **Decreto Legge subtype URI collision**: D.L. and D.Lgs. both abbreviated to `dl` in the proposed URI pattern. Recommend: use `dlgs` for Decreto Legislativo and `dl` for Decreto Legge. Needs a definitive decision before bulk ingest. Current proposal: `dl_emergency` for D.L., `dl` for D.Lgs.; review against normattiva.it URI conventions for alignment.
 
-2. **Comma → AKN element mapping**: Italian commas are numbered (1., 2., 3.) and occupy the same structural role as French alinée (unnumbered paragraphs). The hierarchy-mapping reference lists `alinea` for French and `paragraph` for Italian at this level. However, `alinea` produces an unnumbered element in AKN, while `paragraph` expects a `<num>` element. Italian commas ARE numbered, so `paragraph` with `<num>` is the correct mapping, but the Bluebell `PARAGRAPH` keyword must be used carefully. Confirm with a Bluebell parse test.
+2. **Comma → AKN element mapping**: Italian commas are numbered (1., 2., 3.) and occupy the same structural role as French alinée (unnumbered paragraphs). Comparative hierarchy tables list `alinea` for French and `paragraph` for Italian at this level. However, `alinea` produces an unnumbered element in AKN, while `paragraph` expects a `<num>` element. Italian commas ARE numbered, so `paragraph` with `<num>` is the correct mapping, but the Bluebell `PARAGRAPH` keyword must be used carefully. Confirm with a Bluebell parse test.
 
-3. **Sezione as higher division vs. basic unit**: In the hierarchy-mapping reference, row 6 maps Italian "Sezione" to `section` used as a higher division above articles. This is confirmed for codes. However, some shorter Italian statutes have no intermediate hierarchy and go directly from the act title to articles; Sezione may occasionally appear as a grouping device in these. The profile models Sezione as always a higher division. Verify against short acts without codes.
+3. **Sezione as higher division vs. basic unit**: Comparative hierarchy tables map Italian "Sezione" to `section` used as a higher division above articles. This is confirmed for codes. However, some shorter Italian statutes have no intermediate hierarchy and go directly from the act title to articles; Sezione may occasionally appear as a grouping device in these. The profile models Sezione as always a higher division. Verify against short acts without codes.
 
 4. **Regio Decreto FRBR URIs**: Hundreds of R.D. instruments from the monarchy era remain in force. The proposed `rd` subtype places them under the current `it` country code, which is correct (they are part of Italy's legal corpus). However, the Republic government post-1948 has republished many in consolidated form. The canonical FRBR number should use the original R.D. number, not any subsequent consolidated number. Verify with normattiva.it URI patterns.
 
@@ -320,12 +320,11 @@ OASIS AKN standard, which defines its own naming-convention compliance levels.
 
 - normattiva.it: official Italian legal database (IPZS). Primary source for act text, numbering, XML structure. https://www.normattiva.it
 - Gazzetta Ufficiale online: https://www.gazzettaufficiale.it
-- Camera dei Deputati legislative process: https://www.camera.it/leg19/681
+- Camera dei Deputati legislative process: https://www.camera.it/
 - Senato della Repubblica: https://www.senato.it
-- Costituzione della Repubblica Italiana: https://www.quirinale.it/page/costituzione
+- Costituzione della Repubblica Italiana: https://www.senato.it/istituzione/la-costituzione
 - CIRSFID/CIRSDIG AKN origin documentation: University of Bologna. Monica Palmirani, Fabio Vitali. "Akoma-Ntoso for Legal Documents", Legislative XML for the Semantic Web, Springer 2011.
 - Legge 7 agosto 1990, n. 241 (Legge sul procedimento amministrativo): examined directly on normattiva.it as structural reference (48 articles, Capi structure, rubriche present, comma numbering confirmed).
 - D.Lgs. 30 marzo 2001, n. 165: examined for decreto legislativo structure and promulgation formula.
 - Codice Civile (R.D. 16 marzo 1942, n. 262): examined for deep hierarchy (Libro > Titolo > Capo > Sezione > Articolo), bis/ter insertion numbering, Regio Decreto promulgation formula.
 - AKN4EU profile documentation: EUR-Lex. For EU membership context and supranational layer mapping.
-- Internal hierarchy-mapping reference: Italian column confirmed against actual documents.

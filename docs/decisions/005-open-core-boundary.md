@@ -1,8 +1,8 @@
 # Core and plugin boundary
 
 Codify contains legal-document acquisition, structuring, validation, storage,
-retrieval, comparison and generic plugin interfaces. It can run independently
-of Codify Platform.
+retrieval, comparison and generic plugin interfaces. It runs without the
+hosted platform.
 
 Commercial detector implementations, private catalogues and customer corpora
 are not included. Applications may register their own lenses and supply their

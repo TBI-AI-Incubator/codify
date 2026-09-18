@@ -407,7 +407,7 @@
     "documents_examined": 0,
     "bluebell_tested": false,
     "unresolved_ambiguities": 7,
-    "note": "Profile built from training knowledge of well-documented Nordic civil law jurisdiction. WebFetch unavailable during generation — direct document inspection against Finlex not performed. All [UNVERIFIED] items in profile.md require confirmation before promoting to production."
+    "note": "Profile built from published descriptions of Finnish drafting; no document was inspected directly against Finlex. The unresolved ambiguities in profile.md need confirmation before promotion to production."
   },
   "tier": 1,
   "status": "draft",

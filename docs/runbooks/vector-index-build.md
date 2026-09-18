@@ -14,7 +14,7 @@ keys under a lock that waits on every open writer of `provisions`.
 
 Each step below runs outside a transaction (`CONCURRENTLY` demands it), so run
 it from `psql` with autocommit, not from a migration. Time it away from deploys
-and drain writers to the partition first if the deploy guard watches for long
+and drain writers to the partition first if a deploy guard watches for long
 transactions: a concurrent build holds no transaction open past its own scans,
 but it is a long-running statement.
 

@@ -7,13 +7,15 @@ below is the distribution's.
 ## The public surface
 
 - **Modules.** Everything under `codify.` not starting with an underscore. Which
-  of them the product actually leans on is `codify/contract/product_surface.txt`,
-  checked by a test rather than counted here by hand. One underscore module,
-  `codify.akn._schema`, is imported across it too: debt to repay by promoting or
-  replacing it, not surface. Breaks: removing or renaming a symbol, changing a parameter's name, order or meaning, inserting one ahead of
-  an existing parameter, widening a return type.
+  of them downstream applications depend on is
+  `codify/contract/product_surface.txt`, checked by a test rather than counted
+  here by hand. One underscore module, `codify.akn._schema`, is imported across
+  it too: debt to repay by promoting or replacing it, not surface. Breaks:
+  removing or renaming a symbol, changing a parameter's name, order or meaning,
+  inserting one ahead of an existing parameter, widening a return type.
 - **The command.** `codify`, and the output its subcommands write:
-  `ingest-one`, `scan-corpus`, `index-datadump` and `index-legislation-gov-uk`.
+  `ingest-one`, `scan-corpus`, `index-datadump`, `index-ee-archive` and
+  `index-legislation-gov-uk`.
   Breaks: removing a subcommand or a flag, changing a flag's meaning or the
   shape of the output.
 - **Jurisdiction config.** `JurisdictionConfig`, `ResolvedConfig` and the
@@ -41,5 +43,5 @@ not. Minor for new capability or data. Patch for the rest.
 
 The current version is `0.3.0`, and nothing depends on it by version yet. While the
 major is zero the minor acts as the major: pin `>=0.3,<0.4`. The step from
-`0.1.0` to `0.2.0` carried eleven breaks and the step to `0.3.0` four, each
+`0.1.0` to `0.2.0` carried thirteen breaks and the step to `0.3.0` four, each
 enumerated in the changelog.
