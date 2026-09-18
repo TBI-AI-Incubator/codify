@@ -2,7 +2,7 @@
 
 `provision_embeddings` is partitioned by `jurisdiction_id` (core migration 0020).
 The parent index `provision_embeddings_hnsw_idx` is partitioned too: a partition
-created after it, by `get_or_create_jurisdiction`, gets its own HNSW at creation.
+created after it, by the trigger on `jurisdictions`, gets its own HNSW at creation.
 Partitions that existed when 0020 ran do not, because a build over millions of
 vectors takes hours and a migration must not hold that lock. Until a partition's
 index is attached, searches on it fall back to the exact scan they ran before.

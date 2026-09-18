@@ -114,9 +114,32 @@ def upgrade() -> None:
     op.execute("DROP TABLE provision_embeddings")
     op.execute("ALTER TABLE provision_embeddings_new RENAME TO provision_embeddings")
     _rename_prefix("provision_embeddings", "provision_embeddings_new_", "provision_embeddings_")
+    # Every jurisdiction row gets its partition as it is written, whichever
+    # path writes it: the ORM, a script, a restore. The name is the id.
+    op.execute(
+        """
+        CREATE FUNCTION provision_embeddings_partition_for_jurisdiction() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            EXECUTE format(
+                'CREATE TABLE IF NOT EXISTS %I PARTITION OF provision_embeddings '
+                'FOR VALUES IN (%L)',
+                'provision_embeddings_p_' || replace(NEW.id::text, '-', ''), NEW.id
+            );
+            RETURN NEW;
+        END
+        $$
+        """
+    )
+    op.execute(
+        "CREATE TRIGGER provision_embeddings_partition AFTER INSERT ON jurisdictions "
+        "FOR EACH ROW EXECUTE FUNCTION provision_embeddings_partition_for_jurisdiction()"
+    )
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS provision_embeddings_partition ON jurisdictions")
+    op.execute("DROP FUNCTION IF EXISTS provision_embeddings_partition_for_jurisdiction()")
     op.execute("LOCK TABLE provision_embeddings IN SHARE MODE")
     op.execute(
         """

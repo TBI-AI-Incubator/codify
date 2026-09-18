@@ -20,7 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from codify.storage.embeddings import embed_version_provisions, upsert_embedding
+from codify.storage.embeddings import embed_version_provisions
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.partitions import embedding_partition_name
@@ -155,43 +155,26 @@ async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
     assert {r[2] for r in rows} == {jurisdiction.id}
 
 
-async def test_an_embedding_for_a_jurisdiction_with_no_partition_fails_loudly(
+async def test_a_jurisdiction_written_by_raw_sql_gets_its_partition_too(
     session: AsyncSession,
 ) -> None:
-    """A jurisdiction row written around `get_or_create_jurisdiction` has no
-    partition; the insert refuses rather than misfiling the vector."""
-    jurisdiction = Jurisdiction(code=f"zn{uuid.uuid4().hex[:6]}", name="No partition")
-    session.add(jurisdiction)
-    await session.flush()
-    law = Law(
-        jurisdiction_id=jurisdiction.id,
-        title="Act",
-        doctype="act",
-        frbr_work_uri=f"/akn/{jurisdiction.code}/act/2026/1",
+    """The partition comes from the table, not the ORM writer: a row written by
+    any path has one, so its embeddings never fail to route."""
+    jurisdiction_id = uuid.uuid4()
+    await session.execute(
+        text(
+            "INSERT INTO jurisdictions (id, code, name, calendar, languages, extra) "
+            "VALUES (:id, :code, 'Raw', 'gregorian', '{}', '{}')"
+        ),
+        {"id": jurisdiction_id, "code": f"zr{uuid.uuid4().hex[:6]}"},
     )
-    session.add(law)
-    await session.flush()
-    version = Version(
-        law_id=law.id,
-        expression_uri=f"/akn/{jurisdiction.code}/act/2026/1/eng@2026-01-01",
-        language="en",
-        expression_date=date(2026, 1, 1),
-        akn_xml="<akomaNtoso/>",
-    )
-    session.add(version)
-    await session.flush()
-    provision = Provision(
-        version_id=version.id,
-        akn_eid="sec_1",
-        akn_wid="sec_1",
-        akn_type="section",
-        text="Orphaned.",
-        position=0,
-    )
-    session.add(provision)
-    await session.flush()
-    with pytest.raises(Exception, match="no partition of relation"):
-        await upsert_embedding(session, provision.id, _vec(0.5), "test-model")
+    exists = (
+        await session.execute(
+            text("SELECT to_regclass(:name) IS NOT NULL"),
+            {"name": embedding_partition_name(jurisdiction_id)},
+        )
+    ).scalar_one()
+    assert exists
 
 
 async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSession) -> None:
