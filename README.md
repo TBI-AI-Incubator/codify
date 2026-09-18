@@ -158,6 +158,49 @@ uv run codify serve --openapi > contract/openapi.json
 A client generates its types from that file (the UI does, with `openapi-typescript`),
 so the schema is the one place the two agree.
 
+### MCP server
+
+The same reads as tools for an agent, over the Model Context Protocol:
+
+```bash
+uv sync --extra mcp
+uv run codify mcp                     # stdio, for a client that launches the server
+uv run codify mcp --http --port 8001  # streamable HTTP at http://127.0.0.1:8001/mcp
+```
+
+A client that speaks stdio launches the command itself; this is the shape most take:
+
+```json
+{
+  "mcpServers": {
+    "codify": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/codify", "codify", "mcp"],
+      "env": { "POSTGRES_URL": "postgresql://codify:codify@localhost:5432/codify" }
+    }
+  }
+}
+```
+
+The tools, all reads:
+
+- `search_provisions(query, jurisdiction, language?, k?)`: hybrid search over one
+  jurisdiction's provisions; matches best first, each with its provision id, eId, score
+  and text. Needs the embeddings endpoint `search` needs; unset, the tool says so.
+- `list_laws(jurisdiction?, doctype?, year?, q?, limit?, offset?)`: a page of stored laws
+  with their ids.
+- `get_law(law_id)`: one law's fields, its jurisdiction and every stored version.
+- `get_version(version_id, include_xml?)`: one version's metadata; with `include_xml`,
+  the Akoma Ntoso XML, cut at a million characters and flagged when cut.
+- `list_jurisdictions()`: every configured jurisdiction's code, name and languages.
+- `get_jurisdiction(code)`: a jurisdiction's names, tradition, calendar, languages and
+  document classes.
+- `compare_versions(left_version_id, right_version_id)`: the `compare` report for two
+  stored versions. Needs the chat endpoint and costs a model call per provision.
+
+A failure reads back as the tool's error with a plain message. `--http` binds to
+localhost unless `--host` says otherwise; there is no authentication here either.
+
 ## Configuration
 
 The CLI loads environment variables from a `.env` file in the working directory or parent
