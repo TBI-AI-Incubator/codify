@@ -1,24 +1,24 @@
 # codify
 
-Codify turns a statute book into law a machine can read: each act structured as Akoma
-Ntoso 3.0, the open standard for legal data, addressable by FRBR URI and citable to the
-provision, with quoted amending text lifted out of the prose into markup a machine can
-address.
+Codify turns a statute book into law a machine can read: each act structured as
+[Akoma Ntoso 3.0](https://docs.oasis-open.org/legaldocml/akn-core/v1.0/os/part1-vocabulary/akn-core-v1.0-os-part1-vocabulary.html),
+the open standard for legal documents, addressable by
+[FRBR](https://repository.ifla.org/items/54925d49-b08d-4aeb-807c-1b509ec40b55) URI and
+citable to the provision, with quoted amending text lifted out of the prose into markup a
+machine can address.
 
-Clear, citable law is public infrastructure, and that corpus is the point. Compliance
-assessment, gap analysis and the rest are what it makes possible, and each is only as good
-as the structure beneath it, so this package is the structure: acquisition, transcription,
-anchor-driven structuring, retrieval and comparison. A document structured from a scan
-carries a coverage measurement and the validator's findings; a document already in Akoma
-Ntoso is validated too, but there is no scan to measure coverage against. Confidence
-scores appear where something measures them rather than as a default.
+This repository provides all the components of the core pipeline: acquisition,
+transcription, anchor-driven structuring, retrieval and comparison. Documents converted
+from scans include coverage metrics and validation reports, while pre-existing Akoma Ntoso
+documents run through validation alone.
 
-The pipeline is Apache 2.0 and stands alone. CentreAI builds commercial services around
-it; nothing here needs them, and a government can run this without us.
+The code is Apache 2.0 and fully standalone. While TBI offers commercial services built on
+top of it, this core pipeline requires no external proprietary services and can be run
+independently.
 
-This package is the core. Everything done to legal text lives here as functions and small
-classes you can import. HTTP routing and workflow orchestration are not part of it; those
-live in the service that imports this one.
+This package contains the domain logic for manipulating legal text, exposed as reusable
+functions and classes. Application-level concerns like HTTP routing and workflow
+orchestration are downstream.
 
 ## Quick start
 
@@ -27,8 +27,8 @@ You need:
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
 - `poppler` for scanned PDFs (`brew install poppler` / `apt install poppler-utils`); text
   input needs nothing
-- a chat model behind an OpenAI-compatible endpoint. A Gemini API key is the shortest
-  route; a LiteLLM gateway works the same way
+- access to a chat model behind an OpenAI-compatible endpoint. The repo makes it easy to
+  add a Gemini API key, but a LiteLLM gateway will also easily work
 - Docker, only for the database tests
 
 ```bash
@@ -38,7 +38,7 @@ uv run codify ingest-one data/fixtures/synthetic/xa/legislation-act-1992.pdf --j
 ```
 
 The sample is a five-page synthetic act from `xa`, a fictional jurisdiction shipped for
-exactly this. The run takes under a minute and costs a few cents. `bundle/` then holds:
+this purpose. The run takes under a minute and costs a few cents. `bundle/` then holds:
 
 | File                | What it is                                                     |
 | ------------------- | -------------------------------------------------------------- |
@@ -53,23 +53,23 @@ exactly this. The run takes under a minute and costs a few cents. `bundle/` then
 
 Nothing is written to a database.
 
-Read `anchors.jsonl` before `final.akn.xml`: a body is only filled under a basic unit
+Read `anchors.jsonl` before `final.akn.xml`. A body is filled only under a basic unit
 (section, article) the scanner anchored. A scan that found containers and no basic unit
-logs `body_fill_skipped` and ships the skeleton; one that found nothing at all logs
+logs `body_fill_skipped` and ships the skeleton; one that found nothing logs
 `scaffold_no_anchors` and keeps the text verbatim. The bundled scan prints its section
-numbers in the margin, which the `xa` scanner does not yet read, so today it anchors the
-six parts and no sections; that is the open issue on the samples.
+numbers in the margin, which the `xa` scanner does not yet read, so it anchors the six
+parts and no sections; that is the open issue on the samples.
 
-Two lines in the log are worth knowing. `layout_pass_failed … OcrNotConfigured` says the
-optional second OCR engine (Azure AI Foundry) is not set up, so each scanned page is read
-once by the chat model's vision route rather than twice; the run continues. `page_diverted_to_ocr`
-says a page had no usable text layer and was rasterised. `--quiet` drops the per-event
-progress; the structured log stays.
+Two log lines explain most surprises. `layout_pass_failed … OcrNotConfigured` means the
+optional second OCR engine (Azure AI Foundry) is not configured, so each scanned page is
+read once by the chat model's vision route rather than twice, and the run continues.
+`page_diverted_to_ocr` means a page had no usable text layer and was rasterised.
+`--quiet` drops the per-event progress; the structured log stays.
 
 Structuring is anchor-driven: a deterministic skeleton from the jurisdiction config, then
 the model fills the bodies window by window. `codify scan-corpus <dir> --jurisdiction xa`
 runs the skeleton pass alone over a directory of `.txt` sources, with no key and no
-database, which is the way to see what the scanner claims before spending anything.
+database, so you can see what the scanner claims before spending anything.
 
 ## Configuration
 
@@ -87,34 +87,33 @@ wins. `pytest` and `alembic` read only the environment, so export what they need
 
 ## Jurisdictions
 
-A configuration travels when its own `config.json` carries `synthetic` or
-`public_reference`. `codify/open_wheel.py` holds that rule and the wheel's build hook
-applies it, so the set follows the flags rather than a list that drifts from them.
+A configuration ships in the wheel when its `config.json` carries `synthetic` or
+`public_reference`. `codify/open_wheel.py` holds that rule and the build hook applies it.
 
 Synthetic jurisdictions carry invented law in real legislative shapes, so the suite can
 assert against known-correct structure without redistributing anyone's corpus. Public
 reference configurations describe jurisdictions that publish their own law openly.
 
-By default, a source checkout reads its own `data/`; an installed package reads its
-bundled data. To point at another dataset, set `CODIFY_DATA_ROOT` to an absolute path
-holding `jurisdictions/` and `frameworks/` before Python starts; there is no merge with
-the bundled data, and a missing or relative root raises.
+A source checkout reads its own `data/`; an installed package reads its bundled data. To
+use another dataset, set `CODIFY_DATA_ROOT` to an absolute path holding `jurisdictions/`
+and `frameworks/` before Python starts. It replaces the bundled data rather than merging
+with it, and a missing or relative root raises.
 
 To add one, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
 ## Layout
 
-- `codify/akn/` — AKN 3.0 element model, parsing and emitting, eIds, references, schema validation
-- `codify/pipeline/` — bytes to AKN. Format dispatchers under `formats/`, enrichment passes under `enrich/`
-- `codify/acquisition/` — per-jurisdiction source adapters, manifests, rate limiting
-- `codify/embed/` — provider-agnostic embedding client over an OpenAI-compatible endpoint
-- `codify/retrieve/` — hybrid retrieval over provisions: dense plus BM25, RRF-fused
-- `codify/compare/` — compliance comparator: aligner, prompts, validated model output
-- `codify/storage/` — typed Postgres access
-- `codify/lenses/` — generic plugin types and the lens registry
-- `codify/repair/` — AKN repair agent: per-finding grounding, transactional edits
-- `codify/translate/` — anchored translation: batching, clause parity, quality grading
-- `codify/core/` — shared model client, tracing, i18n, log redaction
+- `codify/akn/`: AKN 3.0 element model, parsing and emitting, eIds, references, schema validation
+- `codify/pipeline/`: bytes to AKN. Format dispatchers under `formats/`, enrichment passes under `enrich/`
+- `codify/acquisition/`: per-jurisdiction source adapters, manifests, rate limiting
+- `codify/embed/`: provider-agnostic embedding client over an OpenAI-compatible endpoint
+- `codify/retrieve/`: hybrid retrieval over provisions: dense plus BM25, RRF-fused
+- `codify/compare/`: compliance comparator: aligner, prompts, validated model output
+- `codify/storage/`: typed Postgres access
+- `codify/lenses/`: generic plugin types and the lens registry
+- `codify/repair/`: AKN repair agent: per-finding grounding, transactional edits
+- `codify/translate/`: anchored translation: batching, clause parity, quality grading
+- `codify/core/`: shared model client, tracing, i18n, log redaction
 
 `frbr.py` builds FRBR URIs. `jurisdictions.py` loads configs.
 
@@ -127,7 +126,7 @@ uv sync --group dev --extra migrations
 uv run pytest tests -m "not integration and not live_llm" -q
 ```
 
-About 4,000 tests in a little over a minute. This is what CI runs. Tests for
+About 4,000 tests in a little over a minute; CI runs the same command. Tests for
 configurations not shipped here skip.
 
 The database tests want a disposable Postgres with pgvector and pg_textsearch, which the
@@ -151,17 +150,17 @@ CI also runs Ruff, strict mypy and a wheel build; the exact commands are in
 
 Codify targets Akoma Ntoso 3.0 and includes schema checks. FRBR URIs identify works,
 expressions and manifestations. Schema validity does not establish accurate transcription
-or universal downstream compatibility. See [interoperability scope](docs/akn4eu-divergences.md).
+or compatibility with every downstream tool. See [interoperability scope](docs/akn4eu-divergences.md).
 
 ## More
 
 - `docs/architecture.md`
 - `docs/ocr-cascade.md`
-- `docs/decisions/` — the decision records
+- `docs/decisions/`: the decision records
 - `CONTRIBUTING.md`
 - `SECURITY.md`
-- `AGENTS.md`, beside this file — conventions for a coding agent working in this package
+- `AGENTS.md`, beside this file: conventions for a coding agent working in this package
 
 Codify is built by CentreAI at the
-[Tony Blair Institute for Global Change](https://institute.global).
-The hosted product wraps this core with tenancy, access control, an audit trail and support.
+[Tony Blair Institute for Global Change](https://institute.global). The hosted product
+wraps this core with tenancy, access control, an audit trail and support.
