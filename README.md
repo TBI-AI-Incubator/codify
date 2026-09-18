@@ -45,7 +45,7 @@ The generated `bundle/` directory contains:
 
 | File                | Contents                                                       |
 | ------------------- | -------------------------------------------------------------- |
-| `pages/`            | Rendered page images fed to the vision model                   |
+| `pages/`            | Page images rendered for inspection after the run              |
 | `source.txt`        | Extracted text transcription                                   |
 | `anchors.jsonl`     | Structural markers detected during the scanning pass           |
 | `coverage.json`     | Provision count metrics (expected vs. captured)                |
@@ -72,8 +72,8 @@ without making model calls or requiring a database, run the anchor scan directly
 uv run codify scan-corpus <dir> --jurisdiction xa
 ```
 
-The summary is JSON on stdout; findings about individual files go to stderr, so
-`2>/dev/null` leaves the summary alone.
+The summary is JSON on stdout; diagnostics such as an empty sweep go to stderr, and
+`--per-document` writes one row per scanned document to a path of your choosing.
 
 **Log messages.**
 
