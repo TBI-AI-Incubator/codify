@@ -1,8 +1,7 @@
 # Security reporting
 
-Where to report: GitHub's private vulnerability reporting on this repository
-(Security tab, "Report a vulnerability"). Until the repository is public and that
-form is enabled, report directly to a maintainer listed in `CODEOWNERS`.
+Where to report: if the Security tab offers "Report a vulnerability", use it. If it
+does not, report directly to a maintainer listed in `.github/CODEOWNERS`.
 
 What to send: a description of the class of problem and a minimal, non-destructive
 way to reproduce it against a local install.
