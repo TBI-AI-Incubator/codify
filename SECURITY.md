@@ -1,8 +1,8 @@
 # Security reporting
 
 Where to report: open a private report through the repository's Security tab
-("Report a vulnerability"). It reaches the maintainers only; nothing is public until
-a fix is out.
+("Report a vulnerability"), or email liam.wilkinson@institute.global. Either route
+reaches the maintainers only; nothing is public until a fix is out.
 
 What to send: a description of the class of problem and a minimal, non-destructive
 way to reproduce it against a local install.
