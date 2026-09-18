@@ -1,5 +1,5 @@
 """Read tools for an MCP client: every tool is the library call the HTTP server
-makes for the same read, so the two surfaces cannot disagree."""
+makes for the same read, so there is one implementation behind both."""
 
 from __future__ import annotations
 
@@ -241,8 +241,10 @@ def create_server(
         "tradition, calendar, languages and document classes."
     )
     async def get_jurisdiction(code: str) -> dict[str, Any]:
-        from codify.jurisdictions import JurisdictionConfigError, load_config
+        from codify.jurisdictions import JURISDICTIONS_DIR, JurisdictionConfigError, load_config
 
+        if not JURISDICTIONS_DIR.exists():
+            raise ToolError("this installation carries no jurisdiction data")
         try:
             config = load_config(code.strip().lower())
         except JurisdictionConfigError:
@@ -255,11 +257,14 @@ def create_server(
         return out
 
     @server.tool(
-        description="Compare two stored versions, the second's provisions aligned "
-        "against the first's through the chat model, one call per provision. Returns "
-        "the report: a summary (aligned, partial, gap) and every alignment."
+        description="Compare two stored versions: each provision of the reference is "
+        "assessed against the domestic version through the chat model, one call per "
+        "reference provision. Returns the report: a summary (aligned, partial, gap) "
+        "and every alignment, keyed by the reference provision's eId."
     )
-    async def compare_versions(left_version_id: str, right_version_id: str) -> dict[str, Any]:
+    async def compare_versions(
+        reference_version_id: str, domestic_version_id: str
+    ) -> dict[str, Any]:
         from codify.akn.io import parse_akn
         from codify.compare.comparator import compare
         from codify.storage import get_version
@@ -268,7 +273,7 @@ def create_server(
         embeddings = _configured(embedding_client)
         docs = []
         async with sessions() as session:
-            for ref in (left_version_id, right_version_id):
+            for ref in (reference_version_id, domestic_version_id):
                 row = await get_version(session, _id(ref, "version"))
                 if row is None:
                     raise ToolError(f"no version {ref}")

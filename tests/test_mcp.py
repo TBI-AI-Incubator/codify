@@ -156,15 +156,18 @@ async def test_search_returns_matches_best_first(monkeypatch: pytest.MonkeyPatch
 
 async def test_out_of_range_k_limit_and_offset_are_refused() -> None:
     server = create_server(sessions=_no_session, embedding_client=_UnitVectors)
-    for name, args in (
-        ("search_provisions", {"query": "x", "jurisdiction": "xa", "k": 0}),
-        ("search_provisions", {"query": "x", "jurisdiction": "xa", "k": 101}),
-        ("list_laws", {"limit": 0}),
-        ("list_laws", {"limit": 501}),
-        ("list_laws", {"offset": -1}),
+    for name, key, value in (
+        ("search_provisions", "k", 0),
+        ("search_provisions", "k", 101),
+        ("list_laws", "limit", 0),
+        ("list_laws", "limit", 501),
+        ("list_laws", "offset", -1),
     ):
+        args = {"query": "x", "jurisdiction": "xa", key: value}
         result = await _call(server, name, **args)
-        assert result.is_error, (name, args)
+        # A crash on the faked session is also an error; only a refusal names the argument.
+        text = result.content[0].text
+        assert result.is_error and "validation error" in text and key in text, (name, args, text)
 
 
 async def test_list_laws_pages_the_summaries(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -330,6 +333,19 @@ async def test_jurisdictions_list_and_read_from_the_configs() -> None:
     assert malformed.is_error and "no jurisdiction" in malformed.content[0].text
 
 
+async def test_an_install_without_jurisdiction_data_says_so(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import codify.jurisdictions as jurisdictions
+
+    monkeypatch.setattr(jurisdictions, "JURISDICTIONS_DIR", tmp_path / "absent")
+
+    result = await _call(create_server(sessions=_no_session), "get_jurisdiction", code="xa")
+
+    assert result.is_error
+    assert "no jurisdiction data" in result.content[0].text
+
+
 async def test_compare_reads_both_versions_and_reports(monkeypatch: pytest.MonkeyPatch) -> None:
     import codify.storage
 
@@ -344,10 +360,16 @@ async def test_compare_reads_both_versions_and_reports(monkeypatch: pytest.Monke
     server = create_server(sessions=_no_session, embedding_client=_UnitVectors, llm_client=_GapLlm)
 
     result = await _call(
-        server, "compare_versions", left_version_id=str(left.id), right_version_id=str(right.id)
+        server,
+        "compare_versions",
+        reference_version_id=str(left.id),
+        domestic_version_id=str(right.id),
     )
     missing = await _call(
-        server, "compare_versions", left_version_id=str(left.id), right_version_id=str(uuid.uuid4())
+        server,
+        "compare_versions",
+        reference_version_id=str(left.id),
+        domestic_version_id=str(uuid.uuid4()),
     )
 
     assert not result.is_error, result.content
@@ -355,6 +377,9 @@ async def test_compare_reads_both_versions_and_reports(monkeypatch: pytest.Monke
     assert report["summary"]["total"] > 0
     assert report["summary"]["gap"] == report["summary"]["total"]
     assert {r["verdict"] for r in report["results"]} == {"gap"}
+    # The first id is the reference side, whatever the caller's order of loading.
+    assert report["directive_frbr_uri"].startswith("/akn/xa/act/1992/7")
+    assert report["domestic_frbr_uri"].startswith("/akn/xz/")
     assert missing.is_error and "no version" in missing.content[0].text
 
 
@@ -366,8 +391,8 @@ async def test_compare_without_a_chat_endpoint_is_a_tool_error(
     result = await _call(
         create_server(sessions=_no_session, embedding_client=_UnitVectors),
         "compare_versions",
-        left_version_id=str(uuid.uuid4()),
-        right_version_id=str(uuid.uuid4()),
+        reference_version_id=str(uuid.uuid4()),
+        domestic_version_id=str(uuid.uuid4()),
     )
 
     assert result.is_error

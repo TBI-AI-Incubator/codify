@@ -195,8 +195,9 @@ The tools, all reads:
 - `list_jurisdictions()`: every configured jurisdiction's code, name and languages.
 - `get_jurisdiction(code)`: a jurisdiction's names, tradition, calendar, languages and
   document classes.
-- `compare_versions(left_version_id, right_version_id)`: the `compare` report for two
-  stored versions. Needs the chat endpoint and costs a model call per provision.
+- `compare_versions(reference_version_id, domestic_version_id)`: the `compare` report,
+  each provision of the reference assessed against the domestic version. Needs the chat
+  endpoint and costs a model call per reference provision.
 
 A failure reads back as the tool's error with a plain message. `--http` binds to
 localhost unless `--host` says otherwise; there is no authentication here either.
