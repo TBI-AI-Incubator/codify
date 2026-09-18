@@ -18,8 +18,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.jurisdictions import JurisdictionConfig
-from codify.pipeline.events import Complete, IngestionEvent
-from codify.serve.runs import QueueFull, Run, RunTable
+from codify.pipeline.events import Complete
+from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored
 from codify.serve.schemas import (
     Cancelled,
     Health,
@@ -72,14 +72,14 @@ class _Clients:
 
 def _ingest_runner(
     sessions: async_sessionmaker[AsyncSession], clients: _Clients
-) -> Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]]:
+) -> Callable[[dict[str, Any]], AsyncIterator[RunEvent]]:
     """Run the pipeline, then store what it produced so the reads can see it."""
 
-    async def run(params: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+    async def run(params: dict[str, Any]) -> AsyncIterator[RunEvent]:
         from codify.cli_store import _descriptors
         from codify.pipeline import ingest_document
         from codify.pipeline.events import MetadataExtracted
-        from codify.storage import save_document
+        from codify.storage import get_version, save_document
 
         llm = clients.llm()
         read_title = ""
@@ -89,7 +89,7 @@ def _ingest_runner(
             if isinstance(event, Complete):
                 doctype, year, number = _descriptors(event.document)
                 async with sessions() as session:
-                    await save_document(
+                    version_id = await save_document(
                         session,
                         event.document,
                         jurisdiction_code=params["jurisdiction"],
@@ -99,7 +99,9 @@ def _ingest_runner(
                         number=number,
                         akn_xml=event.akn_xml,
                     )
+                    law_id = (await get_version(session, version_id)).law_id  # type: ignore[union-attr]
                     await session.commit()
+                yield Stored(version_id=version_id, law_id=law_id)
             yield event
 
     return run
@@ -111,7 +113,7 @@ class EventStream(StreamingResponse):
 
 def create_app(
     *,
-    runner: Callable[[dict[str, Any]], AsyncIterator[IngestionEvent]] | None = None,
+    runner: Callable[[dict[str, Any]], AsyncIterator[RunEvent]] | None = None,
     database: str | None = None,
 ) -> FastAPI:
     """`database` overrides `POSTGRES_URL`; nothing connects until a route needs to."""

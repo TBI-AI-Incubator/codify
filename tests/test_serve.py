@@ -329,12 +329,14 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
     async with _client(None, app) as c:
         rid = await _enqueue(c, title=title)
         events = _sse((await c.get(f"/runs/{rid}/stream")).text)
-        assert events[-2][0] == "complete", events
+        result = (await c.get(f"/runs/{rid}")).json()["result"]
+        assert [k for k, _ in events[-3:]] == ["stored", "complete", "end"], events
         laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()["items"]
         law = (await c.get(f"/laws/{laws[0]['id']}")).json()
         version = (await c.get(f"/versions/{law['versions'][0]['id']}")).json()
 
     try:
+        assert result["version_id"] == version["id"] and result["law_id"] == law["id"]
         assert (law["title"], law["doctype"], law["year"], law["number"]) == (
             title,
             "act",
