@@ -123,6 +123,26 @@ model call per provision.
 `POSTGRES_URL` names the database. Unset, it is the compose one while `ENVIRONMENT` is
 unset, `localhost` or `development`; under any other value an unset URL is an error.
 
+## Serve
+
+The same reads and the ingest, behind HTTP, for a script or a UI that is not on the box:
+
+```bash
+uv sync --extra serve
+uv run codify serve                            # http://127.0.0.1:8000, docs at /docs
+curl -F file=@act.pdf -F jurisdiction=xa localhost:8000/runs/ingest
+curl -N localhost:8000/runs/<run-id>/stream    # server-sent events until the run ends
+```
+
+Reads: `/jurisdictions`, `/jurisdictions/{code}`, `/laws`, `/laws/{id}`,
+`/versions/{id}` (with the AKN), `/search?q=&jurisdiction=`. Ingest: `POST /runs/ingest`
+(a file) or `POST /runs/ingest-url` (a URL) return a run at once; `/runs/{id}` is its
+state, `/runs/{id}/stream` replays every event so far and then follows it, and
+`/runs/{id}/cancel` and `/runs/{id}/retry` do what they say. A succeeded ingest is stored,
+so the reads see it. Runs live in the server's memory: a restart forgets them, and each
+run says so (`lost_on_restart`). There is no authentication; bind it to localhost or put
+it behind something that has.
+
 ## Configuration
 
 The CLI loads environment variables from a `.env` file in the working directory or parent

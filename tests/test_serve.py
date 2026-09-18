@@ -1,0 +1,352 @@
+"""The thin server is routes over the library plus an in-memory run table.
+The run table is what can go wrong: these pin watch, cancel, retry and replay,
+each through the HTTP surface with a scripted runner in place of the pipeline."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import uuid
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import delete
+
+from codify.akn.io import parse_akn
+from codify.cli import main
+from codify.pipeline.events import Complete, Failed, IngestionEvent, Structured
+
+pytest.importorskip("fastapi")
+
+from fastapi import FastAPI  # noqa: E402
+
+from codify.serve import create_app  # noqa: E402, needs the serve extra
+from codify.serve.runs import RunTable  # noqa: E402
+
+FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-atlantis-1992.akn.xml"
+
+
+def _complete() -> Complete:
+    xml = FIXTURE.read_text(encoding="utf-8")
+    return Complete(document=parse_akn(xml), akn_xml=xml)
+
+
+def _sse(text: str) -> list[tuple[str, dict[str, Any]]]:
+    out = []
+    for block in text.strip().split("\n\n"):
+        kind, data = block.split("\n", 1)
+        out.append((kind.removeprefix("event: "), json.loads(data.removeprefix("data: "))))
+    return out
+
+
+def _app(runner: Any) -> FastAPI:
+    os.environ.setdefault("POSTGRES_URL", "postgresql://x:y@localhost:5432/unused")
+    return create_app(runner=runner)
+
+
+def _client(runner: Any, app: FastAPI | None = None) -> AsyncClient:
+    return AsyncClient(transport=ASGITransport(app=app or _app(runner)), base_url="http://t")
+
+
+async def _enqueue(c: AsyncClient) -> str:
+    r = await c.post("/runs/ingest-url", json={"url": "x", "jurisdiction": "xa"})
+    assert r.status_code == 202
+    return str(r.json()["id"])
+
+
+async def test_a_run_is_watched_to_complete_without_the_document() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=3)
+        yield _complete()
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        events = _sse((await c.get(f"/runs/{rid}/stream")).text)
+        state = (await c.get(f"/runs/{rid}")).json()
+
+    assert [k for k, _ in events] == ["structured", "complete", "end"]
+    complete = events[1][1]
+    assert complete["work_uri"] == "/akn/xa/act/1992/7"
+    assert "akn_xml" not in complete and "document" not in complete
+    assert state["status"] == "succeeded"
+    assert state["result"]["work_uri"] == "/akn/xa/act/1992/7"
+
+
+async def test_a_failed_event_fails_the_run_with_its_stage() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Failed(stage="structure", error="boom")
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        state = (await c.get(f"/runs/{rid}")).json()
+
+    assert state["status"] == "failed"
+    assert state["error"] == "structure: boom"
+
+
+async def test_a_runner_that_ends_without_a_verdict_is_a_failure() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=1)
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        state = (await c.get(f"/runs/{rid}")).json()
+
+    assert state["status"] == "failed"
+    assert "without Complete or Failed" in state["error"]
+
+
+async def test_a_runner_that_raises_fails_the_run_not_the_server() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        raise ValueError("no such file")
+        yield  # unreachable; makes this an async generator
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        state = (await c.get(f"/runs/{rid}")).json()
+        assert (await c.get("/health")).status_code == 200
+
+    assert state["status"] == "failed"
+    assert state["error"] == "ValueError: no such file"
+
+
+async def test_a_run_can_be_cancelled_mid_stream() -> None:
+    started = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=1)
+        started.set()
+        await asyncio.sleep(30)
+        yield _complete()
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        await asyncio.wait_for(started.wait(), 5)
+        assert (await c.post(f"/runs/{rid}/cancel")).status_code == 200
+        events = _sse((await c.get(f"/runs/{rid}/stream")).text)
+        state = (await c.get(f"/runs/{rid}")).json()
+
+    assert [k for k, _ in events] == ["structured", "end"]
+    assert state["status"] == "cancelled"
+    assert state["completed_at"] is not None
+
+
+async def test_a_queued_run_cancels_without_ever_running() -> None:
+    ran: list[str] = []
+
+    async def runner(p: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        ran.append(p["url"])
+        await asyncio.sleep(30)
+        yield _complete()
+
+    table = RunTable(runner, concurrency=1)
+    first = table.enqueue("ingest", {"url": "a"})
+    second = table.enqueue("ingest", {"url": "b"})
+    await asyncio.sleep(0.05)
+
+    assert table.cancel(second.id)
+    await asyncio.sleep(0.05)
+    assert second.status == "cancelled"
+    assert ran == ["a"]
+    assert first.status == "running"
+    table.cancel(first.id)
+
+
+async def test_a_run_cancelled_before_its_first_step_still_ends() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    assert table.cancel(run.id)
+
+    events = await asyncio.wait_for(_collect(table, run.id), 5)
+
+    assert events == []
+    assert run.status == "cancelled"
+
+
+async def _collect(table: RunTable, run_id: uuid.UUID) -> list[dict[str, Any]]:
+    return [e async for e in table.stream(run_id)]
+
+
+async def test_a_finished_run_is_retried_as_a_new_run() -> None:
+    calls = 0
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            yield Failed(stage="ocr", error="flaky")
+        else:
+            yield _complete()
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        await c.get(f"/runs/{rid}/stream")
+        retry = (await c.post(f"/runs/{rid}/retry")).json()
+        await c.get(f"/runs/{retry['id']}/stream")
+        old = (await c.get(f"/runs/{rid}")).json()
+        new = (await c.get(f"/runs/{retry['id']}")).json()
+        listed = (await c.get("/runs")).json()
+
+    assert retry["retry_of"] == rid
+    assert old["status"] == "failed" and new["status"] == "succeeded"
+    assert [r["id"] for r in listed] == [new["id"], old["id"]]
+
+
+async def test_only_a_finished_run_can_be_retried_or_cancelled() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        await asyncio.sleep(30)
+        yield _complete()
+
+    async with _client(runner) as c:
+        rid = await _enqueue(c)
+        assert (await c.post(f"/runs/{rid}/retry")).status_code == 409
+        assert (await c.post(f"/runs/{rid}/cancel")).status_code == 200
+        await c.get(f"/runs/{rid}/stream")
+        assert (await c.post(f"/runs/{rid}/cancel")).status_code == 409
+        missing = uuid.uuid4()
+        assert (await c.get(f"/runs/{missing}")).status_code == 404
+        assert (await c.get(f"/runs/{missing}/stream")).status_code == 404
+
+
+async def test_a_late_subscriber_sees_every_event() -> None:
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=1)
+        yield Structured(bluebell_len=2)
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    await asyncio.sleep(0.05)
+    assert run.status == "succeeded"
+
+    kinds = [e["kind"] async for e in table.stream(run.id)]
+
+    assert kinds == ["structured", "structured", "complete"]
+
+
+async def test_an_event_between_replay_and_subscribe_is_not_lost() -> None:
+    gate = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=1)
+        await gate.wait()
+        yield Structured(bluebell_len=2)
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    await asyncio.sleep(0.02)
+    seen: list[int] = []
+
+    async def watch() -> None:
+        async for e in table.stream(run.id):
+            seen.append(e.get("bluebell_len", 0))
+            if len(seen) == 1:
+                gate.set()
+
+    await asyncio.wait_for(watch(), 5)
+    assert seen == [1, 2, 0]
+
+
+async def test_a_run_that_ends_during_replay_still_delivers_its_last_events() -> None:
+    gate = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Structured(bluebell_len=1)
+        yield Structured(bluebell_len=2)
+        await gate.wait()
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    await asyncio.sleep(0.02)
+    seen: list[str] = []
+
+    async def watch() -> None:
+        async for e in table.stream(run.id):
+            seen.append(e["kind"])
+            # Let the run finish while this subscriber is still replaying.
+            gate.set()
+            await asyncio.sleep(0.01)
+
+    await asyncio.wait_for(watch(), 5)
+    assert seen == ["structured", "structured", "complete"]
+
+
+async def test_an_upload_is_kept_for_the_run_and_removed_at_shutdown(tmp_path: Path) -> None:
+    sources: list[str] = []
+
+    async def runner(p: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        sources.append(p["source"])
+        yield _complete()
+
+    app = _app(runner)
+    async with app.router.lifespan_context(app), _client(runner, app) as c:
+        r = await c.post(
+            "/runs/ingest",
+            files={"file": ("act.pdf", b"%PDF-", "application/pdf")},
+            data={"jurisdiction": "xa"},
+        )
+        assert r.status_code == 202
+        await c.get(f"/runs/{r.json()['id']}/stream")
+        assert Path(sources[0]).read_bytes() == b"%PDF-"
+        assert Path(sources[0]).suffix == ".pdf"
+
+    assert not Path(sources[0]).exists()
+
+
+@pytest.mark.integration
+async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The real runner: the pipeline's Complete is saved so the reads see it."""
+    import codify.pipeline
+    from codify import cli_store
+    from codify.storage.models import Law
+
+    async def fake_ingest(*_: Any, **__: Any) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    title = f"Served {uuid.uuid4().hex[:8]}"
+
+    app = create_app()
+    async with _client(None, app) as c:
+        r = await c.post(
+            "/runs/ingest-url", json={"url": "x", "jurisdiction": "xa", "title": title}
+        )
+        events = _sse((await c.get(f"/runs/{r.json()['id']}/stream")).text)
+        assert events[-2][0] == "complete", events
+        laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()["items"]
+        law = (await c.get(f"/laws/{laws[0]['id']}")).json()
+        version = (await c.get(f"/versions/{law['versions'][0]['id']}")).json()
+
+    try:
+        assert (law["title"], law["doctype"], law["year"], law["number"]) == (
+            title,
+            "act",
+            1992,
+            "7",
+        )
+        assert version["akn_xml"].startswith("<akomaNtoso")
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.id == uuid.UUID(law["id"])))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
+def test_serve_is_registered() -> None:
+    with pytest.raises(SystemExit):
+        main(["serve", "--help"])

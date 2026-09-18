@@ -223,3 +223,21 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     cmp.add_argument("--model", help="chat model for the assessment")
     cmp.add_argument("--out", help="write the report here instead of stdout")
     cmp.set_defaults(func=lambda a: asyncio.run(_compare(a)))
+
+    serve = sub.add_parser(
+        "serve", help="run the HTTP server over the library (needs the serve extra)"
+    )
+    serve.add_argument("--host", default="127.0.0.1")
+    serve.add_argument("--port", type=int, default=8000)
+    serve.set_defaults(func=_serve)
+
+
+def _serve(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+
+        from codify.serve import create_app
+    except ImportError as exc:
+        raise SystemExit(f"{exc}; install the serve extra: uv sync --extra serve") from exc
+    uvicorn.run(create_app(), host=args.host, port=args.port)
+    return 0
