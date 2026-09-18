@@ -1563,7 +1563,10 @@ def fold_inserted_suffix(num: str) -> str | None:
     if m is None:
         return None
     folded = insertion_suffix_folds().get(m.group("word").strip())
-    return f"{m.group('base')}{folded}" if folded else None
+    if not folded:
+        return None
+    # A slashed base keys the way the parser writes it.
+    return re.sub(r"(?<=\d)/(?=\d)", "-", m.group("base")) + folded
 
 
 @lru_cache(maxsize=32)

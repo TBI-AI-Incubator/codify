@@ -146,7 +146,8 @@ def _inserted_suffix_end(suffixes: Mapping[str, str]) -> str:
     if not suffixes:
         return _MARKER_NUM_END
     words = "|".join(re.escape(w) for w in sorted(suffixes, key=lambda w: (-len(w), w)))
-    return rf"(?:(?P<suffix>[ \t]*(?:\r?\n)?[ \t]*(?:{words}))(?!\w)|{_MARKER_NUM_END})"
+    # `(?-i:…)`: the denominator compiles case-blind, and a suffix is a word.
+    return rf"(?:(?P<suffix>[ \t]*(?:\r?\n)?[ \t]*(?-i:{words}))(?!\w)|{_MARKER_NUM_END})"
 
 
 def _separator_for(tolerances: AbstractSet[str]) -> str:
@@ -572,8 +573,13 @@ _AR_SAMELINE_FILTER_RE = re.compile(
 )
 
 
-# Scripts that run words together, so a precursor there follows a letter directly.
+# Scripts that run words together, so a word there touches its neighbours.
 _UNSPACED_SCRIPTS = "\u0e00-\u0e7f\u0e80-\u0eff\u1000-\u109f\u1780-\u17ff"
+
+
+def _word_end(word: str) -> str:
+    """A whole-word end for the regex, except in a script that runs words together."""
+    return "" if re.search(f"[{_UNSPACED_SCRIPTS}]$", word) else r"(?!\w)"
 
 
 def _precursor_re(words: tuple[str, ...]) -> re.Pattern[str]:
@@ -673,10 +679,8 @@ def _successor_re(country: str) -> re.Pattern[str] | None:
     successors = _citation_successors_for(country)
     if not successors:
         return None
-    # A whole word, except in a script that runs its words together.
     alts = "|".join(
-        re.escape(w) + ("" if re.search(f"[{_UNSPACED_SCRIPTS}]$", w) else r"(?!\w)")
-        for w in sorted(successors, key=lambda w: (-len(w), w))
+        re.escape(w) + _word_end(w) for w in sorted(successors, key=lambda w: (-len(w), w))
     )
     return re.compile(rf"(?:{alts})")
 
@@ -1492,7 +1496,9 @@ def _annex_caption_re(country: str) -> re.Pattern[str]:
     prefixes = set(_prefix_captions(country))
     alts = "|".join(re.escape(c) for c in captions if c not in prefixes)
     # A prefix caption takes the rest of its line as the heading.
-    opener = "|".join(re.escape(c) for c in sorted(prefixes, key=lambda c: (-len(c), c)))
+    opener = "|".join(
+        re.escape(c) + _word_end(c) for c in sorted(prefixes, key=lambda c: (-len(c), c))
+    )
     prefixed = rf"|^[ \t]{{0,60}}(?P<prefixed>(?:{opener})[^\r\n]*)" if opener else ""
     # A declared caption tolerates a centred indent and its own numbering
     # ("LAMPIRAN I"); the inferred Arabic form keeps its tight margin and its
@@ -2659,9 +2665,10 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
     if not terms:
         return None
     alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
-    # `\s`, not a horizontal space: the scanner's own separator lets the number
-    # wrap onto the next line, and a wrapped marker still opens a provision.
-    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})\s")
+    # The number may wrap onto the next line, as the scanner's own separator
+    # allows; a bare keyword ending a line is prose.
+    wrapped = rf"\r?\n[ \t]*(?=[{_MARKER_DIGITS}IVXLCDM])"
+    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})(?:[^\S\n]|{wrapped})")
 
 
 def _quote_mask(text: str, country: str = "") -> tuple[bool, ...]:

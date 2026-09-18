@@ -509,3 +509,30 @@ def test_one_floor_serves_the_keyword_and_bare_grammars(
 def test_conclusions_keep_their_paragraph_breaks(declared: Any) -> None:
     lines = scaffold_mod._conclusions_lines(f"  {CLOSING}\n\n\nThe Warden\n  Clerk\n\n")
     assert lines == ["CONCLUSIONS", f"  {CLOSING}", "", "  The Warden", "  Clerk", ""]
+
+
+def test_a_slashed_base_with_a_suffix_keys_as_the_parser_does() -> None:
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(jurisdictions, "insertion_suffix_folds", lambda: dict(SUFFIXES))
+        assert anchors_mod._normalise_number("7/1 zib") == "7-1bis"
+
+
+def test_a_prefix_caption_is_a_whole_word_outside_unspaced_scripts(declared: Any) -> None:
+    text = (
+        f"Section 1\nOne.\n\n{CLOSING}\n\nTABLE OFFERS AND SUCH\nprose.\n\nTABLE OF FEES\n1. Two.\n"
+    )
+    assert [a.heading for a in _scan(text).anchors if a.kind == "schedule"] == ["TABLE OF FEES"]
+
+
+def test_the_denominator_reads_a_suffix_case_sensitively(declared: Any) -> None:
+    from codify.pipeline.enrich.anchors import _marker_numbers
+
+    text = "Section 5\nFive.\n\nSection 6 ZIB\nProse, not an inserted unit.\n"
+    assert _marker_numbers(text, jurisdictions.load_config(COUNTRY), "act", "section") == {"5", "6"}
+
+
+def test_a_bare_keyword_ending_a_line_is_not_a_quote_boundary(declared: Any) -> None:
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    assert boundary is not None
+    assert boundary.search("Section\n5\nText")
+    assert boundary.search("Section\ncontinues here") is None
