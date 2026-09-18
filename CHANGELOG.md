@@ -51,9 +51,10 @@ three-digit year segment, so no shipped row moves.
     `docs/runbooks/vector-index-build.md` on a populated database. A scoped
     search reads one partition's index instead of scanning every embedding in
     scope; the dense arm's `hnsw.iterative_scan` is `relaxed_order`.
-13. `upsert_embedding` reads the provision's version and jurisdiction itself,
-    and a trigger on `jurisdictions` creates the partition as the row is
-    written, whichever path writes it.
+13. `upsert_embedding` reads the provision's version and jurisdiction itself.
+    No partition is created at run time: a jurisdiction created after 0020
+    writes to the DEFAULT partition, which has its own index, until a
+    migration promotes it with `codify.storage.partitions.promote_sql`.
 
 Three more groups of differing cells are reachable only through config fields
 0.1.0 could not load, so they are capability rather than breaks: a dated line

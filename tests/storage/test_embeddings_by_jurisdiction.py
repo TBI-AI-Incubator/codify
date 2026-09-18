@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from codify.storage.embeddings import embed_version_provisions
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.models import Jurisdiction, Law, Provision, Version
-from codify.storage.partitions import embedding_partition_name
+from codify.storage.partitions import DEFAULT_PARTITION, embedding_partition_name, promote_sql
 from codify.storage.retrieval import _DENSE_ONLY_SQL, _HYBRID_SQL, hybrid_search
 from codify.testing import postgres_url
 
@@ -95,22 +95,27 @@ async def _seed(
     return jurisdiction, version
 
 
-async def test_a_new_jurisdiction_gets_a_partition_with_its_own_vector_index(
-    session: AsyncSession,
-) -> None:
+async def test_a_new_jurisdiction_writes_to_the_default_partition(session: AsyncSession) -> None:
+    """No partition is created at run time (see `codify.storage.partitions`);
+    a jurisdiction created after the migration lands in DEFAULT, which carries
+    its own vector index, and a scoped search finds it there."""
     code = f"zp{uuid.uuid4().hex[:6]}"
-    jurisdiction = await get_or_create_jurisdiction(session, code)
-    partition = embedding_partition_name(jurisdiction.id)
-    bound = (
-        await session.execute(
-            text(
-                "SELECT pg_get_expr(c.relpartbound, c.oid) FROM pg_class c WHERE c.relname = :name"
-            ),
-            {"name": partition},
+    jurisdiction, version = await _seed(session, code)
+    await embed_version_provisions(session, version.id, client=_FixedVectors())  # type: ignore[arg-type]
+    where = (
+        (
+            await session.execute(
+                text(
+                    "SELECT DISTINCT tableoid::regclass::text FROM provision_embeddings "
+                    "WHERE jurisdiction_id = :j"
+                ),
+                {"j": jurisdiction.id},
+            )
         )
-    ).scalar_one()
-    assert str(jurisdiction.id) in bound
-    # The parent's HNSW is partitioned, so the child index exists and is attached.
+        .scalars()
+        .all()
+    )
+    assert where == [DEFAULT_PARTITION]
     child_indexes = (
         (
             await session.execute(
@@ -120,13 +125,24 @@ async def test_a_new_jurisdiction_gets_a_partition_with_its_own_vector_index(
                     "WHERE i.indrelid = CAST(:name AS regclass) "
                     "AND h.inhparent = 'provision_embeddings_hnsw_idx'::regclass"
                 ),
-                {"name": partition},
+                {"name": DEFAULT_PARTITION},
             )
         )
         .scalars()
         .all()
     )
-    assert child_indexes, "the partition has no vector index attached to the parent's"
+    assert child_indexes, "the default partition has no vector index attached to the parent's"
+    rows = await hybrid_search(
+        session,
+        query_vec=_vec(0.26),
+        query_text="",
+        version_ids=[version.id],
+        k=2,
+        candidate_pool=10,
+        rrf_k=60,
+        model_id="test-model",
+    )
+    assert [r[1] for r in rows] == ["sec_2", "sec_1"]
 
 
 async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
@@ -150,37 +166,42 @@ async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
         )
     ).all()
     assert len(rows) == 3
-    assert {r[0] for r in rows} == {embedding_partition_name(jurisdiction.id)}
+    assert {r[0] for r in rows} == {DEFAULT_PARTITION}
     assert {r[1] for r in rows} == {version.id}
     assert {r[2] for r in rows} == {jurisdiction.id}
 
 
-async def test_a_jurisdiction_written_by_raw_sql_gets_its_partition_too(
+async def test_creating_a_jurisdiction_never_blocks_a_search(session: AsyncSession) -> None:
+    """Creating a jurisdiction performs no partition DDL: `CREATE TABLE ...
+    PARTITION OF` inside its transaction would hold the parent exclusively until
+    commit, and every search would wait on the ingest that created it. Here the
+    creating transaction stays open while another connection reads."""
+    jurisdiction = await get_or_create_jurisdiction(session, f"zb{uuid.uuid4().hex[:6]}")
+    engine = create_async_engine(postgres_url())
+    try:
+        async with engine.connect() as reader:
+            await reader.execute(text("SET statement_timeout = '3s'"))
+            count = await reader.scalar(text("SELECT count(*) FROM provision_embeddings"))
+    finally:
+        await engine.dispose()
+    assert count is not None and jurisdiction.id
+
+
+async def test_a_promoted_jurisdiction_is_served_from_its_own_partition(
     session: AsyncSession,
 ) -> None:
-    """The partition comes from the table, not the ORM writer: a row written by
-    any path has one, so its embeddings never fail to route."""
-    jurisdiction_id = uuid.uuid4()
-    await session.execute(
-        text(
-            "INSERT INTO jurisdictions (id, code, name, calendar, languages, extra) "
-            "VALUES (:id, :code, 'Raw', 'gregorian', '{}', '{}')"
-        ),
-        {"id": jurisdiction_id, "code": f"zr{uuid.uuid4().hex[:6]}"},
-    )
-    exists = (
-        await session.execute(
-            text("SELECT to_regclass(:name) IS NOT NULL"),
-            {"name": embedding_partition_name(jurisdiction_id)},
-        )
-    ).scalar_one()
-    assert exists
-
-
-async def test_a_scoped_search_is_served_from_the_partition(session: AsyncSession) -> None:
+    """Promotion moves the rows out of DEFAULT into a partition of their own,
+    and a scoped search then reads that partition's index."""
     code = f"zs{uuid.uuid4().hex[:6]}"
     jurisdiction, version = await _seed(session, code)
     await embed_version_provisions(session, version.id, client=_FixedVectors())  # type: ignore[arg-type]
+    for statement in promote_sql(jurisdiction.id):
+        await session.execute(text(statement))
+    left_behind = await session.scalar(
+        text(f"SELECT count(*) FROM {DEFAULT_PARTITION} WHERE jurisdiction_id = :j"),
+        {"j": jurisdiction.id},
+    )
+    assert left_behind == 0
     # Three rows cost nothing to scan or sort; the shape under test is that the
     # ordered vector index scan can serve this query at all.
     await session.execute(text("SET LOCAL enable_seqscan = off"))
@@ -364,6 +385,7 @@ def test_the_migration_carries_every_row_into_its_partition_and_back(temp_db: st
             # No partition built its vector index yet: that is the runbook's step.
             assert valid is False
             assert _suffixed_constraints(conn) == []
+            assert conn.execute(text(f"SELECT to_regclass('{DEFAULT_PARTITION}')")).scalar_one()
         _migrate(temp_db, command.downgrade, "0019_search_term_lexicon")
         with engine.connect() as conn:
             count = conn.execute(text("SELECT count(*) FROM provision_embeddings")).scalar_one()
@@ -404,24 +426,6 @@ def _suffixed_constraints(conn) -> list[tuple[str, str]]:
     ]
 
 
-async def test_codes_that_fold_alike_get_their_own_partitions(session: AsyncSession) -> None:
-    stem = uuid.uuid4().hex[:5]
-    first = await get_or_create_jurisdiction(session, f"z{stem}-a")
-    second = await get_or_create_jurisdiction(session, f"z{stem}_a")
-    names = {embedding_partition_name(first.id), embedding_partition_name(second.id)}
-    partitions = (
-        await session.execute(
-            text(
-                "SELECT count(*) FROM pg_inherits "
-                "WHERE inhparent = 'provision_embeddings'::regclass "
-                "AND inhrelid::regclass::text = ANY(:names)"
-            ),
-            {"names": list(names)},
-        )
-    ).scalar_one()
-    assert len(names) == 2 and partitions == 2
-
-
 async def test_a_global_search_merges_every_partition_by_distance(session: AsyncSession) -> None:
     """Two jurisdictions, two partitions: the plan reads both vector indexes and
     merges them, and the answer is the nearest across both, not per partition."""
@@ -430,6 +434,9 @@ async def test_a_global_search_merges_every_partition_by_distance(session: Async
     second, second_version = await _seed(session, f"zg{stem}b")
     await embed_version_provisions(session, first_version.id, client=_FixedVectors(0.1))  # type: ignore[arg-type]
     await embed_version_provisions(session, second_version.id, client=_FixedVectors(0.13))  # type: ignore[arg-type]
+    for jurisdiction in (first, second):
+        for statement in promote_sql(jurisdiction.id):
+            await session.execute(text(statement))
     await session.execute(text("SET LOCAL enable_seqscan = off"))
     await session.execute(text("SET LOCAL enable_bitmapscan = off"))
     await session.execute(text("SET LOCAL enable_sort = off"))

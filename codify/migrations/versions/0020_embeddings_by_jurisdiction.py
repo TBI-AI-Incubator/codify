@@ -6,12 +6,12 @@ HNSW graph and gave up at `hnsw.max_scan_tuples` with a handful of in-scope rows
 With the scope keys on the embeddings table, each jurisdiction's partition
 carries its own HNSW index and the version filter runs inside the index scan.
 
-The vector indexes are not built here. The parent index is created `ON ONLY`, so
-a partition created later gets one automatically, while partitions that already
-hold rows are built `CONCURRENTLY` from the runbook and attached; on a corpus of
-ten million vectors that is hours, and no deploy can wait on it. Until a
-partition's index is attached, searches on it fall back to the exact scan they
-run today.
+The populated partitions' vector indexes are not built here. The parent index is
+created `ON ONLY`; partitions that already hold rows are built `CONCURRENTLY` from
+the runbook and attached; on a corpus of ten million vectors that is hours, and no deploy can
+wait on it. Until a partition's index is attached, searches on it fall back to
+the exact scan they run today. A DEFAULT partition takes every jurisdiction
+created afterwards; `codify.storage.partitions` says why and how one is promoted.
 
 Writers are blocked for the copy (SHARE lock on the old table, which keeps its name
 and serves reads throughout); drain them first. Only the final swap takes the
@@ -25,7 +25,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-from codify.storage.partitions import embedding_partition_name
+from codify.storage.partitions import DEFAULT_PARTITION, embedding_partition_name
 
 revision: str = "0020_embeddings_by_jurisdiction"
 down_revision: str | Sequence[str] | None = "0019_search_term_lexicon"
@@ -110,36 +110,16 @@ def upgrade() -> None:
     op.execute(
         f"CREATE INDEX provision_embeddings_new_hnsw_idx ON ONLY provision_embeddings_new {_HNSW}"
     )
+    # After the indexes, so it gets its own at creation: jurisdictions created
+    # from here on write here until a migration promotes them.
+    op.execute(f"CREATE TABLE {DEFAULT_PARTITION} PARTITION OF provision_embeddings_new DEFAULT")
     # The swap: the only exclusive lock, held for these statements alone.
     op.execute("DROP TABLE provision_embeddings")
     op.execute("ALTER TABLE provision_embeddings_new RENAME TO provision_embeddings")
     _rename_prefix("provision_embeddings", "provision_embeddings_new_", "provision_embeddings_")
-    # Every jurisdiction row gets its partition as it is written, whichever
-    # path writes it: the ORM, a script, a restore. The name is the id.
-    op.execute(
-        """
-        CREATE FUNCTION provision_embeddings_partition_for_jurisdiction() RETURNS trigger
-        LANGUAGE plpgsql AS $$
-        BEGIN
-            EXECUTE format(
-                'CREATE TABLE IF NOT EXISTS %I PARTITION OF provision_embeddings '
-                'FOR VALUES IN (%L)',
-                'provision_embeddings_p_' || replace(NEW.id::text, '-', ''), NEW.id
-            );
-            RETURN NEW;
-        END
-        $$
-        """
-    )
-    op.execute(
-        "CREATE TRIGGER provision_embeddings_partition AFTER INSERT ON jurisdictions "
-        "FOR EACH ROW EXECUTE FUNCTION provision_embeddings_partition_for_jurisdiction()"
-    )
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS provision_embeddings_partition ON jurisdictions")
-    op.execute("DROP FUNCTION IF EXISTS provision_embeddings_partition_for_jurisdiction()")
     op.execute("LOCK TABLE provision_embeddings IN SHARE MODE")
     op.execute(
         """
