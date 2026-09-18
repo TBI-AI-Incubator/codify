@@ -37,100 +37,115 @@ cp .env.example .env   # add your key
 uv run codify ingest-one data/fixtures/synthetic/xa/legislation-act-1992.pdf --jurisdiction xa --out bundle/
 ```
 
-The sample is a five-page synthetic act from `xa`, a fictional jurisdiction shipped for
-this purpose. The run takes under a minute and costs a few cents. `bundle/` then holds:
+The sample command processes a five-page synthetic act from `xa`, a fictional test
+jurisdiction. It takes under a minute, costs a few cents in model API calls, and outputs
+locally without touching any database.
 
-| File                | What it is                                                     |
+The generated `bundle/` directory contains:
+
+| File                | Contents                                                       |
 | ------------------- | -------------------------------------------------------------- |
-| `pages/`            | the page images the model read                                 |
-| `source.txt`        | the transcription                                              |
-| `anchors.jsonl`     | every structural marker found, with the pass that found it     |
-| `coverage.json`     | the numbers expected against the numbers captured              |
-| `scaffold.bluebell` | the deterministic skeleton, before any body text               |
-| `final.akn.xml`     | the Akoma Ntoso document                                       |
-| `validator.json`    | the validator's findings                                       |
-| `manifest.json`     | the summary printed at the end, with the model and config hash |
+| `pages/`            | Rendered page images fed to the vision model                   |
+| `source.txt`        | Extracted text transcription                                   |
+| `anchors.jsonl`     | Structural markers detected during the scanning pass           |
+| `coverage.json`     | Provision count metrics (expected vs. captured)                |
+| `scaffold.bluebell` | Structural skeleton generated prior to filling provision text  |
+| `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                             |
+| `validator.json`    | Schema and structural validation results                       |
+| `manifest.json`     | Run metadata, including model identifiers and config hashes    |
 
-Nothing is written to a database.
+Structuring follows an anchor-driven model: a deterministic skeleton is parsed using the
+jurisdiction's rules, and the LLM then fills the text within each anchored block.
 
-Read `anchors.jsonl` before `final.akn.xml`. A body is filled only under a basic unit
-(section, article) the scanner anchored. A scan that found containers and no basic unit
-logs `body_fill_skipped` and ships the skeleton; one that found nothing logs
-`scaffold_no_anchors` and keeps the text verbatim. The bundled scan prints its section
-numbers in the margin, which the `xa` scanner does not yet read, so it anchors the six
-parts and no sections; that is the open issue on the samples.
+**Inspection order.** Inspect `anchors.jsonl` before `final.akn.xml`. The model only
+populates text inside anchored basic units (e.g., sections, articles). If a pass
+identifies higher-level containers but no basic units, it logs `body_fill_skipped` and
+exports only the skeleton. If no anchors are found, it logs `scaffold_no_anchors` and
+preserves the source text unparsed. (Note: the bundled `xa` fixture places section numbers
+in the margin, which the parser does not currently extract; it anchors six parts but no
+sections.)
 
-Two log lines explain most surprises. `layout_pass_failed … OcrNotConfigured` means the
-optional second OCR engine (Azure AI Foundry) is not configured, so each scanned page is
-read once by the chat model's vision route rather than twice, and the run continues.
-`page_diverted_to_ocr` means a page had no usable text layer and was rasterised.
-`--quiet` drops the per-event progress; the structured log stays.
+**Dry runs.** To inspect detected anchors across `.txt` files without making model calls
+or requiring a database, run the skeleton pass directly:
 
-Structuring is anchor-driven: a deterministic skeleton from the jurisdiction config, then
-the model fills the bodies window by window. `codify scan-corpus <dir> --jurisdiction xa`
-runs the skeleton pass alone over a directory of `.txt` sources, with no key and no
-database, so you can see what the scanner claims before spending anything.
+```bash
+codify scan-corpus <dir> --jurisdiction xa
+```
+
+Pass `--quiet` to suppress per-event console output while retaining structured logs.
+
+**Log messages.**
+
+- `layout_pass_failed ... OcrNotConfigured`: the optional secondary OCR engine (Azure AI
+  Foundry) is not configured. The pipeline reads the scan once via the model's vision
+  endpoint rather than twice, and the run otherwise proceeds.
+- `page_diverted_to_ocr`: the PDF page lacked an extractable text layer and was
+  rasterised for OCR.
 
 ## Configuration
 
-The CLI reads `.env` from the working directory (or any parent); an exported variable
-wins. `pytest` and `alembic` read only the environment, so export what they need.
-`.env.example` lists everything.
+The CLI reads `.env` from the working directory or any parent; an exported variable
+takes precedence. `pytest` and `alembic` read only the environment, so export what they
+need. `.env.example` lists every variable.
 
 | Variable                                        | Purpose                                                  |
 | ----------------------------------------------- | -------------------------------------------------------- |
-| `LITELLM_BASE_URL`, `LITELLM_API_KEY`           | the chat endpoint and its key                            |
-| `LITELLM_MODEL`                                 | body-fill model; `--model` overrides it per run          |
-| `POSTGRES_URL`                                  | database tests and migrations; defaults to the compose DB |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` | optional second OCR engine                               |
-| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`    | optional tracing                                         |
+| `LITELLM_BASE_URL`, `LITELLM_API_KEY`           | Chat endpoint and API key                                |
+| `LITELLM_MODEL`                                 | Body-fill model; `--model` overrides it per run          |
+| `POSTGRES_URL`                                  | Database tests and migrations; defaults to the compose DB |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY` | Optional secondary OCR engine                            |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`    | Optional tracing                                         |
 
 ## Jurisdictions
 
-A configuration ships in the wheel when its `config.json` carries `synthetic` or
-`public_reference`. `codify/open_wheel.py` holds that rule and the build hook applies it.
+A jurisdiction configuration ships in the wheel when its `config.json` is marked
+`synthetic` or `public_reference`; `codify/open_wheel.py` holds that rule and the build
+hook applies it.
 
-Synthetic jurisdictions carry invented law in real legislative shapes, so the suite can
-assert against known-correct structure without redistributing anyone's corpus. Public
-reference configurations describe jurisdictions that publish their own law openly.
+Synthetic jurisdictions contain invented law in realistic legislative structures, so the
+test suite can assert against known-correct structure without redistributing any real
+corpus. Public reference configurations describe jurisdictions that publish their law
+openly.
 
 A source checkout reads its own `data/`; an installed package reads its bundled data. To
-use another dataset, set `CODIFY_DATA_ROOT` to an absolute path holding `jurisdictions/`
-and `frameworks/` before Python starts. It replaces the bundled data rather than merging
-with it, and a missing or relative root raises.
+use another dataset, set `CODIFY_DATA_ROOT` to an absolute path containing
+`jurisdictions/` and `frameworks/` before Python starts. It replaces the bundled data
+rather than merging with it; a missing or relative path raises an error.
 
-To add one, see `docs/jurisdictions/adding-a-jurisdiction.md`.
+To add a jurisdiction, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
 ## Layout
 
-- `codify/akn/`: AKN 3.0 element model, parsing and emitting, eIds, references, schema validation
-- `codify/pipeline/`: bytes to AKN. Format dispatchers under `formats/`, enrichment passes under `enrich/`
-- `codify/acquisition/`: per-jurisdiction source adapters, manifests, rate limiting
-- `codify/embed/`: provider-agnostic embedding client over an OpenAI-compatible endpoint
-- `codify/retrieve/`: hybrid retrieval over provisions: dense plus BM25, RRF-fused
-- `codify/compare/`: compliance comparator: aligner, prompts, validated model output
-- `codify/storage/`: typed Postgres access
-- `codify/lenses/`: generic plugin types and the lens registry
-- `codify/repair/`: AKN repair agent: per-finding grounding, transactional edits
-- `codify/translate/`: anchored translation: batching, clause parity, quality grading
-- `codify/core/`: shared model client, tracing, i18n, log redaction
-
-`frbr.py` builds FRBR URIs. `jurisdictions.py` loads configs.
+| Module                | Responsibility                                                            |
+| --------------------- | ------------------------------------------------------------------------- |
+| `codify/akn/`         | Akoma Ntoso 3.0 element model, parsing and emitting, eIds, references, schema validation |
+| `codify/pipeline/`    | Source bytes to Akoma Ntoso; format dispatchers in `formats/`, enrichment passes in `enrich/` |
+| `codify/acquisition/` | Per-jurisdiction source adapters, manifests, rate limiting                |
+| `codify/embed/`       | Embedding client over an OpenAI-compatible endpoint                       |
+| `codify/retrieve/`    | Hybrid retrieval over provisions (dense and BM25, fused by reciprocal rank) |
+| `codify/compare/`     | Compliance comparator: alignment, prompts, validated model output         |
+| `codify/storage/`     | Typed Postgres access                                                     |
+| `codify/lenses/`      | Plugin types and the lens registry                                        |
+| `codify/repair/`      | Repair agent: per-finding grounding, transactional edits                  |
+| `codify/translate/`   | Anchored translation: batching, clause parity, quality grading            |
+| `codify/core/`        | Shared model client, tracing, i18n, log redaction                         |
+| `frbr.py`             | FRBR URI construction                                                     |
+| `jurisdictions.py`    | Jurisdiction configuration loading                                        |
 
 ## Tests
 
-The default suite needs no database and no key:
+The default suite requires neither a database nor an API key:
 
 ```bash
 uv sync --group dev --extra migrations
 uv run pytest tests -m "not integration and not live_llm" -q
 ```
 
-About 4,000 tests in a little over a minute; CI runs the same command. Tests for
-configurations not shipped here skip.
+About 4,000 tests run in a little over a minute; CI runs the same command. Tests for
+configurations not shipped in this repository are skipped.
 
-The database tests want a disposable Postgres with pgvector and pg_textsearch, which the
-compose file builds:
+The database tests require a disposable Postgres with pgvector and pg_textsearch, which
+the compose file builds:
 
 ```bash
 docker compose up -d --wait postgres          # first build takes a minute or two
@@ -138,28 +153,29 @@ uv run alembic -c alembic.ini upgrade head
 REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 ```
 
-Some tests commit or recreate data; never point `POSTGRES_URL` at a database you care
-about. `CODIFY_PG_PORT` moves the host port if 5432 is taken; export `POSTGRES_URL` to
-match. `live_llm` tests call a real model through a LiteLLM gateway and can incur charges.
-See [the test guide](docs/offline-suite.md).
+Some tests commit or recreate data, so never point `POSTGRES_URL` at a database you
+need. `CODIFY_PG_PORT` changes the host port if 5432 is taken; export `POSTGRES_URL` to
+match. Tests marked `live_llm` call a real model through a LiteLLM gateway and incur
+charges. See [the test guide](docs/offline-suite.md).
 
 CI also runs Ruff, strict mypy and a wheel build; the exact commands are in
 `.github/workflows/ci.yml`.
 
 ## Standards
 
-Codify targets Akoma Ntoso 3.0 and includes schema checks. FRBR URIs identify works,
-expressions and manifestations. Schema validity does not establish accurate transcription
-or compatibility with every downstream tool. See [interoperability scope](docs/akn4eu-divergences.md).
+Codify targets Akoma Ntoso 3.0 and validates output against the schema. FRBR URIs
+identify works, expressions and manifestations. Schema validity does not guarantee an
+accurate transcription or compatibility with every downstream tool; see
+[interoperability scope](docs/akn4eu-divergences.md).
 
 ## More
 
 - `docs/architecture.md`
 - `docs/ocr-cascade.md`
-- `docs/decisions/`: the decision records
+- `docs/decisions/`: architecture decision records
 - `CONTRIBUTING.md`
 - `SECURITY.md`
-- `AGENTS.md`, beside this file: conventions for a coding agent working in this package
+- `AGENTS.md`: conventions for coding agents working in this repository
 
 Codify is built by CentreAI at the
 [Tony Blair Institute for Global Change](https://institute.global). The hosted product
