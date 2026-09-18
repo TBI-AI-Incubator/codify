@@ -1,5 +1,5 @@
 import { CircleFlag } from '../vendor/tbi-ui';
-import { useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 
@@ -42,7 +42,7 @@ export default function IngestRoute() {
     }
   };
 
-  const submitUrl = async (event: React.FormEvent) => {
+  const submitUrl = async (event: FormEvent) => {
     event.preventDefault();
     if (!url.trim()) return;
     try {

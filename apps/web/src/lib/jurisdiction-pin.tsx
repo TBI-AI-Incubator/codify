@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { type ReactNode, createContext, useContext, useState } from 'react';
 
 /* The one preference the standalone UI keeps: which jurisdiction to open on. */
 interface PinState {
@@ -13,7 +13,7 @@ const PinContext = createContext<PinState>({
   setJurisdictionPin: () => {},
 });
 
-export function JurisdictionPinProvider({ children }: { children: React.ReactNode }) {
+export function JurisdictionPinProvider({ children }: { children: ReactNode }) {
   const [jurisdictionPin, setJurisdictionPin] = useState<string | null>(() => {
     try {
       return localStorage.getItem('jurisdiction-pin');

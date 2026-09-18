@@ -1,6 +1,6 @@
+import type { CSSProperties } from 'react';
 import type { TFunction } from 'i18next';
 import { Check } from 'lucide-react';
-import type * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CircleFlag, cn } from '../../vendor/tbi-ui';
@@ -119,7 +119,7 @@ export function StructureSkeleton({
 }
 
 const TICK_STEP_MS = 60;
-function tickDelay(rowIndex: number): React.CSSProperties {
+function tickDelay(rowIndex: number): CSSProperties {
   return { animationDelay: `${rowIndex * TICK_STEP_MS}ms` };
 }
 

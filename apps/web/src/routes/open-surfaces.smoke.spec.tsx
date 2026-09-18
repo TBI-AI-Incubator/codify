@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
@@ -63,7 +64,7 @@ vi.mock('@/lib/api-runs', () => ({
   startIngestUrlRun: vi.fn(),
 }));
 
-function renderRoute(path: string, element: React.ReactNode) {
+function renderRoute(path: string, element: ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>

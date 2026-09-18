@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { type ReactNode, createContext, useContext, useMemo } from 'react';
 
 import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import { FALLBACK_COUNTRY, resolveCountry } from '@/lib/jurisdiction-path';
@@ -11,7 +11,7 @@ export const JurisdictionContext = createContext<JurisdictionContextValue>({
   country: FALLBACK_COUNTRY,
 });
 
-export function JurisdictionProvider({ children }: { children: React.ReactNode }) {
+export function JurisdictionProvider({ children }: { children: ReactNode }) {
   const { jurisdictionPin, jurisdictions } = useJurisdictionPin();
 
   const country = useMemo(
