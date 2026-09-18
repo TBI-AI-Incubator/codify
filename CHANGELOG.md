@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — unpublished
+## 0.3.0 — 2026-09-18
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
 apply without a declaration. Under `VERSIONING.md` the minor moves while the
@@ -38,7 +38,7 @@ New config, additive:
   Lao, Khmer, Myanmar blocks) may follow a letter directly.
 - `attachments[].prefix`: a caption that opens a longer title on the same line.
 
-## 0.2.0 — unpublished
+## 0.2.0 — 2026-09-17
 
 Eleven breaks, so the minor moves, as `VERSIONING.md` prescribes while the
 major is zero. Enumerated by running every year-resolution grid cell and edge
@@ -101,7 +101,7 @@ date converts with its month and the new-year reform where a Gregorian grid
 and a reform year are declared; and such a date's month and day carry into the
 work date.
 
-## 0.1.0 — private extraction candidate
+## 0.1.0 — 2026-09-09
 
 No release has been published from this repository. The package version is a
 candidate identifier, not evidence of a released tag or a benchmark run.
