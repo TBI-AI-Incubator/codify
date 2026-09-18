@@ -6,9 +6,9 @@ HNSW graph and gave up at `hnsw.max_scan_tuples` with a handful of in-scope rows
 With the scope keys on the embeddings table, each jurisdiction's partition
 carries its own HNSW index and the version filter runs inside the index scan.
 
-The vector indexes are not built here. The parent index is created `ON ONLY`;
-partitions that already hold rows are built `CONCURRENTLY` from the runbook and
-attached; on a corpus of ten million vectors that is hours, and no deploy can
+The populated partitions' vector indexes are not built here. The parent index is
+created `ON ONLY`; partitions that already hold rows are built `CONCURRENTLY` from
+the runbook and attached; on a corpus of ten million vectors that is hours, and no deploy can
 wait on it. Until a partition's index is attached, searches on it fall back to
 the exact scan they run today. A DEFAULT partition takes every jurisdiction
 created afterwards; `codify.storage.partitions` says why and how one is promoted.

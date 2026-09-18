@@ -172,11 +172,10 @@ async def test_the_writer_routes_a_row_to_its_partition_with_its_version(
 
 
 async def test_creating_a_jurisdiction_never_blocks_a_search(session: AsyncSession) -> None:
-    """The partition is created and attached outside the caller's transaction:
-    `CREATE TABLE ... PARTITION OF` inside it would hold the parent exclusively
-    until commit, and every search would wait on the ingest that created the
-    jurisdiction. Here the creating transaction stays open while another
-    connection reads."""
+    """Creating a jurisdiction performs no partition DDL: `CREATE TABLE ...
+    PARTITION OF` inside its transaction would hold the parent exclusively until
+    commit, and every search would wait on the ingest that created it. Here the
+    creating transaction stays open while another connection reads."""
     jurisdiction = await get_or_create_jurisdiction(session, f"zb{uuid.uuid4().hex[:6]}")
     engine = create_async_engine(postgres_url())
     try:
