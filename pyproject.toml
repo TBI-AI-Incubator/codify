@@ -1,7 +1,7 @@
 [project]
 name = "codify-core"
 version = "0.3.0"
-description = "Core legal-AI library — AKN parsing, embedding, retrieval, comparison"
+description = "Legal-AI core library: AKN parsing, embedding, retrieval, comparison"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "THIRD-PARTY-NOTICES.md", "licenses/*.txt"]
@@ -50,9 +50,13 @@ migrations = ["alembic>=1.14", "psycopg[binary]>=3.3.4"]
 [project.scripts]
 codify = "codify.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/TBI-AI-Incubator/codify"
+Changelog = "https://github.com/TBI-AI-Incubator/codify/blob/main/CHANGELOG.md"
+Issues = "https://github.com/TBI-AI-Incubator/codify/issues"
+
 [dependency-groups]
-# The open repository is this package alone, so its tests declare what they need
-# rather than inheriting the monorepo root's group.
+# The tests declare what they need; nothing is inherited from a parent tree.
 dev = [
   "hatchling>=1.27",
     "hypothesis>=6.100",
@@ -70,8 +74,7 @@ markers = [
     "live_llm: requires a reachable LLM (Ollama or remote provider)",
 ]
 asyncio_mode = "auto"
-# Run from this directory, as the open repository does, and the scripts are
-# importable by name the way the monorepo root makes them.
+# Run from the repository root; the scripts are importable by name.
 pythonpath = ["scripts"]
 
 [build-system]
