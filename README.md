@@ -148,32 +148,37 @@ To add a jurisdiction, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
 ## Tests
 
-The default suite requires neither a database nor an API key:
+For a detailed breakdown of test scopes, see [the test guide](docs/offline-suite.md).
+
+Unit tests do not require an API key or a database:
 
 ```bash
 uv sync --group dev --extra migrations
 uv run pytest tests -m "not integration and not live_llm" -q
 ```
 
-About 4,000 tests run in a little over a minute; CI runs the same command. Tests for
-configurations not shipped in this repository are skipped.
+This runs roughly 4,000 tests in about a minute and matches the standard CI check. Tests
+for unbundled jurisdictions are skipped automatically.
 
-The database tests require a disposable Postgres with pgvector and pg_textsearch, which
-the compose file builds:
+**Note:** Integration tests require a Postgres instance with the pgvector and
+pg_textsearch extensions:
 
 ```bash
-docker compose up -d --wait postgres          # first build takes a minute or two
+# Start test database and apply schema migrations
+docker compose up -d --wait postgres
 uv run alembic -c alembic.ini upgrade head
+
+# Run integration suite
 REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 ```
 
-Some tests commit or recreate data, so never point `POSTGRES_URL` at a database you
-need. `CODIFY_PG_PORT` changes the host port if 5432 is taken; export `POSTGRES_URL` to
-match. Tests marked `live_llm` call a real model through a LiteLLM gateway and incur
-charges. See [the test guide](docs/offline-suite.md).
-
-CI also runs Ruff, strict mypy and a wheel build; the exact commands are in
-`.github/workflows/ci.yml`.
+- **Database safety:** Integration tests write and drop data. Never set `POSTGRES_URL` to
+  a production or shared database. If port 5432 is already bound locally, set
+  `CODIFY_PG_PORT` and update `POSTGRES_URL` accordingly.
+- **Live LLM tests:** Tests marked `live_llm` issue requests to the configured
+  OpenAI-compatible gateway and incur API charges.
+- **CI checks:** In addition to unit tests, CI enforces formatting, type checking, and
+  wheel builds via Ruff, strict mypy, and Hatch (see `.github/workflows/ci.yml`).
 
 ## Standards
 
