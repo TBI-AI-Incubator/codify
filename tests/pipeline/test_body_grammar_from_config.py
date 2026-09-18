@@ -570,3 +570,46 @@ def test_an_attachment_keyword_scan_refuses_a_citation_run(declared: Any) -> Non
         window, 0, levels, jurisdictions.load_config(COUNTRY), []
     )
     assert [a.number for a in found] == ["1"]
+
+
+def test_glyph_repair_never_touches_the_suffix(
+    declared: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the digit-glyph tolerance on, `2O` repairs to 20 and the suffix stays a word."""
+    config = jurisdictions.load_config(COUNTRY)
+    tolerant = config.model_copy(
+        update={
+            "structuring": config.structuring.model_copy(
+                update={
+                    "marker_tolerances": ["digit_glyph"],
+                    "insertion_suffixes": {"novies": "novies"},
+                }
+            )
+        }
+    )
+    original = jurisdictions.load_config
+    monkeypatch.setattr(
+        anchors_mod, "load_config", lambda c: tolerant if c == COUNTRY else original(c)
+    )
+    monkeypatch.setattr(jurisdictions, "insertion_suffix_folds", lambda: {"novies": "novies"})
+    anchors_mod.cached_regex.cache_clear()
+    regex = build_anchor_regex(tolerant, "act")
+    scan = scan_anchors_with_ambiguity(
+        "Section 19\nOne.\n\nSection 2O novies\nTwo.\n", regex, country=COUNTRY, doctype="act"
+    )
+    anchors_mod.cached_regex.cache_clear()
+    assert [n for n, _ in _sections(scan)] == ["19", "20 novies"]
+
+
+def test_the_denominator_and_the_scan_key_a_spaced_slash_alike(declared: Any) -> None:
+    from codify.pipeline.enrich.anchors import _marker_numbers
+
+    text = "Section 7\nSeven.\n\nSection 7 / 1\nSeven one.\n"
+    expected = _marker_numbers(text, jurisdictions.load_config(COUNTRY), "act", "section")
+    assert expected == {"7", "7-1"}
+
+
+def test_a_wrapped_roman_heading_bounds_a_quotation(declared: Any) -> None:
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    assert boundary is not None
+    assert boundary.search("Section\nii\nText") and boundary.search("Section\nІ\nText")

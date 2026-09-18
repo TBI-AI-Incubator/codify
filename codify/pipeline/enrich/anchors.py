@@ -724,7 +724,7 @@ def _repair_damaged_num(match: re.Match[str]) -> str | None:
     Only a match that arrived through a declared tolerance is repaired, so
     `_normalise_number` stays country-agnostic and a clean `14T` keeps its suffix.
     """
-    num = _matched_number(match)
+    num = match.group("num")
     if num is None:
         return None
     groups = match.groupdict()
@@ -732,14 +732,9 @@ def _repair_damaged_num(match: re.Match[str]) -> str | None:
         num = re.sub(r"[ \t]+", "", num)
     if groups.get("numglyph") is not None or groups.get("numsplit") is not None:
         num = num.translate(_DIGIT_GLYPHS)
-    return _normalise_num(num)
-
-
-def _matched_number(match: re.Match[str]) -> str | None:
-    """The number a match read, its declared insertion suffix joined on."""
-    num = match.group("num")
-    suffix = match.groupdict().get("suffix")
-    return f"{num} {suffix.strip()}" if num and suffix else num
+    # The suffix is a word: repaired digits never reach it.
+    suffix = groups.get("suffix")
+    return _normalise_num(f"{num} {suffix.strip()}" if suffix else num)
 
 
 def _normalise_num(num: str | None) -> str | None:
@@ -2302,7 +2297,7 @@ def _scan_attachment_keywords(
             StructuralAnchor(
                 kind=kind,
                 keyword=_keyword_from_match(m, kind),
-                number=_matched_number(m) if "num" in m.groupdict() else None,
+                number=_repair_damaged_num(m) if "num" in m.groupdict() else None,
                 char_offset=m.start(),
                 line=window.count("\n", 0, m.start()) + 1,
                 matched_text=m.group(0).strip(),
@@ -2670,7 +2665,8 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
     alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
     # The number may wrap onto the next line, as the scanner's own separator
     # allows; a bare keyword ending a line is prose.
-    wrapped = rf"\r?\n[ \t]*(?=[{_MARKER_DIGITS}IVXLCDM])"
+    # A digit, or a whole Roman numeral in either case or the Cyrillic homoglyphs.
+    wrapped = rf"\r?\n[ \t]*(?=[{_MARKER_DIGITS}]|[IVXLCDMivxlcdmІіХх]+(?!\w))"
     return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})(?:[^\S\n]|{wrapped})")
 
 
@@ -4026,7 +4022,7 @@ def _marker_numbers(
             continue
         if _opens_citation_run(text, m.end(), config.code if config else ""):
             continue
-        distinct.add(_normalise_number(_matched_number(m)))
+        distinct.add(_normalise_number(_repair_damaged_num(m)))
     return distinct | from_declared
 
 
