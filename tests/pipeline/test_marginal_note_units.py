@@ -307,3 +307,31 @@ def test_the_denominator_masks_quotes_as_the_scan_does() -> None:
     assert [a.number for a in scan.anchors if a.kind == "section"] == ["2", "3"]
     coverage = anchor_coverage(QUOTED, scan.anchors, load_config("xa"), "act", "section")
     assert (coverage.ratio, sorted(coverage.expected)) == (1.0, ["2", "3"])
+
+
+# A straight-quoted replacement block, which the UK mask hides from the scan.
+UK_REPLACEMENT = """*Short title*
+**1.**
+(1) This Act may be cited as the Widgets Act 2015.
+
+*Amendment*
+**2.**
+(1) For section 4 of the principal Act substitute—
+"
+
+*Registers*
+**4.**
+(1) The Minister shall keep a register.
+"
+
+*Application*
+**3.**
+(1) This Act binds the Crown.
+"""
+
+
+def test_the_denominator_hides_a_uk_replacement_block_as_the_scan_does() -> None:
+    scan = _scan(UK_REPLACEMENT, "gb")
+    assert [a.number for a in scan.anchors if a.kind == "section"] == ["1", "2", "3"]
+    coverage = anchor_coverage(UK_REPLACEMENT, scan.anchors, load_config("gb"), "act", "section")
+    assert (coverage.ratio, sorted(coverage.expected)) == (1.0, ["1", "2", "3"])

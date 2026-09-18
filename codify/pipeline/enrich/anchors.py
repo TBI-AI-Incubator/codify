@@ -4210,7 +4210,9 @@ def _marker_numbers(
     # them alone scores a document against a fraction of what it captured.
     declared_found = _scan_declared_markers(text, 0, declared, config.code)[0]
     if _marginal_note_kind(config.code, doctype) == kind:
-        in_quote = _quote_mask(text, config.code)
+        in_quote: Sequence[bool] = _quote_mask(text, config.code)
+        if config.code in _UK_JURISDICTIONS:
+            in_quote = _uk_amendment_mask(text, in_quote)
         declared_found.extend(
             _scan_marginal_note_units(
                 text,
