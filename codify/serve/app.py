@@ -27,6 +27,7 @@ from codify.serve.schemas import (
     JurisdictionSummary,
     LawDetail,
     LawPage,
+    LawSummary,
     RunSnapshot,
     SearchMatch,
     SearchResult,
@@ -201,7 +202,11 @@ def create_app(
                 limit=limit,
                 offset=offset,
             )
-        return LawPage(items=rows, limit=limit, offset=offset)
+        return LawPage(
+            items=[LawSummary.model_validate(r, from_attributes=True) for r in rows],
+            limit=limit,
+            offset=offset,
+        )
 
     @app.get("/laws/{law_id}")
     async def law(law_id: uuid.UUID) -> LawDetail:
@@ -271,6 +276,7 @@ def create_app(
         q: str, jurisdiction: str, k: int = Query(10, ge=1, le=100), language: str | None = None
     ) -> SearchResult:
         from codify.retrieve.hybrid import retrieve
+        from codify.storage.provisions import provision_contexts
 
         code = _jurisdiction(jurisdiction)
         try:
@@ -286,13 +292,23 @@ def create_app(
                 language=language,
                 k=k,
             )
+            where = await provision_contexts(session, [m.provision_id for m in matches])
         return SearchResult(
             query=q,
             matches=[
                 SearchMatch(
-                    provision_id=m.provision_id, eid=m.akn_eid, score=m.rrf_score, text=m.text
+                    provision_id=m.provision_id,
+                    eid=m.akn_eid,
+                    score=m.rrf_score,
+                    text=m.text,
+                    version_id=where[m.provision_id].version_id,
+                    law_id=where[m.provision_id].law_id,
+                    law_title=where[m.provision_id].law_title,
+                    work_uri=where[m.provision_id].frbr_work_uri,
+                    jurisdiction=where[m.provision_id].jurisdiction_code,
                 )
                 for m in matches
+                if m.provision_id in where
             ],
         )
 

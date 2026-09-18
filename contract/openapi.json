@@ -2802,7 +2802,7 @@
         "type": "object"
       },
       "LawSummary": {
-        "description": "Listing-friendly projection of a Law row. `lens_coverage` is opt-in: the\ncorpus-wide `/laws` route always populates it, the per-jurisdiction listing\nonly on `?include=coverage`, and callers that skip it read `None`.",
+        "description": "The listing row, without the hosted platform's lens and translation fields.",
         "properties": {
           "doctype": {
             "title": "Doctype",
@@ -2845,21 +2845,6 @@
             ],
             "title": "Latest Ingested At"
           },
-          "lens_coverage": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lens Coverage"
-          },
           "number": {
             "anyOf": [
               {
@@ -2889,14 +2874,6 @@
           "title": {
             "title": "Title",
             "type": "string"
-          },
-          "title_translations": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "default": {},
-            "title": "Title Translations",
-            "type": "object"
           },
           "year": {
             "anyOf": [
@@ -3341,6 +3318,19 @@
             "title": "Eid",
             "type": "string"
           },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "law_id": {
+            "format": "uuid",
+            "title": "Law Id",
+            "type": "string"
+          },
+          "law_title": {
+            "title": "Law Title",
+            "type": "string"
+          },
           "provision_id": {
             "format": "uuid",
             "title": "Provision Id",
@@ -3353,13 +3343,27 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          },
+          "work_uri": {
+            "title": "Work Uri",
+            "type": "string"
           }
         },
         "required": [
           "provision_id",
           "eid",
           "score",
-          "text"
+          "text",
+          "version_id",
+          "law_id",
+          "law_title",
+          "work_uri",
+          "jurisdiction"
         ],
         "title": "SearchMatch",
         "type": "object"

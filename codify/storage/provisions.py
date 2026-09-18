@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from codify.storage.models import Law, Provision, Section, Version
+from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 _MAX_DEPTH = 20
 
@@ -142,3 +142,33 @@ __all__ = [
     "find_provision_id_by_eid",
     "get_provision_with_path",
 ]
+
+
+class ProvisionContext(BaseModel):
+    """Where a provision lives, for a result list that links to its law."""
+
+    version_id: uuid.UUID
+    law_id: uuid.UUID
+    law_title: str
+    frbr_work_uri: str
+    jurisdiction_code: str
+
+
+async def provision_contexts(
+    session: AsyncSession, provision_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, ProvisionContext]:
+    if not provision_ids:
+        return {}
+    rows = await session.execute(
+        select(Provision.id, Version.id, Law.id, Law.title, Law.frbr_work_uri, Jurisdiction.code)
+        .join(Version, Version.id == Provision.version_id)
+        .join(Law, Law.id == Version.law_id)
+        .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
+        .where(Provision.id.in_(provision_ids))
+    )
+    return {
+        pid: ProvisionContext(
+            version_id=vid, law_id=lid, law_title=title, frbr_work_uri=uri, jurisdiction_code=code
+        )
+        for pid, vid, lid, title, uri, code in rows.all()
+    }

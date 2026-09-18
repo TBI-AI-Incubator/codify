@@ -9,7 +9,22 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, HttpUrl
 
-from codify.storage.laws import LawSummary
+
+class LawSummary(BaseModel):
+    """The listing row, without the hosted platform's lens and translation fields."""
+
+    id: uuid.UUID
+    jurisdiction_code: str
+    title: str
+    short_title: str | None = None
+    doctype: str
+    status: str
+    year: int | None
+    number: str | None
+    frbr_work_uri: str
+    latest_expression_date: date | None
+    latest_ingested_at: datetime | None = None
+
 
 Status = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
@@ -67,6 +82,11 @@ class SearchMatch(BaseModel):
     eid: str
     score: float
     text: str
+    version_id: uuid.UUID
+    law_id: uuid.UUID
+    law_title: str
+    work_uri: str
+    jurisdiction: str
 
 
 class SearchResult(BaseModel):

@@ -1031,6 +1031,45 @@ async def test_a_law_pages_its_versions_and_a_version_serves_its_document() -> N
         await app.state.sessions.kw["bind"].dispose()
 
 
+@pytest.mark.integration
+async def test_a_search_match_names_its_law(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reader link needs the version, law and title behind a provision."""
+    import codify.retrieve.hybrid as hybrid
+    from codify.retrieve.hybrid import ProvisionMatch
+    from codify.storage import save_document
+    from codify.storage.models import Law, Provision
+
+    title = f"Matched {uuid.uuid4().hex[:8]}"
+    app = _app(None)
+    async with app.state.sessions() as s:
+        vid = await save_document(
+            s, _complete().document, jurisdiction_code="xa", law_title=title, akn_xml="<a/>"
+        )
+        await s.commit()
+        from sqlalchemy import select
+
+        pid = (
+            await s.execute(select(Provision.id).where(Provision.version_id == vid).limit(1))
+        ).scalar_one()
+
+    async def fake_retrieve(session: Any, q: str, **kw: Any) -> list[Any]:
+        return [ProvisionMatch(provision_id=pid, rrf_score=0.5, text="t", akn_eid="sec_1")]
+
+    monkeypatch.setattr(hybrid, "retrieve", fake_retrieve)
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://embeddings.test")
+    try:
+        async with _client(None, app) as c:
+            match = (await c.get("/search?q=x&jurisdiction=xa")).json()["matches"][0]
+        assert match["version_id"] == str(vid)
+        assert (match["law_title"], match["jurisdiction"]) == (title, "xa")
+        assert match["work_uri"] == "/akn/xa/act/1992/7"
+    finally:
+        async with app.state.sessions() as s:
+            await s.execute(delete(Law).where(Law.title == title))
+            await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
 def test_serve_is_registered() -> None:
     with pytest.raises(SystemExit):
         main(["serve", "--help"])
