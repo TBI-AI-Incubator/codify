@@ -2022,6 +2022,7 @@ _ATTACHMENT_KINDS = frozenset({"schedule", "hcontainer"})
 def _attachment_floor(markers: Iterable[tuple[int, str]]) -> int | None:
     """Where the schedules begin: the first schedule marker past the last
     container, so a contents list naming one does not floor the body."""
+    markers = list(markers)
     last_container = max((o for o, k in markers if k in CONTAINER_KINDS), default=-1)
     return min(
         (o for o, k in markers if k in _ATTACHMENT_KINDS and o > last_container), default=None

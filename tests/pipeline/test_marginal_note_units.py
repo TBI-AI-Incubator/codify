@@ -135,6 +135,7 @@ A. Names
 4. The name of every widget.
 
 SCHEDULE 1
+
 Enactments repealed
 5. The Widgets Act.
 6. The Dials Act.
