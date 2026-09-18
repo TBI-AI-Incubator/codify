@@ -244,6 +244,7 @@ and known profile differences, see the
 - `docs/ocr-cascade.md`
 - `docs/decisions/`: architecture decision records
 - `CONTRIBUTING.md`
+- `CODE_OF_CONDUCT.md`
 - `SECURITY.md`
 - `AGENTS.md`: conventions for coding agents working in this repository
 
