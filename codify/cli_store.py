@@ -13,18 +13,28 @@ import json
 import os
 import sys
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from codify.akn.document import Document
 from codify.settings import database_url
 
 _DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
 
 
-def _session_factory() -> async_sessionmaker[AsyncSession]:
-    return async_sessionmaker(create_async_engine(database_url()), expire_on_commit=False)
+@asynccontextmanager
+async def _session() -> AsyncIterator[AsyncSession]:
+    """One engine per command, disposed on the way out."""
+    engine = create_async_engine(database_url())
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            yield session
+    finally:
+        await engine.dispose()
 
 
 def _env(*names: str) -> str | None:
@@ -77,6 +87,18 @@ def _bundle_akn(path: Path) -> tuple[str, dict[str, Any]]:
     return path.read_text(encoding="utf-8"), {}
 
 
+def _descriptors(doc: Document) -> tuple[str, int | None, str]:
+    """Doctype, year and number as the pipeline resolved them into the work URI."""
+    from cobalt import FrbrUri
+
+    from codify.frbr import UNKNOWN_YEAR
+
+    uri = FrbrUri.parse(doc.frbr_work_uri)
+    year = uri.date[:4]
+    resolved = int(year) if year.isdigit() and year != UNKNOWN_YEAR else None
+    return uri.subtype or uri.doctype, doc.work_date.year if doc.work_date else resolved, uri.number
+
+
 async def _load(args: argparse.Namespace) -> int:
     from codify.akn.io import parse_akn
     from codify.storage import save_document
@@ -90,15 +112,17 @@ async def _load(args: argparse.Namespace) -> int:
     if not title:
         raise SystemExit("no title in the bundle's manifest; pass --title")
     doc = parse_akn(akn_xml)
-    async with _session_factory()() as session:
+    # The manifest holds only what the model read (a blank year, no doctype).
+    doctype, year, number = _descriptors(doc)
+    async with _session() as session:
         version_id = await save_document(
             session,
             doc,
             jurisdiction_code=jurisdiction,
             law_title=title,
-            doctype=args.doctype or meta.get("doctype") or "act",
-            year=args.year or meta.get("year"),
-            number=args.number or meta.get("number"),
+            doctype=args.doctype or doctype,
+            year=args.year or year,
+            number=args.number or number,
             akn_xml=akn_xml,
         )
         embedded = 0
@@ -120,7 +144,7 @@ async def _load(args: argparse.Namespace) -> int:
 async def _search(args: argparse.Namespace) -> int:
     from codify.retrieve.hybrid import retrieve
 
-    async with _session_factory()() as session:
+    async with _session() as session:
         matches = await retrieve(
             session,
             args.query,
@@ -143,7 +167,7 @@ async def _compare(args: argparse.Namespace) -> int:
         path = Path(ref)
         if path.exists():
             return parse_akn(_bundle_akn(path)[0])
-        async with _session_factory()() as session:
+        async with _session() as session:
             version = await get_version(session, uuid.UUID(ref))
             if version is None or not version.akn_xml:
                 raise SystemExit(f"no stored version {ref}")

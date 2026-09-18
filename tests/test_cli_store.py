@@ -9,18 +9,21 @@ import io
 import json
 import uuid
 from contextlib import redirect_stdout
+from datetime import date
 from pathlib import Path
 
 import pytest
 from sqlalchemy import delete, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from codify import cli_store
+from codify.akn.document import Document
 from codify.cli import main
 from codify.settings import database_url
 from codify.storage.models import Law, Version
 
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-atlantis-1992.akn.xml"
+OTHER_FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-zerzura-1994.akn.xml"
 
 
 def test_a_bundle_gives_its_akn_and_manifest(tmp_path: Path) -> None:
@@ -43,6 +46,25 @@ def test_a_bare_akn_file_has_no_manifest(tmp_path: Path) -> None:
 def test_a_directory_without_akn_is_refused_by_name(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="final.akn.xml"):
         cli_store._bundle_akn(tmp_path)
+
+
+def test_descriptors_come_from_the_work_uri_with_the_unknown_year_folded() -> None:
+    def doc(uri: str, work_date: date | None = None) -> Document:
+        return Document(
+            frbr_work_uri=uri,
+            frbr_expression_uri=f"{uri}/eng",
+            language="eng",
+            expression_date=date(2026, 1, 1),
+            work_date=work_date,
+        )
+
+    assert cli_store._descriptors(doc("/akn/al/act/vendim/2021/285")) == ("vendim", 2021, "285")
+    assert cli_store._descriptors(doc("/akn/xa/act/0001/abc")) == ("act", None, "abc")
+    assert cli_store._descriptors(doc("/akn/xa/act/1992/7", date(1991, 12, 31))) == (
+        "act",
+        1991,
+        "7",
+    )
 
 
 def test_the_first_set_variable_wins(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -186,13 +208,19 @@ def test_an_absent_url_is_an_error_outside_local(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.integration
-def test_a_bundle_loads_with_no_flags_and_keeps_its_read_title(tmp_path: Path) -> None:
-    """What `ingest-one` wrote into the manifest is what `load` files the law under."""
+def test_a_bundle_loads_with_no_flags_and_its_descriptors_come_from_the_uri(
+    tmp_path: Path,
+) -> None:
+    """The manifest carries the title the model read and, as `ingest-one` writes them,
+    a blank year and no doctype; doctype, year and number come from the work URI."""
     title = f"Read title {uuid.uuid4().hex[:8]}"
     (tmp_path / "final.akn.xml").write_text(FIXTURE.read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "manifest.json").write_text(
         json.dumps(
-            {"jurisdiction": "xa", "metadata": {"title": title, "year": 1992, "number": "7"}}
+            {
+                "jurisdiction": "xa",
+                "metadata": {"title": title, "doctype": None, "year": "", "number": "", "date": ""},
+            }
         )
     )
 
@@ -201,15 +229,65 @@ def test_a_bundle_loads_with_no_flags_and_keeps_its_read_title(tmp_path: Path) -
 
     try:
         assert code == 0
-        assert asyncio.run(_title_of(version_id)) == title
+        law = asyncio.run(_law_of(version_id))
+        assert (law.title, law.doctype, law.year, law.number) == (title, "act", 1992, "7")
     finally:
         asyncio.run(_delete_law_of(version_id))
 
 
-async def _title_of(version_id: uuid.UUID) -> str | None:
+async def _law_of(version_id: uuid.UUID) -> Law:
     engine = create_async_engine(database_url())
     async with async_sessionmaker(engine)() as s:
         law_id = select(Version.law_id).where(Version.id == version_id).scalar_subquery()
-        title = (await s.execute(select(Law.title).where(Law.id == law_id))).scalar_one_or_none()
+        law = (await s.execute(select(Law).where(Law.id == law_id))).scalar_one()
     await engine.dispose()
-    return title
+    return law
+
+
+@pytest.mark.integration
+def test_each_command_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
+    disposed: list[AsyncEngine] = []
+    original = AsyncEngine.dispose
+
+    async def spy(self: AsyncEngine, close: bool = True) -> None:
+        disposed.append(self)
+        await original(self, close)
+
+    monkeypatch.setattr(AsyncEngine, "dispose", spy)
+
+    _run(["search", "anything", "--jurisdiction", "zz-none"])
+
+    assert len(disposed) == 1
+
+
+def test_compare_writes_a_report_from_two_akn_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Llm:
+        async def chat_json(self, prompt: str, **_: object) -> dict[str, object]:
+            return {
+                "verdict": "gap",
+                "confidence": 0.9,
+                "note": "n",
+                "citations": [],
+                "actionable": True,
+                "provision_kind": "obligation",
+                "clause_method": "normal",
+            }
+
+    class _UnitVectors(_FixedVectors):
+        async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
+            return [[float(j == i % _DIM) for j in range(_DIM)] for i in range(len(items))]
+
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: _Llm())
+    monkeypatch.setattr(cli_store, "_embedding_client", _UnitVectors)
+    out = tmp_path / "report.json"
+
+    code, printed = _run(["compare", str(FIXTURE), str(OTHER_FIXTURE), "--out", str(out)])
+    report = json.loads(out.read_text())
+
+    assert code == 0 and printed == ""
+    assert len(report["results"]) >= report["summary"]["total"] > 0
+    assert {r["verdict"] for r in report["results"]} == {"gap"}
+    assert report["summary"]["gap"] == report["summary"]["total"]
