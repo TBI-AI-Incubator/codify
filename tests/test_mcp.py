@@ -723,14 +723,17 @@ def test_a_loaded_bundle_is_searchable_over_mcp(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(cli_store, "_embedding_client", _UnitVectors)
     title = f"Over MCP {uuid.uuid4().hex[:8]}"
-    out = io.StringIO()
-    with redirect_stdout(out):
-        code = main(["load", str(FIXTURE), "--jurisdiction", "xa", "--title", title, "--embed"])
-    assert code == 0
-    version_id = json.loads(out.getvalue().strip().splitlines()[-1])["version_id"]
+    version_ids = []
+    for fixture in (FIXTURE, OTHER_FIXTURE):  # the second is compare's domestic side
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = main(["load", str(fixture), "--jurisdiction", "xa", "--title", title, "--embed"])
+        assert code == 0
+        version_ids.append(json.loads(out.getvalue().strip().splitlines()[-1])["version_id"])
+    version_id, other_id = version_ids
 
     async def read() -> dict[str, Any]:
-        server = create_server(embedding_client=_UnitVectors)
+        server = create_server(embedding_client=_UnitVectors, llm_client=_GapLlm)
         async with Client(server) as c:
             version = await c.call_tool("get_version", {"version_id": version_id})
             law = await c.call_tool("get_law", {"law_id": version.structured_content["law_id"]})
@@ -738,18 +741,29 @@ def test_a_loaded_bundle_is_searchable_over_mcp(monkeypatch: pytest.MonkeyPatch)
             hits = await c.call_tool(
                 "search_provisions", {"query": "official text", "jurisdiction": "xa", "k": 3}
             )
+            codes = await c.call_tool("list_jurisdictions", {})
+            one = await c.call_tool("get_jurisdiction", {"code": "xa"})
+            report = await c.call_tool(
+                "compare_versions",
+                {"reference_version_id": version_id, "domestic_version_id": other_id},
+            )
+        for result in (version, law, laws, hits, codes, one, report):
+            assert not result.is_error, result.content
         return {
             "version": version.structured_content,
             "law": law.structured_content,
             "laws": laws.structured_content,
             "hits": hits.structured_content,
+            "codes": codes.structured_content,
+            "one": one.structured_content,
+            "report": report.structured_content,
         }
 
     async def cleanup() -> None:
         engine = create_async_engine(database_url())
         async with async_sessionmaker(engine)() as s:
-            law_id = select(Version.law_id).where(Version.id == uuid.UUID(version_id))
-            await s.execute(delete(Law).where(Law.id == law_id.scalar_subquery()))
+            law_ids = select(Version.law_id).where(Version.id.in_(map(uuid.UUID, version_ids)))
+            await s.execute(delete(Law).where(Law.id.in_(law_ids.scalar_subquery())))
             await s.commit()
         await engine.dispose()
 
@@ -757,9 +771,13 @@ def test_a_loaded_bundle_is_searchable_over_mcp(monkeypatch: pytest.MonkeyPatch)
         got = asyncio.run(read())
         assert got["law"]["title"] == title
         assert got["version"]["id"] in [v["id"] for v in got["law"]["versions"]]
-        assert [item["title"] for item in got["laws"]["items"]] == [title]
+        assert sorted(item["title"] for item in got["laws"]["items"]) == [title, title]
         matches = got["hits"]["matches"]
         assert matches and all({"provision_id", "eid", "score", "text"} <= set(m) for m in matches)
         assert matches == sorted(matches, key=lambda m: -m["score"])
+        assert "xa" in [item["code"] for item in got["codes"]["items"]]
+        assert got["one"]["code"] == "xa"
+        summary = got["report"]["summary"]
+        assert summary["total"] == 42 and summary["gap"] == 42  # the provisions the model saw
     finally:
         asyncio.run(cleanup())
