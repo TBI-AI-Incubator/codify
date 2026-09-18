@@ -1,5 +1,11 @@
 # Codify
 
+[![CI](https://github.com/TBI-AI-Incubator/codify/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TBI-AI-Incubator/codify/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/codify-core)](https://pypi.org/project/codify-core/)
+[![Python](https://img.shields.io/pypi/pyversions/codify-core)](https://pypi.org/project/codify-core/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Akoma Ntoso](https://img.shields.io/badge/Akoma%20Ntoso-3.0-lightgrey)](http://akomantoso.info/?page_id=27)
+
 Codify turns a statute book into law a machine can read: each act structured as
 [Akoma Ntoso 3.0](http://akomantoso.info/?page_id=27),
 the open standard for legal documents, addressable by
@@ -30,6 +36,10 @@ You need:
 - access to a chat model behind an OpenAI-compatible endpoint. The repo makes it easy to
   add a Gemini API key, but a LiteLLM gateway will also easily work
 - Docker, only for the database tests
+
+To use the library from your own project, `uv add codify-core` (or `pip install
+codify-core`); the extras are `serve`, `mcp` and `migrations`. To work in this
+repository:
 
 ```bash
 uv sync
