@@ -20,9 +20,9 @@ shared or production database. The default CI job does not run them.
    `CODIFY_PG_PORT` moves the host port; if you set it, set `POSTGRES_URL` to
    the same port.
 2. `uv run alembic -c alembic.ini upgrade head` applies the migrations.
-3. `REQUIRE_DB=1 uv run pytest tests -m "not live_llm"` runs the integration
-   tests; `REQUIRE_DB` makes an unreachable database a failure rather than a
-   skip.
+3. `REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm"` runs
+   the integration tests; `REQUIRE_DB` makes an unreachable database a failure
+   rather than a skip.
 
 `live_llm` tests are separate and require configured providers; they can incur
 charges. Neither offline tests nor schema checks certify the accuracy of a
