@@ -20,6 +20,8 @@ ClientFactory = Callable[[], Any]
 
 # One AKN body per call; a statute book's largest acts run to a few megabytes.
 XML_CAP_CHARS = 1_000_000
+# One model call per reference provision, so a compare is bounded before it starts.
+COMPARE_CAP_PROVISIONS = 200
 
 TOOL_NAMES = frozenset(
     {
@@ -82,12 +84,17 @@ def _id(value: str, what: str) -> uuid.UUID:
         raise ToolError(f"{value!r} is not a {what} id") from None
 
 
+def _no_data() -> ToolError:
+    return ToolError("this installation carries no jurisdiction data")
+
+
 def create_server(
     *,
     sessions: SessionFactory | None = None,
     embedding_client: ClientFactory = _embedding_client,
     llm_client: ClientFactory = _llm_client,
     xml_cap: int = XML_CAP_CHARS,
+    compare_cap: int = COMPARE_CAP_PROVISIONS,
 ) -> MCPServer[None]:
     """The server. `sessions` defaults to one engine on `POSTGRES_URL`, disposed
     when the server stops; the client factories default to the CLI's."""
@@ -227,6 +234,8 @@ def create_server(
     async def list_jurisdictions() -> dict[str, Any]:
         from codify.jurisdictions import JURISDICTIONS_DIR, load_config
 
+        if not JURISDICTIONS_DIR.exists():
+            raise _no_data()
         items = []
         for entry in sorted(JURISDICTIONS_DIR.iterdir()):
             if (entry / "config.json").exists():
@@ -244,7 +253,7 @@ def create_server(
         from codify.jurisdictions import JURISDICTIONS_DIR, JurisdictionConfigError, load_config
 
         if not JURISDICTIONS_DIR.exists():
-            raise ToolError("this installation carries no jurisdiction data")
+            raise _no_data()
         try:
             config = load_config(code.strip().lower())
         except JurisdictionConfigError:
@@ -259,18 +268,18 @@ def create_server(
     @server.tool(
         description="Compare two stored versions: each provision of the reference is "
         "assessed against the domestic version through the chat model, one call per "
-        "reference provision. Returns the report: a summary (aligned, partial, gap) "
-        "and every alignment, keyed by the reference provision's eId."
+        f"reference provision, refused above {compare_cap} of them. Returns the report: "
+        "a summary (aligned, partial, gap) and every alignment, keyed by the reference "
+        "provision's eId."
     )
     async def compare_versions(
         reference_version_id: str, domestic_version_id: str
     ) -> dict[str, Any]:
         from codify.akn.io import parse_akn
         from codify.compare.comparator import compare
+        from codify.compare.scaffold import is_excluded, iter_assessable
         from codify.storage import get_version
 
-        llm = _configured(llm_client)
-        embeddings = _configured(embedding_client)
         docs = []
         async with sessions() as session:
             for ref in (reference_version_id, domestic_version_id):
@@ -278,6 +287,14 @@ def create_server(
                 if row is None:
                     raise ToolError(f"no version {ref}")
                 docs.append(parse_akn(row.akn_xml))
+        count = sum(1 for p in iter_assessable(docs[0]) if not is_excluded(p, docs[0]))
+        if count > compare_cap:
+            raise ToolError(
+                f"the reference has {count} assessable provisions; this tool compares "
+                f"at most {compare_cap}"
+            )
+        llm = _configured(llm_client)
+        embeddings = _configured(embedding_client)
         report = await compare(docs[0], docs[1], llm=llm, embedding_client=embeddings)
         return report.model_dump(mode="json")
 

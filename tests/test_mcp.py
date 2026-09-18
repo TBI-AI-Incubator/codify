@@ -333,30 +333,24 @@ async def test_jurisdictions_list_and_read_from_the_configs() -> None:
     assert malformed.is_error and "no jurisdiction" in malformed.content[0].text
 
 
+@pytest.mark.parametrize(
+    ("name", "args"), [("get_jurisdiction", {"code": "xa"}), ("list_jurisdictions", {})]
+)
 async def test_an_install_without_jurisdiction_data_says_so(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, args: dict[str, Any]
 ) -> None:
     import codify.jurisdictions as jurisdictions
 
     monkeypatch.setattr(jurisdictions, "JURISDICTIONS_DIR", tmp_path / "absent")
 
-    result = await _call(create_server(sessions=_no_session), "get_jurisdiction", code="xa")
+    result = await _call(create_server(sessions=_no_session), name, **args)
 
     assert result.is_error
     assert "no jurisdiction data" in result.content[0].text
 
 
 async def test_compare_reads_both_versions_and_reports(monkeypatch: pytest.MonkeyPatch) -> None:
-    import codify.storage
-
-    left = _version(uuid.uuid4(), FIXTURE.read_text(encoding="utf-8"))
-    right = _version(uuid.uuid4(), OTHER_FIXTURE.read_text(encoding="utf-8"))
-    rows = {left.id: left, right.id: right}
-
-    async def fake_get(session: Any, version_id: uuid.UUID) -> Version | None:
-        return rows.get(version_id)
-
-    monkeypatch.setattr(codify.storage, "get_version", fake_get)
+    left, right = _two_stored_fixtures(monkeypatch)
     server = create_server(sessions=_no_session, embedding_client=_UnitVectors, llm_client=_GapLlm)
 
     result = await _call(
@@ -383,20 +377,62 @@ async def test_compare_reads_both_versions_and_reports(monkeypatch: pytest.Monke
     assert missing.is_error and "no version" in missing.content[0].text
 
 
+def _two_stored_fixtures(monkeypatch: pytest.MonkeyPatch) -> tuple[Version, Version]:
+    import codify.storage
+
+    left = _version(uuid.uuid4(), FIXTURE.read_text(encoding="utf-8"))
+    right = _version(uuid.uuid4(), OTHER_FIXTURE.read_text(encoding="utf-8"))
+    rows = {left.id: left, right.id: right}
+
+    async def fake_get(session: Any, version_id: uuid.UUID) -> Version | None:
+        return rows.get(version_id)
+
+    monkeypatch.setattr(codify.storage, "get_version", fake_get)
+    return left, right
+
+
 async def test_compare_without_a_chat_endpoint_is_a_tool_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    left, right = _two_stored_fixtures(monkeypatch)
 
     result = await _call(
         create_server(sessions=_no_session, embedding_client=_UnitVectors),
         "compare_versions",
-        reference_version_id=str(uuid.uuid4()),
-        domestic_version_id=str(uuid.uuid4()),
+        reference_version_id=str(left.id),
+        domestic_version_id=str(right.id),
     )
 
     assert result.is_error
     assert "LITELLM_BASE_URL" in result.content[0].text
+
+
+async def test_compare_over_the_provision_cap_is_refused_before_any_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    left, right = _two_stored_fixtures(monkeypatch)
+    built: list[str] = []
+
+    def llm() -> _GapLlm:
+        built.append("llm")
+        return _GapLlm()
+
+    server = create_server(
+        sessions=_no_session, embedding_client=_UnitVectors, llm_client=llm, compare_cap=10
+    )
+
+    result = await _call(
+        server,
+        "compare_versions",
+        reference_version_id=str(left.id),
+        domestic_version_id=str(right.id),
+    )
+
+    assert result.is_error
+    text = result.content[0].text
+    assert "58 assessable provisions" in text and "at most 10" in text
+    assert built == []
 
 
 async def test_a_crash_inside_a_tool_does_not_leak_its_message(
