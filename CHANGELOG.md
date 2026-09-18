@@ -48,10 +48,9 @@ major is zero. Eleven are in year resolution, enumerated by running every
 year-resolution grid cell and edge row through the 0.1.0 and 0.2.0 callers
 (`resolve_year`, `gregorian_year`, `resolve_descriptors`) and grouping every
 differing cell; two are in embedding storage. Each line names the input shape
-that triggers it. Checked against a populated deployment on 17 September 2026:
-no jurisdiction with a non-Gregorian calendar (af, et, ir, jp, kp, ma, np, sa,
-th, tw) had any law stored, no stored law had a year below 1000, and no work
-URI carried a one- to three-digit year segment, so no stored row moved.
+that triggers it. A stored row moves only where a jurisdiction with a
+non-Gregorian calendar has a law stored, a stored law has a year below 1000,
+or a work URI carries a one- to three-digit year segment.
 
 1. A date field the model left unlabelled is read as written; 0.1.0 converted
    its year through the jurisdiction's calendar, filing a Gregorian `1968-09-09`

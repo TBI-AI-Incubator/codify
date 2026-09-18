@@ -407,7 +407,7 @@
     "documents_examined": 0,
     "bluebell_tested": false,
     "unresolved_ambiguities": 7,
-    "note": "Profile built from published descriptions of Finnish drafting; no document was inspected directly against Finlex. The unresolved ambiguities in profile.md need confirmation before promotion to production."
+    "note": "Hierarchy and numbering built from published descriptions of Finnish drafting; no statute was inspected for structure against Finlex. The tier rests on the Finlex Open Data endpoint, which was fetched and returns AKN XML. The unresolved ambiguities in profile.md need confirmation before promotion to production."
   },
   "tier": 1,
   "status": "draft",
