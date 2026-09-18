@@ -3,6 +3,15 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
+## Unreleased
+
+- The anchor scan reads marginal-note layouts: where a jurisdiction declares
+  `display.heading_type: marginal_note`, a bare basic-unit number under a
+  heading line (the shape a scanned gazette transcribes to) is a section, with
+  that line as its heading. The coverage denominator counts the same markers, so
+  a scan that lost them reads below 1.0 instead of measuring nothing. The
+  bundled `xa` scan now structures its twenty sections rather than six parts.
+
 ## 0.4.0 (2026-09-18)
 
 The first published release. Everything after the bundle: a store, a server, a

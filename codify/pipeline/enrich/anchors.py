@@ -1221,6 +1221,31 @@ def scan_anchors_with_ambiguity(
         fires["scan_declared_markers"] = len(marked)
         raw.extend(marked)
         raw.sort(key=lambda a: a.char_offset)
+    marginal_kind = _marginal_note_kind(country, doctype)
+    noted: list[StructuralAnchor] = []
+    if marginal_kind:
+        noted = _stamp(
+            _scan_marginal_note_units(
+                text,
+                marginal_kind,
+                _anchor_lines(text, raw),
+                toc_end=toc_end,
+                end=_first_attachment_offset(raw),
+                in_quote=effective_quote,
+            ),
+            "marginal_note_units",
+        )
+        fires["scan_marginal_note_units"] = len(noted)
+        raw = _fire_dropped(
+            fires,
+            "drop_references_in_marginal_bodies",
+            raw,
+            _drop_references_in_marginal_bodies(text, raw, noted, marginal_kind),
+            spans,
+            reads_as="prose_citation",
+        )
+        raw.extend(noted)
+        raw.sort(key=lambda a: a.char_offset)
     if country in _UK_JURISDICTIONS:
         # Keyword-less UK sections/subsections; scan, merge in doc order, and
         # drop Arrangement-of-Sections contents entries. SI "(N)" subdivisions
@@ -1236,6 +1261,8 @@ def scan_anchors_with_ambiguity(
         )
         raw = _stamp(raw, "regex")
         uk = _stamp(_scan_uk_provisions(text, effective_quote, toc_end, sub_kind), "uk_provisions")
+        if noted and marginal_kind:
+            uk = _drop_references_in_marginal_bodies(text, uk, noted, marginal_kind)
         fires["scan_uk_provisions"] = len(uk)
         raw.extend(uk)
         raw.sort(key=lambda a: a.char_offset)
@@ -1850,6 +1877,206 @@ def _scan_numbered_heading_fallback(text: str) -> list[StructuralAnchor]:
             )
         )
     return out
+
+
+# A basic unit set marginal-note style: the note on its own line, the bare number
+# (bold in a transcription) below it, the body on the next line or beside it.
+_MARGINAL_NUMBER_RE = re.compile(
+    r"(?m)^[ \t]{0,8}(?:\*\*)?(?P<num>\d{1,4}[A-Z]?)(?:\*\*)?\.(?:\*\*)?"
+    r"(?:[ \t]+(?P<body>\S[^\r\n]*))?[ \t]*\r?$"
+)
+_MARGINAL_HEADING_MAX = 80
+_MARGINAL_BODY_START_RE = re.compile(r"[(\"\u201c\u2018'A-Z]")
+# A body beside the number is a sentence; a contents entry is a bare title.
+_MARGINAL_BODY_MIN = 60
+_SENTENCE_TAIL_RE = re.compile(r"[.;:\u2014\"\u201d]\s*$")
+# An outline caption ("B. Dials") heads a list, not a provision.
+_OUTLINE_CAPTION_RE = re.compile(r"^(?:[A-Za-z]|\d{1,3})[.)]\s")
+
+
+def _marginal_note_kind(country: str, doctype: str) -> str | None:
+    """The basic unit to scan for when the config says headings are marginal notes."""
+    if not country:
+        return None
+    try:
+        config = load_config(country)
+    except Exception:  # noqa: BLE001, missing/invalid config: keyword scan only
+        return None
+    display = config.display
+    if display is None or display.heading_type != "marginal_note":
+        return None
+    # Declared, not defaulted: the model's default is also marginal_note.
+    if "heading_type" not in display.model_fields_set:
+        return None
+    return _basic_unit_for(country, doctype)
+
+
+def _neighbour_line(text: str, offset: int, *, back: bool) -> tuple[int, str] | None:
+    """The nearest non-blank line before (or after) the line at `offset`."""
+    if back:
+        end = _line_start(text, offset)
+        while end > 0:
+            start = text.rfind("\n", 0, end - 1) + 1
+            line = text[start : end - 1]
+            if line.strip():
+                return start, line
+            end = start
+        return None
+    start = text.find("\n", offset)
+    while start != -1:
+        start += 1
+        stop = text.find("\n", start)
+        line = text[start : stop if stop != -1 else len(text)]
+        if line.strip():
+            return start, line
+        if stop == -1:
+            break
+        start = stop
+    return None
+
+
+def _reads_as_marginal_note(line: str) -> bool:
+    """Short, sentence or title case, no terminal punctuation: a note, not prose."""
+    bare = line.strip().strip("*_").strip()
+    return (
+        0 < len(bare) <= _MARGINAL_HEADING_MAX
+        and not _OUTLINE_CAPTION_RE.match(bare)
+        and bare[0].isupper()
+        and any(c.islower() for c in bare)
+        and bare[-1] not in ".;:,"
+    )
+
+
+def _opens_a_block(text: str, line_start: int) -> bool:
+    """Whether the line at `line_start` follows a blank line or the text's start;
+    a wrapped line of prose follows a line of prose."""
+    if line_start == 0:
+        return True
+    prev_end = line_start - 1
+    prev_start = text.rfind("\n", 0, prev_end) + 1
+    return not text[prev_start:prev_end].strip()
+
+
+def _scan_marginal_note_units(
+    text: str,
+    kind: str,
+    taken_lines: AbstractSet[int],
+    *,
+    toc_end: int = 0,
+    end: int | None = None,
+    in_quote: Sequence[bool] | None = None,
+) -> list[StructuralAnchor]:
+    """Basic units whose number stands alone under a marginal note, before `end`.
+
+    The note above must read as a heading and not already anchor a container;
+    the body, beside the number or on the next line, must open like a sentence;
+    and numbers must climb, so a page number or a list restarting at 1 between
+    paragraphs never becomes a provision.
+    """
+    out: list[StructuralAnchor] = []
+    last = 0
+    for m in _MARGINAL_NUMBER_RE.finditer(text, toc_end, len(text) if end is None else end):
+        if in_quote is not None and in_quote[m.start("num")]:
+            continue
+        number = int(m.group("num").rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+        number_line = text.count("\n", 0, m.start()) + 1
+        before = _neighbour_line(text, m.start(), back=True)
+        if number < last or number_line in taken_lines or before is None:
+            continue
+        note_start, note = before
+        note_line = text.count("\n", 0, note_start) + 1
+        if note_line in taken_lines or not _reads_as_marginal_note(note):
+            continue
+        if not _opens_a_block(text, note_start):
+            continue
+        body = m.group("body")
+        if body is not None and not (
+            len(body) >= _MARGINAL_BODY_MIN or _SENTENCE_TAIL_RE.search(body)
+        ):
+            continue
+        if body is None:
+            after = _neighbour_line(text, m.start(), back=False)
+            body = after[1] if after else ""
+        if not _MARGINAL_BODY_START_RE.match(body.lstrip()):
+            continue
+        last = number
+        heading = note.strip().strip("*_").strip()
+        out.append(
+            StructuralAnchor(
+                kind=kind,
+                keyword=heading,
+                number=m.group("num"),
+                char_offset=note_start,
+                line=note_line,
+                matched_text=note.strip(),
+                heading=heading if kind in _HEADING_KINDS else None,
+            )
+        )
+    return out
+
+
+# A schedule anchors as the builtin kind or as the grouping hcontainer a config declares.
+_ATTACHMENT_KINDS = frozenset({"schedule", "hcontainer"})
+
+
+def _attachment_floor(markers: Iterable[tuple[int, str]]) -> int | None:
+    """Where the schedules begin: the first schedule marker past the last
+    container, so a contents list naming one does not floor the body."""
+    last_container = max((o for o, k in markers if k in CONTAINER_KINDS), default=-1)
+    return min(
+        (o for o, k in markers if k in _ATTACHMENT_KINDS and o > last_container), default=None
+    )
+
+
+def _first_attachment_offset(anchors: Iterable[StructuralAnchor]) -> int | None:
+    return _attachment_floor((a.char_offset, a.kind) for a in anchors)
+
+
+def _first_attachment_marker(
+    text: str, config: JurisdictionConfig, doctype: str, in_quote: Sequence[bool]
+) -> int | None:
+    """`_first_attachment_offset` for the denominator, which has no anchors yet."""
+    pattern = _compile_anchor_regex(
+        keyword_aliases(config, doctype), config, boundary="column_only"
+    )
+    markers = []
+    for m in pattern.finditer(text):
+        kind = _kind_from_match(m)
+        if kind and not in_quote[_marker_line_start(text, m.start())]:
+            markers.append((m.start(), kind))
+    return _attachment_floor(markers)
+
+
+def _anchor_lines(text: str, anchors: Iterable[StructuralAnchor]) -> set[int]:
+    """Lines that open with an anchor's marker. A marker met mid-line leaves the
+    line free: after a bare number it is the body's own cross-reference."""
+    out: set[int] = set()
+    for a in anchors:
+        start = _marker_line_start(text, a.char_offset)
+        marker = a.char_offset
+        while marker < len(text) and text[marker] in " \t\r\n":
+            marker += 1
+        if not text[start:marker].strip():
+            out.add(text.count("\n", 0, start) + 1)
+    return out
+
+
+def _drop_references_in_marginal_bodies(
+    text: str, anchors: list[StructuralAnchor], noted: Sequence[StructuralAnchor], kind: str
+) -> list[StructuralAnchor]:
+    """A keyword match on a line a bare number opened is a cross-reference in
+    that unit's first sentence, not a second unit."""
+    number_lines: set[int] = set()
+    for a in noted:
+        below = _neighbour_line(text, a.char_offset, back=False)
+        if below is not None:
+            number_lines.add(text.count("\n", 0, below[0]) + 1)
+    return [
+        a
+        for a in anchors
+        if a.kind != kind
+        or text.count("\n", 0, _marker_line_start(text, a.char_offset)) + 1 not in number_lines
+    ]
 
 
 # Arabic ordinal-list markers (`أولاً:`, `ثانياً:`, ...): common on
@@ -3981,6 +4208,17 @@ def _marker_numbers(
     # Unioned, not returned alone: the scan counts both spellings, and one of
     # them alone scores a document against a fraction of what it captured.
     declared_found = _scan_declared_markers(text, 0, declared, config.code)[0]
+    if _marginal_note_kind(config.code, doctype) == kind:
+        in_quote = _quote_mask(text, config.code)
+        declared_found.extend(
+            _scan_marginal_note_units(
+                text,
+                kind,
+                _anchor_lines(text, declared_found),
+                end=_first_attachment_marker(text, config, doctype, in_quote),
+                in_quote=in_quote,
+            )
+        )
     aliases: list[str] = []
     for entry in doc_class.hierarchy:
         if entry.akn_element != kind:

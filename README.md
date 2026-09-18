@@ -71,9 +71,7 @@ jurisdiction's rules, and the LLM then fills the text within each anchored block
 populates text inside anchored basic units (e.g., sections, articles). If a pass
 identifies higher-level containers but no basic units, it logs `body_fill_skipped` and
 exports only the skeleton. If no anchors are found, it logs `scaffold_no_anchors` and
-preserves the source text unparsed. (Note: the bundled `xa` fixture places section numbers
-in the margin, which the parser does not currently extract; it anchors six parts but no
-sections.)
+preserves the source text unparsed.
 
 **Dry runs.** To inspect detected anchors across `.txt` and text-layer `.pdf` files
 without making model calls or requiring a database, run the anchor scan directly:

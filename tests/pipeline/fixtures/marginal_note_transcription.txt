@@ -1,0 +1,152 @@
+THE ATLANTIS GAZETTE
+
+No. 412 Published by Authority 14th May, 1992
+
+No. 7 of 1992
+
+LEGISLATION ACT, 1992
+
+An Act to consolidate and reform the law relating to the making, publication and citation of the legislation of Atlantis; to establish the Office of the Publishing Authority and to provide for its functions; to secure a right of public access to the official text of the law; to provide for the keeping of a register of legislation and for the evidentiary status of published text; to create offences relating to the integrity of the legislative record; to make provision for appeals; and for connected and incidental purposes.
+
+[Assented to 2nd May, 1992]
+
+WHEREAS IT IS EXPEDIENT THAT THE LAWS OF ATLANTIS BE PUBLISHED IN A COMPLETE, AUTHENTIC AND CURRENT FORM, AND THAT EVERY PERSON HAVE ACCESS TO THE LAW BY WHICH THAT PERSON IS BOUND: BE IT ENACTED BY THE ASSEMBLY OF ATLANTIS, AND BY THE AUTHORITY OF THE SAME, AS FOLLOWS:
+
+PART I — PRELIMINARY
+
+*Short title and commencement*
+**1.**
+(1) This Act may be cited as the Legislation Act, 1992.
+(2) This Act shall come into operation on such day as the Minister may, by notice published in the Gazette, appoint, and different days may be appointed for different provisions and for different purposes.
+(3) Where a provision of this Act has not been brought into operation within two years of the passing of this Act, it shall come into operation on the day after the expiry of that period.
+
+*Interpretation*
+**2.**
+(1) In this Act, unless the context otherwise requires—
+(a) "amending instrument" means any Act, order, rule, regulation, by-law or other instrument by which a provision of a law is inserted, substituted, amended, repealed or otherwise affected;
+(b) "commencement", in relation to a provision, means the day on which the provision comes into operation;
+(c) "the Gazette" means the official gazette of Atlantis published under section 6;
+(d) "law" means any Act of the Assembly and any instrument of subsidiary legislation, whether made before or after the commencement of this section;
+(e) "official text", in relation to a law, means the text of the law as enacted or made, incorporating every amendment to it that is in force at the material time, as published under Part II;
+
+(f) "prescribed" means prescribed by regulations made under this Act;
+(g) "the Publishing Authority" means the officer holding the office established by section 9;
+(h) "the Register" means the register of legislation kept under section 8;
+(i) "subsidiary legislation" means any instrument having legislative effect made under a power conferred by an Act;
+(j) "the Tribunal" means the Administrative Tribunal established under the Administrative Tribunal Act.
+(2) A reference in this Act to a provision of a law includes a reference to a Part, a section, a subsection, a paragraph, a Schedule and any other division of the law.
+(3) Where in this Act a period of days is expressed to run from a given day, that day shall not be counted, and where the last day of the period is not a working day the period shall extend to the next working day.
+
+*Application*
+**3.**
+(1) This Act applies to every law in force on the commencement of this section and to every law enacted or made after that commencement.
+(2) This Act binds the State.
+(3) Where any other Act is inconsistent with this Act in relation to the publication or citation of legislation, this Act prevails to the extent of the inconsistency, unless the other Act expressly provides otherwise.
+
+
+PART II — PUBLICATION OF LEGISLATION
+
+*Duty to publish*
+**4.**
+(1) The Publishing Authority shall cause every law in force to be published in an electronic form which—
+(a) permits the whole of the text of the law to be searched;
+(b) permits any provision of the law to be extracted, cited and reproduced without transcription; and
+(c) identifies, in respect of each provision, its commencement and every amendment affecting it.
+(2) The reproduction of a printed page as an image shall not, of itself, satisfy the requirements of subsection (1).
+
+*Currency of the official text*
+**5.**
+(1) The Publishing Authority shall maintain the official text of every law in a state that is current to within thirty days of the coming into force of any amending instrument affecting the law.
+(2) Where a provision has been amended, the Publishing Authority shall publish both the text of the provision as it stands and the text as it stood immediately before the amendment took effect, and shall in each case identify the amending instrument by its citation.
+(3) The Publishing Authority may correct in the official text any clerical or typographical error, or any error of a similar nature, but no such correction shall change the effect of the law, and every correction shall be recorded in the Register.
+
+*The Gazette*
+**6.**
+
+(1) There shall continue to be an official gazette of Atlantis, to be published by the Publishing Authority at such intervals as are prescribed.
+(2) The publication in the Gazette of any notice, order or instrument shall be sufficient notice of its contents to all persons.
+
+*Evidentiary status*
+**7.**
+(1) A copy of the official text of a law, published under this Part and bearing an endorsement by the Publishing Authority as to its currency, shall be received in all courts as evidence of the law and of its coming into force, without further proof.
+(2) Nothing in this section makes the official text conclusive evidence of the law as enacted, and in the event of a discrepancy the text of the law as enacted by the Assembly prevails.
+
+*The Register*
+**8.**
+(1) The Publishing Authority shall keep a register of legislation, in which shall be recorded, in respect of each law—
+(a) its short title, number and year;
+(b) the date of its enactment or making and the date of its commencement; and
+(c) every amending instrument affecting it and the date on which each amendment took effect.
+(2) The Register shall be open to inspection by any person, free of charge, at all reasonable times.
+
+PART III — THE PUBLISHING AUTHORITY
+
+*Office of the Publishing Authority*
+**9.**
+(1) There is established the Office of the Publishing Authority.
+(2) The Publishing Authority shall be appointed by the Minister, by notice published in the Gazette, and shall hold office on such terms as are specified in the instrument of appointment.
+(3) In the exercise of the functions conferred by this Act, the Publishing Authority shall not be subject to the direction of any person as to the content of the official text.
+
+*Functions and powers*
+**10.**
+(1) The functions of the Publishing Authority are to publish the laws in accordance with Part II, to keep the Register, and to do all things necessary or convenient to be done for or in connection with the performance of those functions.
+(2) The Publishing Authority may, in writing, delegate any of its functions, other than this power of delegation, to an officer of the Office, and a delegation under this subsection does not prevent the performance of the function by the Publishing Authority.
+
+*Deferral of publication*
+**11.**
+(1) The Publishing Authority may, where it considers it expedient to do so, defer the publication of any law or class of laws for such period and on such terms as it thinks fit.
+(2) A deferral under subsection (1) shall not be called in question in any proceedings.
+
+PART IV — ACCESS AND APPEALS
+
+*Right of access*
+**12.**
+(1) Every person has the right of access to the official text of any law in force, in a form that is complete, current and free of charge.
+(2) No fee shall be charged for access to the official text in electronic form, but the Publishing Authority may charge a reasonable fee, not exceeding the cost of production, for a certified printed copy.
+
+*Appeals*
+**13.**
+(1) A person aggrieved by a decision of the Publishing Authority under this Act, other than a decision to defer publication under section 11, may appeal to the Tribunal within twenty-eight days of being notified of the decision.
+(2) On an appeal under this section the Tribunal may confirm, vary or set aside the decision appealed against, and the decision of the Tribunal shall be final.
+
+PART V — OFFENCES AND ENFORCEMENT
+
+*Obstruction*
+**14.** A person who wilfully obstructs the Publishing Authority, or an officer of the Office, in the discharge of any function under this Act commits an offence and is liable on summary conviction to a fine not exceeding five hundred pounds or to imprisonment for a term not exceeding three months, or to both.
+
+*Falsifying the record*
+**15.**
+(1) A person who, in the Register or in the official text, makes or causes to be made an entry which that person knows to be false in a material particular commits an offence.
+(2) A person who is guilty of an offence under subsection (1) is liable on conviction on indictment to a fine not exceeding five thousand pounds or to imprisonment for a term not exceeding two years, or to both.
+
+*Offences by bodies corporate*
+**16.** Where an offence under this Act committed by a body corporate is proved to have been committed with the consent or connivance of, or to be attributable to any neglect on the part of, a director, manager, secretary or other similar officer of the body corporate, that person, as well as the body corporate, commits the offence and is liable to be proceeded against and punished accordingly.
+
+PART VI — REGULATIONS AND GENERAL
+
+*Regulations*
+**17.**
+(1) The Minister may make regulations, not inconsistent with this Act, prescribing all matters that are required or permitted to be prescribed, or that are necessary or convenient to be prescribed, for carrying out or giving effect to this Act.
+(2) Without limiting the generality of subsection (1), regulations may—
+(a) prescribe the form and manner of publication of laws and of the Register;
+(b) prescribe the intervals at which the Gazette is to be published;
+(c) prescribe fees for certified printed copies; and
+(d) prescribe the procedure on an appeal to the Tribunal.
+(3) Regulations made under this section shall be laid before the Assembly within
+
+twenty-one days of their making, and if the Assembly resolves within forty days that the regulations be annulled, the regulations shall cease to have effect, but without prejudice to anything previously done under them.
+
+*Transitional*
+
+**18.**
+(1) Any law that, immediately before the commencement of this section, was published under any enactment repealed by this Act shall be taken to have been published under this Act.
+
+(2) The person who, immediately before the commencement of section 9, held the office charged with the publication of the laws shall continue in office as the Publishing Authority as if appointed under that section.
+
+*Savings*
+
+**19.** Nothing in this Act affects the validity of any law as enacted or made, or the operation of any law in force immediately before the commencement of this section, except as expressly provided.
+
+*Repeals*
+
+**20.** The enactments specified in the Schedule are repealed to the extent set out in the third column of the Schedule.
