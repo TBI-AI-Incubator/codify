@@ -2291,9 +2291,12 @@ def _scan_attachment_keywords(
         return []
     taken = {a.char_offset for a in already}
     out: list[StructuralAnchor] = []
+    country = config.code if config else ""
     for m in _compile_anchor_regex(aliases, config).finditer(window):
         kind = _kind_from_match(m)
         if kind is None or m.start() < toc_end or m.start() in taken:
+            continue
+        if _opens_citation_run(window, m.end(), country):
             continue
         out.append(
             StructuralAnchor(
@@ -2659,7 +2662,7 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
         form
         for doc_class in (config.document_classes or {}).values()
         for entry in doc_class.hierarchy
-        if entry.akn_element in {"article", "section"}
+        if entry.akn_element in {"article", "section", "rule"}
         for form in _alias_terms_for(entry)
     }
     if not terms:

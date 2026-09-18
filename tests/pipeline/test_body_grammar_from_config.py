@@ -536,3 +536,37 @@ def test_a_bare_keyword_ending_a_line_is_not_a_quote_boundary(declared: Any) -> 
     assert boundary is not None
     assert boundary.search("Section\n5\nText")
     assert boundary.search("Section\ncontinues here") is None
+
+
+def test_a_rule_based_unit_bounds_a_quotation_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = jurisdictions.load_config
+    base = original(COUNTRY)
+    act = base.document_classes["act"]
+    ruled = act.model_copy(
+        update={
+            "hierarchy": [
+                jurisdictions.HierarchyEntry(
+                    local_term="Rule", akn_element="rule", level="basic", numbering="arabic"
+                )
+            ]
+        }
+    )
+    config = base.model_copy(update={"document_classes": {**base.document_classes, "act": ruled}})
+    monkeypatch.setattr(
+        anchors_mod, "load_config", lambda c: config if c == COUNTRY else original(c)
+    )
+    anchors_mod._basic_unit_line_re.cache_clear()
+    boundary = anchors_mod._basic_unit_line_re(COUNTRY)
+    anchors_mod._basic_unit_line_re.cache_clear()
+    assert boundary is not None and boundary.search("Rule 2\nText")
+
+
+def test_an_attachment_keyword_scan_refuses_a_citation_run(declared: Any) -> None:
+    levels = [a for a in jurisdictions.load_config(COUNTRY).attachments if a.caption == "ANNEX"][
+        0
+    ].hierarchy
+    window = "ANNEX\nRule 1\nAnnex one.\n\nRule 2 to Rule 4 apply.\nProse.\n"
+    found = anchors_mod._scan_attachment_keywords(
+        window, 0, levels, jurisdictions.load_config(COUNTRY), []
+    )
+    assert [a.number for a in found] == ["1"]
