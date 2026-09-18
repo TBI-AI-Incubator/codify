@@ -18,6 +18,7 @@ from codify.jurisdictions import (
     HierarchyEntry,
     JurisdictionConfig,
     JurisdictionConfigError,
+    fold_inserted_suffix,
     load_config,
     ordinal_word_folds,
 )
@@ -139,6 +140,16 @@ _MARKER_NUM_END = rf"(?:(?<=[{_MARKER_DIGITS}])(?![{_MARKER_DIGITS}])|(?<![{_MAR
 _MARKER_NUM_TAIL = r"(?(sep)|(?=[ \t]*$))"
 
 
+def _inserted_suffix_end(suffixes: Mapping[str, str]) -> str:
+    """The number's end, or a declared insertion suffix ("5 bis") ending it instead.
+    The suffix may wrap onto the next line and ends on a non-word character."""
+    if not suffixes:
+        return _MARKER_NUM_END
+    words = "|".join(re.escape(w) for w in sorted(suffixes, key=lambda w: (-len(w), w)))
+    # `(?-i:…)`: the denominator compiles case-blind, and a suffix is a word.
+    return rf"(?:(?P<suffix>[ \t]*(?:\r?\n)?[ \t]*(?-i:{words}))(?!\w)|{_MARKER_NUM_END})"
+
+
 def _separator_for(tolerances: AbstractSet[str]) -> str:
     """Keyword-to-number separator, optional where the sources lose it."""
     if "missing_separator" not in tolerances:
@@ -152,7 +163,8 @@ _NUM_ALTS = (
     # Roman numerals, incl. the Cyrillic homoglyphs OCR yields for Ukrainian
     # section rubrics ("РОЗДІЛ І" uses Cyrillic І U+0406, Х U+0425).
     r"[IVXLCDMivxlcdmІіХх]+"
-    r"|\d+(?:\s?[-\u2013]\s?\d+)+"  # hyphenated insertions ("13-1", spaced "13 - 1")
+    # Hyphenated or slashed insertions ("13-1", spaced "13 - 1", "7/1").
+    r"|\d+(?:\s?[-\u2013/]\s?\d+)+"
     r"|\d+[A-Za-z]?"  # Western Arabic, optional letter suffix (e.g. 5A)
     r"|[٠-٩]+"  # Arabic-Indic ٠-٩
     r"|[۰-۹]+"  # Extended Arabic-Indic (Persian/Urdu) ۰-۹
@@ -523,7 +535,8 @@ def _compile_anchor_regex(
     flags = "(?im)" if case_insensitive else "(?m)"
     pattern = (
         rf"{flags}{_BOUNDARIES[boundary or _policy(config)]}(?:{keyword_group})"
-        rf"{_separator_for(tolerances)}{num_pattern}{_MARKER_NUM_END}"
+        rf"{_separator_for(tolerances)}{num_pattern}"
+        rf"{_inserted_suffix_end(structuring.insertion_suffixes if structuring else {})}"
         rf"{_MARKER_NUM_TAIL if 'missing_separator' in tolerances else ''}"
     )
     return re.compile(pattern)
@@ -560,6 +573,15 @@ _AR_SAMELINE_FILTER_RE = re.compile(
 )
 
 
+# Scripts that run words together, so a word there touches its neighbours.
+_UNSPACED_SCRIPTS = "\u0e00-\u0e7f\u0e80-\u0eff\u1000-\u109f\u1780-\u17ff"
+
+
+def _word_end(word: str) -> str:
+    """A whole-word end for the regex, except in a script that runs words together."""
+    return "" if re.search(f"[{_UNSPACED_SCRIPTS}]$", word) else r"(?!\w)"
+
+
 def _precursor_re(words: tuple[str, ...]) -> re.Pattern[str]:
     if not words:
         return re.compile(r"(?!)")
@@ -568,7 +590,10 @@ def _precursor_re(words: tuple[str, ...]) -> re.Pattern[str]:
     # Indonesian writes the legal basis as "Mengingat :   Pasal 5 ayat (1)".
     # Case-insensitive: a precursor is a word, and a line can end on it in any
     # case a scan produces.
-    return re.compile(rf"(?:^|\s|[،,(\[])[وفلبك]?(?:{alts})\s*[:：]?\s*$", re.IGNORECASE)
+    return re.compile(
+        rf"(?:^|\s|[،,(\[]|(?<=[{_UNSPACED_SCRIPTS}]))[وفلبك]?(?:{alts})\s*[:：]?\s*$",
+        re.IGNORECASE,
+    )
 
 
 @lru_cache(maxsize=32)
@@ -636,6 +661,40 @@ def _is_prose_reference(text: str, start: int, country: str = "") -> bool:
     return gap_newlines == 0 and bool(_sameline_filter_for(country).search(window))
 
 
+# Footnote brackets and amendment stars sit between a number and what follows it.
+_NUMBER_DECORATIONS_RE = re.compile(r"^(?:[ \t]*(?:\*|\[[^\]\n]{1,6}\]))*[ \t]*")
+
+
+@lru_cache(maxsize=64)
+def _citation_successors_for(country: str) -> tuple[str, ...]:
+    if not country:
+        return ()
+    config = load_config(country)
+    return tuple(config.structuring.citation_successors if config.structuring else ())
+
+
+@lru_cache(maxsize=64)
+def _successor_re(country: str) -> re.Pattern[str] | None:
+    """The declared successors as whole words, or None where none are declared."""
+    successors = _citation_successors_for(country)
+    if not successors:
+        return None
+    alts = "|".join(
+        re.escape(w) + _word_end(w) for w in sorted(successors, key=lambda w: (-len(w), w))
+    )
+    return re.compile(rf"(?:{alts})")
+
+
+def _opens_citation_run(text: str, end: int, country: str) -> bool:
+    """Does a declared successor word follow the number on the marker's own line?"""
+    pattern = _successor_re(country)
+    if pattern is None:
+        return False
+    rest = text[end : text.find("\n", end) if text.find("\n", end) >= 0 else len(text)]
+    rest = _NUMBER_DECORATIONS_RE.sub("", rest, count=1)
+    return pattern.match(rest) is not None
+
+
 _CYRILLIC_ROMAN = str.maketrans({"І": "I", "і": "i", "Х": "X", "х": "x"})
 
 # Matches a captured num carrying a bis suffix: "6) مكرر", "9) مكرر (1".
@@ -673,7 +732,9 @@ def _repair_damaged_num(match: re.Match[str]) -> str | None:
         num = re.sub(r"[ \t]+", "", num)
     if groups.get("numglyph") is not None or groups.get("numsplit") is not None:
         num = num.translate(_DIGIT_GLYPHS)
-    return _normalise_num(num)
+    # The suffix is a word: repaired digits never reach it.
+    suffix = groups.get("suffix")
+    return _normalise_num(f"{num} {suffix.strip()}" if suffix else num)
 
 
 def _normalise_num(num: str | None) -> str | None:
@@ -686,6 +747,7 @@ def _normalise_num(num: str | None) -> str | None:
         base, idx = bis
         return f"{base} مكرر ({idx})" if idx else f"{base} مكرر"
     num = re.sub(r"\s*[-\u2013]\s*", "-", num)
+    num = re.sub(r"\s*/\s*", "/", num)
     if all(c in "IVXLCDMivxlcdmІіХх" for c in num):
         num = num.translate(_CYRILLIC_ROMAN)
     return num
@@ -787,9 +849,13 @@ def _declare_unclaimed_markers(
     # By offset, not line: the anchor regex consumes the leading newline, so an
     # anchor's recorded line can be one less than the marker's own.
     starts = sorted(a.char_offset for a in anchors)
+    # A marker the closing boundary set aside is classified, not unclaimed.
+    excluded = [(sp.start, sp.end) for sp in spans if sp.kind == "tail_excluded"]
     for m in _BARE_MARKER_LINE_RE.finditer(text):
         i = bisect_left(starts, m.start() - 2)
         if i < len(starts) and starts[i] <= m.end():
+            continue
+        if any(start <= m.start() < end for start, end in excluded):
             continue
         line = text.count("\n", 0, m.start()) + 1
         spans.append(
@@ -1106,6 +1172,17 @@ def scan_anchors_with_ambiguity(
                 )
             )
             continue
+        if _opens_citation_run(text, match.end(), country):
+            spans.append(
+                AmbiguitySpan(
+                    kind="unmatched_marker",
+                    start=match.start(),
+                    end=match.end(),
+                    emitted_by="regex",
+                    detail={"reason": "read_as_citation_run", "text": match.group(0).strip()},
+                )
+            )
+            continue
         kind = _kind_from_match(match)
         if kind is None:
             spans.append(
@@ -1226,6 +1303,8 @@ def scan_anchors_with_ambiguity(
         ),
     )
     annexes = _stamp(_scan_unnumbered_annexes(text, raw, toc_end, country), "unnumbered_annex")
+    body_offsets = [a.char_offset for a in raw if a.kind != "schedule"]
+    closing_floor = _closing_floor(text, country, min(body_offsets)) if body_offsets else None
     fires["unnumbered_annex"] = len(annexes)
     raw.extend(annexes)
     raw.sort(key=lambda a: a.char_offset)
@@ -1233,13 +1312,20 @@ def scan_anchors_with_ambiguity(
     # here as a probe: a body table caption is not an annex, and scanning past
     # one would pull the rest of the document inside it.
     outlines = _stamp(
-        _scan_attachment_outlines(text, _drop_embedded_schedule_captions(raw), toc_end, country),
+        _scan_attachment_outlines(
+            text, _drop_embedded_schedule_captions(raw, closing_floor), toc_end, country
+        ),
         "attachment_outline",
     )
     if outlines:
         fires["scan_attachment_outlines"] = len(outlines)
         raw.extend(outlines)
         raw.sort(key=lambda a: a.char_offset)
+    # Before TOC dedup: an appended instrument restarts its numbers, and left in,
+    # its twins would eject the body's own provisions.
+    raw = _fire(
+        fires, "exclude_closing_tail", raw, _exclude_closing_tail(text, raw, country, spans)
+    )
     raw = _fire(fires, "drop_toc_duplicates", raw, _drop_toc_duplicates(raw, rank_map, spans))
     raw = _fire(
         fires,
@@ -1286,7 +1372,7 @@ def scan_anchors_with_ambiguity(
         fires,
         "drop_embedded_schedule_captions",
         raw,
-        _drop_embedded_schedule_captions(raw),
+        _drop_embedded_schedule_captions(raw, closing_floor),
         spans,
         reads_as="table_caption",
     )
@@ -1339,20 +1425,87 @@ def _attachment_captions(country: str) -> tuple[tuple[str, bool], ...]:
     return tuple((a.caption, a.normative) for a in config.attachments if a.caption)
 
 
+# A prefix caption is a title line; longer is prose that happens to open with the word.
+_PREFIX_CAPTION_MAX_CHARS = 80
+
+
+def _exclude_closing_tail(
+    text: str, anchors: list[StructuralAnchor], country: str, spans: list[AmbiguitySpan]
+) -> list[StructuralAnchor]:
+    """Drop body markers between the closing phrase and the first attachment;
+    the span's text is not lost, the structurer keeps it as the conclusions."""
+    body = [a for a in anchors if a.kind != "schedule"]
+    if not body:
+        return anchors
+    start = _closing_floor(text, country, min(a.char_offset for a in body))
+    if start is None:
+        return anchors
+    end = min(
+        (a.char_offset for a in anchors if a.kind == "schedule" and a.char_offset >= start),
+        default=len(text),
+    )
+    kept = [a for a in anchors if a.kind == "schedule" or not start <= a.char_offset < end]
+    dropped = len(anchors) - len(kept)
+    spans.append(
+        AmbiguitySpan(
+            kind="tail_excluded",
+            start=start,
+            end=end,
+            emitted_by="exclude_closing_tail",
+            resolved=True,
+            detail={"anchors": dropped, "chars": end - start},
+        )
+    )
+    return kept
+
+
+def _closing_floor(text: str, country: str, after: int) -> int | None:
+    """Offset of the jurisdiction's closing phrase past `after`, or None."""
+    from codify.pipeline.enrich.closing import closing_offset, closing_phrases_for
+
+    phrases = closing_phrases_for(country)
+    if not phrases:
+        return None
+    return closing_offset(text, phrases, after=after, quoted=_closed_quote_mask(text, country))
+
+
+def _closed_quote_mask(text: str, country: str = "") -> tuple[bool, ...]:
+    """Per-char flag: inside a quotation something closes. A stray opener masks nothing here."""
+    quoted, stray = _walk_quotes(text, country)
+    return tuple(q and not s for q, s in zip(quoted, stray, strict=True))
+
+
+@lru_cache(maxsize=32)
+def _prefix_captions(country: str) -> tuple[str, ...]:
+    """Captions declared as line openers rather than whole lines."""
+    from codify.jurisdictions import load_config
+
+    config = load_config(country) if country else None
+    if config is None:
+        return ()
+    return tuple(a.caption for a in config.attachments if a.caption and a.prefix)
+
+
 @lru_cache(maxsize=32)
 def _annex_caption_re(country: str) -> re.Pattern[str]:
     """The annex pattern, extended by the jurisdiction's declared captions."""
     captions = [c for c, _ in _attachment_captions(country)]
     if not captions:
         return _UNNUMBERED_ANNEX_RE
-    alts = "|".join(re.escape(c) for c in captions)
+    prefixes = set(_prefix_captions(country))
+    alts = "|".join(re.escape(c) for c in captions if c not in prefixes)
+    # A prefix caption takes the rest of its line as the heading.
+    opener = "|".join(
+        re.escape(c) + _word_end(c) for c in sorted(prefixes, key=lambda c: (-len(c), c))
+    )
+    prefixed = rf"|^[ \t]{{0,60}}(?P<prefixed>(?:{opener})[^\r\n]*)" if opener else ""
     # A declared caption tolerates a centred indent and its own numbering
     # ("LAMPIRAN I"); the inferred Arabic form keeps its tight margin and its
     # bare-keyword rule, so PS behaviour does not move.
     return re.compile(
         rf"(?m)^(?:[ \t]{{0,8}}(?:ال)?(?:ملحق|جدول)"
-        rf"|[ \t]{{0,60}}(?P<declared>{alts})(?P<decnum>[ \t]+[IVXLCDM]+|[ \t]+\d+)?)"
-        rf"[ \t]*(?:(?P<colon>[:：])[ \t]*(?=\S)|$)"
+        rf"|[ \t]{{0,60}}(?P<declared>{alts or '(?!)'})(?P<decnum>[ \t]+[IVXLCDM]+|[ \t]+\d+)?)"
+        rf"[ \t]*(?:(?P<colon>[:：])[ \t]*(?=\S)|\r?$){prefixed}"
     )
 
 
@@ -1365,6 +1518,9 @@ def _scan_unnumbered_annexes(
     first_body = min((a.char_offset for a in existing if a.kind != "schedule"), default=None)
     if first_body is None:
         return []
+    # Where the jurisdiction closes its body with a signature, a caption before
+    # it titles a table in the body and a caption after it opens an attachment.
+    floor = _closing_floor(text, country, first_body)
     next_no = max(
         (int(n) for a in existing if a.kind == "schedule" and (n := a.number) and n.isdigit()),
         default=0,
@@ -1373,7 +1529,10 @@ def _scan_unnumbered_annexes(
     for m in _annex_caption_re(country).finditer(text):
         if m.start() < toc_end or m.start() <= first_body or m.start() in taken:
             continue
-        declared = "declared" in m.re.groupindex and m.group("declared") is not None
+        if floor is not None and m.start() < floor:
+            continue
+        prefixed = "prefixed" in m.re.groupindex and m.group("prefixed") is not None
+        declared = prefixed or ("declared" in m.re.groupindex and m.group("declared") is not None)
         if m.group("colon") is None and not declared:
             # Bare-keyword form needs a blank line above: wrapped prose is a
             # continuation, an annex header never is.
@@ -1383,7 +1542,11 @@ def _scan_unnumbered_annexes(
         match_line_end = text.find("\n", m.end())
         if match_line_end == -1:
             match_line_end = len(text)
-        if declared:
+        if prefixed:
+            heading = m.group("prefixed").strip()
+            if len(heading) > _PREFIX_CAPTION_MAX_CHARS:
+                continue
+        elif declared:
             # The caption names the attachment. Taking the next line instead
             # titles a Penjelasan "ATAS", the first word of the heading below it.
             heading = (m.group("declared") + (m.group("decnum") or "")).strip()
@@ -1398,8 +1561,8 @@ def _scan_unnumbered_annexes(
             )
         # Heading-likeness: a definitions line ("الجدول: يقصد به الجدول
         # المرفق.") is prose, not an annex heading; promoting it would pull
-        # the whole body inside an attachment.
-        if heading and (len(heading.split()) > 6 or re.search(r"[.؛،]", heading)):
+        # the whole body inside an attachment. A declared prefix already vouched.
+        if heading and not prefixed and (len(heading.split()) > 6 or re.search(r"[.؛،]", heading)):
             continue
         next_no += 1
         line = text.count("\n", 0, m.start()) + 1
@@ -1419,7 +1582,9 @@ def _scan_unnumbered_annexes(
     return out
 
 
-def _drop_embedded_schedule_captions(anchors: list[StructuralAnchor]) -> list[StructuralAnchor]:
+def _drop_embedded_schedule_captions(
+    anchors: list[StructuralAnchor], floor: int | None = None
+) -> list[StructuralAnchor]:
     """Drop schedule anchors that caption a table embedded in the body.
 
     A جدول/ملحق heading is a real annex or a caption for an embedded table, and
@@ -1436,7 +1601,7 @@ def _drop_embedded_schedule_captions(anchors: list[StructuralAnchor]) -> list[St
 
     dropped: set[int] = set()
     for i, a in enumerate(ordered):
-        if a.kind != "schedule":
+        if a.kind != "schedule" or (floor is not None and a.char_offset >= floor):
             continue
         prev_num = next(
             (
@@ -2125,15 +2290,18 @@ def _scan_attachment_keywords(
         return []
     taken = {a.char_offset for a in already}
     out: list[StructuralAnchor] = []
+    country = config.code if config else ""
     for m in _compile_anchor_regex(aliases, config).finditer(window):
         kind = _kind_from_match(m)
         if kind is None or m.start() < toc_end or m.start() in taken:
+            continue
+        if _opens_citation_run(window, m.end(), country):
             continue
         out.append(
             StructuralAnchor(
                 kind=kind,
                 keyword=_keyword_from_match(m, kind),
-                number=m.group("num") if "num" in m.groupdict() else None,
+                number=_repair_damaged_num(m) if "num" in m.groupdict() else None,
                 char_offset=m.start(),
                 line=window.count("\n", 0, m.start()) + 1,
                 matched_text=m.group(0).strip(),
@@ -2410,7 +2578,7 @@ def _walk_quotes(raw: str, country: str = "") -> tuple[tuple[bool, ...], tuple[b
     # reversed, so the decision is per occurrence and not per document.
     openers = dict(_CLOSERS_FOR_OPENER)
     ltr = re.search("\u201c[^\u201c]*\u201d", text) is not None
-    boundary = _basic_unit_line_re(country) if ltr else None
+    boundary = _basic_unit_line_re(country)
     # A directional opener nothing closes is skipped outright, as it always
     # was: left in, it masks to end of file, and it cannot be bounded the way
     # an ambiguous glyph can.
@@ -2425,7 +2593,7 @@ def _walk_quotes(raw: str, country: str = "") -> tuple[tuple[bool, ...], tuple[b
             j = i + 1
             while j < len(text) and text[j] in " \t\r":
                 j += 1
-            if text.startswith("\n", j) and not _closes_later(text, i, open_by):
+            if text.startswith("\n", j) and not _closes_later(text, i, open_by, boundary):
                 spans.append((open_at, i, False))
                 open_at, open_by = -1, ""
         if open_by and ch in _CLOSERS_FOR_OPENER[open_by]:
@@ -2434,7 +2602,7 @@ def _walk_quotes(raw: str, country: str = "") -> tuple[tuple[bool, ...], tuple[b
         elif (
             ch in openers
             and i not in skip
-            and (ch != "\u201d" or not ltr or _opens_reversed(text, i, boundary))
+            and (ch != "\u201d" or not ltr or _opens_reversed(text, i, boundary if ltr else None))
         ):
             if open_by:
                 spans.append((open_at, i, False))
@@ -2452,9 +2620,13 @@ def _walk_quotes(raw: str, country: str = "") -> tuple[tuple[bool, ...], tuple[b
     return tuple(mask), tuple(stray)
 
 
-def _closes_later(text: str, at: int, opener: str) -> bool:
-    """Does a closer for this opener appear after ``at``?"""
-    return any(text.find(c, at) != -1 for c in _CLOSERS_FOR_OPENER[opener])
+def _closes_later(text: str, at: int, opener: str, boundary: re.Pattern[str] | None = None) -> bool:
+    """Does a closer for this opener appear after ``at``, before the next provision?
+    A quotation does not run over a heading: a closer past one is a later quote's."""
+    positions = [p for c in _CLOSERS_FOR_OPENER[opener] if (p := text.find(c, at)) != -1]
+    if not positions:
+        return False
+    return boundary is None or not boundary.search(text, at, min(positions))
 
 
 def _unclosed_quote_spans(text: str, country: str) -> int:
@@ -2485,17 +2657,33 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
         config = load_config(country)
     except Exception:  # noqa: BLE001, missing config -> no boundary to enforce
         return None
-    terms = {
-        form
+    entries = [
+        entry
         for doc_class in (config.document_classes or {}).values()
         for entry in doc_class.hierarchy
-        if entry.akn_element in {"article", "section"}
-        for form in _alias_terms_for(entry)
-    }
-    if not terms:
+        if entry.akn_element in {"article", "section", "rule"}
+    ]
+    terms = {form for entry in entries for form in _alias_terms_for(entry)}
+    branches: list[str] = []
+    if terms:
+        alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
+        # The scanner's own separator and number grammar: what it would anchor is a
+        # provision heading here, and a keyword opening prose is not.
+        tolerances = set(config.structuring.marker_tolerances if config.structuring else ())
+        number = _num_pattern_with(
+            config.structuring.ordinal_words if config.structuring else {},
+            digit_glyphs="digit_glyph" in tolerances,
+            split_numbers="split_number" in tolerances,
+        )
+        branches.append(
+            rf"^[^\S\n]{{0,8}}(?:{alts}){_separator_for(tolerances)}{number}{_MARKER_NUM_END}"
+        )
+    # A keyword-less unit ("2. …") is a heading by its declared marker form.
+    for form in sorted({e.marker_form for e in entries if e.marker_form in _OUTLINE_RES}):
+        branches.append(_OUTLINE_RES[form].pattern.removeprefix("(?m)").replace("(?P<num>", "(?:"))
+    if not branches:
         return None
-    alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
-    return re.compile(rf"(?m)^[^\S\n]{{0,8}}(?:{alts})[^\S\n]")
+    return re.compile("(?m)" + "|".join(f"(?:{b})" for b in branches))
 
 
 def _quote_mask(text: str, country: str = "") -> tuple[bool, ...]:
@@ -2650,6 +2838,11 @@ def _roman_or_digit(num: str | None) -> int | None:
             return int(folded)
     if text.isdigit():
         return int(text)
+    # An inserted unit sits between its base and the next number.
+    if (inserted := fold_inserted_suffix(text)) is not None:
+        base = re.match(r"\d+", inserted)
+        if base is not None:
+            return int(base.group(0))
     upper = text.upper()
     if not upper or any(c not in _ROMAN_VALUE for c in upper):
         return None
@@ -3487,13 +3680,16 @@ def _normalise_number(num: str | None) -> str:
     stripped = normalise_digits(num).strip()
     if not stripped:
         return "0"
+    if (inserted := fold_inserted_suffix(stripped)) is not None:
+        return inserted
     if (folded := ordinal_word_folds().get(re.sub(r"\s+", " ", stripped))) is not None:
         return folded
     if len(stripped) == 1 and "ء" <= stripped <= "ي":
         rank = _ABJAD_RANK.get(stripped.translate(_ABJAD_FOLD))
         if rank is not None:
             return str(rank)
-    return latinise_arabic_ordinal(stripped) or stripped
+    # A slashed insertion keys as the parser's own eId form.
+    return latinise_arabic_ordinal(stripped) or re.sub(r"(?<=\d)/(?=\d)", "-", stripped)
 
 
 @lru_cache(maxsize=64)
@@ -3784,25 +3980,40 @@ def _marker_numbers(
     declared = [e for e in doc_class.hierarchy if e.marker_form]
     # Unioned, not returned alone: the scan counts both spellings, and one of
     # them alone scores a document against a fraction of what it captured.
-    from_declared = {
-        _normalise_number(a.number)
-        for a in _scan_declared_markers(text, 0, declared, config.code)[0]
-        if a.kind == kind and a.number and _line_start(text, a.char_offset) not in exclude_starts
-    }
+    declared_found = _scan_declared_markers(text, 0, declared, config.code)[0]
     aliases: list[str] = []
     for entry in doc_class.hierarchy:
         if entry.akn_element != kind:
             continue
         aliases.extend(_alias_terms_for(entry))
-    if not aliases:
+    pattern = (
+        _compile_anchor_regex(
+            {kind: aliases}, config, boundary="column_only", case_insensitive=True
+        )
+        if aliases
+        else None
+    )
+    # One floor for both grammars, from the earliest marker either reads: the
+    # body may use the keyword form and an appended instrument the bare one.
+    first_alias = next((m.start() for m in pattern.finditer(text)), None) if pattern else None
+    candidates = [a.char_offset for a in declared_found]
+    if first_alias is not None:
+        candidates.append(first_alias)
+    floor = _closing_floor(text, config.code, min(candidates)) if candidates else None
+    from_declared = {
+        _normalise_number(a.number)
+        for a in declared_found
+        if a.kind == kind
+        and a.number
+        and _line_start(text, a.char_offset) not in exclude_starts
+        and (floor is None or a.char_offset < floor)
+    }
+    if pattern is None:
         return from_declared
     # Composes the scanner's own grammar, so declaring an ordinal word or a
     # damage tolerance cannot read as lost coverage: a denominator on the strict
     # grammar would let a recovered marker raise `captured` without raising
     # `expected`. A number after the keyword is what marks a structural header.
-    pattern = _compile_anchor_regex(
-        {kind: aliases}, config, boundary="column_only", case_insensitive=True
-    )
     # Distinct provision numbers, under the scanner's own prose filter. Raw
     # occurrences over-count TOC entries and cross-references, so a raw
     # denominator makes improved filtering read as lost coverage. A provision
@@ -3815,6 +4026,9 @@ def _marker_numbers(
     for m in pattern.finditer(text):
         if _partial_decimal_number(text, m):
             continue
+        # Past the closing phrase is not the body, for the denominator either.
+        if floor is not None and floor <= m.start():
+            break
         # The scanner's matches begin on the preceding newline, which is
         # what lets the prose window read a wrapped line's tail.
         probe = _probe_from(text, m.start())
@@ -3822,7 +4036,9 @@ def _marker_numbers(
             continue
         if _line_start(text, m.start()) in exclude_starts:
             continue
-        distinct.add(_normalise_number(_normalise_num(m.group("num"))))
+        if _opens_citation_run(text, m.end(), config.code if config else ""):
+            continue
+        distinct.add(_normalise_number(_repair_damaged_num(m)))
     return distinct | from_declared
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import cast
 
 import structlog
 from lxml import etree
@@ -30,7 +31,15 @@ def emit_conclusions(
 
     root = etree.fromstring(akn_xml.encode("utf-8"))
     act = _act(root)
-    if act is None or act.find("akn:conclusions", NS) is not None:
+    if act is None:
+        return akn_xml
+    existing = act.find("akn:conclusions", NS)
+    if existing is not None:
+        # A block the structurer wrote from the closing span still gets the
+        # signatory grouping, where it is a signature and not an appended instrument.
+        if _is_direct_signature(existing, vocab.closing_phrases):
+            _regroup_signatory(existing)
+            return cast(str, etree.tostring(root, encoding="unicode"))
         return akn_xml
 
     container, start = find_displaced_attestation(root, vocab.closing_phrases)
@@ -124,6 +133,9 @@ def _attestation_start(
 
 # Place, date, name and role are short lines. A sentence of obligations is not.
 _ATTESTATION_MAX_WORDS = 14
+# Lines after the phrase in a signature block: a rank, a name, a role. More, or a
+# digit, is an appended instrument the boundary set aside, with no signatory to group.
+_SIGNATURE_BLOCK_MAX_PARAGRAPHS = 4
 _HAS_DIGIT = re.compile(r"[\d٠-٩۰-۹]")
 
 
@@ -144,6 +156,21 @@ def _keep_tail(element: etree._Element) -> None:
         if parent is not None:
             parent.text = (parent.text or "") + tail
     element.tail = None
+
+
+def _is_direct_signature(conclusions: etree._Element, phrases: tuple[str, ...]) -> bool:
+    """A block that is a signature and nothing else: the closing phrase, then a
+    few digit-free lines (rank, name, role), with no signatory grouped yet."""
+    paragraphs = conclusions.findall("akn:p", NS)
+    if not paragraphs or conclusions.find("akn:blockContainer", NS) is not None:
+        return False
+    texts = ["".join(p.itertext()) for p in paragraphs]
+    if not any(phrase in texts[0] for phrase in phrases):
+        return False
+    following = texts[1:]
+    return 2 <= len(following) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS and not any(
+        _HAS_DIGIT.search(t) for t in following
+    )
 
 
 def _regroup_signatory(conclusions: etree._Element) -> None:

@@ -127,6 +127,12 @@ def _latinise_num(num: str) -> str | None:
     latin = latinise_arabic_ordinal(base)
     if latin is not None:
         return latin + tail
+    # A declared insertion suffix ("5 bis" in the source script) folds the same
+    # way the anchor scanner keys it, so the two eIds agree.
+    from codify.jurisdictions import fold_inserted_suffix
+
+    if (inserted := fold_inserted_suffix(base)) is not None:
+        return inserted + tail
     bis = _BIS_EID_RE.match(base)
     if bis is not None:
         idx = bis.group("idx")
@@ -198,7 +204,7 @@ def _ascii_fold_eid(eid: str) -> str:
     # A Latin ordinal word is ASCII, so it survives the script-specific pass
     # above untouched and a mixed-script eId (`chp_الأول__part_Kesatu`) needs
     # both. Runs unconditionally rather than as an else-branch for that reason.
-    return _restore_unfoldable_segments(eid, _fold_ordinal_words(folded))
+    return _restore_unfoldable_segments(eid, _fold_inserted_suffixes(_fold_ordinal_words(folded)))
 
 
 @lru_cache(maxsize=1)
@@ -220,6 +226,22 @@ def ordinal_eid_words() -> tuple[str, ...]:
     """Every ordinal word an eId can carry, for callers that must detect what the
     fold repairs. Sharing the table stops detection drifting narrower than the fix."""
     return tuple(_ordinal_fold_table())
+
+
+def _fold_inserted_suffixes(eid: str) -> str:
+    """Fold a declared insertion suffix in any segment, ASCII aliases included."""
+    from codify.jurisdictions import fold_inserted_suffix
+
+    parts = eid.split("__")
+    for i, part in enumerate(parts):
+        prefix, sep, num = part.partition("_")
+        if not sep or not num:
+            continue
+        base, dup_sep, dup = num.partition("_")
+        folded = fold_inserted_suffix(base)
+        if folded is not None:
+            parts[i] = f"{prefix}_{folded}{dup_sep}{dup}"
+    return "__".join(parts)
 
 
 def _fold_ordinal_words(eid: str) -> str:

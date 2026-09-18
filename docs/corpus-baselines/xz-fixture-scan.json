@@ -138,6 +138,11 @@
       1,
       5
     ],
+    "exclude_closing_tail": [
+      0,
+      0,
+      5
+    ],
     "mark_amendment_items": [
       0,
       0,
@@ -261,6 +266,11 @@
         0,
         1
       ],
+      "exclude_closing_tail": [
+        0,
+        0,
+        1
+      ],
       "mark_amendment_items": [
         0,
         0,
@@ -371,6 +381,11 @@
       "drop_toc_duplicates": [
         -3,
         1,
+        4
+      ],
+      "exclude_closing_tail": [
+        0,
+        0,
         4
       ],
       "mark_amendment_items": [

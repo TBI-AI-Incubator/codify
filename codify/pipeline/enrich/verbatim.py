@@ -9,6 +9,8 @@ scaffold assembly.
 
 from __future__ import annotations
 
+import re
+
 from codify.pipeline.enrich.anchors import (
     StructuralAnchor,
     anchor_summary,
@@ -22,6 +24,9 @@ from codify.pipeline.enrich.scaffold import (
     scaffold_from_anchors,
 )
 
+# Footnote brackets and amendment stars after the number are not a heading.
+_DECORATIONS_RE = re.compile(r"^(?:[ \t]*(?:\*|\[[^\]\n]{1,6}\]))+")
+
 
 def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFillResponse:
     """One BodyBlock per anchor: heading from the anchor line's remainder,
@@ -31,8 +36,12 @@ def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFill
     for i, anchor in enumerate(ordered):
         end = ordered[i + 1].char_offset if i + 1 < len(ordered) else len(text)
         chunk = text[anchor.char_offset : end].lstrip()
-        first_line, _, rest = chunk.partition("\n")
-        heading = first_line[len(anchor.matched_text.lstrip()) :].strip(" .-—:") or None
+        # The marker may wrap (a suffix on its own line): consume all of it first.
+        marker = anchor.matched_text.lstrip()
+        after = chunk[len(marker) :] if chunk.startswith(marker) else chunk
+        after = _DECORATIONS_RE.sub("", after, count=1)
+        first_line, _, rest = after.partition("\n")
+        heading = first_line.strip(" .-—:\r") or None
         lines = [ln.strip() for ln in rest.splitlines() if ln.strip()]
         # A heading captured from the next source line (bare-keyword annex)
         # must not repeat as the first body paragraph.
@@ -70,13 +79,19 @@ def text_to_bluebell_verbatim(
     if not anchors:
         raise ValueError("no structural anchors found — use the LLM structuring lane")
 
+    from codify.pipeline.enrich.closing import bound_body_at_closing, closing_phrases_for
     from codify.pipeline.enrich.enacting import split_opening_material
 
+    # The same bound the model lane applies: the scan has already dropped the
+    # tail's markers, and the text must lose the span or the last unit absorbs it.
+    bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
+    text, anchors = bound.text, bound.anchors
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(
-        anchors, preface=preface, preamble=preamble, country=country
+        anchors, preface=preface, preamble=preamble, country=country, conclusions=bound.conclusions
     )
     response = fill_bodies_verbatim(text, anchors)
     bluebell = assemble_filled_scaffold(scaffold, eid_to_anchor, response)
-
-    return bluebell, anchor_summary(anchors), eid_to_anchor
+    # Callers map these against the source, so hand back source offsets.
+    at_source = {a.akn_eid: a for a in bound.source_anchors if a.akn_eid in eid_to_anchor}
+    return bluebell, anchor_summary(anchors), at_source

@@ -133,11 +133,13 @@ def scaffold_from_anchors(
     preface: str | None = None,
     preamble: str | None = None,
     country: str = "",
+    conclusions: str | None = None,
 ) -> tuple[str, dict[str, StructuralAnchor]]:
     """Return (bluebell_skeleton, eid_to_anchor) with empty body lines.
 
     ``preface`` carries title/cover matter, ``preamble`` the recital chain +
-    enacting formula; Bluebell maps the keywords to distinct AKN elements."""
+    enacting formula; Bluebell maps the keywords to distinct AKN elements.
+    ``conclusions`` is emitted line by line before the first attachment."""
     lines: list[str] = []
     leads = long_title_lead_ins(country)
     for keyword, block in (("PREFACE", preface), ("PREAMBLE", preamble)):
@@ -153,6 +155,7 @@ def scaffold_from_anchors(
     eid_to_anchor: dict[str, StructuralAnchor] = {}
     anchor_list = list(anchors)
     schedule_rooted = _schedule_rooted(anchor_list)
+    closing = _conclusions_lines(conclusions)
     for anchor in anchor_list:
         # Quoted-amendment anchors have no eid and are not emitted as peer headers, so
         # they surface as prose under the host article's body-fill. Bluebell
@@ -160,12 +163,32 @@ def scaffold_from_anchors(
         # docs/log/2026-07-22-amendment-quoted-structure.md.
         if anchor.quoted_amendment:
             continue
+        if closing and anchor.akn_eid in schedule_rooted:
+            lines.extend(closing)
+            closing = []
         lines.append(_marker_header(anchor, schedule_rooted, anchor.heading))
         lines.append("")
         eid_to_anchor[anchor.akn_eid] = anchor
+    lines.extend(closing)
     # Container-only anchors yield no windows, so this scaffold is returned
     # without ever reaching assembly.
     return "\n".join(nest_pipe_tables(lines)) + "\n", eid_to_anchor
+
+
+# A line opening with an upper-case word reads as a Bluebell keyword; `\` makes it text.
+_KEYWORD_SHAPED_RE = re.compile(r"^[A-Z]{2,}(?:\s|$)")
+
+
+def _conclusions_lines(block: str | None) -> list[str]:
+    """A CONCLUSIONS block of the source's own lines, paragraph breaks kept."""
+    body: list[str] = []
+    for line in (block or "").strip().splitlines():
+        text = line.strip()
+        if text:
+            body.append("  " + ("\\" + text if _KEYWORD_SHAPED_RE.match(text) else text))
+        elif body and body[-1]:
+            body.append("")
+    return ["CONCLUSIONS", *body, ""] if body else []
 
 
 _WRAP_TERMINAL = (".", ":", ";", "!", "?", ")", "]", "»", "”", '"', "。")

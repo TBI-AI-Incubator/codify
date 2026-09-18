@@ -585,6 +585,9 @@ class AttachmentCaption(BaseModel):
     # lettered outline, not the Pasal hierarchy of the body it is attached to.
     # Empty keeps today's behaviour: the body's levels, or none.
     hierarchy: list[HierarchyEntry] = Field(default_factory=list)
+    # True where the caption opens a longer title on the same line ("SCHEDULE of
+    # fees…"), so the caption need only begin the line. The line is the heading.
+    prefix: bool = False
 
 
 class StructuringConfig(BaseModel):
@@ -606,6 +609,33 @@ class StructuringConfig(BaseModel):
     # Ordinal words used as container numbers ("Bagian Kesatu" is part 1).
     # Declared in the source's own casing; matching is case-sensitive.
     ordinal_words: dict[str, int] = Field(default_factory=dict)
+    # Words after a marker's number that mark an inserted unit ("5 bis"), mapped to the eId form.
+    # One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.
+    insertion_suffixes: dict[str, str] = Field(default_factory=dict)
+    # Words that, following a marker's number on its own line, make the line a
+    # citation list rather than a provision ("Article 5 to Article 9 apply").
+    citation_successors: list[str] = Field(default_factory=list)
+
+    @field_validator("insertion_suffixes")
+    @classmethod
+    def _suffixes_are_distinctive_words(cls, value: dict[str, str]) -> dict[str, str]:
+        for word, form in value.items():
+            bare_latin = len(word) == 1 and word.isascii()
+            # Letters and marks only: a decoration such as `**` or `-` is never a word.
+            lettered = all(unicodedata.category(ch)[0] in "LM" for ch in word)
+            if not word or not lettered or bare_latin:
+                raise ValueError(f"insertion suffix {word!r} is not a distinctive word")
+            if not re.fullmatch(r"[a-z]+", form):
+                raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")
+        return value
+
+    @field_validator("citation_successors", "prose_precursors", "sameline_precursors")
+    @classmethod
+    def _cue_words_are_not_blank(cls, value: list[str]) -> list[str]:
+        if any(not word.strip() or word.strip() != word for word in value):
+            raise ValueError("a cue word cannot be blank or carry surrounding whitespace")
+        return value
+
     # Words that introduce a citation's number ("Pasal 41 ayat (3)"). A line
     # ending in one of these makes the bracketed number on the next line part
     # of the citation, not a structural marker opening a new provision.
@@ -1527,6 +1557,35 @@ def ordinal_word_folds() -> dict[str, str]:
             out[word] = str(value)
             out[word.upper()] = str(value)
     return out
+
+
+@lru_cache(maxsize=1)
+def insertion_suffix_folds() -> dict[str, str]:
+    """Every declared insertion suffix mapped to its ASCII form, across all
+    jurisdictions; one table, like `ordinal_word_folds`, for eId derivation."""
+    out: dict[str, str] = {}
+    for entry in sorted(JURISDICTIONS_DIR.glob("*/config.json")):
+        try:
+            raw = json.loads(entry.read_text())
+        except (OSError, json.JSONDecodeError):
+            logger.warning("insertion_suffixes_unreadable", config=str(entry))
+            continue
+        words = (raw.get("structuring") or {}).get("insertion_suffixes") or {}
+        out.update({str(word): str(value) for word, value in words.items()})
+    return out
+
+
+def fold_inserted_suffix(num: str) -> str | None:
+    """`"5 bis"` as `"5bis"` when the number ends in a declared suffix, else None."""
+    value = num.strip()
+    folds = insertion_suffix_folds()
+    # Longest word first: the suffix is matched at the end, never inferred.
+    for word in sorted(folds, key=lambda w: (-len(w), w)):
+        base = value[: -len(word)].rstrip() if value.endswith(word) else ""
+        if base:
+            # A slashed base keys the way the parser writes it.
+            return re.sub(r"(?<=\d)/(?=\d)", "-", base) + folds[word]
+    return None
 
 
 @lru_cache(maxsize=32)

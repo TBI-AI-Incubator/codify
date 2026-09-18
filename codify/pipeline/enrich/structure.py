@@ -7,7 +7,7 @@ import hashlib
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
 
@@ -141,11 +141,11 @@ def normalise_rtl_extract(text: str) -> str:
     return _STRAY_PAREN_MADDA_RE.sub(r"\1", text)
 
 
-def _expects_body(kind: str) -> bool:
+def _expects_body(kind: str, basic: str | None = None) -> bool:
     # Only leaf units are flagged empty. `section` stays excluded even though the
-    # canonical CONTAINER_KINDS omits it: the anchor scanner, not this check,
-    # decides section-as-unit against section-as-grouping.
-    return kind not in (CONTAINER_KINDS | {"section"})
+    # canonical CONTAINER_KINDS omits it, unless the doctype numbers its provisions
+    # as sections: then a section left empty is a dropped provision.
+    return kind == basic or kind not in (CONTAINER_KINDS | {"section"})
 
 
 def _anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
@@ -390,6 +390,14 @@ async def text_to_bluebell_scaffolded(
     regex = cached_regex(country, doctype)
     scan = scan_anchors_with_ambiguity(text, regex, country=country, doctype=doctype)
     anchors = scan.anchors
+    # Source offsets throughout: the trace's readers locate the source with them.
+    trace_anchors = anchors
+    # The signature ends the body: the span to the first attachment leaves the
+    # text every gate below reads and returns as the conclusions.
+    from codify.pipeline.enrich.closing import bound_body_at_closing, closing_phrases_for
+
+    bound = bound_body_at_closing(text, anchors, closing_phrases_for(country), country=country)
+    text, anchors = bound.text, bound.anchors
 
     if on_anchors:
         # The total counts the same population the summary does, or the trace
@@ -401,7 +409,9 @@ async def text_to_bluebell_scaffolded(
     # Guarded heading-vs-container probe from this same scan; the ingest probe
     # turns a below-floor ratio into a container_coverage warning. Independent of
     # the coverage gate, so measured once here and carried on every trace.
-    container = container_coverage_probe(text, scan, config, country, doctype)
+    container = container_coverage_probe(
+        text, replace(scan, anchors=anchors), config, country, doctype
+    )
 
     halts: list[StructureHalt] = []
 
@@ -409,7 +419,7 @@ async def text_to_bluebell_scaffolded(
         if on_scan:
             on_scan(
                 ScanTrace(
-                    anchors=tuple(anchors),
+                    anchors=tuple(trace_anchors),
                     coverage=coverage,
                     scaffold=scaffold,
                     fallback=fallback,
@@ -644,7 +654,7 @@ async def text_to_bluebell_scaffolded(
 
     preface, preamble = split_opening_material(text[: min(a.char_offset for a in anchors)], country)
     scaffold, eid_to_anchor = scaffold_from_anchors(
-        anchors, preface=preface, preamble=preamble, country=country
+        anchors, preface=preface, preamble=preamble, country=country, conclusions=bound.conclusions
     )
     _trace(scaffold=scaffold)
     windows = windows_from_anchors(text, anchors)
@@ -730,11 +740,12 @@ async def text_to_bluebell_scaffolded(
     # source text. Bare-heading anchors are legitimately empty and left alone; the
     # rest re-fill in progressively smaller windows.
     has_body_source = _anchors_with_body_source(text, anchors)
+    basic = basic_unit_kind(config, doctype)
     for max_per in (2, 1):
         targets = {
             a.akn_eid
             for a in anchors
-            if _expects_body(a.kind)
+            if _expects_body(a.kind, basic)
             and a.akn_eid in has_body_source
             and not by_eid.get(a.akn_eid, _EMPTY_BLOCK).lines
         }
@@ -764,7 +775,7 @@ async def text_to_bluebell_scaffolded(
     still_empty = {
         a.akn_eid
         for a in anchors
-        if _expects_body(a.kind)
+        if _expects_body(a.kind, basic)
         and a.akn_eid in has_body_source
         and not by_eid.get(a.akn_eid, _EMPTY_BLOCK).lines
     }
