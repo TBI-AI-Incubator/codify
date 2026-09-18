@@ -10,6 +10,7 @@ from codify.acquisition.adapters import (
     ee,  # noqa: F401  (registers bulk_xml_archive for ee)
     es,  # noqa: F401  (registers gazette_xml)
     eu,  # noqa: F401  (registers eurlex_cellar)
+    oecd,  # noqa: F401  (registers oecd_compendium)
     rs,  # noqa: F401  (registers paragraf_propisi)
     th,  # noqa: F401  (registers json_portal)
     ua,  # noqa: F401  (registers html_portal)

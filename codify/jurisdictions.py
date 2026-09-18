@@ -886,6 +886,7 @@ SourceAdapterKind = Literal[
     "bulk_xml_archive",  # Bulk XML archives (USLM, Indigo dumps).
     "gazette_xml",  # Official-gazette XML per item (BOE).
     "json_portal",  # JSON document API with per-unit sections (OCS).
+    "oecd_compendium",  # Compendium of OECD Legal Instruments (JSON API + HTML bodies).
 ]
 
 
@@ -899,6 +900,7 @@ _ADAPTER_TIER: dict[SourceAdapterKind, Literal[1, 2, 3]] = {
     "bulk_xml_archive": 2,
     "gazette_xml": 2,
     "json_portal": 2,
+    "oecd_compendium": 2,
     "paragraf_propisi": 3,
     "pdf_gazette": 3,
 }
