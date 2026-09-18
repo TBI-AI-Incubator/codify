@@ -197,7 +197,7 @@ uv sync --group dev --extra migrations
 uv run pytest tests -m "not integration and not live_llm" -q
 ```
 
-This runs about 4,600 tests in about a minute and matches the standard CI check. Tests
+This runs the unit suite in about a minute and matches the standard CI check. Tests
 for unbundled jurisdictions are skipped automatically.
 
 **Note:** Integration tests require the same Postgres as
