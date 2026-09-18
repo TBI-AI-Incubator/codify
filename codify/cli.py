@@ -439,7 +439,11 @@ def _run_scan_corpus(args: argparse.Namespace) -> int:
     if not scans:
         # Print nothing: the documented workflow redirects stdout over a pinned
         # baseline, and a redirect keeps the file whatever the exit code says.
-        print(f"no .txt or .pdf sources under {root}", file=sys.stderr)
+        print(
+            f"no scannable sources under {root} "
+            f"(unreadable {sweep.unreadable}, no text layer {sweep.no_text_layer})",
+            file=sys.stderr,
+        )
         return 1
     if args.per_document:
         rows = "\n".join(json.dumps(asdict(s), ensure_ascii=False) for s in scans)

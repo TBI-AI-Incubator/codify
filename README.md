@@ -51,7 +51,7 @@ The generated `bundle/` directory contains:
 | `coverage.json`     | Provision count metrics (expected vs. captured)                |
 | `scaffold.bluebell` | Structural skeleton generated prior to filling provision text  |
 | `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                             |
-| `validator.json`    | Schema and structural validation results                       |
+| `validator.json`    | Structural validation findings                                 |
 | `manifest.json`     | Run metadata, including model identifiers and config hashes    |
 
 Structuring follows an anchor-driven model: a deterministic skeleton is parsed using the
@@ -80,8 +80,10 @@ The summary is JSON on stdout; findings about individual files go to stderr, so
 - `layout_pass_failed ... OcrNotConfigured`: the optional secondary OCR engine (Azure AI
   Foundry) is not configured. The pipeline reads the scan once via the model's vision
   endpoint rather than twice, and the run otherwise proceeds.
-- `page_diverted_to_ocr`: the PDF page lacked an extractable text layer and was
-  rasterised for OCR.
+- `page_diverted_to_ocr`: the page's extracted text layer was rejected (the event's
+  `reason` names the test it failed: too short, garbled, letter-spaced, presentation
+  forms, divergent from the scan, or a visible annotation) and the page was rasterised
+  for OCR.
 
 ## Store, search, compare
 
@@ -151,8 +153,8 @@ either `synthetic` or `public_reference` to true. This filtering is enforced by
 - **Public reference configurations**: cover jurisdictions that publish their legal texts
   openly.
 
-By default, local source checkouts read from `./data/`, while installed package
-distributions read bundled package data. To supply a custom dataset, set
+A source checkout reads the repository's `data/` directory, wherever the command is
+run from; an installed wheel reads the data bundled inside the package. To supply a custom dataset, set
 `CODIFY_DATA_ROOT` to an absolute path containing `jurisdictions/` and `frameworks/`
 directories before starting Python. Relative paths are rejected, and custom data roots
 completely replace bundled data.
@@ -217,15 +219,17 @@ REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 - **Live LLM tests:** Tests marked `live_llm` issue requests to the configured
   OpenAI-compatible gateway and incur API charges.
 - **CI checks:** In addition to unit tests, CI enforces formatting, type checking, and
-  wheel builds via Ruff, strict mypy, and Hatch (see `.github/workflows/ci.yml`).
+  wheel builds via Ruff, strict mypy, and `uv build` with the Hatchling backend (see
+  `.github/workflows/ci.yml`).
 
 ## Standards
 
-Codify targets the Akoma Ntoso 3.0 specification and validates all generated documents
-against the official schema, using FRBR URIs to uniquely identify works, expressions, and
-manifestations down to the individual provision.
+Codify targets the Akoma Ntoso 3.0 specification. Generated documents pass a structural
+validator whose findings ride the bundle and the run; the OASIS schema itself is not run.
+FRBR URIs identify works, expressions and manifestations, and eIds address the individual
+provision within them.
 
-Schema validity alone does not guarantee semantic fidelity to the source text or seamless
+Structural validity alone does not guarantee semantic fidelity to the source text or seamless
 compatibility with external tooling. Internal structural conventions, such as how annex
 content is inlined, can diverge from specific downstream profiles like AKN4EU or platforms
 such as Indigo. You should validate intended interchange workflows using representative
