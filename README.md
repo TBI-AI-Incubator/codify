@@ -1,4 +1,4 @@
-# codify
+# Codify
 
 Codify turns a statute book into law a machine can read: each act structured as
 [Akoma Ntoso 3.0](http://akomantoso.info/?page_id=27),
