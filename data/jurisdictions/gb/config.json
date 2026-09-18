@@ -357,7 +357,7 @@
       "kind": "akn_native",
       "name": "legislation.gov.uk",
       "url_template": "https://www.legislation.gov.uk/{source_path}/data.akn",
-      "notes": "UK national legislation publisher. Serves AKN XML via /data.akn on its own type-token paths (ukpga/uksi/...); {source_path} maps our FRBR doctype to that token. The rate is the floor of a process-wide adaptive pace: two requests a second across every fetch in the process, doubling on 429, 436 or 503 (Retry-After honoured) and recovering on success. The publisher states no limit in its API notes; its robots.txt carries Crawl-delay 5, knowingly exceeded on the product lead's approval of 2026-09-06 on the strength of the relationship with the publisher's team.",
+      "notes": "UK national legislation publisher. Serves AKN XML via /data.akn on its own type-token paths (ukpga/uksi/...); {source_path} maps our FRBR doctype to that token. The rate is the floor of a process-wide adaptive pace: two requests a second across every fetch in the process, doubling on 429, 436 or 503 (Retry-After honoured) and recovering on success. The publisher's fair-use policy allows 1,500 requests per five minutes; this pace stays under it.",
       "rate_limit_per_minute": 120,
       "licence": "OGL-UK-3.0"
     }

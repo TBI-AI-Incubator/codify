@@ -103,8 +103,7 @@ work date.
 
 ## 0.1.0 — 2026-09-09
 
-No release has been published from this repository. The package version is a
-candidate identifier, not evidence of a released tag or a benchmark run.
+First version of the standalone library, before any published release or benchmark run.
 
 - Standalone Python library and CLI with selected public-reference and synthetic
   jurisdiction configurations. Missing configurations raise

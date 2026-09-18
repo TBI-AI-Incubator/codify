@@ -39,7 +39,7 @@ not. Minor for new capability or data. Patch for the rest.
 
 ## 0.x
 
-`0.3.0` and unpublished, so nothing depends on it by version yet. While the
+`0.3.0`; nothing depends on it by version yet. While the
 major is zero the minor acts as the major: pin `>=0.3,<0.4`. The step from
 `0.1.0` to `0.2.0` carried eleven breaks and the step to `0.3.0` four, each
 enumerated in the changelog.

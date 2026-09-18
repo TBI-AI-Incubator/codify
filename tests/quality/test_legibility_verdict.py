@@ -28,7 +28,7 @@ def _verdict(row: dict[str, float | None]) -> str | None:
 
 def _rows() -> list[dict]:
     if not MARKED.exists():
-        pytest.skip("legibility/marked.jsonl not in the open tree; lives in the closed corpus")
+        pytest.skip("legibility/marked.jsonl not in the open tree")
     return [json.loads(line) for line in MARKED.read_text(encoding="utf-8").splitlines() if line]
 
 
