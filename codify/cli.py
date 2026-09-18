@@ -439,7 +439,11 @@ def _run_scan_corpus(args: argparse.Namespace) -> int:
     if not scans:
         # Print nothing: the documented workflow redirects stdout over a pinned
         # baseline, and a redirect keeps the file whatever the exit code says.
-        print(f"no .txt sources under {root}", file=sys.stderr)
+        print(
+            f"no scannable sources under {root} (unreadable {sweep.unreadable}, "
+            f"no text layer {sweep.no_text_layer}, derived exports {sweep.excluded_derived})",
+            file=sys.stderr,
+        )
         return 1
     if args.per_document:
         rows = "\n".join(json.dumps(asdict(s), ensure_ascii=False) for s in scans)
@@ -567,7 +571,7 @@ def main(argv: list[str] | None = None) -> int:
     scan = sub.add_parser(
         "scan-corpus", help="measure the anchor scan over a directory of raw sources"
     )
-    scan.add_argument("root", help="directory searched recursively for .txt sources")
+    scan.add_argument("root", help="directory searched recursively for .txt and .pdf sources")
     scan.add_argument("--jurisdiction", required=True, help="jurisdiction code, e.g. xa")
     scan.add_argument("--per-document", help="write one JSON row per document to this path")
     scan.add_argument(

@@ -1,0 +1,6 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    # GitHub's issue chooser accepts absolute URLs only; forks edit this line.
+    url: https://github.com/TBI-AI-Incubator/codify/security/policy
+    about: Report privately as SECURITY.md describes; do not open a public issue.

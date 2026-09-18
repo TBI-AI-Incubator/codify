@@ -30,7 +30,7 @@ _AKN = f"""<akomaNtoso xmlns="{NS}"><act name="act">
     <p>صدر بمدينة رام الله بتاريخ : ١٢ / ٤ / ٢٠٠٤ ميلادية</p>
     <p>الموافق : ٢٢ / صفر / ١٤٢٥ هجرية</p>
     <blockContainer eId="sig_1">
-      <p>أحمد قريع</p>
+      <p>نادر بن سالم</p>
       <p>رئيس مجلس الوزراء</p>
     </blockContainer>
   </conclusions>
@@ -62,7 +62,7 @@ class TestSlots:
         """`_set_p_text` flattens inline markup, so a `<p>` carrying semantic
         children must not be offered as a slot."""
         mixed = _AKN.replace(
-            "<p>أحمد قريع</p>", "<p>Signed by <docType>Decree</docType> holder</p>"
+            "<p>نادر بن سالم</p>", "<p>Signed by <docType>Decree</docType> holder</p>"
         )
         assert len(conclusions_p_slots(etree.fromstring(mixed.encode()))) == 3
 
@@ -73,14 +73,14 @@ class TestTheAuditMeasuresIt:
         block that comes back in the source script passes the delivery gate."""
         from codify.translate.translate import _akn_text_content
 
-        assert "أحمد قريع" in _akn_text_content(_AKN)
+        assert "نادر بن سالم" in _akn_text_content(_AKN)
 
 
 class TestPatch:
     _LINES = [
         "Done at Ramallah on 12 April 2004",
         "corresponding to 22 Safar 1425",
-        "Ahmed Qurei",
+        "Nadir bin Salem",
         "Prime Minister",
     ]
 
@@ -102,7 +102,7 @@ class TestPatch:
         )
         block = etree.fromstring(out.encode()).find(f".//{{{NS}}}blockContainer")
         assert block is not None and block.get("eId") == "sig_1"
-        assert [p.text for p in block] == ["Ahmed Qurei", "Prime Minister"]
+        assert [p.text for p in block] == ["Nadir bin Salem", "Prime Minister"]
 
     def test_a_count_mismatch_fails_loudly(self) -> None:
         """Strict zip: half-translated attestation is worse than none, because it

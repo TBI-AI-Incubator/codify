@@ -21,7 +21,7 @@ _AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
 def _parse(name: str) -> object:
     if not (_FIXTURES / name).exists():
-        pytest.skip(f"rada ua fixture {name} not in the open tree; lives in the closed corpus")
+        pytest.skip(f"rada ua fixture {name} not in the open tree")
     raw = (_FIXTURES / name).read_bytes()
     if name.endswith(".gz"):
         raw = gzip.decompress(raw)

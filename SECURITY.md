@@ -1,12 +1,18 @@
 # Security reporting
 
-This repository is currently a private review candidate. A public security
-reporting channel and supported-release policy have not yet been established.
-They must be configured and documented before public release.
+Where to report: open a private report through the repository's Security tab
+("Report a vulnerability"). It reaches the maintainers only; nothing is public until
+a fix is out.
 
-During private review, report suspected vulnerabilities directly to the
-repository maintainers using the existing private collaboration channel. Do not
-put credentials, customer data or exploit details in a public issue.
+What to send: a description of the class of problem and a minimal, non-destructive
+way to reproduce it against a local install.
 
-Do not use development Compose credentials or expose its database outside your
-local machine. Keep model-provider credentials outside source control.
+What not to send: credentials, personal data, customer documents, or exploit code
+aimed at a running system. Do not open a public issue for a suspected vulnerability.
+
+Supported release: `main`, and the latest minor on PyPI once one is published.
+Fixes land on `main` first and ship in the next release; the advisory names the
+fixed version.
+
+Keep model-provider and database credentials outside source control, and never
+expose the development Compose database beyond your own machine.
