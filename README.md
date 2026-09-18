@@ -10,7 +10,7 @@ machine can address.
 This repository provides all the components of the core pipeline: acquisition,
 transcription, anchor-driven structuring, retrieval and comparison. Documents converted
 from scans include coverage metrics and validation reports, while pre-existing Akoma Ntoso
-documents run through validation alone.
+documents skip the scan passes and are normalised (identifiers, unique eIds) and validated.
 
 The code is Apache 2.0 and fully standalone. While TBI offers commercial services built on
 top of it, this core pipeline requires no external proprietary services and can be run
@@ -225,7 +225,8 @@ REQUIRE_DB=1 uv run pytest tests -m "integration and not live_llm" -q
 ## Standards
 
 Codify targets the Akoma Ntoso 3.0 specification. Generated documents pass a structural
-validator whose findings ride the bundle and the run; the OASIS schema itself is not run.
+validator whose findings ride the bundle and the run; the OASIS schema is checked on one
+acquisition route only, not on every output.
 FRBR URIs identify works, expressions and manifestations, and eIds address the individual
 provision within them.
 
