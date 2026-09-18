@@ -194,7 +194,10 @@ def create_server(
             if found is None:
                 raise ToolError(f"no law {law_id}")
             row, code = found
-            versions, _ = await list_versions(session, key)
+            versions, cursor = await list_versions(session, key)
+            while cursor is not None:  # every page: the contract is every version
+                page, cursor = await list_versions(session, key, cursor=cursor)
+                versions.extend(page)
         return {
             "id": str(row.id),
             "title": row.title,

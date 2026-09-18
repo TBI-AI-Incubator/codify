@@ -186,7 +186,7 @@ The tools, all reads:
 
 - `search_provisions(query, jurisdiction, language?, k?)`: hybrid search over one
   jurisdiction's provisions; matches best first, each with its provision id, eId, score
-  and text. Needs the embeddings endpoint `search` needs; unset, the tool says so.
+  and text. Needs the embeddings endpoint, as `search` does; unset, the tool says so.
 - `list_laws(jurisdiction?, doctype?, year?, q?, limit?, offset?)`: a page of stored laws
   with their ids.
 - `get_law(law_id)`: one law's fields, its jurisdiction and every stored version.

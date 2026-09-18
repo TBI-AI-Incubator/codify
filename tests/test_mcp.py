@@ -257,6 +257,37 @@ async def test_get_law_carries_its_versions_without_xml(monkeypatch: pytest.Monk
     assert malformed.is_error and "not a law id" in malformed.content[0].text
 
 
+async def test_get_law_follows_every_version_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    import codify.storage
+    import codify.storage.laws as laws
+
+    law = _law()
+    pages = [[_version(law.id) for _ in range(3)] for _ in range(3)]
+    asked: list[uuid.UUID | None] = []
+
+    async def fake_get(session: Any, law_id: uuid.UUID) -> tuple[Law, str]:
+        return law, "xa"
+
+    async def fake_versions(
+        session: Any, law_id: uuid.UUID, *, cursor: uuid.UUID | None = None, **_: Any
+    ) -> tuple[list[Version], uuid.UUID | None]:
+        asked.append(cursor)
+        index = (
+            0 if cursor is None else next(i for i, p in enumerate(pages) if p[-1].id == cursor) + 1
+        )
+        page = pages[index]
+        return page, page[-1].id if index < len(pages) - 1 else None
+
+    monkeypatch.setattr(laws, "get_law_with_jurisdiction", fake_get)
+    monkeypatch.setattr(codify.storage, "list_versions", fake_versions)
+
+    result = await _call(create_server(sessions=_no_session), "get_law", law_id=str(law.id))
+
+    ids = [v["id"] for v in result.structured_content["versions"]]
+    assert ids == [str(v.id) for page in pages for v in page]
+    assert asked == [None, pages[0][-1].id, pages[1][-1].id]
+
+
 async def test_get_version_respects_the_xml_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     import codify.storage
 
