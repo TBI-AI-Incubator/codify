@@ -1,4 +1,4 @@
-import { CountryFlag, StatusPill, cn } from '@codify/tbi-ui';
+import { CountryFlag, StatusPill, cn } from '../../vendor/tbi-ui';
 import type {
   LawGroup,
   LawSummary,

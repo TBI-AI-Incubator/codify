@@ -1,13 +1,9 @@
 @import 'tailwindcss';
-@import '@codify/tbi-ui/styles.css';
+@import '../vendor/tbi-ui/index.css';
+@import '../vendor/stele/index.css';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
-/* Pull workspace packages into the JIT content scan. Without tbi-ui here, any
-   utility used only inside a tbi-ui component is never generated — StatusPill's
-   [&_svg]:size-3 went missing, so its icons fell back to lucide's 24px. */
-@source '../../../../packages/stele/src/**/*.{ts,tsx}';
-@source '../../../../packages/tbi-ui/src/**/*.{ts,tsx}';
 
 /* Font stack — values populated by @fontsource imports in src/main.tsx */
 :root {
@@ -86,7 +82,7 @@
   --card-foreground: oklch(0.145 0.006 250);
   --popover: oklch(0.995 0.003 250);
   --popover-foreground: oklch(0.145 0.006 250);
-  /* shadcn --primary tracks @codify/tbi-ui's --emphasis-strong by reference
+  /* shadcn --primary tracks the vendored theme's --emphasis-strong by reference
      so brand-styled and shadcn-styled affordances stay in lockstep. */
   --primary: var(--emphasis-strong);
   --primary-foreground: oklch(0.985 0.003 250);

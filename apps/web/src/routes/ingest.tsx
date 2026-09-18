@@ -1,4 +1,4 @@
-import { CircleFlag } from '@codify/tbi-ui';
+import { CircleFlag } from '../vendor/tbi-ui';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';

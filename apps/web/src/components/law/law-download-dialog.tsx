@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { toast } from '@codify/tbi-ui';
+import { toast } from '../../vendor/tbi-ui';
 
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { downloadOriginalSource, downloadVersionText } from '@/lib/api-laws';

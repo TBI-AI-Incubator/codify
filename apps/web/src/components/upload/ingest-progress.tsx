@@ -1,10 +1,10 @@
-import { LawReader, type VersionDocument as SteleVersionDocument } from '@codify/stele';
+import { LawReader, type VersionDocument as SteleVersionDocument } from '../../vendor/stele';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { cn } from '@codify/tbi-ui';
+import { cn } from '../../vendor/tbi-ui';
 
 import type { RunStreamStatus } from '@/hooks/use-run';
 import { getVersionDocument } from '@/lib/api-laws';

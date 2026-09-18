@@ -1,5 +1,5 @@
 
-import { ISO1_TO_ISO3 } from '@codify/core-ts';
+import { ISO1_TO_ISO3 } from './iso-languages';
 
 import type { VersionSummary } from '@codify/core-ts/api';
 

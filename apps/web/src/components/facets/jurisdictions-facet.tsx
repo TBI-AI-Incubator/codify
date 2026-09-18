@@ -1,4 +1,4 @@
-import { CountryFlag } from '@codify/tbi-ui';
+import { CountryFlag } from '../../vendor/tbi-ui';
 
 import { FacetPill } from './facet-pill';
 import {

@@ -1,4 +1,4 @@
-import { capitalize } from '@codify/tbi-ui';
+import { capitalize } from '../vendor/tbi-ui';
 
 const GENERIC: Record<string, string> = {
   act: 'Act',

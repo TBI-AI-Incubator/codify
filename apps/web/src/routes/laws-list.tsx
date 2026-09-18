@@ -1,6 +1,6 @@
 
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { CountryFlag } from '@codify/tbi-ui';
+import { CountryFlag } from '../vendor/tbi-ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useSearchParams } from 'react-router';

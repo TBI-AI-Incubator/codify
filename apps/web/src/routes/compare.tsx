@@ -1,4 +1,4 @@
-import { LawReader, type VersionDocument as SteleVersionDocument } from '@codify/stele';
+import { LawReader, type VersionDocument as SteleVersionDocument } from '../vendor/stele';
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';

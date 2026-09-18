@@ -1,4 +1,4 @@
-import { TopBar, cn } from '@codify/tbi-ui';
+import { TopBar, cn } from '../vendor/tbi-ui';
 import {
   BookOpen,
   Copy,

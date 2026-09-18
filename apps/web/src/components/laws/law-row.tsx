@@ -1,4 +1,4 @@
-import { CountryFlag, StatusPill } from '@codify/tbi-ui';
+import { CountryFlag, StatusPill } from '../../vendor/tbi-ui';
 import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';

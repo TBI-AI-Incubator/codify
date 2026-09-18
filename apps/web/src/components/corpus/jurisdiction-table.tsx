@@ -16,7 +16,7 @@ import type { CorpusJurisdiction } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 import { TierBadge } from './tier-badge';
-import { CircleFlag } from '@codify/tbi-ui';
+import { CircleFlag } from '../../vendor/tbi-ui';
 
 type SortKey = 'tier' | 'name' | 'documents_examined' | 'unresolved_ambiguities';
 type SortDir = 'asc' | 'desc';

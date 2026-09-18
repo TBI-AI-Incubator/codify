@@ -10,7 +10,7 @@ import LawReaderRoute from '@/routes/law-reader';
 import LawsCorpusPage from '@/routes/laws-list';
 import SearchPage from '@/routes/search';
 
-vi.mock('@codify/stele', () => ({
+vi.mock('../vendor/stele', () => ({
   LawReader: () => <div>Rendered law text</div>,
 }));
 vi.mock('@/components/bluebell-source-view', () => ({

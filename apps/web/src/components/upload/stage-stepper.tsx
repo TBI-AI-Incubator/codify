@@ -1,7 +1,7 @@
 import { Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cn } from '@codify/tbi-ui';
+import { cn } from '../../vendor/tbi-ui';
 
 import type { Stage, StageInfo } from '@/lib/run-views/ingest';
 

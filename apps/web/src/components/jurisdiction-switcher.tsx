@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { countryName } from '@/lib/countries';
 import { rescopePath } from '@/lib/jurisdiction-path';
 import { useAllowedJurisdictions } from '@/lib/use-allowed-jurisdictions';
-import { CircleFlag } from '@codify/tbi-ui';
+import { CircleFlag } from '../vendor/tbi-ui';
 
 interface JurisdictionSwitcherProps {
   currentCode: string;

@@ -1,7 +1,7 @@
 import { AlertTriangle, ScanLine } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { cn } from '@codify/tbi-ui';
+import { cn } from '../../vendor/tbi-ui';
 
 import type { PageInfo } from '@/lib/run-views/ingest';
 

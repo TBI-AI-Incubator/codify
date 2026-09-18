@@ -1,0 +1,303 @@
+/* Design tokens. Codify sibling of @blackbox/ui:
+   a neutral substrate, and no brand accent. Emphasis is carried by ink and
+   weight rather than by a colour of our own.
+   See DESIGN.md for the spec; this file is the source of truth for values. */
+
+:root {
+  --paper: oklch(1 0 0);
+  --paper-sunken: oklch(0.985 0.003 250);
+
+  --ink: oklch(0.145 0.005 250);
+  --ink-80: oklch(0.3 0.005 250);
+  --ink-60: oklch(0.5 0.005 250);
+  --ink-40: oklch(0.68 0.004 250);
+  --ink-20: oklch(0.88 0.003 250);
+  --ink-10: oklch(0.94 0.003 250);
+
+  /* Emphasis carries what an accent used to: primary actions, the flash rail,
+     selected state. Black and greys, per the TBI palette. */
+  --emphasis-strong: oklch(0 0 0);
+  --emphasis: oklch(0.37 0 0);
+  --emphasis-soft: oklch(0.9687 0 0);
+
+  --teal-strong: oklch(0.5 0.1 195);
+  --teal: oklch(0.62 0.09 195);
+  --teal-soft: oklch(0.94 0.03 195);
+
+  --coral-strong: oklch(0.58 0.18 25);
+  --coral: oklch(0.7 0.16 25);
+  --coral-soft: oklch(0.95 0.04 25);
+
+  --gold-strong: oklch(0.65 0.13 80);
+  --gold: oklch(0.78 0.12 85);
+  --gold-soft: oklch(0.96 0.04 85);
+
+  /* Draft state — unsaved-but-not-an-error, between gold and coral. */
+  --draft-strong: oklch(0.55 0.16 60);
+  --draft: oklch(0.7 0.14 60);
+  --draft-soft: oklch(0.95 0.04 60);
+
+  /* Confidence palette. Colour-Plus-Shape Rule (DESIGN §2): always paired
+     with a glyph or percentage; never colour-only. */
+  --confidence-high: oklch(0.65 0.2 145);
+  --confidence-medium: oklch(0.75 0.18 85);
+  --confidence-low: oklch(0.65 0.2 50);
+
+  /* Contrast-safe text variants — lightness dropped to clear WCAG AA (4.5:1) on --paper. */
+  --confidence-high-fg: oklch(0.4 0.15 145);
+  --confidence-medium-fg: oklch(0.45 0.15 85);
+  --confidence-low-fg: oklch(0.45 0.2 50);
+
+  /* Distinct from --font-tbi-{sans,mono} so @theme inline can reference them. */
+  --tbi-font-sans: 'Geist', 'Geist Sans', ui-sans-serif, system-ui, sans-serif;
+  --tbi-font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* Elevation. Reserved for transient surfaces only (DESIGN §4
+     Flat-By-Default Rule). Standing layout stays flat. The tbi-prefixed
+     names avoid colliding with Tailwind's own --shadow-* theme namespace
+     (Tailwind generates utilities from --shadow-<name>; if the @theme
+     inline mapping pointed back to a same-named root variable the value
+     would resolve cyclically). */
+  --tbi-shadow-popover-whisper:
+    0 1px 2px 0 oklch(0 0 0 / 0.04), 0 4px 12px -2px oklch(0 0 0 / 0.06);
+  --tbi-shadow-transient-lift: 0 1px 2px 0 oklch(0 0 0 / 0.05), 0 8px 24px -4px oklch(0 0 0 / 0.1);
+
+  /* Shadcn-shaped semantic shims. The tbi-ui components consume base-ui /
+     shadcn primitives that reference --primary, --ring, --popover etc.;
+     mapping them to TBI tokens here makes the package render correctly
+     when consumed standalone (Storybook, isolated tests) without depending
+     on a host app to backfill them. Consumers can override. */
+  --background: var(--paper-sunken);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--emphasis-strong);
+  --primary-foreground: var(--paper);
+  --secondary: var(--paper-sunken);
+  --secondary-foreground: var(--ink-80);
+  --muted: var(--paper-sunken);
+  --muted-foreground: var(--ink-60);
+  --accent: var(--paper-sunken);
+  --accent-foreground: var(--ink);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: var(--paper);
+  --border: var(--ink-20);
+  --input: var(--ink-20);
+  /* Same ink as --primary, so focus rings must carry a paper offset to clear
+     the control they surround. WCAG 1.4.11 measures against adjacent colour. */
+  --ring: var(--emphasis-strong);
+}
+
+/* Shuttle keyframe for ProgressTrack indeterminate variant.
+   Driven on a 30%-wide fill so the bar sweeps the full track with
+   a clean enter/exit. */
+@keyframes progress-shuttle {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+/* Flash-rule for LawReader deep-link targets. A statute-navy left-border
+   holds for 2s when a section/provision or table row is the focus of a URL
+   hash navigation, then fades over 600ms. The hold is long enough to survive
+   the scroll that precedes it. Triggered by `[data-flash="true"]` which the
+   reader sets and clears via setTimeout at the same 2.6s total. */
+@keyframes flash-rule {
+  0%,
+  76.9% {
+    box-shadow: inset 3px 0 0 0 var(--emphasis-strong);
+    background-color: color-mix(in oklch, var(--emphasis-soft) 60%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+/* RTL mirror: the rule sits on the inline-start edge, which box-shadow
+   insets (physical) can't express — flip the offset sign instead. */
+@keyframes flash-rule-rtl {
+  0%,
+  76.9% {
+    box-shadow: inset -3px 0 0 0 var(--emphasis-strong);
+    background-color: color-mix(in oklch, var(--emphasis-soft) 60%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+
+[data-flash='true'] {
+  animation: flash-rule 2.6s ease-out forwards;
+  scroll-margin-top: 4rem;
+}
+
+[dir='rtl'] [data-flash='true'] {
+  animation-name: flash-rule-rtl;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-flash='true'] {
+    animation: none;
+    box-shadow: inset 3px 0 0 0 var(--emphasis-strong);
+    background-color: color-mix(in oklch, var(--emphasis-soft) 30%, transparent);
+    transition: background-color 0.3s ease-out;
+  }
+
+  [dir='rtl'] [data-flash='true'] {
+    box-shadow: inset -3px 0 0 0 var(--emphasis-strong);
+  }
+}
+
+/* Slow opacity breath for StructureSkeleton bones during the Metadata →
+   Validate phase. The horizontal-sheen shimmer pattern is universal SaaS
+   loading-skeleton chrome; this is opacity-only and slower (2.4s) so the
+   bones read as "alive but unhurried" rather than "still loading."
+   No layout-property animation; reduced-motion guard freezes at full. */
+@keyframes bone-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.shimmer-bone {
+  background: var(--ink-20);
+  animation: bone-breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-bone {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+/* Tick-in keyframe for the validate-stage check glyphs in
+   StructureSkeleton. Cascades top-to-bottom; the per-element delay is
+   set via inline style so we can derive it from the rendered index. */
+@keyframes tick-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tick-in {
+  animation: tick-in 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tick-in {
+    animation: none;
+  }
+}
+
+/* Active-row underline for StageStepper — replaces the animate-ping halo
+   on the status dot. A 2px Statute-Navy line draws in beneath the active
+   row over 360ms, then sits there for the duration of that stage. Reads
+   as "this is where we are" without the dashboard pulse trope. */
+@keyframes step-underline {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+.step-underline {
+  animation: step-underline 360ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-underline {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+
+.dark {
+  --paper: oklch(0.145 0.006 250);
+  --paper-sunken: oklch(0.205 0.006 250);
+
+  --ink: oklch(0.985 0.003 250);
+  --ink-80: oklch(0.85 0.005 250);
+  --ink-60: oklch(0.7 0.005 250);
+  --ink-40: oklch(0.55 0.005 250);
+  --ink-20: oklch(0.3 0.005 250);
+  --ink-10: oklch(0.25 0.005 250);
+
+  --emphasis-strong: oklch(1 0 0);
+  --emphasis: oklch(0.85 0 0);
+  --emphasis-soft: oklch(0.3 0 0);
+
+  --teal-strong: oklch(0.72 0.1 195);
+  --teal: oklch(0.65 0.09 195);
+  --teal-soft: oklch(0.3 0.05 195);
+
+  --coral-strong: oklch(0.75 0.17 25);
+  --coral: oklch(0.7 0.16 25);
+  --coral-soft: oklch(0.32 0.08 25);
+
+  --gold-strong: oklch(0.8 0.14 85);
+  --gold: oklch(0.74 0.12 85);
+  --gold-soft: oklch(0.32 0.07 85);
+
+  /* Draft state — dark-mode values (soft is a recessed fill, not near-white). */
+  --draft-strong: oklch(0.78 0.15 60);
+  --draft: oklch(0.7 0.14 60);
+  --draft-soft: oklch(0.3 0.07 60);
+
+  --confidence-high: oklch(0.7 0.2 145);
+  --confidence-medium: oklch(0.78 0.18 85);
+  --confidence-low: oklch(0.7 0.2 50);
+
+  /* Dark-mode fg variants: light text on dark tinted surfaces. */
+  --confidence-high-fg: oklch(0.85 0.18 145);
+  --confidence-medium-fg: oklch(0.88 0.16 85);
+  --confidence-low-fg: oklch(0.85 0.18 50);
+
+  /* Shadows on dark surfaces sit deeper to read against the inverted ink. */
+  --tbi-shadow-popover-whisper: 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 4px 12px -2px oklch(0 0 0 / 0.4);
+  --tbi-shadow-transient-lift: 0 1px 2px 0 oklch(0 0 0 / 0.45), 0 8px 24px -4px oklch(0 0 0 / 0.55);
+
+  /* Shadcn-shaped semantic shims, dark theme. Each maps to its TBI dark
+     counterpart so package components invert cleanly when an ancestor
+     carries .dark — without depending on a host app's shadcn config. */
+  --background: var(--paper-sunken);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--emphasis-strong);
+  /* --emphasis-strong is white here, so the label takes the dark ground, not
+     --ink, which inverts to near-white and would leave white on white. */
+  --primary-foreground: var(--paper);
+  --secondary: var(--paper-sunken);
+  --secondary-foreground: var(--ink-80);
+  --muted: var(--paper-sunken);
+  --muted-foreground: var(--ink-60);
+  --accent: var(--paper-sunken);
+  --accent-foreground: var(--ink);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: var(--ink);
+  --border: var(--ink-20);
+  --input: var(--ink-20);
+  --ring: var(--emphasis-strong);
+}

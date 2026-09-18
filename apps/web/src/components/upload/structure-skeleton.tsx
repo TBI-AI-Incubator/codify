@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import type * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CircleFlag, cn } from '@codify/tbi-ui';
+import { CircleFlag, cn } from '../../vendor/tbi-ui';
 
 import { formatKindCount, type Stage } from '@/lib/run-views/ingest';
 import { countryName } from '@/lib/countries';

@@ -1,5 +1,5 @@
-import { LawReader, type VersionDocument as SteleVersionDocument } from '@codify/stele';
-import { Button, buttonVariants, cn, toast } from '@codify/tbi-ui';
+import { LawReader, type VersionDocument as SteleVersionDocument } from '../../vendor/stele';
+import { Button, buttonVariants, cn, toast } from '../../vendor/tbi-ui';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, Copy } from 'lucide-react';
 import { useCallback, useState } from 'react';

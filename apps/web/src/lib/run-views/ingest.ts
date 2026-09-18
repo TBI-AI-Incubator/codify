@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 
 import type { RunStageData } from '@codify/core-ts/run_events';
 
-import { capitalize } from '@codify/tbi-ui';
+import { capitalize } from '../../vendor/tbi-ui';
 
 import { formatNumber } from '@/lib/format';
 import { dataParts, latestPart, type RunParts } from '@/lib/run-parts';
