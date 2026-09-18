@@ -50,6 +50,16 @@ async def dispatch(
     frbr_work_uri: str | None = None,
     language: str = "eng",
 ) -> AsyncIterator[IngestionEvent]:
+    if jurisdiction_code == "oecd" and _is_html_path(source):
+        # A Compendium body the OECD acquirer wrapped: deterministic, no LLM lane.
+        from codify.pipeline.formats import oecd_html
+
+        async for event in oecd_html.ingest(
+            source, jurisdiction_code, frbr_work_uri=frbr_work_uri, language=language
+        ):
+            yield event
+        return
+
     if looks_like_eu(source) or (jurisdiction_code == "eu" and _is_html_path(source)):
         # XML from a non-EU jurisdiction is either a publisher's native AKN
         # (legislation.gov.uk, Laws.Africa) or domain XML (Riigi Teataja),

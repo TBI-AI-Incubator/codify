@@ -38,6 +38,24 @@ New config, additive:
   Lao, Khmer, Myanmar blocks) may follow a letter directly.
 - `attachments[].prefix`: a caption that opens a longer title on the same line.
 
+New source, additive:
+
+- `SourceAdapterKind` gains `oecd_compendium` (Tier 2), with
+  `OecdCompendiumAcquirer` over the Compendium of OECD Legal Instruments' JSON
+  API: `discover` lists the instruments in force with their publish date,
+  `fetch` returns the English body as primary and the French as a translation,
+  each wrapped in a head whose `oecd.*` meta tags name the instrument, and the
+  record's committee, themes, related instruments, adherents and monitoring
+  reports as `upstream_metadata`.
+- `codify.pipeline.formats.oecd_html` segments that body deterministically
+  into AKN: preamble citations and recitals, the enacting line, Roman verb
+  sections with paragraphs numbered across them, `PART`/`Article` codes and
+  conventions, and `WE ...` declarations. Sections whose verb addresses someone
+  other than the Adherents (`INVITES`, `INSTRUCTS`) and their paragraphs carry
+  `refersTo="#nonAdherentDuty"`. `dispatch` routes a local HTML source under
+  jurisdiction `oecd` to it. Annexes and tables inside a code fall out as flat
+  duplicate-numbered units; the operative articles are exact.
+
 ## 0.2.0 — unpublished
 
 Eleven breaks, so the minor moves, as `VERSIONING.md` prescribes while the
