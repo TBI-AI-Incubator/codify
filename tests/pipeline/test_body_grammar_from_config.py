@@ -810,3 +810,16 @@ def test_a_foreign_conclusions_block_is_left_alone(declared: Any) -> None:
         "</conclusions></act></akomaNtoso>"
     )
     assert emit_conclusions(akn, vocab=RegionVocabulary(closing_phrases=(CLOSING,))) == akn
+
+
+def test_a_restored_table_body_consumes_a_wrapped_marker(declared: Any) -> None:
+    from codify.pipeline.enrich.scaffold import BodyBlock
+    from codify.pipeline.enrich.table_fidelity import preserve_source_tables
+
+    text = "Section 5\nzter*\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSection 6\nSix.\n"
+    scan = _scan(text)
+    bodies = {"sec_5ter": BodyBlock(eid="sec_5ter", lines=["A B 1 2"])}
+    restored = preserve_source_tables(text, scan.anchors, bodies)
+    assert "sec_5ter" in restored
+    assert bodies["sec_5ter"].heading is None
+    assert not any("zter" in line for line in bodies["sec_5ter"].lines), bodies["sec_5ter"]

@@ -22,6 +22,10 @@ def _rows(lines: list[str]) -> list[tuple[str, ...]]:
     ]
 
 
+# Footnote brackets and amendment stars after the number are not a heading.
+_DECORATIONS_RE = re.compile(r"^(?:[ \t]*(?:\*|\[[^\]\n]{1,6}\]))+")
+
+
 def preserve_source_tables(
     text: str, anchors: list[StructuralAnchor], bodies: dict[str, BodyBlock]
 ) -> frozenset[str]:
@@ -30,17 +34,19 @@ def preserve_source_tables(
     ordered = sorted(anchors, key=lambda a: a.char_offset)
     for i, anchor in enumerate(ordered):
         end = ordered[i + 1].char_offset if i + 1 < len(ordered) else len(text)
-        source = text[anchor.char_offset : end]
-        lines = source.split("\n", 1)[1].splitlines() if "\n" in source else []
+        source = text[anchor.char_offset : end].lstrip()
+        # The marker may wrap (a suffix on its own line): consume all of it first.
+        matched = anchor.matched_text.strip()
+        after = source[len(matched) :] if matched and source.startswith(matched) else source
+        after = _DECORATIONS_RE.sub("", after, count=1)
+        first_line, _, rest = after.partition("\n")
+        lines = rest.splitlines()
         if not has_table(lines):
             continue
         body = bodies.get(anchor.akn_eid)
         if body is not None and _rows(lines) == _rows(body.lines):
             continue
-        first_line = source.partition("\n")[0].lstrip()
-        matched = anchor.matched_text.strip()
-        remainder = first_line[len(matched) :] if matched and first_line.startswith(matched) else ""
-        heading = anchor.heading or remainder.strip(" .-—:") or None
+        heading = anchor.heading or first_line.strip(" .-—:\r") or None
         source_lines = [line.strip() for line in lines if line.strip()]
         if heading and source_lines and source_lines[0] == heading:
             source_lines = source_lines[1:]
