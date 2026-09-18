@@ -1,10 +1,5 @@
-"""Runs as background tasks over an in-memory table.
-
-A run is one `ingest_document` iteration. Its events are buffered so a client
-that connects late, or reconnects, sees the whole stream. Nothing here survives
-a restart: a process that stops loses every run it held, by design, and says so
-in `Run.lost_on_restart`.
-"""
+"""Runs as background tasks over an in-memory table: events buffered for late clients,
+nothing surviving a restart, and each run saying so in `lost_on_restart`."""
 
 from __future__ import annotations
 
@@ -151,17 +146,19 @@ class RunTable:
         async with self._gate:
             run.status = "running"
             run.started_at = datetime.now(UTC)
+            # The verdict waits for the iterator to end: a lane may report a Failed
+            # pass and still reach Complete, so the last of the two decides.
+            outcome: Complete | Failed | None = None
             async for event in self._runner(run.params):
                 self._publish(run, _slim(event))
-                if isinstance(event, Complete):
-                    run.status = "succeeded"
-                    run.result = _slim(event)
-                elif isinstance(event, Failed):
-                    run.status = "failed"
-                    run.error = f"{event.stage}: {event.error}"
-            if run.status == "running":
-                run.status = "failed"
-                run.error = "the pipeline ended without Complete or Failed"
+                if isinstance(event, Complete | Failed):
+                    outcome = event
+            if isinstance(outcome, Complete):
+                run.status, run.result = "succeeded", _slim(outcome)
+            elif isinstance(outcome, Failed):
+                run.status, run.error = "failed", f"{outcome.stage}: {outcome.error}"
+            else:
+                run.status, run.error = "failed", "the pipeline ended without Complete or Failed"
 
     def _finish(self, run: Run, task: asyncio.Task[None]) -> None:
         """Runs when the task ends, however it ends: cancelled before its first step included."""

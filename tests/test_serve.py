@@ -1,6 +1,5 @@
-"""The thin server is routes over the library plus an in-memory run table.
-The run table is what can go wrong: these pin watch, cancel, retry and replay,
-each through the HTTP surface with a scripted runner in place of the pipeline."""
+"""The run table is what can go wrong in the thin server: these pin watch, cancel,
+retry and replay through the HTTP surface, with a scripted runner for the pipeline."""
 
 from __future__ import annotations
 
@@ -493,6 +492,32 @@ async def test_search_without_an_embeddings_endpoint_is_503(
 
     assert r.status_code == 503
     assert "EMBEDDING_BASE_URL" in r.json()["detail"]
+
+
+async def test_a_failed_pass_before_complete_does_not_end_the_run() -> None:
+    """A lane may report a failed enrichment pass and still complete."""
+    gate = asyncio.Event()
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield Failed(stage="enrich", error="pass crashed")
+        await gate.wait()
+        yield _complete()
+
+    table = RunTable(runner)
+    run = table.enqueue("ingest", {})
+    await asyncio.sleep(0.02)
+    assert run.status == "running"
+    assert table.retry(run.id) is None
+
+    async def watch() -> list[str]:
+        kinds = []
+        async for e in table.stream(run.id):
+            kinds.append(e["kind"])
+            gate.set()
+        return kinds
+
+    assert await asyncio.wait_for(watch(), 5) == ["failed", "complete"]
+    assert run.status == "succeeded" and run.error is None
 
 
 def test_serve_is_registered() -> None:

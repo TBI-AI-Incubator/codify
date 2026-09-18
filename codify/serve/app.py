@@ -1,8 +1,5 @@
-"""The thin HTTP server: the library's reads behind routes, and ingest as a run.
-
-Nothing here is a service in its own right. Every route is one library call;
-the only state is the in-memory run table, which a restart empties.
-"""
+"""The thin HTTP server: every route is one library call, ingest is a run, and the
+only state is the in-memory run table."""
 
 from __future__ import annotations
 
