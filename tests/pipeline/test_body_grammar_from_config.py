@@ -613,3 +613,25 @@ def test_a_wrapped_roman_heading_bounds_a_quotation(declared: Any) -> None:
     boundary = anchors_mod._basic_unit_line_re(COUNTRY)
     assert boundary is not None
     assert boundary.search("Section\nii\nText") and boundary.search("Section\nІ\nText")
+
+
+@pytest.mark.parametrize(
+    "suffixes",
+    [{"": "bis"}, {" zib": "bis"}, {"A": "bis"}, {"12": "bis"}, {"zib": ""}, {"zib": "b is"}],
+)
+def test_a_suffix_declaration_must_be_a_distinctive_word(suffixes: dict[str, str]) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        jurisdictions.StructuringConfig(insertion_suffixes=suffixes)
+    # A single character in a script that writes its suffix so is a word.
+    assert jurisdictions.StructuringConfig(insertion_suffixes={"ζ": "sexies"})
+
+
+@pytest.mark.parametrize("field", ["citation_successors", "prose_precursors"])
+def test_a_blank_cue_word_is_refused(field: str) -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        jurisdictions.StructuringConfig(**{field: ["to", ""]})
+    assert getattr(jurisdictions.StructuringConfig(**{field: ["to"]}), field) == ["to"]

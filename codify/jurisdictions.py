@@ -611,10 +611,31 @@ class StructuringConfig(BaseModel):
     ordinal_words: dict[str, int] = Field(default_factory=dict)
     # Words that follow a keyword marker's number to mark an inserted unit ("5 bis"),
     # each mapped to the ASCII form its eId carries; the number keeps its script.
+    # One table serves every jurisdiction, as `ordinal_words` does, so a word must
+    # be distinctive: never blank, a number, or a bare Latin letter ("5A" is a number).
     insertion_suffixes: dict[str, str] = Field(default_factory=dict)
     # Words that, following a marker's number on its own line, make the line a
     # citation list rather than a provision ("Article 5 to Article 9 apply").
     citation_successors: list[str] = Field(default_factory=list)
+
+    @field_validator("insertion_suffixes")
+    @classmethod
+    def _suffixes_are_distinctive_words(cls, value: dict[str, str]) -> dict[str, str]:
+        for word, form in value.items():
+            bare_latin = len(word) == 1 and word.isascii()
+            if not word.strip() or word.strip() != word or word.isdigit() or bare_latin:
+                raise ValueError(f"insertion suffix {word!r} is not a distinctive word")
+            if not form or form.strip() != form or not form.isascii() or " " in form:
+                raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")
+        return value
+
+    @field_validator("citation_successors", "prose_precursors", "sameline_precursors")
+    @classmethod
+    def _cue_words_are_not_blank(cls, value: list[str]) -> list[str]:
+        if any(not word.strip() or word.strip() != word for word in value):
+            raise ValueError("a cue word cannot be blank or carry surrounding whitespace")
+        return value
+
     # Words that introduce a citation's number ("Pasal 41 ayat (3)"). A line
     # ending in one of these makes the bracketed number on the next line part
     # of the citation, not a structural marker opening a new provision.
