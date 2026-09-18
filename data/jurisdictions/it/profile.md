@@ -218,7 +218,7 @@ For Decreto Legge (emergency decree):
 
 **Bluebell limitation note**: Bluebell uses `PARAGRAPH` for comma, but Italian commas are numbered (1, 2, 3) rather than using the unmumbered `alinea` pattern of French law. The pipeline must ensure comma numbers are preserved in the `<num>` element of each `<paragraph>` rather than treating them as unnumbered alinee.
 
-**Prompt variant**: Italian legislation would need a jurisdiction-specific `structuring.prompt_variant` because:
+**Prompt additions**: Italian legislation would need jurisdiction-specific `structuring.prompt_additions`, which the structurer appends to its jurisdiction context, because:
 
 1. The basic unit is `ARTICLE` not `SECTION`
 2. `SECTION` (Sezione) is a higher division above articles, not the basic unit

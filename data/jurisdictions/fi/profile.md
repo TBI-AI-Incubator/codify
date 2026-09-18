@@ -187,7 +187,7 @@ Same Eduskunta formula but the preamble records the constitutional procedure.
 | Alakohta (Sub-point)      | `subparagraph` | `SUBPARAGRAPH`   | Sub-items within a kohta                 |
 | Liite (Schedule/Appendix) | `attachment`   | `SCHEDULE`       | Bluebell SCHEDULE maps to AKN attachment |
 
-**Structuring prompt variant**: a Finland-specific `structuring.prompt_variant` would:
+**Structuring prompt additions**: Finland-specific `structuring.prompt_additions`, which the structurer appends to its jurisdiction context, would:
 
 1. Reflect that `CHAPTER` (luku) is the primary higher division (not PART)
 2. Handle the § symbol as the article marker (normalising "5 §" to an ARTICLE heading)

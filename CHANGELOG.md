@@ -48,9 +48,11 @@ major is zero. Eleven are in year resolution, enumerated by running every
 year-resolution grid cell and edge row through the 0.1.0 and 0.2.0 callers
 (`resolve_year`, `gregorian_year`, `resolve_descriptors`) and grouping every
 differing cell; two are in embedding storage. Each line names the input shape
-that triggers it. A stored row moves only where a jurisdiction with a
-non-Gregorian calendar has a law stored, a stored law has a year below 1000,
-or a work URI carries a one- to three-digit year segment.
+that triggers it. Under the year-resolution items a stored row moves only
+where a jurisdiction with a non-Gregorian calendar has a law stored, a stored
+law has a year below 1000, or a work URI carries a one- to three-digit year
+segment. Items 12 and 13 are storage changes: migration 0020 copies every
+existing `provision_embeddings` row into the partitioned table.
 
 1. A date field the model left unlabelled is read as written; 0.1.0 converted
    its year through the jurisdiction's calendar, filing a Gregorian `1968-09-09`
