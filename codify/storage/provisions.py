@@ -137,10 +137,12 @@ async def get_provision_with_path(
 
 
 __all__ = [
+    "ProvisionContext",
     "ProvisionWithPath",
     "SectionRef",
     "find_provision_id_by_eid",
     "get_provision_with_path",
+    "provision_contexts",
 ]
 
 

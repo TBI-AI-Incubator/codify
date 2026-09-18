@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getVersionDocument, listLawVersions } from '@/lib/api-laws';
-import { useTranslatedLawTitle } from '@/hooks/use-law-title';
 import { pickExpression, preferredExpressionLanguage } from '@/lib/expression-language';
 import { languageName } from '@/lib/languages';
 import { aknEidLabel, formatCitation } from '@/lib/citation';
@@ -50,7 +49,6 @@ function PreviewBody({ provision }: { provision: PreviewableProvision }) {
   const { t, i18n } = useTranslation();
   const [copied, setCopied] = useState(false);
   const wanted = preferredExpressionLanguage(i18n.language);
-  const translatedTitle = useTranslatedLawTitle(provision.law_id);
   const versions = useQuery({
     queryKey: ['law-versions', provision.law_id],
     queryFn: () => listLawVersions(provision.law_id, { limit: 100 }),
@@ -96,7 +94,7 @@ function PreviewBody({ provision }: { provision: PreviewableProvision }) {
           {aknEidLabel(provision.akn_eid)}
         </SheetTitle>
         <SheetDescription className="font-tbi-sans">
-          {translatedTitle ?? provision.law_title}
+          {provision.law_title}
         </SheetDescription>
         {sibling && source ? (
           <div
