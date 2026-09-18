@@ -9,8 +9,9 @@ way to reproduce it against a local install.
 What not to send: credentials, personal data, customer documents, or exploit code
 aimed at a running system. Do not open a public issue for a suspected vulnerability.
 
-Supported release: the latest minor on PyPI and `main`. Fixes land on `main` first
-and ship in the next release; the advisory names the fixed version.
+Supported release: `main`, and the latest minor on PyPI once one is published.
+Fixes land on `main` first and ship in the next release; the advisory names the
+fixed version.
 
 Keep model-provider and database credentials outside source control, and never
 expose the development Compose database beyond your own machine.
