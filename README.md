@@ -102,19 +102,21 @@ your environment. See `.env.example` for all available options.
 
 ## Jurisdictions
 
-A jurisdiction configuration ships in the wheel when its `config.json` is marked
-`synthetic` or `public_reference`; `codify/open_wheel.py` holds that rule and the build
-hook applies it.
+Configurations are included in distributed package wheels if their `config.json` sets
+either `synthetic` or `public_reference` to true. This filtering is enforced by
+`codify/open_wheel.py` at build time to prevent the bundled set from drifting out of sync.
 
-Synthetic jurisdictions contain invented law in realistic legislative structures, so the
-test suite can assert against known-correct structure without redistributing any real
-corpus. Public reference configurations describe jurisdictions that publish their law
-openly.
+- **Synthetic jurisdictions**: contain mock legislation formatted to real-world
+  legislative structures, allowing test suites to assert against known-good parses
+  without distributing copyrighted corpora.
+- **Public reference configurations**: cover jurisdictions that publish their legal texts
+  openly.
 
-A source checkout reads its own `data/`; an installed package reads its bundled data. To
-use another dataset, set `CODIFY_DATA_ROOT` to an absolute path containing
-`jurisdictions/` and `frameworks/` before Python starts. It replaces the bundled data
-rather than merging with it; a missing or relative path raises an error.
+By default, local source checkouts read from `./data/`, while installed package
+distributions read bundled package data. To supply a custom dataset, set
+`CODIFY_DATA_ROOT` to an absolute path containing `jurisdictions/` and `frameworks/`
+directories before starting Python. Relative paths are rejected, and custom data roots
+completely replace bundled data.
 
 To add a jurisdiction, see `docs/jurisdictions/adding-a-jurisdiction.md`.
 
