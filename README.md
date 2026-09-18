@@ -197,7 +197,8 @@ The tools, all reads:
   document classes.
 - `compare_versions(reference_version_id, domestic_version_id)`: the `compare` report,
   each provision of the reference assessed against the domestic version. Needs the chat
-  endpoint and costs a model call per reference provision; refused above 200 of them.
+  and embeddings endpoints and costs a model call per reference provision that carries
+  text; refused above 200 of them.
 
 A failure reads back as the tool's error with a plain message. `--http` binds to
 localhost unless `--host` says otherwise; there is no authentication here either.

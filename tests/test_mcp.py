@@ -499,8 +499,21 @@ async def test_compare_over_the_provision_cap_is_refused_before_any_model(
 
     assert result.is_error
     text = result.content[0].text
-    assert "58 assessable provisions" in text and "at most 10" in text
+    # 42 of the reference's 58 assessable provisions reach the model; 16 are headings.
+    assert "42 provisions to assess" in text and "at most 10" in text
     assert built == []
+
+    at_the_cap = create_server(
+        sessions=_no_session, embedding_client=_UnitVectors, llm_client=llm, compare_cap=42
+    )
+    ran = await _call(
+        at_the_cap,
+        "compare_versions",
+        reference_version_id=str(left.id),
+        domestic_version_id=str(right.id),
+    )
+
+    assert not ran.is_error and built == ["llm"]
 
 
 async def test_a_crash_inside_a_tool_does_not_leak_its_message(
