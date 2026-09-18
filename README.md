@@ -73,7 +73,7 @@ uv run codify scan-corpus <dir> --jurisdiction xa
 ```
 
 The summary is JSON on stdout; diagnostics such as an empty sweep go to stderr, and
-`--per-document` writes one row per file to a path of your choosing.
+`--per-document` writes one row per scanned document to a path of your choosing.
 
 **Log messages.**
 
