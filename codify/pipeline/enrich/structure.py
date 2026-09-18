@@ -116,7 +116,7 @@ _DIGIT_PREFIX_MADDA_RE = re.compile(r"([0-9٠-٩۰-۹]+)[ \t]*مادة")
 # RTL reorder prefixes headers with a stray `)` on its own line (`)مادة 3`),
 # defeating the regex's column boundary. Stripped before a line-start numbered
 # article keyword; on three measured instruments it cost 21, nine and seven
-# articles (docs/calibration/structuring-heuristics.md).
+# articles.
 _STRAY_PAREN_MADDA_RE = re.compile(
     r"(?m)^([^\S\n]{0,8})\)[^\S\n]{0,4}(?=(?:ال)?مادة(?:[^\S\n]|\()*[0-9٠-٩۰-۹])"
 )
@@ -223,7 +223,7 @@ def _scaffold_for_window(
 
 
 # Appended per body-fill window that carries a fenced table row. A window with no
-# table has no use for it: see docs/calibration/structuring-heuristics.md.
+# table has no use for it.
 TABLE_ROWS_RULE = (
     "This source contains a markdown table. A line whose content is "
     "`| cell | cell |` is body content: copy it into `lines` verbatim and in "

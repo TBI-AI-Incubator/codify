@@ -246,7 +246,7 @@ def scan_corpus(
     converted to text. On the bundle this was measured against, the derived text
     files were just over a third of the PDFs and all predated the most recent era, so a
     text-only sweep silently excluded that whole era and reported the passes
-    written for it as never firing (docs/calibration/corpus-composition.md).
+    written for it as never firing.
 
     Excluded, unreadable and text-layerless files are counted on the returned
     sweep rather than dropped. Path order, for a stable diff."""

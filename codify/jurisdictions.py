@@ -579,10 +579,10 @@ class AttachmentCaption(BaseModel):
 
     # Centred in the source, so the match tolerates a wide indent.
     caption: str
-    # False for an Indonesian Penjelasan: no norm, and no legal basis.
+    # False for an explanatory memorandum: no norm, and no legal basis.
     normative: bool = True
-    # Levels the attachment's own content uses. An Indonesian Lampiran is a
-    # lettered outline, not the Pasal hierarchy of the body it is attached to.
+    # Levels the attachment's own content uses: an annex can be a lettered
+    # outline rather than the article hierarchy of the body it is attached to.
     # Empty keeps today's behaviour: the body's levels, or none.
     hierarchy: list[HierarchyEntry] = Field(default_factory=list)
     # True where the caption opens a longer title on the same line ("SCHEDULE of

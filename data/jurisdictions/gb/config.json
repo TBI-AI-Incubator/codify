@@ -374,7 +374,7 @@
     "documents_examined": 5,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Validated against five legislation.gov.uk AKN exports (DPA 2018, Equality 2010, Housing 2004, Finance 2020, MLR 2017 SI) via the uk-gold structure/resolution/effects benchmarks; act + si hierarchies exercised end-to-end through the anchor scaffolder and Bluebell round-trip."
+    "note": "Validated against five legislation.gov.uk AKN exports (DPA 2018, Equality 2010, Housing 2004, Finance 2020, MLR 2017 SI) through the structure, resolution and effects benchmarks; act + si hierarchies exercised end-to-end through the anchor scaffolder and Bluebell round-trip."
   },
   "tier": 1,
   "status": "draft",

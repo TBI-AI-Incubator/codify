@@ -646,8 +646,7 @@ class LiteLLMClient:
             # become anchor zero.
             "extract_header": True,
             "extract_footer": True,
-            # Pinned, not inherited: default observed true on 84/84 pages, see
-            # docs/log/2026-08-02-structured-ocr-response.md.
+            # Pinned, not inherited: the default was observed true on 84/84 pages.
             "include_blocks": True,
             # Per-word confidence with a character offset into the markdown, so
             # doubt lands on the text rather than only on the page image.
