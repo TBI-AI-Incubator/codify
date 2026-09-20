@@ -21,8 +21,8 @@ New:
 
 - A web app over the server, `apps/web`: laws, reader, search, jurisdictions and
   ingest with a live run stream; types generated from `contract/openapi.json`.
-- Two reader routes on the server, `/versions/{id}/document` and
-  `/laws/{id}/versions`; the run stream carries a `stored` event with the new
+- Two reader routes on the server, `/versions/{version_id}/document` and
+  `/laws/{law_id}/versions`; the run stream carries a `stored` event with the new
   version and law ids; search matches carry law and version context.
 - Notebooks under `docs/notebooks/`: Codify 101, 201, 301 and 301a.
 
