@@ -14,8 +14,8 @@ below is the distribution's.
   removing or renaming a symbol, changing a parameter's name, order or meaning,
   inserting one ahead of an existing parameter, widening a return type.
 - **The command.** `codify`, and the output its subcommands write:
-  `ingest-one`, `scan-corpus`, `load`, `search`, `compare`, `index-datadump`,
-  `index-ee-archive` and `index-legislation-gov-uk`.
+  `ingest-one`, `scan-corpus`, `load`, `search`, `compare`, `serve`, `mcp`,
+  `index-datadump`, `index-ee-archive` and `index-legislation-gov-uk`.
   Breaks: removing a subcommand or a flag, changing a flag's meaning or the
   shape of the output.
 - **Jurisdiction config.** `JurisdictionConfig`, `ResolvedConfig` and the
@@ -41,7 +41,7 @@ not. Minor for new capability or data. Patch for the rest.
 
 ## 0.x
 
-The current version is `0.4.0`, the first on PyPI. While the major is zero the
-minor acts as the major: pin `>=0.4,<0.5`. The step from `0.1.0` to `0.2.0`
-carried thirteen breaks and the step to `0.3.0` four, each enumerated in the
-changelog; `0.4.0` adds commands and carries no break.
+The current version is `0.5.0`. While the major is zero the minor acts as the
+major: pin `>=0.5,<0.6`. The step from `0.1.0` to `0.2.0` carried thirteen
+breaks, the step to `0.3.0` four and the step to `0.5.0` one, each enumerated
+in the changelog; `0.4.0` added commands and carried no break.
