@@ -3,14 +3,31 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
-## Unreleased
+## 0.5.0 (2026-09-20)
 
-- The anchor scan reads marginal-note layouts: where a jurisdiction declares
-  `display.heading_type: marginal_note`, a bare basic-unit number under a
-  heading line (the shape a scanned gazette transcribes to) is a section, with
-  that line as its heading. The coverage denominator counts the same markers, so
-  a scan that lost them reads below 1.0 instead of measuring nothing. The
-  bundled `xa` scan now structures its twenty sections rather than six parts.
+One structuring change, so the minor moves as `VERSIONING.md` prescribes while the
+major is zero; the rest is additive.
+
+Breaks, in that the structurer's output changes for documents it already read:
+
+1. The anchor scan reads marginal-note layouts: where a jurisdiction declares
+   `display.heading_type: marginal_note`, a bare basic-unit number under a
+   heading line (the shape a scanned gazette transcribes to) is a section, with
+   that line as its heading. The coverage denominator counts the same markers, so
+   a scan that lost them reads below 1.0 instead of measuring nothing. The
+   bundled `xa` scan now structures its twenty sections rather than six parts.
+
+New:
+
+- A web app over the server, `apps/web`: laws, reader, search, jurisdictions and
+  ingest with a live run stream; types generated from `contract/openapi.json`.
+- Two reader routes on the server, `/versions/{id}/document` and
+  `/laws/{id}/versions`; the run stream carries a `stored` event with the new
+  version and law ids; search matches carry law and version context.
+- Notebooks under `docs/notebooks/`: Codify 101, 201, 301 and 301a.
+
+Repository: the publish action reads current metadata; Dependabot version
+updates with a release cooldown; pinned actions advanced; pypdf 6.18.1.
 
 ## 0.4.0 (2026-09-18)
 
