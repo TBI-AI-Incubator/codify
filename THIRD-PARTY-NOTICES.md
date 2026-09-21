@@ -39,7 +39,7 @@ identified in its files; acquired documents require their own rights assessment.
 | distro | 1.9.0 | Apache License, Version 2.0 |
 | genai-prices | 0.1.6 | MIT |
 | google-auth | 2.58.0 | Apache 2.0 |
-| google-genai | 1.75.0 | Apache-2.0 |
+| google-genai | 2.19.0 | Apache-2.0 |
 | googleapis-common-protos | 1.75.3 | Apache-2.0 |
 | greenlet | 3.5.5 | MIT AND PSF-2.0 |
 | griffelib | 2.3.0 | ISC |
@@ -58,7 +58,7 @@ identified in its files; acquired documents require their own rights assessment.
 | Mako | 1.4.1 | MIT |
 | MarkupSafe | 3.0.3 | BSD-3-Clause |
 | numpy | 2.5.3 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
-| openai | 2.54.0 | Apache-2.0 |
+| openai | 3.3.1 | Apache-2.0 |
 | opentelemetry-api | 1.44.0 | Apache-2.0 |
 | opentelemetry-exporter-otlp-proto-common | 1.44.0 | Apache-2.0 |
 | opentelemetry-exporter-otlp-proto-http | 1.44.0 | Apache-2.0 |
@@ -81,7 +81,7 @@ identified in its files; acquired documents require their own rights assessment.
 | pydantic-graph | 1.107.5 | MIT |
 | pydantic-settings | 2.15.0 | MIT |
 | PyMeeus | 0.5.12 | LGPLv3 |
-| pypdf | 6.18.0 | BSD-3-Clause |
+| pypdf | 6.18.1 | BSD-3-Clause |
 | PyStemmer | 3.1.0 | MIT, BSD |
 | python-dotenv | 1.2.3 | BSD-3-Clause |
 | PyYAML | 6.0.3 | MIT |
@@ -95,7 +95,6 @@ identified in its files; acquired documents require their own rights assessment.
 | structlog | 26.1.0 | MIT OR Apache-2.0 |
 | tenacity | 9.1.4 | Apache 2.0 |
 | tiktoken | 0.14.0 | See installed distribution licence files |
-| tqdm | 4.70.0 | MPL-2.0 AND MIT |
 | truststore | 0.10.4 | MIT |
 | typing_extensions | 4.16.0 | PSF-2.0 |
 | typing-inspection | 0.4.4 | MIT |
