@@ -53,16 +53,16 @@ locally without touching any database.
 
 The generated `bundle/` directory contains:
 
-| File                | Contents                                                      |
-| ------------------- | ------------------------------------------------------------- |
-| `pages/`            | Page images rendered for inspection after the run             |
-| `source.txt`        | Extracted text transcription                                  |
-| `anchors.jsonl`     | Structural markers detected during the scanning pass          |
-| `coverage.json`     | Provision count metrics (expected vs. captured)               |
-| `scaffold.bluebell` | Structural skeleton generated prior to filling provision text |
-| `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                            |
-| `validator.json`    | Structural validation findings                                |
-| `manifest.json`     | Run metadata, including model identifiers and config hashes   |
+| File                | Contents                                                       |
+| ------------------- | -------------------------------------------------------------- |
+| `pages/`            | Page images rendered for inspection after the run              |
+| `source.txt`        | Extracted text transcription                                   |
+| `anchors.jsonl`     | Structural markers detected during the scanning pass           |
+| `coverage.json`     | Provision count metrics (expected vs. captured)                |
+| `scaffold.bluebell` | Structural skeleton generated prior to filling provision text  |
+| `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                             |
+| `validator.json`    | Structural validation findings                                 |
+| `manifest.json`     | Run metadata, including model identifiers and config hashes    |
 
 Structuring follows an anchor-driven model: a deterministic skeleton is parsed using the
 jurisdiction's rules, and the LLM then fills the text within each anchored block.
@@ -246,16 +246,16 @@ directories; explicitly exported shell variables take precedence. Note that `pyt
 `alembic` do not read `.env` files automatically and require variables to be exported in
 your environment. See `.env.example` for all available options.
 
-| Variable                | Purpose                                                                                 |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| `LITELLM_BASE_URL`      | Base URL for the OpenAI-compatible chat endpoint                                        |
-| `LITELLM_API_KEY`       | API key for the chat endpoint                                                           |
-| `LITELLM_MODEL`         | Default model used for body fill (overridden by `--model`)                              |
+| Variable                | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `LITELLM_BASE_URL`      | Base URL for the OpenAI-compatible chat endpoint                          |
+| `LITELLM_API_KEY`       | API key for the chat endpoint                                             |
+| `LITELLM_MODEL`         | Default model used for body fill (overridden by `--model`)                |
 | `POSTGRES_URL`          | Postgres connection string for migrations and tests (defaults to local Compose service) |
-| `AZURE_OPENAI_ENDPOINT` | Endpoint for the optional secondary Azure AI Foundry OCR engine                         |
-| `AZURE_OPENAI_API_KEY`  | API key for the optional Azure OCR engine                                               |
-| `LANGFUSE_PUBLIC_KEY`   | Public key for optional Langfuse tracing                                                |
-| `LANGFUSE_SECRET_KEY`   | Secret key for optional Langfuse tracing                                                |
+| `AZURE_OPENAI_ENDPOINT` | Endpoint for the optional secondary Azure AI Foundry OCR engine           |
+| `AZURE_OPENAI_API_KEY`  | API key for the optional Azure OCR engine                                 |
+| `LANGFUSE_PUBLIC_KEY`   | Public key for optional Langfuse tracing                                  |
+| `LANGFUSE_SECRET_KEY`   | Secret key for optional Langfuse tracing                                  |
 
 ## Jurisdictions
 
