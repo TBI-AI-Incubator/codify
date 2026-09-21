@@ -17,5 +17,7 @@ inspect validation findings before relying on structured output. Schema validity
 alone does not establish legal accuracy or complete transcription.
 
 `codify/lenses` exposes generic extension interfaces. Detector implementations
-and private catalogues are supplied by applications. Core has no hosted service,
-tenancy system or web interface in this tree.
+and private catalogues are supplied by applications. Core includes optional HTTP
+and MCP servers and a local web app.
+Managed hosting, accounts and durable workflow orchestration are provided by
+Codify Platform.
