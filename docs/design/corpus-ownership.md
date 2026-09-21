@@ -55,6 +55,17 @@ The intended end state is:
 | `versions`         | Existing UUID; unique `(corpus_id, expression_uri)` and `(id, corpus_id)` | Non-null corpus; law and optional parent in that corpus |
 | `source_documents` | New UUID; unique `(corpus_id, sha256)` and `(id, corpus_id)`              | Non-null corpus                                         |
 
+`versions.ingest_run_id` is retained provenance, currently not a foreign key; it can
+outlive the run row. Introduce a minimal `run_identities` table with immutable run UUID
+primary key, non-null corpus foreign key and unique `(id, corpus_id)`. Create this
+binding atomically before the live run; both `runs` and a version's optional ingest-run
+reference use same-corpus composite foreign keys to it. Run cleanup retains the binding,
+which contains no payload or actor data. Restrict deletion while provenance references
+remain, and prohibit reusing a run UUID under another corpus. This preserves the UUID
+after cleanup without accepting an unverifiable cross-corpus association. Legacy run
+IDs require explicit provenance-backed bindings; an absent live run is not grounds to
+invent an owner. Include this table in migration ownership and model exports.
+
 A version references its source UUID rather than using the source hash as identity.
 Hashes remain integrity and deduplication values. Original filenames, source metadata
 and object references belong to the corpus, even when file bytes match another corpus.
@@ -110,7 +121,16 @@ Use these explicit rules for roots and records whose parents can disappear:
   parent IDs are null. Disputes inherit through their mandatory page reference.
 
 Corpus ownership is immutable during ordinary updates. Moving content requires an
-explicit copy, not reassigning a root and leaving dependent rows behind. Synthetic
+explicit copy, not reassigning a root and leaving dependent rows behind. The migration
+must enforce this in PostgreSQL: reject `OLD.corpus_id IS DISTINCT FROM NEW.corpus_id`
+on every corpus-bearing table, including sources, acquisitions, runs and the retained
+run bindings. Extend or supplement `enforce_versions_immutable`, whose current protected
+column list does not include ownership. Do not exempt ownership checks based on trigger
+depth. API updates must omit ownership from mutable fields and reject reassignment;
+rows inheriting ownership must also reject reparenting into another corpus. The runtime
+role must not own the schema or have permission to disable these checks. Backfill uses a
+separate migration role and finishes before enforcement; there is no runtime bypass flag.
+Synthetic
 upgrade validation must include roots without documents and page evidence without
 surviving parents; missing provenance is not permission to select a default owner.
 
@@ -180,7 +200,15 @@ The acceptance cases are:
     cross-corpus references on emission; retain the original owner after entity deletion.
     Exercise concurrent action reservations within and across corpora, and verify any
     separate application-wide limit still holds after the caller migration.
-13. Remove each scope predicate or relationship constraint in controlled mutations;
+13. Assign an ingest run from the other corpus to a version, through both the API and
+    direct SQL; reject it. Clean up the live run and confirm the version's original
+    ingest UUID and immutable corpus binding remain valid. Reject reuse of that UUID
+    in another corpus and fail upgrade on unassignable legacy provenance.
+14. Attempt direct ownership updates on every corpus-bearing table and cross-corpus
+    reparenting on inherited rows, including rows without dependants. Verify rejection
+    under the runtime role, unchanged data after rollback and valid same-corpus updates.
+    Remove the ownership trigger in a controlled mutation; this test must fail.
+15. Remove each scope predicate or relationship constraint in controlled mutations;
     the corresponding isolation test fails.
 
 Run both directions and mixed holdings. Test the actual PostgreSQL constraints and
