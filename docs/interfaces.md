@@ -121,8 +121,9 @@ The tools do not write to the corpus:
   document classes.
 - `compare_versions(reference_version_id, domestic_version_id)`: the `compare` report,
   each provision of the reference assessed against the domestic version. Needs the chat
-  and embeddings endpoints and costs a model call per reference provision that carries
-  text; refused above 200 of them.
+  and embeddings endpoints. By default, the cap is 200 reference articles, sections
+  and paragraphs after removing structural units and units excluded by the document’s
+  rules (such as placeholders). Points do not count separately.
 
 Tool failures return an error message. `--http` binds to
 localhost unless `--host` says otherwise; there is no authentication here either.
