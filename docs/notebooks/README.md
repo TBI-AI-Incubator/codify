@@ -1,35 +1,57 @@
 # Notebooks
 
-Four walks through the library, in order. Each runs top to bottom on a clean clone with
-`uv sync --group dev --extra migrations --extra serve --extra mcp` and a `.env` copied from
-`.env.example` with a key added. The material is synthetic (`xa`, `xu`) so nothing quotes
-a real statute book.
+Learn to structure legal documents, search a small corpus and compare laws in Python.
+The notebooks include saved outputs, so you can read them without running the code.
+All sample laws are fictional.
 
-| Notebook | Covers | Needs |
+| Notebook | What you will do | Requirements |
 | --- | --- | --- |
-| [Codify 101](codify-101.ipynb) | Jurisdiction config, Bluebell to Akoma Ntoso, the typed document, validation, the anchor scan and model body-fill | A chat model for the last section; everything before it is offline |
-| [Codify 201](codify-201.ipynb) | Loading a corpus into Postgres, embedding, hybrid search, the HTTP routes and the MCP tools in-process | The compose Postgres, migrated; an embeddings endpoint |
-| [Codify 301a](codify-301a.ipynb) | What a jurisdiction configuration declares, one act scanned under five of them, calendar and era, structuring under three, then one rule edited in a scratch data root and what moved | A chat model for sections 4 and 5; the rest is offline |
-| [Codify 301](codify-301.ipynb) | Comparing one act against a reference instrument, provision by provision, and reading the report | A chat model and an embeddings endpoint |
+| [Codify 101](codify-101.ipynb) | Convert text to Akoma Ntoso, inspect the document and validate its structure | Runs offline until the final section, which needs a chat model |
+| [Codify 201](codify-201.ipynb) | Store laws in PostgreSQL, search provisions and use HTTP and MCP | A local database with migrations applied and an embeddings endpoint |
+| [Codify 301a](codify-301a.ipynb) | Test jurisdiction rules and see how a configuration change affects the output | Runs partly offline; sections 4 and 5 also need a chat model |
+| [Codify 301](codify-301.ipynb) | Compare a document with a reference instrument and inspect the findings | Chat and embeddings endpoints; no database |
 
-Model spend for all four is a few cents.
+## Setup
 
-## Re-executing
+From the repository root:
 
-The outputs are committed so the notebooks read without running. After a change to what
-they call, re-execute in order against a fresh database and commit the outputs:
-
+```bash
+uv sync --group dev --extra migrations --extra serve --extra mcp
 ```
-docker compose down -v && docker compose up -d --wait postgres
+
+Open a notebook in VS Code or another notebook editor and select the repository's
+`.venv` as the Python kernel. Run its cells in order.
+
+For model-assisted sections, copy `.env.example` to `.env` and configure the
+endpoints you plan to use. Calls may incur charges; cost depends on the model,
+document size and retries. See [storage setup](../usage.md#store-search-compare)
+for embeddings settings.
+
+For Codify 201, use a dedicated local database. The notebook writes sample records:
+
+```bash
+docker compose up -d --wait postgres
 uv run alembic -c alembic.ini upgrade head
+```
+
+Docker runs PostgreSQL here, not the notebook or API server.
+See [interfaces](../interfaces.md) for API, MCP and web app setup.
+
+## Updating saved outputs
+
+After changing executable examples, run the affected notebooks against a dedicated
+local database and review the outputs before committing them. From the repository root:
+
+```bash
 for nb in 101 201 301a 301; do
   uv run jupyter execute --inplace docs/notebooks/codify-$nb.ipynb
 done
 ```
 
-`jupyter execute` comes with `nbclient`, which the dev group installs. Check the outputs
-carry no key, home path or run-specific timestamp before committing. There is no CI job:
-the run costs model calls and the outputs are the record.
+The dev dependencies include `nbclient`, which provides `jupyter execute`.
+These runs can call model providers, so CI does not execute them.
 
-The FRBR expression date in the outputs is the day of the run: Bluebell stamps the
-generation date at parse time, so it moves on every re-execution and is not a defect.
+Remove credentials, local paths and incidental timestamps from saved outputs.
+Bluebell uses the run date in FRBR expression identifiers. That date may change
+between runs, and rerunning Codify 201 on a later day creates new versions.
+Prose-only edits do not need model calls or refreshed outputs.

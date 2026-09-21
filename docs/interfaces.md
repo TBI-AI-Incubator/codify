@@ -10,6 +10,27 @@ The HTTP and MCP servers have no built-in authentication. Keep them on localhost
 or protect them with an authenticated proxy. Ingestion runs are held in memory
 and are lost on restart; successfully stored documents remain in PostgreSQL.
 
+## Docker support
+
+The repository includes a Docker Compose service for PostgreSQL, with the search
+extensions Codify needs. It does not currently include container images or Compose
+services for the REST API, MCP server or web app. Those run locally as described below.
+
+After the quick start, start the database from the repository root:
+
+```bash
+docker compose up -d --wait postgres
+uv sync --extra migrations
+uv run --extra migrations alembic -c alembic.ini upgrade head
+```
+
+Check that `POSTGRES_URL` points to this local database before applying migrations.
+The default is `postgresql://codify:codify@localhost:5432/codify`. Compose binds the
+database to localhost and keeps its data in a named volume. If you change
+`CODIFY_PG_PORT`, update the port in `POSTGRES_URL` too.
+
+`docker compose stop postgres` stops the database without deleting its data.
+
 ## REST API
 
 Start the server to upload documents, read stored laws and search provisions:
