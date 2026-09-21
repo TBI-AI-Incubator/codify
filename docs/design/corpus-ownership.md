@@ -23,22 +23,23 @@ Public jurisdiction configuration and parsing rules may remain shared.
 Paths below are relative to the repository root. These are source observations,
 not claims about any running installation.
 
-| Area                                                       | Current behaviour                                                                                         | Required change                                                                       |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `codify/storage/models.py`                                 | Work and expression URIs are globally unique. Source hashes identify source rows.                         | Make URI and hash uniqueness local to a corpus.                                       |
-| `codify/storage/sources.py`                                | Upload deduplication uses a hash; inherited-source lookup walks version ancestry.                         | Scope deduplication and every lineage hop; return only the owned source.              |
-| `codify/storage/repository.py`                             | Save, reuse and replacement select laws by work URI; repeat detection also considers language and source. | Apply scope before selecting, locking, reusing or replacing a row.                    |
-| `codify/storage/versions.py`                               | Version lookup, listing, lineage and amendment persistence use document identifiers.                      | Require scope on entry; preserve it through derived versions and cursor lookups.      |
-| `codify/storage/documents.py`                              | Document projection loads body rows for a version.                                                        | Resolve the scoped version before loading its body.                                   |
-| `codify/storage/repair.py`                                 | Source retrieval can select a source directly by hash.                                                    | Use the owned source identity, including repair evidence reads.                       |
-| `codify/storage/lexicon.py`                                | Expansion terms and counts come from a shared lexicon.                                                    | Scope terms, counts, writes, rebuilds and pruning.                                    |
-| `codify/storage/retrieval.py`, `codify/retrieve/hybrid.py` | Search combines filters and candidate limits.                                                             | Apply corpus constraints before candidate selection, ranking and pagination.          |
-| `codify/storage/partitions.py`                             | Embeddings are partitioned by jurisdiction.                                                               | Keep partitioning a performance choice, never an ownership boundary.                  |
-| `codify/cli_store.py`, `codify/serve/app.py`               | Standalone entry points persist without corpus selection.                                                 | Require explicit configured corpus selection.                                         |
-| `codify/storage/laws.py`                                   | Lists, URI/UUID reads, existence checks, cursors, counts and facets select corpus content.                | Require corpus scope for all readers, including cursor resolution and aggregation.    |
-| `codify/storage/acquisitions.py`, `codify/storage/runs.py` | Acquisition and job records can exist without a document.                                                 | Store required corpus identity at creation; scope deduplication, reads and mutations. |
-| `codify/storage/page_reads.py`                             | Page evidence can outlive its run without being attached to a version.                                    | Preserve independent corpus ownership when either optional parent disappears.         |
-| `codify/storage/events.py`                                 | Audit events have no ownership foreign key; feeds and action counts can span the table.                   | Persist corpus ownership; scope writes, feeds, cursors, counts and entity enrichment. |
+| Area                                                                | Current behaviour                                                                                         | Required change                                                                          |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `codify/storage/models.py`                                          | Work and expression URIs are globally unique. Source hashes identify source rows.                         | Make URI and hash uniqueness local to a corpus.                                          |
+| `codify/storage/sources.py`                                         | Upload deduplication uses a hash; inherited-source lookup walks version ancestry.                         | Scope deduplication and every lineage hop; return only the owned source.                 |
+| `codify/storage/repository.py`                                      | Save, reuse and replacement select laws by work URI; repeat detection also considers language and source. | Apply scope before selecting, locking, reusing or replacing a row.                       |
+| `codify/storage/versions.py`                                        | Version lookup, listing, lineage and amendment persistence use document identifiers.                      | Require scope on entry; preserve it through derived versions and cursor lookups.         |
+| `codify/storage/documents.py`                                       | Document projection loads body rows for a version.                                                        | Resolve the scoped version before loading its body.                                      |
+| `codify/storage/repair.py`                                          | Source retrieval can select a source directly by hash.                                                    | Use the owned source identity, including repair evidence reads.                          |
+| `codify/storage/lexicon.py`                                         | Expansion terms and counts come from a shared lexicon.                                                    | Scope terms, counts, writes, rebuilds and pruning.                                       |
+| `codify/storage/retrieval.py`, `codify/retrieve/hybrid.py`          | Search combines filters and candidate limits.                                                             | Apply corpus constraints before candidate selection, ranking and pagination.             |
+| `codify/storage/partitions.py`                                      | Embeddings are partitioned by jurisdiction.                                                               | Keep partitioning a performance choice, never an ownership boundary.                     |
+| `codify/cli_store.py`, `codify/serve/app.py`                        | Standalone entry points persist without corpus selection.                                                 | Require explicit configured corpus selection.                                            |
+| `codify/storage/laws.py`                                            | Lists, URI/UUID reads, existence checks, cursors, counts and facets select corpus content.                | Require corpus scope for all readers, including cursor resolution and aggregation.       |
+| `codify/storage/acquisitions.py`, `codify/storage/runs.py`          | Acquisition and job records can exist without a document.                                                 | Store required corpus identity at creation; scope deduplication, reads and mutations.    |
+| `codify/storage/page_reads.py`                                      | Page evidence can outlive its run without being attached to a version.                                    | Preserve independent corpus ownership when either optional parent disappears.            |
+| `codify/storage/events.py`                                          | Audit events have no ownership foreign key; feeds and action counts can span the table.                   | Persist corpus ownership; scope writes, feeds, cursors, counts and entity enrichment.    |
+| `codify/storage/registry_sync.py`, `codify/storage/resolve_refs.py` | Registry rows and imported edges are jurisdiction-scoped; a registry row holds one law link.              | Own registry rows and edges per corpus; scope linking, resolution, counts and refreshes. |
 
 This inventory identifies the initial path and its dependencies. It is not an
 exhaustive audit of every storage function. Each subsequent surface needs its own
@@ -130,14 +131,43 @@ depth. API updates must omit ownership from mutable fields and reject reassignme
 rows inheriting ownership must also reject reparenting into another corpus. The runtime
 role must not own the schema or have permission to disable these checks. Backfill uses a
 separate migration role and finishes before enforcement; there is no runtime bypass flag.
-Synthetic
-upgrade validation must include roots without documents and page evidence without
+Synthetic upgrade validation must include roots without documents and page evidence without
 surviving parents; missing provenance is not permission to select a default owner.
 
 Derived data is content too. Vocabulary, embeddings, reference links, acquisition
 records, retained text, review output and job artifacts must not become cross-corpus
-lookup channels. Audit registry uniqueness and reference resolution separately;
-matching legal identifiers must never silently join content from different corpora.
+lookup channels. Matching legal identifiers must never silently join content from
+different corpora.
+
+### Registry holdings
+
+Use corpus-owned registry rows and imported edges, not a shared registry-to-law link.
+`registry_works` gains immutable non-null `corpus_id` referencing `corpora`, unique
+`(corpus_id, jurisdiction_id, external_id)` and unique `(id, corpus_id)`, replacing
+its jurisdiction-only uniqueness. Its optional `law_id` uses a same-corpus composite
+foreign key. Deleting a held law explicitly clears only this optional link in the
+scoped transaction; the imported registry entry and its owner remain.
+
+`law_links` also gains immutable non-null corpus ownership and uniqueness on
+`(corpus_id, jurisdiction_id, source_ref, target_ref, relation)`. Upsert conflict
+keys include corpus. Replacement deletes restrict corpus, jurisdiction and source;
+counts and lifecycle-event imports also require corpus. Registry imports may copy the
+same public source into separate corpora, but neither copy exposes the other's held
+status, changes or resolved targets.
+
+`link_registry_to_held_laws` constrains both the registry and law to the requested
+corpus. A URI/ref match that remains ambiguous within that corpus stays unlinked;
+it must not select an arbitrary law. Reference resolution, including `_registry_target`,
+uses the source version's validated corpus for registry, law and derived-target queries.
+No fallback searches another corpus. An absent holding remains unresolved even when
+another corpus holds the identical URI.
+
+Migration requires explicit assignment or approved independent copies of existing
+registry rows and edges. Do not broadcast a previously stored `law_id` to every copy.
+Validate or rebuild each link against the destination corpus, retaining unresolved
+status where no unambiguous local holding exists. Reject cross-corpus links directly
+in the database. Registry writers, resolver paths and their readers must be migrated
+or disabled before enabling duplicate legal URIs across corpora.
 
 ## API contract
 
@@ -208,7 +238,13 @@ The acceptance cases are:
     reparenting on inherited rows, including rows without dependants. Verify rejection
     under the runtime role, unchanged data after rollback and valid same-corpus updates.
     Remove the ownership trigger in a controlled mutation; this test must fail.
-15. Remove each scope predicate or relationship constraint in controlled mutations;
+15. Import the same registry identifiers and edges into A and B with independent
+    holdings of the same legal URI. Verify each link resolves only to its local law;
+    an absent or ambiguous local holding remains unresolved. Refresh and replace edges
+    in A without changing B's rows, counts, held status or lifecycle events. Reject a
+    direct foreign-law assignment and test link detachment on local law deletion.
+    Rehearse copying legacy registry rows without copying a foreign holding link.
+16. Remove each scope predicate or relationship constraint in controlled mutations;
     the corresponding isolation test fails.
 
 Run both directions and mixed holdings. Test the actual PostgreSQL constraints and
