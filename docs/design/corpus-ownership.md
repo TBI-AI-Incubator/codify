@@ -23,18 +23,21 @@ Public jurisdiction configuration and parsing rules may remain shared.
 Paths below are relative to the repository root. These are source observations,
 not claims about any running installation.
 
-| Area                                                       | Current behaviour                                                                                         | Required change                                                                  |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `codify/storage/models.py`                                 | Work and expression URIs are globally unique. Source hashes identify source rows.                         | Make URI and hash uniqueness local to a corpus.                                  |
-| `codify/storage/sources.py`                                | Upload deduplication uses a hash; inherited-source lookup walks version ancestry.                         | Scope deduplication and every lineage hop; return only the owned source.         |
-| `codify/storage/repository.py`                             | Save, reuse and replacement select laws by work URI; repeat detection also considers language and source. | Apply scope before selecting, locking, reusing or replacing a row.               |
-| `codify/storage/versions.py`                               | Version lookup, listing, lineage and amendment persistence use document identifiers.                      | Require scope on entry; preserve it through derived versions and cursor lookups. |
-| `codify/storage/documents.py`                              | Document projection loads body rows for a version.                                                        | Resolve the scoped version before loading its body.                              |
-| `codify/storage/repair.py`                                 | Source retrieval can select a source directly by hash.                                                    | Use the owned source identity, including repair evidence reads.                  |
-| `codify/storage/lexicon.py`                                | Expansion terms and counts come from a shared lexicon.                                                    | Scope terms, counts, writes, rebuilds and pruning.                               |
-| `codify/storage/retrieval.py`, `codify/retrieve/hybrid.py` | Search combines filters and candidate limits.                                                             | Apply corpus constraints before candidate selection, ranking and pagination.     |
-| `codify/storage/partitions.py`                             | Embeddings are partitioned by jurisdiction.                                                               | Keep partitioning a performance choice, never an ownership boundary.             |
-| `codify/cli_store.py`, `codify/serve/app.py`               | Standalone entry points persist without corpus selection.                                                 | Require explicit configured corpus selection.                                    |
+| Area                                                       | Current behaviour                                                                                         | Required change                                                                       |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `codify/storage/models.py`                                 | Work and expression URIs are globally unique. Source hashes identify source rows.                         | Make URI and hash uniqueness local to a corpus.                                       |
+| `codify/storage/sources.py`                                | Upload deduplication uses a hash; inherited-source lookup walks version ancestry.                         | Scope deduplication and every lineage hop; return only the owned source.              |
+| `codify/storage/repository.py`                             | Save, reuse and replacement select laws by work URI; repeat detection also considers language and source. | Apply scope before selecting, locking, reusing or replacing a row.                    |
+| `codify/storage/versions.py`                               | Version lookup, listing, lineage and amendment persistence use document identifiers.                      | Require scope on entry; preserve it through derived versions and cursor lookups.      |
+| `codify/storage/documents.py`                              | Document projection loads body rows for a version.                                                        | Resolve the scoped version before loading its body.                                   |
+| `codify/storage/repair.py`                                 | Source retrieval can select a source directly by hash.                                                    | Use the owned source identity, including repair evidence reads.                       |
+| `codify/storage/lexicon.py`                                | Expansion terms and counts come from a shared lexicon.                                                    | Scope terms, counts, writes, rebuilds and pruning.                                    |
+| `codify/storage/retrieval.py`, `codify/retrieve/hybrid.py` | Search combines filters and candidate limits.                                                             | Apply corpus constraints before candidate selection, ranking and pagination.          |
+| `codify/storage/partitions.py`                             | Embeddings are partitioned by jurisdiction.                                                               | Keep partitioning a performance choice, never an ownership boundary.                  |
+| `codify/cli_store.py`, `codify/serve/app.py`               | Standalone entry points persist without corpus selection.                                                 | Require explicit configured corpus selection.                                         |
+| `codify/storage/laws.py`                                   | Lists, URI/UUID reads, existence checks, cursors, counts and facets select corpus content.                | Require corpus scope for all readers, including cursor resolution and aggregation.    |
+| `codify/storage/acquisitions.py`, `codify/storage/runs.py` | Acquisition and job records can exist without a document.                                                 | Store required corpus identity at creation; scope deduplication, reads and mutations. |
+| `codify/storage/page_reads.py`                             | Page evidence can outlive its run without being attached to a version.                                    | Preserve independent corpus ownership when either optional parent disappears.         |
 
 This inventory identifies the initial path and its dependencies. It is not an
 exhaustive audit of every storage function. Each subsequent surface needs its own
@@ -70,6 +73,35 @@ include provision-to-section links, resolved references, findings tied to runs a
 versions, and feedback tied to provisions and findings. A single valid foreign key
 is insufficient when another field can point outside the corpus.
 
+Inheritance requires a non-null ownership path that survives for the row's lifetime.
+Use these explicit rules for roots and records whose parents can disappear:
+
+- `acquisitions`: non-null `corpus_id` referencing `corpora`; preserve the UUID primary
+  key and add unique `(id, corpus_id)`. Deduplicate on
+  `(corpus_id, jurisdiction_code, source_url, content_sha256)`; hash and URL lookups
+  require corpus scope even before a version exists.
+- `runs`: non-null `corpus_id` referencing `corpora`, assigned before any payload or
+  artifact is written. Preserve run UUIDs and add unique `(id, corpus_id)`; an optional
+  parent run uses a same-corpus composite foreign key. Actor and application identifiers
+  are not substitutes for corpus identity. Retries retain the original corpus.
+- `run_artifacts`: inherit ownership through the mandatory run foreign key, which
+  cascades deletion. Every artifact read or mutation joins to the scoped run. Any future
+  additional parent must agree with that corpus; a stored corpus column, if added, must
+  have a composite foreign key to the run rather than independent unchecked values.
+- `page_reads`: non-null `corpus_id` referencing `corpora` from creation, with unique
+  `(id, corpus_id)`. Optional run and version references use same-corpus composite foreign
+  keys. Keep per-run page uniqueness as `(corpus_id, run_id, page_number)` while attached;
+  detached rows retain their UUID identity and are not deduplicated by page number alone.
+  Run cleanup clears only `run_id` in the scoped transaction, never ownership. Existing
+  version-deletion cascade behaviour can remain, with relationship tests. Reads, version
+  attachment, disputes and retention cleanup require the page's corpus even when both
+  parent IDs are null. Disputes inherit through their mandatory page reference.
+
+Corpus ownership is immutable during ordinary updates. Moving content requires an
+explicit copy, not reassigning a root and leaving dependent rows behind. Synthetic
+upgrade validation must include roots without documents and page evidence without
+surviving parents; missing provenance is not permission to select a default owner.
+
 Derived data is content too. Vocabulary, embeddings, reference links, acquisition
 records, retained text, review output and job artifacts must not become cross-corpus
 lookup channels. Audit registry uniqueness and reference resolution separately;
@@ -86,6 +118,8 @@ There is no default corpus and no `None` meaning all corpora.
   returns the owned source UUID. Duplicate detection is local to the corpus.
 - Read by UUID or legal URI includes corpus in the query. A missing or foreign record
   returns the same empty result. No foreign row is loaded first for later filtering.
+- Law listings, counts, facets, existence checks and cursor lookups apply corpus
+  scope before pagination or aggregation, even when search is disabled.
 - Supersede and repair constrain every selected row, lock and mutation by corpus.
   Existing compare-and-replace and replay checks remain additional requirements.
 - Parent/source IDs are validated before mutation and constrained in the database.
@@ -102,9 +136,12 @@ caller authority by accepting an arbitrary corpus identifier.
 ## First implementation slice
 
 Implement source persistence, document persistence, document projection and inherited
-source retrieval together, including their derived-row writes. Scope lexicon writes
+source retrieval together, including their derived-row writes and law readers.
+Create required corpus ownership on acquisition/job roots and retained page evidence
+before enabling those paths; the native-document slice cannot legitimise unscoped jobs. Scope lexicon writes
 in the same slice so persisting private text cannot populate a shared vocabulary.
-Search exposure remains disabled for multiple corpora until its readers are scoped.
+Every remaining reader or writer stays unavailable to multi-corpus callers until scoped;
+disabling search alone does not protect law listings or job/artifact endpoints.
 
 Use synthetic native AKN in fictional jurisdiction `xa`; no model calls are needed.
 The acceptance cases are:
@@ -119,8 +156,15 @@ The acceptance cases are:
    retained text or vocabulary. Retry succeeds within the same corpus.
 7. Derive a version and read an inherited source; the ancestry stays within its corpus.
 8. Reuse a pooled connection in A then B; no implicit previous scope survives.
-9. Remove each scope predicate or relationship constraint in controlled mutations;
-   the corresponding isolation test fails.
+9. List laws, resolve cursors, query counts/facets and test existence in mixed holdings;
+   neither corpus observes the other's records or aggregate contributions.
+10. Record the same acquisition URL/hash in both corpora; deduplication stays local.
+    Create jobs without versions and reject cross-corpus parent runs and page attachment.
+11. Retain page evidence after failed-run cleanup with no version; verify its owner can
+    read it and the other corpus cannot. Check artifact reads through their owning run
+    and artifact deletion on run cleanup.
+12. Remove each scope predicate or relationship constraint in controlled mutations;
+    the corresponding isolation test fails.
 
 Run both directions and mixed holdings. Test the actual PostgreSQL constraints and
 queries against a disposable database; mock-only tests cannot establish enforcement.
