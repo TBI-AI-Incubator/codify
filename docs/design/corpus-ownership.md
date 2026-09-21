@@ -38,6 +38,7 @@ not claims about any running installation.
 | `codify/storage/laws.py`                                   | Lists, URI/UUID reads, existence checks, cursors, counts and facets select corpus content.                | Require corpus scope for all readers, including cursor resolution and aggregation.    |
 | `codify/storage/acquisitions.py`, `codify/storage/runs.py` | Acquisition and job records can exist without a document.                                                 | Store required corpus identity at creation; scope deduplication, reads and mutations. |
 | `codify/storage/page_reads.py`                             | Page evidence can outlive its run without being attached to a version.                                    | Preserve independent corpus ownership when either optional parent disappears.         |
+| `codify/storage/events.py`                                 | Audit events have no ownership foreign key; feeds and action counts can span the table.                   | Persist corpus ownership; scope writes, feeds, cursors, counts and entity enrichment. |
 
 This inventory identifies the initial path and its dependencies. It is not an
 exhaustive audit of every storage function. Each subsequent surface needs its own
@@ -84,6 +85,17 @@ Use these explicit rules for roots and records whose parents can disappear:
   artifact is written. Preserve run UUIDs and add unique `(id, corpus_id)`; an optional
   parent run uses a same-corpus composite foreign key. Actor and application identifiers
   are not substitutes for corpus identity. Retries retain the original corpus.
+- `events`: non-null `corpus_id` referencing `corpora`, recorded at emission and
+  retained after the referenced entity is deleted. Preserve the UUID primary key;
+  actor, entity and payload identifiers do not establish ownership. Corpus event
+  producers validate referenced domain entities in the same corpus and transaction;
+  the free-form entity/payload fields cannot enforce that with a generic foreign key.
+  Reads and enrichment joins must independently constrain corpus, including actor/entity
+  feeds, recent feeds, cursor anchors and action counts. `reserve_actor_action` must
+  use the same corpus in its lock key, count and insert. Application-wide audit events
+  and account-wide rate limits belong in separate application storage, not a null-corpus
+  exception or an accidental weakening of existing global limits. Audit ownership must
+  not be cleared by entity deletion; use a restrictive corpus foreign key.
 - `run_artifacts`: inherit ownership through the mandatory run foreign key, which
   cascades deletion. Every artifact read or mutation joins to the scoped run. Any future
   additional parent must agree with that corpus; a stored corpus column, if added, must
@@ -163,7 +175,12 @@ The acceptance cases are:
 11. Retain page evidence after failed-run cleanup with no version; verify its owner can
     read it and the other corpus cannot. Check artifact reads through their owning run
     and artifact deletion on run cleanup.
-12. Remove each scope predicate or relationship constraint in controlled mutations;
+12. Emit events in both corpora with the same synthetic actor. Verify actor, entity and
+    recent feeds, counts, cursor anchors and title enrichment remain scoped. Reject
+    cross-corpus references on emission; retain the original owner after entity deletion.
+    Exercise concurrent action reservations within and across corpora, and verify any
+    separate application-wide limit still holds after the caller migration.
+13. Remove each scope predicate or relationship constraint in controlled mutations;
     the corresponding isolation test fails.
 
 Run both directions and mixed holdings. Test the actual PostgreSQL constraints and
@@ -187,7 +204,10 @@ Plan rollout in separately validated stages:
 
 1. Add corpus records and source UUIDs without claiming isolation. Inventory existing
    relationships and prepare an explicit assignment map supplied by the operator.
-2. Backfill only from that approved map. Country, filename, source hash and last writer
+2. Backfill only from that approved map. Audit-event backfill needs an explicitly
+   authorised migration procedure for the append-only trigger; test that normal
+   update/delete attempts remain blocked afterwards. Events with deleted entities
+   require independent provenance or block enforcement, never an inferred owner. Country, filename, source hash and last writer
    do not establish ownership. Ambiguous records block enforcement; the library must
    not silently assign, copy, expose or delete them.
 3. Validate counts and relationships, replace global uniqueness, and enforce required
