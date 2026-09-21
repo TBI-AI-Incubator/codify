@@ -10,6 +10,10 @@ Codify Core converts legal documents into structured data that you can inspect,
 search and reuse. It accepts PDFs, text and existing
 [Akoma Ntoso XML](http://akomantoso.info/?page_id=27), an open standard for legal documents.
 
+![A synthetic law shown as a scanned page, a readable document and structured Akoma Ntoso XML.](docs/images/codify-overview.png)
+
+*Illustrative example using synthetic legislation; the OCR score shown is not a benchmark.*
+
 A structured document keeps its articles, sections, tables and references identifiable.
 You can search individual provisions, link to them and compare them with another document.
 Each ingestion includes the extracted text and validation findings so you can check the
