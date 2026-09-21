@@ -241,3 +241,27 @@ async def test_vision_uses_sniffed_mime_for_jpeg(client: LiteLLMClient) -> None:
     await client.vision("what is this", images=[img])
     parts = client.client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
     assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+@pytest.mark.parametrize(
+    "timeout, expected",
+    [
+        (None, {"connect": 10.0, "read": 600.0, "write": 600.0, "pool": 600.0}),
+        (
+            httpx.Timeout(connect=1.0, read=2.0, write=3.0, pool=4.0),
+            {"connect": 1.0, "read": 2.0, "write": 3.0, "pool": 4.0},
+        ),
+        (httpx.Timeout(None), {"connect": None, "read": None, "write": None, "pool": None}),
+    ],
+)
+async def test_sdk_transport_preserves_timeout_values(
+    timeout: httpx.Timeout | None, expected: dict[str, float | None]
+) -> None:
+    client = LiteLLMClient(
+        base_url="http://127.0.0.1:1", api_key="test", model="test", timeout=timeout
+    )
+    try:
+        request = client.client._client.build_request("GET", "http://127.0.0.1:1")
+        assert request.extensions["timeout"] == expected
+    finally:
+        await client.client.close()
