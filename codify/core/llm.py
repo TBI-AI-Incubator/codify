@@ -304,7 +304,7 @@ class LiteLLMClient:
         self.client = AsyncOpenAI(
             base_url=base_url,
             api_key=api_key,
-            timeout=timeout or httpx.Timeout(600.0, connect=10.0),
+            timeout=openai.Timeout(**(timeout or httpx.Timeout(600.0, connect=10.0)).as_dict()),
         )
         self.model = model
         self.telemetry_mode = telemetry_mode
