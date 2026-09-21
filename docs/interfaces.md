@@ -61,7 +61,7 @@ uv run --extra serve codify serve --openapi > contract/openapi.json
 
 Clients can generate types from this schema. The web app uses `openapi-typescript`.
 
-### MCP server
+## MCP server
 
 Expose search, document retrieval and comparison to an MCP client:
 

@@ -14,11 +14,13 @@ The generated `bundle/` directory contains:
 | `pages/`            | Page images rendered for inspection after the run              |
 | `source.txt`        | Extracted text transcription                                   |
 | `anchors.jsonl`     | Structural markers detected during the scanning pass           |
+| `ambiguity.jsonl`   | Ambiguous structural spans found during scanning               |
 | `coverage.json`     | Provision count metrics (expected vs. captured)                |
 | `scaffold.bluebell` | Structural skeleton generated prior to filling provision text  |
 | `final.akn.xml`     | Generated Akoma Ntoso 3.0 document                             |
 | `validator.json`    | Structural validation findings                                 |
 | `manifest.json`     | Run metadata, including model identifiers and config hashes    |
+| `events.jsonl`      | Pipeline event history, including progress and failures        |
 
 Jurisdiction rules identify the document's structure. The model fills the text
 within the detected sections and articles.
