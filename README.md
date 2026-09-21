@@ -361,6 +361,7 @@ and known profile differences, see the
 
 - `docs/notebooks/`: four notebooks, Codify 101 to 301, from one act to configuration, search and comparison
 - `docs/architecture.md`
+- [Corpus ownership proposal](docs/design/corpus-ownership.md): storage boundaries and migration requirements; not implemented isolation.
 - `docs/ocr-cascade.md`
 - `docs/decisions/`: architecture decision records
 - `CONTRIBUTING.md`
