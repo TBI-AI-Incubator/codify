@@ -41,9 +41,10 @@ not claims about any running installation.
 | `codify/storage/events.py`                                          | Audit events have no ownership foreign key; feeds and action counts can span the table.                   | Persist corpus ownership; scope writes, feeds, cursors, counts and entity enrichment.    |
 | `codify/storage/registry_sync.py`, `codify/storage/resolve_refs.py` | Registry rows and imported edges are jurisdiction-scoped; a registry row holds one law link.              | Own registry rows and edges per corpus; scope linking, resolution, counts and refreshes. |
 
-This inventory identifies the initial path and its dependencies. It is not an
-exhaustive audit of every storage function. Each subsequent surface needs its own
-read, write and relationship checks before it is enabled for multiple corpora.
+The table summarises the initial path. The [complete storage entry-point inventory](corpus-api-inventory.md)
+classifies every public session-taking storage function, including aggregates, translations,
+repair proposals, findings and feedback. Its release gate requires completing the inventory
+and caller/query validation before enabling multiple corpora; partial coverage is not isolation.
 
 ## Identity and constraints
 
@@ -171,6 +172,16 @@ or disabled before enabling duplicate legal URIs across corpora.
 
 ## API contract
 
+Core provides `create_corpus(session, *, corpus_id: UUID)` and
+`get_corpus(session, *, corpus_id: UUID)`. The calling application generates a fresh
+UUID once, durably retains it for retries, and supplies it explicitly. Creation inserts
+only the identifier; concurrent/repeated calls with that same UUID return the existing
+record without updating ownership or metadata. The caller commits; rollback removes a
+new record and a retry can recreate it. Lookup returns the record or None, never creates
+one. Neither operation lists other corpora or establishes application authorisation.
+The application must authorise creation and lookup; do not expose caller-selected UUIDs
+as an ownership-claim API. Deletion, transfer and corpus discovery remain out of scope.
+
 Use a required keyword-only `corpus_id: UUID` on corpus storage entry points.
 A UUID is sufficient for this boundary; a new session wrapper or permissions framework
 is not required. Application access contexts may carry the UUID after authorisation.
@@ -244,7 +255,15 @@ The acceptance cases are:
     in A without changing B's rows, counts, held status or lifecycle events. Reject a
     direct foreign-law assignment and test link detachment on local law deletion.
     Rehearse copying legacy registry rows without copying a foreign holding link.
-16. Remove each scope predicate or relationship constraint in controlled mutations;
+16. Give A and B distinct synthetic vocabulary plus a shared term with different counts.
+    Expansion and counts return only the selected corpus's values. Rebuild and prune B
+    without changing A, including after deleting B's last occurrence of the shared term.
+    Remove corpus predicates from expansion, rebuild and pruning separately; each mutation
+    must fail the corresponding isolation assertion.
+17. Create and retrieve a corpus with an explicit UUID; retry and concurrently create
+    the same UUID without duplicate records. Verify missing lookup, transaction rollback
+    and recreation, and application refusal of unauthorised creation or lookup.
+18. Remove each scope predicate or relationship constraint in controlled mutations;
     the corresponding isolation test fails.
 
 Run both directions and mixed holdings. Test the actual PostgreSQL constraints and
