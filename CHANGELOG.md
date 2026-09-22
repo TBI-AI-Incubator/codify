@@ -9,7 +9,9 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 1. A declared closing phrase also matches where the source breaks the line
    between two of its words (one line break, any spaces or tabs), so the
-   attestation after it leaves the body. A blank phrase no longer matches.
+   attestation after it leaves the body. Conclusion lifting, signatory grouping
+   and the page-region signal read phrases the same way. A blank phrase no
+   longer matches.
 
 New, additive:
 
