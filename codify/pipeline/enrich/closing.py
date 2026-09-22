@@ -66,7 +66,7 @@ def bound_body_at_closing(
 ) -> BodyBound:
     """Cut the span from the closing phrase to the first attachment caption; the
     scan has dropped and counted its markers, and its text becomes the conclusions."""
-    words = [p for p in phrases if p]
+    words = [p for p in phrases if p.strip()]
     if not anchors or not words:
         return BodyBound(text, anchors, anchors)
     quoted = _closed_quote_mask(text, country)
