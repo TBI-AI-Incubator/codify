@@ -45,6 +45,12 @@ def _phrase_pattern(phrase: str) -> str:
     return r"(?:[ \t]+(?:\r?\n[ \t]*)?|\r?\n[ \t]*)".join(map(re.escape, phrase.split()))
 
 
+def mentions_closing_phrase(text: str, phrases: Iterable[str]) -> bool:
+    """Whether `text` holds any phrase anywhere, read as `closing_offset` reads it."""
+    words = [p for p in phrases if p.strip()]
+    return bool(words) and re.search("|".join(map(_phrase_pattern, words)), text) is not None
+
+
 def closing_offset(
     text: str, phrases: Iterable[str], *, after: int, quoted: Sequence[bool] = ()
 ) -> int | None:

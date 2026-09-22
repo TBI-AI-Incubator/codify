@@ -87,6 +87,16 @@ class TestConclusions:
         )
         assert "ميلادية" in text and "هجرية" in text
 
+    def test_a_phrase_broken_across_a_line_still_lifts(self) -> None:
+        split = ARTICLE_79.replace("صدر بمدينة", "صدر\nبمدينة")
+        root = etree.fromstring(emit_conclusions(split, vocab=PS_VOCAB).encode())
+        paragraphs = root.findall(".//akn:article/akn:content/akn:p", NS)
+        assert [p.get("eId") for p in paragraphs] == ["art_79__p_1"]
+
+    def test_a_phrase_broken_by_a_blank_line_does_not_lift(self) -> None:
+        split = ARTICLE_79.replace("صدر بمدينة", "صدر\n\nبمدينة")
+        assert emit_conclusions(split, vocab=PS_VOCAB) == split
+
     def test_a_document_with_no_closing_phrase_is_untouched(self) -> None:
         plain = _act('<article eId="art_1"><content><p>نص عادي</p></content></article>')
         assert emit_conclusions(plain, vocab=PS_VOCAB) == plain

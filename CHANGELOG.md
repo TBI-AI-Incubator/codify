@@ -16,8 +16,8 @@ New, additive:
 - `document_classes.<class>.number_source` in the jurisdiction config:
   `"stated"` (the default, unchanged behaviour) or `"title_identity"`, which
   numbers the class's work URI from its title digest (`t-...`) and ignores any
-  extracted number. Declaring it requires `frbr.title_identity`. For classes whose
-  serials repeat across issuers, where a stated number collides.
+  extracted number, for classes whose serials repeat across issuers and so
+  collide. Declaring it requires `frbr.title_identity`.
 
 ## 0.5.0 (2026-09-20)
 

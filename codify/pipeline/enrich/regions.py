@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from codify.jurisdictions import JurisdictionConfig, load_config
+from codify.pipeline.enrich.closing import mentions_closing_phrase
 from codify.pipeline.enrich.ocr import OcrBlock, PageDimensions, PageLayout
 
 RegionKind = Literal["body", "furniture", "toc", "footnote", "conclusions", "aside", "unknown"]
@@ -220,7 +221,7 @@ def _classify_block(
     sig.add("marker_footnote", when=_matches_any(content, vocab.footnote_markers))
     sig.add(
         "phrase_closing",
-        when=bool(vocab.closing_phrases) and any(p in content for p in vocab.closing_phrases),
+        when=mentions_closing_phrase(content, vocab.closing_phrases),
     )
     sig.add("after_last_heading", when=last_heading >= 0 and index > last_heading)
 
