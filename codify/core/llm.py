@@ -285,6 +285,12 @@ def _messages(prompt: str, system: str | None) -> list[ChatCompletionMessagePara
     return cast(list[ChatCompletionMessageParam], out)
 
 
+def _content_filtered(finish_reason: object) -> bool:
+    """Gemini's OpenAI-compatible endpoint suffixes the cause, as in
+    'content_filter: RECITATION', so an equality test never sees the block."""
+    return isinstance(finish_reason, str) and finish_reason.startswith("content_filter")
+
+
 class LiteLLMClient:
     """Single OpenAI-SDK-backed client pointed at a LiteLLM gateway."""
 
@@ -478,6 +484,10 @@ class LiteLLMClient:
                 )
                 if observation is not None:
                     _finish_usage(observation, resolved_model, resp)
+            # The SDK raises only on the bare 'content_filter'; a suffixed
+            # reason comes back as an empty completion instead.
+            if _content_filtered(resp.choices[0].finish_reason):
+                raise openai.ContentFilterFinishReasonError()
         except openai.ContentFilterFinishReasonError:
             if self.fallback_model and resolved_model != self.fallback_model:
                 logger.warning(
@@ -588,7 +598,7 @@ class LiteLLMClient:
         # dropped its text. The non-Google fallback reads it.
         choice = resp.choices[0]
         if (
-            choice.finish_reason == "content_filter"
+            _content_filtered(choice.finish_reason)
             and self.fallback_model
             and resolved_model != self.fallback_model
         ):
