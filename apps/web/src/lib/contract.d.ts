@@ -662,6 +662,12 @@ export interface components {
              * @default false
              */
             number_has_year_prefix: boolean;
+            /**
+             * Number Source
+             * @default stated
+             * @enum {string}
+             */
+            number_source: "stated" | "title_identity";
             /** Prompt Variant */
             prompt_variant?: string | null;
             /** Search Rank */
