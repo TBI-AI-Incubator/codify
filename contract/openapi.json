@@ -795,6 +795,15 @@
             "title": "Number Has Year Prefix",
             "type": "boolean"
           },
+          "number_source": {
+            "default": "stated",
+            "enum": [
+              "stated",
+              "title_identity"
+            ],
+            "title": "Number Source",
+            "type": "string"
+          },
           "prompt_variant": {
             "anyOf": [
               {

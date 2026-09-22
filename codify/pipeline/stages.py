@@ -325,6 +325,9 @@ def resolve_descriptors(
     # number it would split the FRBR path in two. A cited number keeps its
     # slash; this one cannot.
     number = number.replace("/", "-")
+    if document_class and document_class.number_source == "title_identity":
+        # A stated serial repeats across issuers and varies by run; the title does not.
+        number = identity.segment if identity is not None else ""
     if not number and identity is not None:
         number = identity.segment
     if not number:

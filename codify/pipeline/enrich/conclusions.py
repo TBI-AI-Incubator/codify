@@ -9,6 +9,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
+from codify.pipeline.enrich.closing import mentions_closing_phrase
 from codify.pipeline.enrich.regions import Region, RegionVocabulary
 
 logger = structlog.get_logger()
@@ -121,7 +122,7 @@ def _attestation_start(
     paragraphs = last.findall("akn:p", NS)
     for index, paragraph in enumerate(paragraphs):
         text = "".join(paragraph.itertext())
-        if not any(phrase in text for phrase in closing_phrases):
+        if not mentions_closing_phrase(text, closing_phrases):
             continue
         # It and everything after it has to look like attestation. A closing
         # phrase inside a provision that keeps going is prose, not attestation.
@@ -165,7 +166,7 @@ def _is_direct_signature(conclusions: etree._Element, phrases: tuple[str, ...]) 
     if not paragraphs or conclusions.find("akn:blockContainer", NS) is not None:
         return False
     texts = ["".join(p.itertext()) for p in paragraphs]
-    if not any(phrase in texts[0] for phrase in phrases):
+    if not mentions_closing_phrase(texts[0], phrases):
         return False
     following = texts[1:]
     return 2 <= len(following) <= _SIGNATURE_BLOCK_MAX_PARAGRAPHS and not any(

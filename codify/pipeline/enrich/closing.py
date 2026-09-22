@@ -40,15 +40,27 @@ def closing_phrases_for(country: str) -> list[str]:
     return phrases
 
 
+def _phrase_pattern(phrase: str) -> str:
+    """The phrase with each space between words also matching one line break."""
+    return r"(?:[ \t]+(?:\r?\n[ \t]*)?|\r?\n[ \t]*)".join(map(re.escape, phrase.split()))
+
+
+def mentions_closing_phrase(text: str, phrases: Iterable[str]) -> bool:
+    """Whether `text` holds any phrase anywhere, read as `closing_offset` reads it."""
+    words = [p for p in phrases if p.strip()]
+    return bool(words) and re.search("|".join(map(_phrase_pattern, words)), text) is not None
+
+
 def closing_offset(
     text: str, phrases: Iterable[str], *, after: int, quoted: Sequence[bool] = ()
 ) -> int | None:
     """Start of the first line opening with a closing phrase past `after`.
     `quoted` flags offsets inside quoted text, where a phrase is a quotation's."""
-    words = [p for p in phrases if p]
+    # A blank phrase would match every line.
+    words = [p for p in phrases if p.strip()]
     if not words:
         return None
-    pattern = re.compile(r"(?m)^[ \t]*(?:" + "|".join(re.escape(w) for w in words) + ")")
+    pattern = re.compile(r"(?m)^[ \t]*(?:" + "|".join(map(_phrase_pattern, words)) + ")")
     for m in pattern.finditer(text):
         if m.start() > after and not (m.end() <= len(quoted) and quoted[m.end() - 1]):
             return m.start()
@@ -60,7 +72,7 @@ def bound_body_at_closing(
 ) -> BodyBound:
     """Cut the span from the closing phrase to the first attachment caption; the
     scan has dropped and counted its markers, and its text becomes the conclusions."""
-    words = [p for p in phrases if p]
+    words = [p for p in phrases if p.strip()]
     if not anchors or not words:
         return BodyBound(text, anchors, anchors)
     quoted = _closed_quote_mask(text, country)

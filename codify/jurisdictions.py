@@ -255,6 +255,9 @@ class DocumentClass(BaseModel):
     basic_unit: str = "section"
     # A matching year prefix in the printed serial is separate from the URI number.
     number_has_year_prefix: bool = False
+    # "title_identity": the URI number is always the title digest, never a stated
+    # serial, for classes whose serials repeat across issuers.
+    number_source: Literal["stated", "title_identity"] = "stated"
     hierarchy: list[HierarchyEntry] = Field(default_factory=list)
     hcontainers: list[HContainer] = Field(default_factory=list, alias="hcontainers")
     direct_effect: bool | None = None
@@ -1136,6 +1139,19 @@ class JurisdictionConfig(BaseModel):
                 )
             overlay = {k: getattr(dc, k) for k in dc.model_fields_set if k != "extends"}
             self.document_classes[name] = parent.model_copy(update=overlay)
+        return self
+
+    @model_validator(mode="after")
+    def _title_numbered_classes_have_a_grammar(self) -> "JurisdictionConfig":
+        # Without the grammar the forced number would be the content address.
+        if self.frbr is not None and self.frbr.title_identity is not None:
+            return self
+        for name, dc in self.document_classes.items():
+            if dc.number_source == "title_identity":
+                raise ValueError(
+                    f"document class '{name}' sets number_source='title_identity' "
+                    "but frbr.title_identity is not declared"
+                )
         return self
 
     @model_validator(mode="after")

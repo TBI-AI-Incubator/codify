@@ -3,6 +3,24 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
+## Unreleased
+
+Breaks, in that the structurer's output changes for documents it already read:
+
+1. A declared closing phrase also matches where the source breaks the line
+   between two of its words (one line break, any spaces or tabs), so the
+   attestation after it leaves the body. Conclusion lifting, signatory grouping
+   and the page-region signal read phrases the same way. A blank phrase no
+   longer matches.
+
+New, additive:
+
+- `document_classes.<class>.number_source` in the jurisdiction config:
+  `"stated"` (the default, unchanged behaviour) or `"title_identity"`, which
+  numbers the class's work URI from its title digest (`t-...`) and ignores any
+  extracted number, for classes whose serials repeat across issuers and so
+  collide. Declaring it requires `frbr.title_identity`.
+
 ## 0.5.0 (2026-09-20)
 
 One structuring change, so the minor moves as `VERSIONING.md` prescribes while the

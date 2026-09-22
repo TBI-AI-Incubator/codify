@@ -221,6 +221,34 @@ def test_no_closing_phrase_leaves_the_text_alone(declared: Any) -> None:
     assert closing_offset(TAIL, ["Nothing here"], after=0) is None
 
 
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_a_closing_phrase_broken_after_its_first_word_bounds_the_body(
+    declared: Any, newline: str
+) -> None:
+    first, rest = CLOSING.split(" ", 1)
+    text = f"Section 1\nOne.\n\nSection 2\nTwo.\n\n{first}{newline}{rest}\nThe Warden\n"
+    scan = _scan(text)
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert bound.cut_at == text.index(f"{first}{newline}")
+    assert bound.conclusions is not None and "The Warden" in bound.conclusions
+    assert "The Warden" not in bound.text
+
+
+def test_a_line_opening_with_the_phrase_first_word_alone_does_not_close(declared: Any) -> None:
+    first = CLOSING.split(" ", 1)[0]
+    text = f"Section 1\nOne.\n\n{first}\nenvelopes are kept.\n\nSection 2\nTwo.\n"
+    scan = _scan(text)
+    bound = bound_body_at_closing(text, scan.anchors, [CLOSING], country=COUNTRY)
+    assert bound.cut_at is None and bound.text == text
+
+
+def test_a_split_phrase_takes_at_most_one_line_break(declared: Any) -> None:
+    first, rest = CLOSING.split(" ", 1)
+    assert closing_offset(f"x\n{first}\n{rest}", [CLOSING], after=0) == 2
+    assert closing_offset(f"x\n{first}\n\n{rest}", [CLOSING], after=0) is None
+    assert closing_offset("x\n \ny", ["  "], after=0) is None
+
+
 def test_a_caption_before_the_closing_phrase_is_not_an_attachment(declared: Any) -> None:
     # Nothing numbered follows the caption, the shape the caption rule reads as an annex.
     text = f"Section 1\nOne.\n\nSection 2\nTwo.\n\nNOTE\nA body note.\n\n{CLOSING}\nThe Warden\n"
