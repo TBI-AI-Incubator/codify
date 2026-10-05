@@ -99,6 +99,33 @@ def test_expression_uri_composition() -> None:
     assert build_frbr_expression_uri(work, "sqi", "") == f"{work}/sqi"
 
 
+def test_expression_timestamp_is_opt_in() -> None:
+    from codify.frbr import expression_uri_version
+
+    work = "/akn/xy/act/2024/1"
+    stamp = "2026-10-05T14:00:00.123456+00:00"
+    uri = build_frbr_expression_uri(work, "eng", stamp, include_time=True)
+    assert uri == f"{work}/eng@{stamp}"
+    assert expression_uri_version(uri) == stamp
+    assert expression_uri_date(uri) == "2026-10-05"
+    assert expression_uri_version(uri + "/!schedule_1.xml") == stamp
+    assert expression_uri_version(uri + ".xml") == stamp
+    assert build_frbr_expression_uri(work, "eng", stamp) == f"{work}/eng@2026-10-05"
+
+
+def test_expression_timestamp_rejects_invalid_values() -> None:
+    from codify.frbr import expression_uri_version
+
+    work = "/akn/xy/act/2024/1"
+    for stamp in (
+        "2026-10-05T25:00:00Z",
+        "2026-02-30T14:00:00Z",
+        "2026-10-05T14:00:00",
+        "2026-10-051T14:00:00Z",
+    ):
+        assert expression_uri_version(f"{work}/eng@{stamp}") is None
+
+
 def test_work_uri_string_none_year_becomes_the_placeholder():
     # str(None) leaking from upstream metadata must not mint /None/ segments;
     # it means "year unresolved", which is what the placeholder says.
