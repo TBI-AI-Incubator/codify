@@ -17,7 +17,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS
-from codify.frbr import EXPRESSION_URI_DATE
+from codify.frbr import EXPRESSION_URI_VERSION
 
 logger = structlog.get_logger()
 
@@ -136,14 +136,12 @@ def _date_expression_from_work(ident: etree._Element) -> None:
             if el is None:
                 continue
             was = el.get("value") or ""
-            if not EXPRESSION_URI_DATE.search(was):
-                # No `@date` segment to move, and adding one would mint an identity no
-                # row holds, so the mismatch is logged rather than invented. Tested
-                # directly, since an unchanged substitution would also match every URI
-                # already reading the right date, which is all of them on a re-run.
+            if not EXPRESSION_URI_VERSION.search(was):
+                # No dated segment to move, and adding one would mint an identity no
+                # row holds, so the mismatch is logged rather than invented.
                 logger.warning("frbr_uri_carries_no_date", block=block, name=name, uri=was)
                 continue
-            el.set("value", EXPRESSION_URI_DATE.sub(f"@{stated}", was, count=1))
+            el.set("value", EXPRESSION_URI_VERSION.sub(f"@{stated}", was, count=1))
 
 
 def _sole_date(ident: etree._Element, block: str) -> etree._Element | None:
