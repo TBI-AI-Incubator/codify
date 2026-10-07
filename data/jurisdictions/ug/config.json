@@ -1,0 +1,239 @@
+{
+  "code": "ug",
+  "name": "Uganda",
+  "name_en": "Republic of Uganda",
+  "type": "national",
+  "tradition": [
+    "common_law"
+  ],
+  "calendar": "gregorian",
+  "languages": [
+    "eng"
+  ],
+  "authoritative_language": "eng",
+  "default_document_class": "act",
+  "document_classes": {
+    "act": {
+      "label": "Act of Parliament",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Division",
+          "akn_element": "division",
+          "level": "higher",
+          "bluebell_keyword": "DIVISION",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous",
+          "marker_form": "arabic_period"
+        },
+        {
+          "local_term": "Subsection",
+          "akn_element": "subsection",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBSECTION",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "roman_lower_parenthesized"
+        }
+      ],
+      "hcontainers": []
+    },
+    "si": {
+      "label": "Statutory Instrument",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Regulation (reg)",
+          "akn_element": "section",
+          "eid_abbrev": "reg",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous",
+          "marker_form": "arabic_period"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "numbering": "alpha_lower_parenthesized"
+        }
+      ],
+      "hcontainers": []
+    }
+  },
+  "frbr": {
+    "country_code": "ug",
+    "uri_patterns": {
+      "act": "/akn/ug/act/{year}/{number}"
+    },
+    "date_calendar": "gregorian",
+    "sample_uris": {
+      "Local Governments (Amendment) (No. 2) Act, 2008": "/akn/ug/act/2008/8",
+      "Income Tax (Amendment) Act, 2012": "/akn/ug/act/2012/4"
+    }
+  },
+  "numbering": {
+    "act_citation": "{Short Title}, {year}",
+    "act_citation_alt": "Act {number} of {year}",
+    "citations": {
+      "cap": "Cap. {chapter}"
+    },
+    "insertion_style": "alphanumeric"
+  },
+  "enacting_formulae": [
+    {
+      "text": "BE IT ENACTED by Parliament as follows:",
+      "position": "preamble",
+      "document_class": [
+        "act"
+      ]
+    }
+  ],
+  "amendments": {
+    "style": "textual_commonwealth",
+    "phrasing": "is amended",
+    "cross_reference_format": "short_title_and_year",
+    "trigger_phrases": [
+      "is amended by",
+      "by inserting immediately after",
+      "by substituting for",
+      "by repealing"
+    ],
+    "amending_body_structure": "The amending Act names the principal Act once in section 1 and refers to it as 'the principal Act' thereafter; each section amends one provision by inserting, substituting or repealing quoted text introduced by 'the following—'."
+  },
+  "core_tlcs": [
+    {
+      "eId": "parliament",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/ug/parliament",
+      "showAs": "Parliament of Uganda"
+    },
+    {
+      "eId": "officialGazette",
+      "class": "TLCObject",
+      "href": "/ontology/obj/ug/uganda-gazette",
+      "showAs": "The Uganda Gazette"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "prompt_additions": "Body-fill task only. Preserve citations, inline markup, and list numbering verbatim. Never emit structural keywords — the scaffold owns hierarchy. Render body text in the legal register of the source language; do not translate or paraphrase."
+  },
+  "supranational_memberships": [
+    {
+      "body": "un",
+      "direct_effect": "none",
+      "member_since": "1962-10-25"
+    },
+    {
+      "body": "commonwealth-of-nations",
+      "direct_effect": "none",
+      "member_since": "1962-10-09"
+    },
+    {
+      "body": "african-union",
+      "direct_effect": "none"
+    },
+    {
+      "body": "eac",
+      "direct_effect": "none"
+    },
+    {
+      "body": "comesa",
+      "direct_effect": "none"
+    },
+    {
+      "body": "igad",
+      "direct_effect": "none"
+    },
+    {
+      "body": "wto",
+      "direct_effect": "none"
+    }
+  ],
+  "display": {
+    "heading_type": "inline_heading",
+    "heading_case": "sentence_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 4,
+    "bluebell_tested": true,
+    "unresolved_ambiguities": 3,
+    "documents_examined_note": "National Social Security Fund Act (Cap. 230, revised edition, 38-page scan); Local Governments (Amendment) (No. 2) Act, 2008 (12-page scan); Income Tax (Amendment) Act, 2012 (4-page scan); Excise Duty (Amendment) Act, 2024 (text-layer PDF). All four ingested end to end; the anchor scan reads 53 of the NSSF Act's body sections (section 20 is on a page the transcription lost; section 9 is the ambiguity below), 12 schedule items and the three closing schedules and 18 in the 2008 Act, and the 2008 Act's scaffold round-trips through Bluebell with no findings.",
+    "ambiguities": [
+      "A body section is dropped when the sentence before it names a schedule and that schedule holds an item with the section's number: in the NSSF Act, section 8 ends '... specified in Schedule 2 to this Act ...', Schedule 2 has an item 9, and '9. Cancellation of registration' is not anchored. Coverage still reads 54 of 54, because the schedule's item supplies the number.",
+      "A schedule that itself divides into Parts or Divisions (as a schedule of regulations does) is not anchored, because the scan floors schedules after the last container; its Divisions nest under the body's last Part.",
+      "The Statutory Instruments Supplement numbering form has not been read through the pipeline; the si class is a hypothesis from the Act hierarchy."
+    ],
+    "laws_africa_reference": "ulii.org publishes unofficial consolidations built by Laws.Africa; official texts are the Gazette and the revised edition."
+  },
+  "ocr_header_patterns": [
+    "^(?-i:\\s*\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]\\s+[A-Z].*)$",
+    "^(?-i:.+\\[Cap\\.\\s*\\d+\\.\\s+\\d{3,5})\\s*$",
+    "^(?-i:Act\\s+\\d+\\s+(?:(?:[A-Z(][^\\s]*|\\d+\\)|of|and|the|for|in|on|to|by)\\s+)*Act(?:\\s+\\d{4})?)\\s*$"
+  ],
+  "furniture_line_patterns": [
+    "^(?-i:\\s*\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]\\s+[A-Z].*)$",
+    "^(?-i:.+\\[Cap\\.\\s*\\d+\\.\\s+\\d{3,5})\\s*$",
+    "^(?-i:Act\\s+\\d+\\s+(?:(?:[A-Z(][^\\s]*|\\d+\\)|of|and|the|for|in|on|to|by)\\s+)*Act(?:\\s+\\d{4})?)\\s*$"
+  ],
+  "furniture_inline_patterns": [
+    "(?-i:\\b\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]?\\s+[A-Z][A-Za-z ()]+ Act\\b)"
+  ],
+  "tier": 4,
+  "status": "draft",
+  "public_reference": true
+}
