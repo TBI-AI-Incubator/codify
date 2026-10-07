@@ -70,21 +70,26 @@ async def count_laws_by_code(session: AsyncSession) -> dict[str, int]:
 async def jurisdiction_counts(session: AsyncSession, code: str) -> JurisdictionCounts:
     """Laws and versions for a single jurisdiction. Zeros if absent.
 
-    Two counts on indexed keys. Provisions are not counted: an exact count
+    Two counts on indexed keys, in one statement. Provisions are not counted: an exact count
     reads every provision row the jurisdiction holds.
     """
     jurisdiction = await get_jurisdiction_by_code(session, code)
     if jurisdiction is None:
         return JurisdictionCounts(laws=0, versions=0)
-    laws = await session.scalar(
-        select(func.count()).select_from(Law).where(Law.jurisdiction_id == jurisdiction.id)
+    laws_q = (
+        select(func.count())
+        .select_from(Law)
+        .where(Law.jurisdiction_id == jurisdiction.id)
+        .scalar_subquery()
     )
-    versions = await session.scalar(
+    versions_q = (
         select(func.count())
         .select_from(Version)
         .join(Law, Law.id == Version.law_id)
         .where(Law.jurisdiction_id == jurisdiction.id)
+        .scalar_subquery()
     )
+    laws, versions = (await session.execute(select(laws_q, versions_q))).one()
     return JurisdictionCounts(laws=int(laws or 0), versions=int(versions or 0))
 
 
