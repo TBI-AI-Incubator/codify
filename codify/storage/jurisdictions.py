@@ -8,13 +8,14 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from codify.storage.models import Jurisdiction, Law, Provision, Version
+from codify.storage.models import Jurisdiction, Law, Version
 
 
 class JurisdictionCounts(BaseModel):
     laws: int
     versions: int
-    provisions: int
+    # Always None: see `jurisdiction_counts`.
+    provisions: int | None = None
 
 
 async def get_jurisdiction_by_code(session: AsyncSession, code: str) -> Jurisdiction | None:
@@ -67,25 +68,24 @@ async def count_laws_by_code(session: AsyncSession) -> dict[str, int]:
 
 
 async def jurisdiction_counts(session: AsyncSession, code: str) -> JurisdictionCounts:
-    """Laws / versions / provisions for a single jurisdiction. Zeros if absent."""
-    row = (
-        await session.execute(
-            select(
-                func.count(func.distinct(Law.id)).label("laws"),
-                func.count(func.distinct(Version.id)).label("versions"),
-                func.count(func.distinct(Provision.id)).label("provisions"),
-            )
-            .select_from(Jurisdiction)
-            .join(Law, Law.jurisdiction_id == Jurisdiction.id, isouter=True)
-            .join(Version, Version.law_id == Law.id, isouter=True)
-            .join(Provision, Provision.version_id == Version.id, isouter=True)
-            .where(Jurisdiction.code == code)
-        )
-    ).first()
-    if row is None:
-        return JurisdictionCounts(laws=0, versions=0, provisions=0)
-    laws, versions, provisions = row
-    return JurisdictionCounts(laws=int(laws), versions=int(versions), provisions=int(provisions))
+    """Laws and versions for a single jurisdiction. Zeros if absent.
+
+    Two counts on indexed keys. Provisions are not counted: an exact count
+    reads every provision row the jurisdiction holds.
+    """
+    jurisdiction = await get_jurisdiction_by_code(session, code)
+    if jurisdiction is None:
+        return JurisdictionCounts(laws=0, versions=0)
+    laws = await session.scalar(
+        select(func.count()).select_from(Law).where(Law.jurisdiction_id == jurisdiction.id)
+    )
+    versions = await session.scalar(
+        select(func.count())
+        .select_from(Version)
+        .join(Law, Law.id == Version.law_id)
+        .where(Law.jurisdiction_id == jurisdiction.id)
+    )
+    return JurisdictionCounts(laws=int(laws or 0), versions=int(versions or 0))
 
 
 __all__ = [

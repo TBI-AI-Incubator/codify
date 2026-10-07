@@ -1,91 +1,88 @@
-"""Coverage counts versions, including fallback-only versions, once each."""
+"""Coverage counts the versions whose embedding finished, each once."""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from codify.storage.versions import _COUNT_EMBEDDED_SQL, count_embedded_versions
+from codify.akn.io import parse_akn
+from codify.pipeline.enrich.bluebell import parse_to_akn
+from codify.storage.embeddings import embed_and_stamp
+from codify.storage.repository import save_document
+from codify.storage.versions import count_embedded_versions
 from codify.testing import postgres_url
 
-# CTEs shadow corpus tables: these controls need PostgreSQL syntax but neither
-# migrations nor persisted fixtures. No customer data or providers are used.
-# One law in one jurisdiction; `u(n)` is the zero-padded uuid ending in n.
-FIXTURE_SQL = """
-WITH u AS (SELECT n, ('00000000-0000-0000-0000-' || lpad(n::text, 12, '0'))::uuid AS id
-           FROM generate_series(1, 20) n),
-laws(id, jurisdiction_id) AS (
-  SELECT (SELECT id FROM u WHERE n = 10), (SELECT id FROM u WHERE n = 20)
-), versions(id, law_id) AS (
-  SELECT id, (SELECT id FROM u WHERE n = 10) FROM u WHERE n IN (1, 2, 3, 4)
-), provision_embeddings(provision_id, model_id, version_id, jurisdiction_id) AS (
-  SELECT p, m, (SELECT id FROM u WHERE n = v), (SELECT id FROM u WHERE n = 20)
-  FROM (VALUES (1, 'new', 1), (1, 'old', 1), (2, 'new', 1), (3, 'old', 2), (4, 'unrelated', 3))
-       AS rows(p, m, v)
-)
-"""
 
-CASES = [
-    ([1, 2, 3, 4], None, 1),
-    ([1, 2, 3, 4], "old", 2),
-    ([1, 1, 2, 2], "old", 2),
-    ([1, 2, 3, 4], "new", 1),
-    ([2], None, 0),
-    ([2], "old", 1),
-    ([3, 4, 5], "old", 0),
-    ([], "old", 0),
-]
+class _FixedVectors:
+    model = "test-model"
+
+    async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
+        return [[1.0] + [0.0] * 767 for _ in items]
+
+
+@pytest.fixture
+async def session() -> AsyncIterator[AsyncSession]:
+    engine = create_async_engine(postgres_url(), pool_pre_ping=True)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as s:
+        yield s
+        await s.rollback()
+    await engine.dispose()
+
+
+async def _save(session: AsyncSession, code: str) -> uuid.UUID:
+    number = uuid.uuid4().hex[:8]
+    xml = parse_to_akn(
+        "BODY\n  ARTICLE 1\n    Body text.\n",
+        country=code,
+        doctype="act",
+        number=number,
+        date="2020-01-01",
+        language="eng",
+    )
+    return await save_document(
+        session, parse_akn(xml), jurisdiction_code=code, law_title=number, akn_xml=xml
+    )
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("ids,fallback,expected", CASES)
-async def test_scoped_coverage_sql(ids, fallback, expected):
-    engine = create_async_engine(postgres_url())
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SET TRANSACTION READ ONLY"))
-            stmt = text(FIXTURE_SQL + str(_COUNT_EMBEDDED_SQL)).bindparams(
-                *_COUNT_EMBEDDED_SQL._bindparams.values()
-            )
-            result = await conn.execute(
-                stmt,
-                dict(
-                    version_ids=[uuid.UUID(int=i) for i in ids],
-                    model_id="new",
-                    fallback_model_id=fallback,
-                ),
-            )
-            assert result.scalar_one() == expected
-            await conn.rollback()
-    finally:
-        await engine.dispose()
+async def test_counts_stamped_versions_in_scope_once_each(session: AsyncSession) -> None:
+    a, b = "xa", "xy"
+    embedded_a, unembedded_a, embedded_b, outside = (
+        await _save(session, a),
+        await _save(session, a),
+        await _save(session, b),
+        await _save(session, b),
+    )
+    for vid in (embedded_a, embedded_b, outside):
+        await embed_and_stamp(session, vid, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
+
+    scope = [embedded_a, unembedded_a, embedded_b, embedded_b]
+    stamped = (
+        await session.execute(
+            text("SELECT count(*) FROM versions WHERE id = ANY(:ids) AND embedded_at IS NOT NULL"),
+            {"ids": scope},
+        )
+    ).scalar_one()
+    counted = await count_embedded_versions(session, scope, "test-model", None)
+    assert (counted, stamped) == (2, 2)
+    assert await count_embedded_versions(session, [unembedded_a], "test-model") == 0
 
 
-async def test_empty_scope_does_not_query():
+async def test_empty_scope_does_not_query() -> None:
     session = AsyncMock()
     assert await count_embedded_versions(session, [], "new", "old") == 0
     session.execute.assert_not_awaited()
 
 
-async def test_count_passes_both_model_identities_and_scope():
+async def test_count_binds_the_scope_as_one_array() -> None:
     session = AsyncMock()
     session.execute.return_value = Mock(scalar_one=Mock(return_value=2))
     ids = [uuid.uuid4(), uuid.uuid4()]
     assert await count_embedded_versions(session, ids, "new", "old") == 2
-    assert session.execute.await_args.args[1] == dict(
-        version_ids=ids, model_id="new", fallback_model_id="old"
-    )
-
-
-def test_coverage_probe_stops_after_one_embedding_per_distinct_version():
-    sql = str(_COUNT_EMBEDDED_SQL)
-    assert "SELECT DISTINCT unnest(:version_ids)" in sql
-    assert "EXISTS" in sql
-    # The probe names the partition and its version index; nothing goes through provisions.
-    assert "e.jurisdiction_id = l.jurisdiction_id" in sql
-    assert "e.version_id = scoped.id" in sql
-    assert "provisions" not in sql
+    assert session.execute.await_args.args[1] == {"version_ids": ids}

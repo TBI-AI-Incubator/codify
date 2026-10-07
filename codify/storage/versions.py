@@ -245,24 +245,13 @@ async def latest_versions_for_jurisdiction(
     return [row[0] for row in result.all()]
 
 
-# Coverage needs one matching embedding per version, not every embedding in
-# the corpus. The embeddings carry their version and jurisdiction, so the
-# probe is one partition's version index, not a walk through provisions.
+# Coverage reads the stamp `embed_and_stamp` writes, through the primary key.
+# Probing `provision_embeddings` instead joined on a column, so no partition was
+# pruned and every partition's model index was read.
 _COUNT_EMBEDDED_SQL = text(
     """
-    SELECT count(*)
-    FROM (SELECT DISTINCT unnest(:version_ids) AS id) scoped
-    JOIN versions v ON v.id = scoped.id
-    JOIN laws l ON l.id = v.law_id
-    WHERE EXISTS (
-      SELECT 1 FROM provision_embeddings e
-      WHERE e.jurisdiction_id = l.jurisdiction_id
-        AND e.version_id = scoped.id
-        AND (
-          e.model_id = :model_id
-          OR e.model_id = CAST(:fallback_model_id AS text)
-        )
-    )
+    SELECT count(*) FROM versions v
+    WHERE v.id = ANY(:version_ids) AND v.embedded_at IS NOT NULL
     """
 ).bindparams(bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))))
 
@@ -273,21 +262,17 @@ async def count_embedded_versions(
     model_id: str,
     fallback_model_id: str | None = None,
 ) -> int:
-    """How many of these versions the dense arm can see. Counted against
-    `provision_embeddings` for the model in use, not `versions.embedded_at`, which
-    records that embedding finished without saying which model produced it. An
-    array parameter, because a corpus-wide IN list exceeds the bind limit.
+    """How many of these versions have finished embedding, each counted once.
+    An array parameter, because a corpus-wide IN list exceeds the bind limit.
+
+    The model ids are unused: retrieval reads the active and superseded models,
+    so while no third exists the stamp implies a readable vector. Revisit on a
+    third model, or a model switch without re-embedding.
     """
+    del model_id, fallback_model_id
     if not version_ids:
         return 0
-    result = await session.execute(
-        _COUNT_EMBEDDED_SQL,
-        {
-            "version_ids": list(version_ids),
-            "model_id": model_id,
-            "fallback_model_id": fallback_model_id,
-        },
-    )
+    result = await session.execute(_COUNT_EMBEDDED_SQL, {"version_ids": list(version_ids)})
     return int(result.scalar_one())
 
 
