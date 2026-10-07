@@ -103,13 +103,18 @@ def test_expression_timestamp_is_opt_in() -> None:
     from codify.frbr import expression_uri_version
 
     work = "/akn/xy/act/2024/1"
-    stamp = "2026-10-05T14:00:00.123456+00:00"
+    stamp = "2026-10-05T15:00:00.123456+01:00"
     uri = build_frbr_expression_uri(work, "eng", stamp, include_time=True)
-    assert uri == f"{work}/eng@{stamp}"
-    assert expression_uri_version(uri) == stamp
+    canonical = "2026-10-05T14:00:00.123456Z"
+    assert uri == f"{work}/eng@{canonical}"
+    assert expression_uri_version(uri) == canonical
     assert expression_uri_date(uri) == "2026-10-05"
-    assert expression_uri_version(uri + "/!schedule_1.xml") == stamp
-    assert expression_uri_version(uri + ".xml") == stamp
+    assert expression_uri_version(uri + "/!schedule_1.xml") == canonical
+    assert expression_uri_version(uri + ".xml") == canonical
+    assert (
+        build_frbr_expression_uri(work, "eng", "2026-10-05T14:00:00.123456Z", include_time=True)
+        == uri
+    )
     assert build_frbr_expression_uri(work, "eng", stamp) == f"{work}/eng@2026-10-05"
 
 
@@ -122,8 +127,14 @@ def test_expression_timestamp_rejects_invalid_values() -> None:
         "2026-02-30T14:00:00Z",
         "2026-10-05T14:00:00",
         "2026-10-051T14:00:00Z",
+        "2026-10-05T14:00:00+14:01",
+        "2026-10-05T14:00:00-14:01",
+        "2026-10-05T14:00:00+23:59",
     ):
         assert expression_uri_version(f"{work}/eng@{stamp}") is None
+
+    for stamp in ("2026-10-05T14:00:00+14:00", "2026-10-05T14:00:00-14:00"):
+        assert expression_uri_version(f"{work}/eng@{stamp}") == stamp
 
 
 def test_work_uri_string_none_year_becomes_the_placeholder():

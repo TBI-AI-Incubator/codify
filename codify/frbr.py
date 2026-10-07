@@ -11,7 +11,7 @@ import hashlib
 import re
 import unicodedata
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import NamedTuple
 
 import structlog
@@ -462,11 +462,11 @@ def _assert_citable(uri: str, *, country: str, doctype: str, number: str) -> str
 def build_frbr_expression_uri(
     work_uri: str, language: str, date_: date | str | None, *, include_time: bool = False
 ) -> str:
-    """`(work, "sqi", date(2021,5,19))` → `{work}/sqi@2021-05-19`.
+    """Build a date-only Expression URI, or a canonical UTC timestamp when `include_time`.
 
     An empty string is no date, same as None. It is falsy but not None, so the
     `is None` test alone emitted a trailing bare `@` and minted an expression URI
-    no row would ever match."""
+    no row would ever match. Timestamp mode emits `YYYY-MM-DDTHH:MM:SS.ffffffZ`."""
     if not date_:
         return f"{work_uri}/{language}"
     iso = date_ if isinstance(date_, str) else date_.isoformat()
@@ -474,18 +474,23 @@ def build_frbr_expression_uri(
         timestamp = datetime.fromisoformat(iso)
         if timestamp.tzinfo is None:
             raise ValueError("Timestamped expressions require a timezone-aware dateTime")
-        uri = f"{work_uri}/{language}@{iso}"
-        if expression_uri_version(uri) != iso:
+        if not _XSD_DATETIME.fullmatch(iso):
             raise ValueError("Timestamped expressions require an XSD dateTime")
-        return uri
+        canonical = (
+            timestamp.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+        )
+        return f"{work_uri}/{language}@{canonical}"
     return f"{work_uri}/{language}@{iso[:10]}"
 
 
 # The `@date` segment of an expression or manifestation FRBR URI. Anchored on the
 # `@` so a `/!component` tail or a `.akn` format suffix after it is left alone.
-EXPRESSION_URI_DATE = re.compile(r"@(\d{4}-\d{2}-\d{2})")
+_XSD_TIMEZONE = r"(?:Z|[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00))"
+_XSD_DATETIME = re.compile(
+    rf"\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}:\d{{2}}:\d{{2}}(?:\.\d+)?{_XSD_TIMEZONE}"
+)
 EXPRESSION_URI_VERSION = re.compile(
-    r"@(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?)"
+    rf"@(\d{{4}}-\d{{2}}-\d{{2}}(?:T\d{{2}}:\d{{2}}:\d{{2}}(?:\.\d+)?{_XSD_TIMEZONE})?)"
     r"(?=$|/|\.)"
 )
 
