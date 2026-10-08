@@ -192,6 +192,15 @@
   "structuring": {
     "marker_boundary": "line_anchored",
     "marker_order": "number_first",
+    "prose_precursors": [
+      "a",
+      "az",
+      "e",
+      "és",
+      "vagy",
+      "illetve",
+      "valamint"
+    ],
     "ordinal_words": {
       "Első": 1,
       "Második": 2,

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from codify.jurisdictions import JurisdictionConfig, load_config
+import pytest
+from pydantic import ValidationError
+
+from codify.jurisdictions import JurisdictionConfig, StructuringConfig, load_config
 from codify.pipeline.enrich.anchors import (
     _basic_unit_line_re,
     _normalise_number,
     anchor_coverage,
     build_anchor_regex,
     scan_anchors,
+    scan_anchors_with_ambiguity,
 )
+from codify.pipeline.enrich.container_coverage import container_coverage
 
 # Invented text in the shape of a Hungarian act.
 NUMBER_FIRST_ACT = """2031. évi CXI. törvény
@@ -24,7 +29,10 @@ I. FEJEZET
 
 ALAPELVEK
 
-1. § (1) E törvény a próbaügyekre terjed ki.
+A fejezet hatálya a próbaügyekre terjed ki.
+
+1. § (1) E törvény a próbaügyekre terjed ki, a
+3. § (3) bekezdésében foglalt kivétellel.
 
 (2) A 3. § (2) bekezdése szerinti eljárás díjmentes.
 
@@ -84,10 +92,25 @@ def test_the_coverage_denominator_reads_the_same_order() -> None:
     config = _hu()
     anchors = scan_anchors(text, build_anchor_regex(config, "act"), country="hu", doctype="act")
     coverage = anchor_coverage(text, anchors, config, "act", "article")
-    host = {"1", "2", "2-A", "3", "4"}
-    assert coverage.captured == host
+    assert coverage.captured == {"1", "2", "2-A", "3", "4"}
     # The quoted 9/C counts too: the denominator reads markers through no quote mask.
-    assert host <= coverage.expected
+    assert coverage.expected == {"1", "2", "2-A", "3", "4", "9-C"}
+
+
+def test_the_container_census_reads_number_first_headings() -> None:
+    config = _hu()
+    scan = scan_anchors_with_ambiguity(
+        NUMBER_FIRST_ACT, build_anchor_regex(config, "act"), country="hu", doctype="act"
+    )
+    recall = container_coverage(NUMBER_FIRST_ACT, scan, config, "hu", "act")["container_recall"]
+    assert recall == {"part": [1, 1], "chapter": [2, 2]}
+
+
+def test_number_first_refuses_options_that_read_after_the_number() -> None:
+    with pytest.raises(ValidationError, match="number_first"):
+        StructuringConfig(marker_order="number_first", marker_tolerances=["missing_separator"])
+    with pytest.raises(ValidationError, match="number_first"):
+        StructuringConfig(marker_order="number_first", insertion_suffixes={"bis": "bis"})
 
 
 def test_keyword_first_configs_keep_their_order() -> None:

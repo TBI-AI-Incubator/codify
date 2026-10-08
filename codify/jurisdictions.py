@@ -755,6 +755,16 @@ class StructuringConfig(BaseModel):
                 raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")
         return value
 
+    @model_validator(mode="after")
+    def _number_first_drops_keyword_tail_options(self) -> "StructuringConfig":
+        # Each reads what follows the number, where a number-first marker has its keyword.
+        dropped = set(self.marker_tolerances) & {"missing_separator", "split_number"}
+        if self.marker_order == "number_first" and (dropped or self.insertion_suffixes):
+            raise ValueError(
+                "number_first markers take no insertion_suffixes, missing_separator or split_number"
+            )
+        return self
+
     @field_validator("citation_successors", "prose_precursors", "sameline_precursors")
     @classmethod
     def _cue_words_are_not_blank(cls, value: list[str]) -> list[str]:

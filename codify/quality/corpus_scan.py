@@ -10,6 +10,7 @@ from typing import Any
 
 from codify.jurisdictions import JurisdictionConfig, load_config
 from codify.pipeline.enrich.anchors import (
+    _number_first,
     cached_regex,
     keyword_aliases,
     scan_anchors_with_ambiguity,
@@ -130,9 +131,12 @@ def scan_text(
     # Defaulting to "article" would score those as a corpus-wide miss.
     basic = basic_unit_kind(config, doctype)
 
-    aliases = _census_aliases(keyword_aliases(config, doctype), regex)
+    first = _number_first(config)
+    aliases = _census_aliases(keyword_aliases(config, doctype), regex, number_first=first)
     forms: dict[str, list[int]] = {}
-    basic_line_re = _keyword_line_re(aliases.get(basic, ())) if basic is not None else None
+    basic_line_re = (
+        _keyword_line_re(aliases.get(basic, ()), number_first=first) if basic is not None else None
+    )
     if basic_line_re is not None:
         # Credit by line: an anchor's offset starts at the whitespace it
         # consumed, so walk to the keyword before counting.

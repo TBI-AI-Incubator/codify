@@ -19,6 +19,7 @@ from codify.jurisdictions import JurisdictionConfig
 from codify.pipeline.enrich.anchors import (
     _kind_for_mangled_keyword,
     _kind_from_match,
+    _number_first,
     _quote_mask,
     cached_regex,
     keyword_aliases,
@@ -26,7 +27,7 @@ from codify.pipeline.enrich.anchors import (
 
 
 def _census_aliases(
-    aliases: dict[str, tuple[str, ...]], regex: re.Pattern[str]
+    aliases: dict[str, tuple[str, ...]], regex: re.Pattern[str], *, number_first: bool = False
 ) -> dict[str, tuple[str, ...]]:
     """Aliases regrouped under the kind the scan regex actually resolves them to. Overlapping
     alternations let a config file a term under one kind while the regex answers with
@@ -37,18 +38,23 @@ def _census_aliases(
     regrouped: dict[str, list[str]] = {}
     for kind, terms in aliases.items():
         for term in terms:
-            match = regex.search(f"\n{term} 5\n")
+            match = regex.search(f"\n5. {term}\n" if number_first else f"\n{term} 5\n")
             resolved = _kind_from_match(match) if match else None
             regrouped.setdefault(resolved or kind, []).append(term)
     return {kind: tuple(dict.fromkeys(terms)) for kind, terms in regrouped.items()}
 
 
-def _keyword_line_re(aliases: tuple[str, ...]) -> re.Pattern[str] | None:
+def _keyword_line_re(
+    aliases: tuple[str, ...], *, number_first: bool = False
+) -> re.Pattern[str] | None:
     """Line-initial keyword plus the rest of its line. Looser than the scan
     regex on purpose: it must find the markers the scan refuses."""
     if not aliases:
         return None
     alts = "|".join(sorted((re.escape(a) for a in aliases), key=len, reverse=True))
+    if number_first:
+        # The group is the number token, which plays the keyword-first tail's part.
+        return re.compile(rf"(?m)^[^\S\n]*([^\s.]{{1,12}})\.?[^\S\n]+(?:{alts})(?![\w-])")
     # Allow column gaps so the marker form remains measurable.
     return re.compile(rf"(?m)^[^\S\n]*(?:{alts})([^\n]{{0,40}})")
 
@@ -87,7 +93,9 @@ def _grouping_context(
     declared grouping (`higher`) levels."""
     anchors = scan_result.anchors
     regex = cached_regex(country, doctype)
-    aliases = _census_aliases(keyword_aliases(config, doctype), regex)
+    aliases = _census_aliases(
+        keyword_aliases(config, doctype), regex, number_first=_number_first(config)
+    )
     doc_class = config.get_document_class(doctype) if config else None
     grouping: set[str] = (
         {e.akn_element for e in doc_class.hierarchy if e.level == "higher"} if doc_class else set()
@@ -113,7 +121,7 @@ def container_coverage(
     # line-initial count of them reports a rate above 100%.
     recall: dict[str, list[int]] = {}
     for kind in grouping:
-        line_re = _keyword_line_re(aliases.get(kind, ()))
+        line_re = _keyword_line_re(aliases.get(kind, ()), number_first=_number_first(config))
         if line_re is None:
             continue
         present = 0
@@ -134,7 +142,7 @@ def container_coverage(
     for other, other_aliases in _jurisdiction_grouping_aliases(config).items():
         if other in grouping:
             continue
-        other_re = _keyword_line_re(other_aliases)
+        other_re = _keyword_line_re(other_aliases, number_first=_number_first(config))
         if other_re is None:
             continue
         seen = len(other_re.findall(normalised_text))
@@ -215,7 +223,7 @@ def container_coverage_probe(
     found = 0
     seen_lines: set[int] = set()
     for alias in grouping_aliases.values():
-        line_re = _keyword_line_re(alias)
+        line_re = _keyword_line_re(alias, number_first=_number_first(config))
         if line_re is None:
             continue
         for match in line_re.finditer(normalised_text):

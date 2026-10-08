@@ -221,7 +221,7 @@ def _num_pattern_with(
         extra += f"{_GLYPHED_NUM}|"
     if slash_letter:
         # A lettered insertion after a slash ("5/A").
-        extra += r"\d+/[A-Z](?![A-Za-z])|"
+        extra += r"\d+/(?-i:[A-Z])(?![A-Za-z])|"
     if not ordinals:
         return rf"(?P<num>(?:{extra}{_NUM_ALTS}){_BIS_SUFFIX})" if extra else _NUM_PATTERN
     forms = {f for w in ordinals for f in (w, w.upper())}
@@ -569,9 +569,9 @@ def _number_first(config: JurisdictionConfig | None) -> bool:
 
 
 def _number_first_marker(keyword_group: str, number: str) -> str:
-    """Number, an optional full stop, then the keyword ("15. §", "I. FEJEZET").
-    A keyword running into a word or a hyphenated case ending ("§-a") is a citation."""
-    return rf"{number}(?:\.[^\S\n]*|[^\S\n]+)(?:{keyword_group})(?![\w-])"
+    """Number, an optional full stop, then the keyword ("15. §", "I. FEJEZET"). A lone
+    letter needs its stop ("A fejezet" is prose), and a keyword running on ("§-a") cites."""
+    return rf"{number}(?:\.[^\S\n]*|(?<!\b[A-Za-z])[^\S\n]+)(?:{keyword_group})(?![\w-])"
 
 
 # Scanned Arabic drops the hamza (أ إ آ -> ا), so a precursor spelled with one
