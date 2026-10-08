@@ -866,6 +866,7 @@ SourceAdapterKind = Literal[
     "paragraf_propisi",  # Paragraf Lex slug-keyed PDFs (rs).
     "sparql",  # SPARQL endpoint (non-Cellar).
     "bulk_xml_archive",  # Bulk XML archives (USLM, Indigo dumps).
+    "gazette_xml",  # Official-gazette XML per item (BOE).
 ]
 
 
@@ -877,6 +878,7 @@ _ADAPTER_TIER: dict[SourceAdapterKind, Literal[1, 2, 3]] = {
     "html_portal": 2,
     "sparql": 2,
     "bulk_xml_archive": 2,
+    "gazette_xml": 2,
     "paragraf_propisi": 3,
     "pdf_gazette": 3,
 }

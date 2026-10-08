@@ -3538,7 +3538,8 @@
               "pdf_gazette",
               "paragraf_propisi",
               "sparql",
-              "bulk_xml_archive"
+              "bulk_xml_archive",
+              "gazette_xml"
             ],
             "title": "Kind",
             "type": "string"

@@ -52,11 +52,18 @@ async def dispatch(
 ) -> AsyncIterator[IngestionEvent]:
     if looks_like_eu(source) or (jurisdiction_code == "eu" and _is_html_path(source)):
         # XML from a non-EU jurisdiction is either a publisher's native AKN
-        # (legislation.gov.uk, Laws.Africa) or domain XML (Riigi Teataja),
+        # (legislation.gov.uk, Laws.Africa) or domain XML (BOE, Riigi Teataja),
         # deterministic normalise-only ingest. The EU path keeps FORMEX/AKN4EU handling.
         if jurisdiction_code != "eu":
-            from codify.pipeline.formats import akn_native, riigi_teataja
+            from codify.pipeline.formats import akn_native, boe, riigi_teataja
 
+            if boe.is_boe(source):
+                lang = "spa" if language == "eng" else language
+                async for event in boe.ingest(
+                    source, jurisdiction_code, frbr_work_uri=frbr_work_uri, language=lang
+                ):
+                    yield event
+                return
             if riigi_teataja.is_riigi_teataja(source):
                 lang = "est" if (language == "eng" and jurisdiction_code == "ee") else language
                 async for event in riigi_teataja.ingest(
