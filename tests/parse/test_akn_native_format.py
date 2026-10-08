@@ -486,7 +486,7 @@ def test_unnumbered_annex_flattens_to_storable_rows() -> None:
     assert sum(1 for p in provisions if p.text.endswith("note.")) == 3
 
 
-async def test_ingest_counts_attachment_ids_as_synthesised(tmp_path: Path) -> None:
+async def test_ingest_counts_minted_ids(tmp_path: Path) -> None:
     from codify.pipeline.events import ValidationIssued
     from codify.pipeline.formats.akn_native import ingest
 
@@ -494,4 +494,72 @@ async def test_ingest_counts_attachment_ids_as_synthesised(tmp_path: Path) -> No
     src.write_text(_annex_act(_annex("First note.", "Second note.")), encoding="utf-8")
     events = [e async for e in ingest(src, "xz")]
     issues = [e.issue for e in events if isinstance(e, ValidationIssued)]
-    assert {"synthesised_eids": 2} in issues
+    # Two paragraphs and their attachment.
+    assert {"synthesised_eids": 3} in issues
+
+
+async def test_stored_xml_carries_the_ids_the_document_has(tmp_path: Path) -> None:
+    """A rederive re-parses the stored XML, so an id only the model held would
+    come back empty and fail the same check."""
+    from codify.pipeline.formats.akn_native import ingest
+
+    wrapped = (
+        "<blockContainer><paragraph><content><p>Wrapped.</p></content></paragraph></blockContainer>"
+    )
+    body = '<hcontainer name="x"><content><p>Unnumbered body unit.</p></content></hcontainer>'
+    src = tmp_path / "act.akn"
+    src.write_text(
+        _annex_act(_annex("First note.", "Second note.") + wrapped_annex(wrapped), body=body),
+        encoding="utf-8",
+    )
+    done = [e async for e in ingest(src, "xz") if isinstance(e, Complete)]
+    assert len(done) == 1
+    reparsed = parse_akn(done[0].akn_xml)
+    ids = _all_ids(reparsed)
+    assert ids and all(eid and wid for eid, wid in ids), ids
+    assert len({eid for eid, _ in ids}) == len(ids), ids
+    assert ids == _all_ids(done[0].document)
+    # What was missing was minted in the XML itself.
+    root = etree.fromstring(done[0].akn_xml.encode())
+    unit_tags = ("article", "hcontainer", "paragraph", "attachment")
+    missing = [el for el in root.iter(*(f"{{*}}{t}" for t in unit_tags)) if not el.get("eId")]
+    assert not missing
+
+
+def wrapped_annex(inner: str) -> str:
+    return f'<attachment><doc name="Allegato"><mainBody>{inner}</mainBody></doc></attachment>'
+
+
+def test_body_fallback_ids_skip_published_ones() -> None:
+    held = '<article eId="codify-synth-1"><num>2</num><content><p>Holds.</p></content></article>'
+    bare = '<hcontainer name="x"><content><p>Bare.</p></content></hcontainer>'
+    doc, synth = normalise_native_akn(parse_akn(_annex_act("", body=held + bare)))
+    ids = [eid for eid, _ in _all_ids(doc)]
+    assert synth == 1
+    assert len(set(ids)) == len(ids), ids
+    assert "codify-synth-2" in ids
+
+
+def test_duplicate_renames_skip_published_ones() -> None:
+    def art(eid: str) -> str:
+        return f'<article eId="{eid}"><num>1</num><content><p>t</p></content></article>'
+
+    doc, _ = normalise_native_akn(
+        parse_akn(_annex_act("", body=art("x") + art("x-dup1") + art("x")))
+    )
+    ids = [eid for eid, _ in _all_ids(doc)]
+    assert len(set(ids)) == len(ids), ids
+    assert {"x", "x-dup1"} <= set(ids)
+
+
+def test_mint_missing_eids_matches_the_parser_walk() -> None:
+    from codify.pipeline.formats.akn_native import mint_missing_eids
+
+    xml = _annex_act(
+        _annex("One.", "Two."), body='<hcontainer name="x"><content><p>t</p></content></hcontainer>'
+    )
+    out, minted = mint_missing_eids(xml)
+    assert minted == 4  # hcontainer, attachment, two paragraphs
+    assert _all_ids(parse_akn(out)) == _all_ids(normalise_native_akn(parse_akn(out))[0])
+    again, none = mint_missing_eids(out)
+    assert (again, none) == (out, 0)
