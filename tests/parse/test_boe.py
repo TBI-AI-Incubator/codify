@@ -312,6 +312,8 @@ def test_decree_law_preamble_annexes_and_table() -> None:
     assert _text(second.find(".//a:mainBody", NS)) == "Modelo de solicitud."
     this = first.find(".//a:FRBRWork/a:FRBRthis", NS).get("value")
     assert this == "/akn/es/act/rdl/2019/8/!att_1"
+    manifestation = first.find(".//a:FRBRManifestation/a:FRBRthis", NS).get("value")
+    assert manifestation == "/akn/es/act/rdl/2019/8/spa@2019-04-03/!att_1.akn"
     # The signature closes the body; the annexes are not conclusions.
     assert "Cuantías" not in _text(root.find(".//a:conclusions", NS))
 

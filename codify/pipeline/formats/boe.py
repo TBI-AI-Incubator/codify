@@ -168,12 +168,26 @@ def _roman_value(token: str) -> int | None:
     return total
 
 
+_ROMAN_PARTS = (
+    (1000, "M"),
+    (900, "CM"),
+    (500, "D"),
+    (400, "CD"),
+    (100, "C"),
+    (90, "XC"),
+    (50, "L"),
+    (40, "XL"),
+    (10, "X"),
+    (9, "IX"),
+    (5, "V"),
+    (4, "IV"),
+    (1, "I"),
+)
+
+
 def _to_roman(n: int) -> str:
     out = ""
-    for v, s in ((100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX")):
-        while n >= v:
-            out, n = out + s, n - v
-    for v, s in ((5, "V"), (4, "IV"), (1, "I")):
+    for v, s in _ROMAN_PARTS:
         while n >= v:
             out, n = out + s, n - v
     return out
@@ -733,7 +747,7 @@ def _identification(
     _sub(e, "FRBRauthor", href=f"#{author}")
     _sub(e, "FRBRlanguage", language=language)
     m = _sub(ident, "FRBRManifestation")
-    _sub(m, "FRBRthis", value=f"{expression}.akn{suffix}")
+    _sub(m, "FRBRthis", value=f"{expression}{suffix}.akn")
     _sub(m, "FRBRuri", value=f"{expression}.akn")
     _sub(m, "FRBRdate", date=date, name="generation")
     _sub(m, "FRBRauthor", href="#codify")
