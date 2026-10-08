@@ -93,7 +93,8 @@ ORGANIC = _item(
     <p class="capitulo_tit">De los registros de ensayo</p>
     <p class="seccion">Sección primera. Disposiciones comunes</p>
     <p class="sangrado_articulo">Artículo 20 bis. Objeto.</p>
-    <p class="sangrado_2">1. El registro se lleva por medios electrónicos.»</p>
+    <p class="sangrado_2">1. El registro se lleva por medios electrónicos.</p>
+    <p class="sangrado_2">2. Su consulta es libre.»</p>
     <p class="capitulo">DISPOSICIÓN FINAL</p>
     <p class="parrafo">La presente ley orgánica entra en vigor el día de su publicación.</p>"""
     + _CLOSING,
@@ -176,7 +177,28 @@ MARKERS = _item(
     <p class="articulo">[precepto]Primera.</p>
     <p class="parrafo">Primera.– Esta línea fuera de orden es contenido.</p>
     <p class="articulo">[precepto]Segunda.</p>
-    <p class="parrafo">[ignorar]CAPÍTULO IX</p>"""
+    <p class="parrafo">[ignorar]CAPÍTULO IX</p>
+    <p class="articulo">Disposición transitoria primera.</p>
+    <p class="parrafo">Tercera.- Esta línea también es contenido.</p>"""
+)
+
+# A legislative decree: the text it approves follows the signature.
+CONSOLIDATING = _item(
+    """
+    <p class="centro_redonda">DISPONGO:</p>
+    <p class="articulo">Artículo único. Aprobación.</p>
+    <p class="parrafo">Se aprueba el texto refundido que se inserta a continuación.</p>
+    <p class="parrafo_2">Dado en Madrid, el 3 de abril de 2019.</p>
+    <p class="firma_rey">FELIPE R.</p>
+    <p class="libro">[encabezado]TEXTO REFUNDIDO DE LA LEY DE ENSAYO</p>
+    <p class="titulo_num">TÍTULO I</p>
+    <p class="titulo_tit">Disposiciones generales</p>
+    <p class="articulo">Artículo 1. Objeto.</p>
+    <p class="parrafo">Este texto refunde las normas de ensayo.</p>""",
+    rango="Real Decreto Legislativo",
+    eli="rdlg",
+    numero="2/2019",
+    titulo="Real Decreto Legislativo 2/2019, de 3 de abril, de ensayo.",
 )
 
 
@@ -220,6 +242,7 @@ def test_organic_law_keeps_a_quoted_chapter_inside_its_article() -> None:
     assert root.find(".//a:FRBRWork/a:FRBRuri", NS).get("value") == "/akn/es/act/lo/2019/9"
     assert _eids(root, "article") == ["art_unico"]
     assert _eids(root, "chapter") == [] and _eids(root, "section") == []
+    assert _eids(root, "paragraph") == []  # the quoted article's apartados are not this law's
     article = _text(root.find(".//a:article", NS))
     assert "«CAPÍTULO II BIS" in article and "Artículo 20 bis. Objeto." in article
     final = root.find(".//a:hcontainer[@name='disposicion-final']", NS)
@@ -301,6 +324,17 @@ def test_editorial_cues_and_out_of_order_ordinals() -> None:
     assert _text(additional[0].find("a:content", NS)).startswith("Primera.– Esta línea")
     assert _text(additional[1].find("a:content", NS)) == "CAPÍTULO IX"
     assert "[" not in _text(root.find(".//a:body", NS))
+    transitional = root.find(".//a:hcontainer[@name='disposicion-transitoria']", NS)
+    assert _text(transitional.find("a:content", NS)).startswith("Tercera.- Esta línea")
+
+
+def test_the_text_a_legislative_decree_approves_is_an_attachment() -> None:
+    root, meta = _convert(CONSOLIDATING)
+    assert meta["frbr_work_uri"] == "/akn/es/act/rdlg/2019/2"
+    assert _eids(root, "article") == ["art_unico", "att_1__title_I__art_1"]
+    attachment = root.find(".//a:attachment", NS)
+    assert _text(attachment.find(".//a:preface", NS)) == "TEXTO REFUNDIDO DE LA LEY DE ENSAYO"
+    assert _text(root.find(".//a:conclusions", NS)).endswith("FELIPE R.")
 
 
 def test_an_item_without_text_is_refused() -> None:

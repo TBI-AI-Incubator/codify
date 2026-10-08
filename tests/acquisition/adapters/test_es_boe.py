@@ -125,8 +125,14 @@ async def test_an_item_without_text_hands_on_its_pdf() -> None:
     assert acquired.upstream_metadata["text_missing"] is True
 
 
-async def test_an_unknown_eli_is_missing_not_parsed() -> None:
+@pytest.mark.parametrize(
+    "page",
+    [
+        b"<!DOCTYPE html><html><head><title>Error 404</title></head></html>",
+        b"<html><body>No existe</body></html>",
+    ],
+)
+async def test_an_unknown_eli_is_missing_not_parsed(page: bytes) -> None:
     # The site answers a missing ELI with a 200 HTML error page.
-    page = b"<!DOCTYPE html><html><head><title>Error 404</title></head></html>"
     with pytest.raises(BoeItemMissing):
         await _fetch({_ELI: httpx.Response(200, content=page)}, _ref())
