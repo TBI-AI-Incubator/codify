@@ -335,20 +335,21 @@ def _quote_left_open(items: list[_Item], start: int, depth: int) -> bool:
     """Whether a quote open at `start` stays open up to the next real article or
     the end, so it was never closed rather than holding this heading."""
     for it in items[start:]:
-        if "articulo" in it.cls.lower():
-            return _is_article_class(it.cls)
         depth = max(0, depth + _quote_delta(it.text))
         if depth == 0:
             return False
+        if "articulo" in it.cls.lower():
+            return _is_article_class(it.cls)
     return True
 
 
 def _quoted_head(items: list[_Item], i: int, depth: int) -> bool:
-    """A head-class line inside a quote that closes before the next real article."""
-    it = items[i]
-    if it.text.startswith(("«", "“")):
-        depth = max(0, depth + _quote_delta(it.text))
-    return depth > 0 and not _quote_left_open(items, i + 1, depth)
+    """A head-class line inside a quote that closes on it or before the next real article."""
+    text = items[i].text
+    if depth == 0 and not text.startswith(("«", "“")):
+        return False
+    after = max(0, depth + _quote_delta(text))
+    return after == 0 or not _quote_left_open(items, i + 1, after)
 
 
 def _classify(items: list[_Item]) -> None:

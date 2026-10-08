@@ -388,7 +388,8 @@ QUOTED_ARTICLE = _item(
     <p class="parrafo">Se añaden a la Ley 7/2001 un apartado y un artículo:</p>
     <p class="parrafo">«Uno. El registro es público.</p>
     <p class="articulo">Artículo 5 bis. Plazos.</p>
-    <p class="parrafo">El plazo es de dos meses.»</p>
+    <p class="parrafo">El plazo es de dos meses.</p>
+    <p class="articulo">Artículo 5 ter. Cómputo.»</p>
     <p class="articulo">Artículo 2.</p>
     <p class="parrafo">Texto propio.</p>"""
 )
