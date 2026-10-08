@@ -379,6 +379,24 @@ UNCLOSED = _item(
 )
 
 
+# A quoted article that keeps the BOE's own article class.
+QUOTED_ARTICLE = _item(
+    """
+    <p class="articulo">Artículo 1.</p>
+    <p class="parrafo">El artículo 5 de la Ley 7/2001 queda redactado así:</p>
+    <p class="articulo">«Artículo 5. Plazos.</p>
+    <p class="parrafo">El plazo es de dos meses.»</p>
+    <p class="articulo">Artículo 2.</p>
+    <p class="parrafo">Texto propio.</p>"""
+)
+
+
+def test_a_quoted_article_in_article_class_stays_text() -> None:
+    root, _ = _convert(QUOTED_ARTICLE)
+    assert _eids(root, "article") == ["art_1", "art_2"]
+    assert "«Artículo 5. Plazos." in _text(root.find(".//a:article[@eId='art_1']", NS))
+
+
 def test_an_unclosed_quote_does_not_hide_the_next_chapter() -> None:
     root, _ = _convert(UNCLOSED)
     assert _eids(root, "article") == ["chp_I__art_1", "chp_II__art_2"]

@@ -332,15 +332,23 @@ def _quote_delta(text: str) -> int:
 
 
 def _quote_left_open(items: list[_Item], start: int, depth: int) -> bool:
-    """Whether a quote open at `start` stays open up to the next real article,
-    so it was never closed rather than holding this heading."""
+    """Whether a quote open at `start` stays open up to the next real article or
+    the end, so it was never closed rather than holding this heading."""
     for it in items[start:]:
         if "articulo" in it.cls.lower():
             return _is_article_class(it.cls)
         depth = max(0, depth + _quote_delta(it.text))
         if depth == 0:
             return False
-    return False
+    return True
+
+
+def _quoted_head(items: list[_Item], i: int, depth: int) -> bool:
+    """A head-class line inside a quote that closes before the next real article."""
+    it = items[i]
+    if it.text.startswith(("«", "“")):
+        depth = max(0, depth + _quote_delta(it.text))
+    return depth > 0 and not _quote_left_open(items, i + 1, depth)
 
 
 def _classify(items: list[_Item]) -> None:
@@ -354,8 +362,10 @@ def _classify(items: list[_Item]) -> None:
             it.quoted = True
         elif it.cls.lower().startswith("firma"):
             it.kind = "signature"
-        elif (_is_article_class(it.cls) or it.cls == "anexo_num") and _head(
-            it, group, group_last, strict=False
+        elif (
+            (_is_article_class(it.cls) or it.cls == "anexo_num")
+            and not _quoted_head(items, i, depth)
+            and _head(it, group, group_last, strict=False)
         ):
             depth = 0
         elif depth == 0 and not opens_quote and _head(it, group, group_last, strict=True):
