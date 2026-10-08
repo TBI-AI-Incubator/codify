@@ -390,6 +390,7 @@ QUOTED_ARTICLE = _item(
     <p class="articulo">Artículo 5 bis. Plazos.</p>
     <p class="parrafo">El plazo es de dos meses.</p>
     <p class="articulo">Artículo 5 ter. Cómputo.»</p>
+    <p class="parrafo">Y se cita «otro texto que no se cierra.</p>
     <p class="articulo">Artículo 2.</p>
     <p class="parrafo">Texto propio.</p>"""
 )
