@@ -132,7 +132,7 @@ def scan_text(
     basic = basic_unit_kind(config, doctype)
 
     first = _number_first(config)
-    aliases = _census_aliases(keyword_aliases(config, doctype), regex, number_first=first)
+    aliases = _census_aliases(keyword_aliases(config, doctype), regex)
     forms: dict[str, list[int]] = {}
     basic_line_re = (
         _keyword_line_re(aliases.get(basic, ()), number_first=first) if basic is not None else None

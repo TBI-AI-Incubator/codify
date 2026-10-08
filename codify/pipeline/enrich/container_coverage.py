@@ -27,7 +27,7 @@ from codify.pipeline.enrich.anchors import (
 
 
 def _census_aliases(
-    aliases: dict[str, tuple[str, ...]], regex: re.Pattern[str], *, number_first: bool = False
+    aliases: dict[str, tuple[str, ...]], regex: re.Pattern[str]
 ) -> dict[str, tuple[str, ...]]:
     """Aliases regrouped under the kind the scan regex actually resolves them to. Overlapping
     alternations let a config file a term under one kind while the regex answers with
@@ -38,7 +38,7 @@ def _census_aliases(
     regrouped: dict[str, list[str]] = {}
     for kind, terms in aliases.items():
         for term in terms:
-            match = regex.search(f"\n5. {term}\n" if number_first else f"\n{term} 5\n")
+            match = regex.search(f"\n{term} 5\n")
             resolved = _kind_from_match(match) if match else None
             regrouped.setdefault(resolved or kind, []).append(term)
     return {kind: tuple(dict.fromkeys(terms)) for kind, terms in regrouped.items()}
@@ -53,8 +53,10 @@ def _keyword_line_re(
         return None
     alts = "|".join(sorted((re.escape(a) for a in aliases), key=len, reverse=True))
     if number_first:
-        # The group is the number token, which plays the keyword-first tail's part.
-        return re.compile(rf"(?m)^[^\S\n]*([^\s.]{{1,12}})\.?[^\S\n]+(?:{alts})(?![\w-])")
+        # The group is the number token, playing the tail's part; a lone letter needs its stop.
+        return re.compile(
+            rf"(?m)^[^\S\n]*([^\s.]{{1,12}})(?:\.[^\S\n]*|(?<!\b[A-Za-z])[^\S\n]+)(?:{alts})(?![\w-])"
+        )
     # Allow column gaps so the marker form remains measurable.
     return re.compile(rf"(?m)^[^\S\n]*(?:{alts})([^\n]{{0,40}})")
 
@@ -93,9 +95,7 @@ def _grouping_context(
     declared grouping (`higher`) levels."""
     anchors = scan_result.anchors
     regex = cached_regex(country, doctype)
-    aliases = _census_aliases(
-        keyword_aliases(config, doctype), regex, number_first=_number_first(config)
-    )
+    aliases = _census_aliases(keyword_aliases(config, doctype), regex)
     doc_class = config.get_document_class(doctype) if config else None
     grouping: set[str] = (
         {e.akn_element for e in doc_class.hierarchy if e.level == "higher"} if doc_class else set()

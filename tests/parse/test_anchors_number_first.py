@@ -29,7 +29,7 @@ I. FEJEZET
 
 ALAPELVEK
 
-A fejezet hatálya a próbaügyekre terjed ki.
+A Fejezet hatálya a próbaügyekre terjed ki.
 
 1. § (1) E törvény a próbaügyekre terjed ki, a
 3. § (3) bekezdésében foglalt kivétellel.
@@ -134,6 +134,14 @@ def test_declaring_number_first_flips_a_keyword_first_config() -> None:
     regex = build_anchor_regex(flipped, "act")
     assert [a.number for a in scan_anchors("5. § Kohaldamine\n\nSisu.\n", regex)] == ["5"]
     assert scan_anchors("§ 5. Kohaldamine\n\nSisu.\n", regex) == []
+
+
+def test_a_lowercase_slashed_letter_is_no_marker_on_either_side() -> None:
+    text = "1. § Első.\n\n1/a. § Második.\n"
+    config = _hu()
+    anchors = scan_anchors(text, build_anchor_regex(config, "act"), country="hu", doctype="act")
+    coverage = anchor_coverage(text, anchors, config, "act", "article")
+    assert (coverage.captured, coverage.expected) == ({"1"}, {"1"})
 
 
 def test_a_slashed_letter_keys_as_the_parser_writes_it() -> None:
