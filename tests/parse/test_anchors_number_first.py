@@ -14,7 +14,10 @@ from codify.pipeline.enrich.anchors import (
     scan_anchors,
     scan_anchors_with_ambiguity,
 )
-from codify.pipeline.enrich.container_coverage import container_coverage
+from codify.pipeline.enrich.container_coverage import (
+    container_coverage,
+    container_coverage_probe,
+)
 
 # Invented text in the shape of a Hungarian act.
 NUMBER_FIRST_ACT = """2031. évi CXI. törvény
@@ -106,6 +109,8 @@ def test_the_container_census_reads_number_first_headings() -> None:
     )
     recall = container_coverage(NUMBER_FIRST_ACT, scan, config, "hu", "act")["container_recall"]
     assert recall == {"part": [1, 1], "chapter": [2, 2]}
+    probe = container_coverage_probe(NUMBER_FIRST_ACT, scan, config, "hu", "act")
+    assert (probe["present"], probe["found"]) == (3, 3)
 
 
 def test_number_first_refuses_options_that_read_after_the_number() -> None:

@@ -179,6 +179,10 @@ _ORDINAL_TAIL_RE = re.compile(
 )
 
 
+# A number-first heading's leading numeral, Roman included: "I. FEJEZET" cannot be a word.
+_NUMBER_TOKEN_RE = re.compile(r"\d+|[IVXLCDM]+")
+
+
 def container_coverage_probe(
     normalised_text: str,
     scan_result: Any,
@@ -219,15 +223,26 @@ def container_coverage_probe(
         if a.kind in grouping_aliases and not a.quoted_amendment
     }
 
+    first = _number_first(config)
+    # Number-first, the leading token is the ordinal: a numeral or a declared word.
+    words = (
+        set(config.structuring.ordinal_words) if first and config and config.structuring else set()
+    )
     present = 0
     found = 0
     seen_lines: set[int] = set()
     for alias in grouping_aliases.values():
-        line_re = _keyword_line_re(alias, number_first=_number_first(config))
+        line_re = _keyword_line_re(alias, number_first=first)
         if line_re is None:
             continue
         for match in line_re.finditer(normalised_text):
-            if not _ORDINAL_TAIL_RE.match(match.group(1)):  # guard 2
+            token = match.group(1)
+            ordinal = (
+                _NUMBER_TOKEN_RE.fullmatch(token) or token in words or token.title() in words
+                if first
+                else _ORDINAL_TAIL_RE.match(token)
+            )
+            if not ordinal:  # guard 2
                 continue
             if quote_mask[match.start()]:  # guard 1: inside a quoted amendment
                 continue
