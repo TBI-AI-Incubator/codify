@@ -13,6 +13,7 @@ import re
 import unicodedata
 from datetime import UTC, datetime
 from typing import ClassVar
+from urllib.parse import urljoin
 
 import httpx
 from lxml import etree
@@ -108,8 +109,15 @@ def item_date(meta: dict[str, str]) -> str:
 
 
 def item_number(meta: dict[str, str]) -> str:
-    """`41/1984` -> `41`; an unnumbered item falls back to its BOE identifier."""
-    official = meta.get("numero_oficial", "").split("/")[0].strip()
+    """The ELI's own number (`41`, `hac1272`), else `numero_oficial` less its year
+    (`41/1984` -> `41`, `HAC/1272/2019` -> `hac-1272`), else the BOE identifier."""
+    eli = re.search(r"/eli/es/[a-z]+/\d{4}/\d{2}/\d{2}/([^/]+)", meta.get("url_eli", ""))
+    if eli:
+        return eli.group(1).strip("()")
+    parts = [p.strip() for p in meta.get("numero_oficial", "").split("/") if p.strip()]
+    if len(parts) > 1 and re.fullmatch(r"\d{4}", parts[-1]):
+        parts = parts[:-1]
+    official = re.sub(r"[^a-z0-9]+", "-", _fold("-".join(parts))).strip("-")
     return official or meta.get("identificador", "").lower() or "boe"
 
 
@@ -160,10 +168,12 @@ class BoeAcquirer(BaseAcquirer):
         if pdf_url:
             upstream["pdf_url"] = pdf_url
         texto = root.find("texto")
-        if texto is None or not "".join(texto.itertext()).strip():
+        # The converter's test: some paragraph outside a table carries text.
+        lines = [] if texto is None else [c for c in texto if c.tag != "table"]
+        if not any("".join(c.itertext()).strip() for c in lines):
             if not pdf_url:
                 raise BoeItemMissing(f"{url} carries neither text nor a PDF")
-            pdf = await self._client.get(pdf_url)
+            pdf = await self._client.get(urljoin(self._base + "/", pdf_url))
             pdf.raise_for_status()
             # No text to convert: the PDF goes to the structuring lane instead.
             xml.role = "card"

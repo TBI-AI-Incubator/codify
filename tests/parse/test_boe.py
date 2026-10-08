@@ -337,6 +337,51 @@ def test_the_text_a_legislative_decree_approves_is_an_attachment() -> None:
     assert _text(root.find(".//a:conclusions", NS)).endswith("FELIPE R.")
 
 
+# Mixed-case annex headings, curly quotes and a dashed heading in a heading class.
+VARIANTS = _item(
+    """
+    <p class="articulo">Artículo 1.- Objeto.</p>
+    <p class="parrafo">Se añade un capítulo:</p>
+    <p class="capitulo_num">“CAPÍTULO III</p>
+    <p class="seccion">Sección 1.ª Ámbito</p>
+    <p class="parrafo">Texto citado.”</p>
+    <p class="articulo">Artículo 2.</p>
+    <p class="parrafo">Texto propio.</p>
+    <p class="anexo_num">Anexo I</p>
+    <p class="parrafo">Primer anexo.</p>
+    <p class="anexo_num">Anexo II</p>
+    <p class="parrafo">Segundo anexo.</p>"""
+)
+
+
+def test_curly_quotes_mixed_case_annexes_and_dashed_headings() -> None:
+    root, _ = _convert(VARIANTS)
+    assert _eids(root, "article") == ["art_1", "art_2"]
+    assert _eids(root, "section") == []
+    assert _text(root.find(".//a:article[@eId='art_1']/a:heading", NS)) == "Objeto"
+    assert [_text(a.find(".//a:mainBody", NS)) for a in root.findall(".//a:attachment", NS)] == [
+        "Primer anexo.",
+        "Segundo anexo.",
+    ]
+
+
+# A quote the source never closes: the chapter after it is still real.
+UNCLOSED = _item(
+    """
+    <p class="capitulo_num">CAPÍTULO I</p>
+    <p class="articulo">Artículo 1.</p>
+    <p class="parrafo">Se cita «un texto que no se cierra.</p>
+    <p class="capitulo_num">CAPÍTULO II</p>
+    <p class="articulo">Artículo 2.</p>
+    <p class="parrafo">Texto propio.</p>"""
+)
+
+
+def test_an_unclosed_quote_does_not_hide_the_next_chapter() -> None:
+    root, _ = _convert(UNCLOSED)
+    assert _eids(root, "article") == ["chp_I__art_1", "chp_II__art_2"]
+
+
 def test_an_item_without_text_is_refused() -> None:
     with pytest.raises(BoeTextMissing):
         boe_to_akn(_item(""))

@@ -7,7 +7,12 @@ import pytest
 
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, registered_kinds
-from codify.acquisition.adapters.es.boe import BoeAcquirer, BoeItemMissing, eli_xml_url
+from codify.acquisition.adapters.es.boe import (
+    BoeAcquirer,
+    BoeItemMissing,
+    eli_xml_url,
+    item_number,
+)
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter
 
@@ -110,8 +115,36 @@ async def test_fetch_takes_the_xml_by_eli() -> None:
     assert acquired.upstream_metadata["boe_id"] == "BOE-A-2019-90002"
 
 
-async def test_an_item_without_text_hands_on_its_pdf() -> None:
-    item = _ITEM.format(texto="").encode()
+@pytest.mark.parametrize(
+    ("meta", "number"),
+    [
+        (
+            {"numero_oficial": "41/2019", "url_eli": "https://www.boe.es/eli/es/l/2019/04/03/41"},
+            "41",
+        ),
+        (
+            {
+                "numero_oficial": "HAC/12/2019",
+                "url_eli": "https://www.boe.es/eli/es/o/2019/04/03/hac12",
+            },
+            "hac12",
+        ),
+        ({"numero_oficial": "HAC/12/2019"}, "hac-12"),
+        ({"numero_oficial": "41/2019"}, "41"),
+        ({"identificador": "BOE-A-2019-90002"}, "boe-a-2019-90002"),
+    ],
+)
+def test_item_number_keeps_an_issuer_prefix(meta: dict[str, str], number: str) -> None:
+    assert item_number(meta) == number
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["", "<table><tr><td><p>Solo una tabla.</p></td></tr></table>"],
+)
+async def test_an_item_without_text_hands_on_its_pdf(texto: str) -> None:
+    # The PDF path is site-relative, as the BOE may give it.
+    item = _ITEM.format(texto=texto).replace("https://www.boe.es/boe/dias/", "/boe/dias/").encode()
     pdf_url = "https://www.boe.es/boe/dias/2019/04/04/pdfs/BOE-A-2019-90002.pdf"
     acquired, _ = await _fetch(
         {_ELI: httpx.Response(200, content=item), pdf_url: httpx.Response(200, content=_PDF)},

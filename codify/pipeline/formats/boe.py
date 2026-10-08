@@ -209,7 +209,7 @@ _STRUCT = re.compile(
     rf"^(?P<kw>LIBRO|T[ÍI]TULO|CAP[ÍI]TULO|SECCI[ÓO]N|SUBSECCI[ÓO]N)\s+{_NUM}{_SEP}\s*(?P<rest>.*)$",
     re.S | re.I,
 )
-_ANNEX = re.compile(rf"^ANEXOS?(?:\s+{_NUM})?{_SEP}\s*(?P<rest>.*)$", re.S)
+_ANNEX = re.compile(rf"^ANEXOS?(?:\s+{_NUM})?{_SEP}\s*(?P<rest>.*)$", re.S | re.I)
 _MARKER = re.compile(r"^\[(?P<m>[a-z_]+)\]\s*")
 _FORMULA = re.compile(
     r"^(?:A todos los que la presente|Sabed\s*:|En su virtud|D\s*I\s*S\s*P\s*O\s*N\s*G\s*O)", re.I
@@ -313,15 +313,24 @@ def _is_heading_class(cls: str) -> bool:
     return bool(cls) and not cls.lower().startswith(_BODY_CLASSES)
 
 
+def _quote_delta(text: str) -> int:
+    return text.count("«") + text.count("“") - text.count("»") - text.count("”")
+
+
+def _quote_left_open(items: list[_Item], start: int, depth: int) -> bool:
+    """Whether a quote open at `start` stays open up to the next real article,
+    so it was never closed rather than holding this heading."""
+    for it in items[start:]:
+        if "articulo" in it.cls.lower():
+            return _is_article_class(it.cls)
+        depth = max(0, depth + _quote_delta(it.text))
+        if depth == 0:
+            return False
+    return False
+
+
 def _classify(items: list[_Item]) -> None:
     """Mark heads in place. A heading quoted for amendment stays text."""
-    # Per position: is the next article-like line a real article, not a quoted one?
-    next_real = [False] * len(items)
-    real = False
-    for i in range(len(items) - 1, -1, -1):
-        next_real[i] = real
-        if "articulo" in items[i].cls.lower():
-            real = _is_article_class(items[i].cls)
     depth = 0
     group: str | None = None
     group_last = 0
@@ -337,7 +346,12 @@ def _classify(items: list[_Item]) -> None:
             depth = 0
         elif depth == 0 and not opens_quote and _head(it, group, group_last, strict=True):
             pass
-        elif depth > 0 and not opens_quote and _is_heading_class(it.cls) and next_real[i]:
+        elif (
+            depth > 0
+            and not opens_quote
+            and _is_heading_class(it.cls)
+            and _quote_left_open(items, i, depth)
+        ):
             # Unbalanced quotes upstream; a real article follows, so this heads.
             if _struct_head(it):
                 depth = 0
@@ -354,7 +368,10 @@ def _classify(items: list[_Item]) -> None:
         elif it.kind in ("article", "struct", "annex"):
             group = None
         if it.kind != "table":
-            depth = max(0, depth + it.text.count("«") - it.text.count("»"))
+            depth = max(0, depth + _quote_delta(it.text))
+    if depth > 0:
+        # An unclosed quote may have hidden later headings in body classes.
+        logger.warning("boe_quote_unclosed", depth=depth)
 
 
 def _struct_head(it: _Item) -> bool:
@@ -387,7 +404,8 @@ def _head(it: _Item, group: str | None, group_last: int, *, strict: bool) -> boo
             return False
         it.kind, it.level = kind, level
         it.num, it.value, it.heading, it.words = parsed
-        it.inline_body = dashed and bool(it.heading)
+        # Only a body-class line runs on into its text; a heading class keeps a heading.
+        it.inline_body = strict and dashed and bool(it.heading)
         return True
 
     m = _ARTICLE.match(text)
@@ -487,7 +505,9 @@ def _table(parent: etree._Element, src: etree._Element) -> None:
                 continue
             attrs = {k: v for k, v in cell.attrib.items() if k in ("rowspan", "colspan")}
             out = _sub(row, cell.tag, **attrs)
-            paras = [c for c in cell if c.tag == "p"] or [cell]
+            children = [c for c in cell if isinstance(c.tag, str)]
+            only_p = children and all(c.tag == "p" for c in children)
+            paras = children if only_p else [cell]
             for para in paras:
                 p = _sub(out, "p")
                 p.text = _plain(para)
