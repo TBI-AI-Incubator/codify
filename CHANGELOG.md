@@ -7,6 +7,14 @@ the launch tag.
 
 New, additive:
 
+- `codify.pipeline.formats.boe` converts a Boletín Oficial del Estado item's
+  XML to AKN without a model: books, titles, chapters, sections, articles
+  (ordinal, cardinal and `bis` numbers), apartados and letters, the four kinds
+  of disposition as named `hcontainer`s, preamble and enacting formula,
+  conclusions and annexes. Text quoted for amendment stays inside its article.
+  `dispatch` routes a BOE item there by its root. `BoeAcquirer`, registered as
+  the new `gazette_xml` source kind, fetches the item by its ELI through the
+  polite client, and hands on the PDF when the XML carries no text.
 - Migration `0023_source_spans` and `codify.storage.spans`: a multi-act
   source's split is stored as spans over its pages, one generation at a time.
   Each span is an act, a held region, a skipped non-act or front matter; its

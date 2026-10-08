@@ -1594,7 +1594,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive";
+            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml";
             /** Licence */
             licence?: string | null;
             /** Name */
