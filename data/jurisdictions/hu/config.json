@@ -47,6 +47,9 @@
         },
         {
           "local_term": "Szakasz",
+          "local_terms": {
+            "alt1": "§"
+          },
           "akn_element": "article",
           "level": "basic",
           "bluebell_keyword": "ARTICLE",
@@ -90,6 +93,9 @@
         },
         {
           "local_term": "Szakasz",
+          "local_terms": {
+            "alt1": "§"
+          },
           "akn_element": "article",
           "level": "basic",
           "bluebell_keyword": "ARTICLE",
@@ -183,7 +189,22 @@
       "showAs": "Codify"
     }
   ],
-  "structuring": {},
+  "structuring": {
+    "marker_boundary": "line_anchored",
+    "marker_order": "number_first",
+    "ordinal_words": {
+      "Első": 1,
+      "Második": 2,
+      "Harmadik": 3,
+      "Negyedik": 4,
+      "Ötödik": 5,
+      "Hatodik": 6,
+      "Hetedik": 7,
+      "Nyolcadik": 8,
+      "Kilencedik": 9,
+      "Tizedik": 10
+    }
+  },
   "display": {
     "heading_type": "section_heading",
     "heading_case": "sentence_case",

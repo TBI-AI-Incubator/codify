@@ -725,6 +725,8 @@ class StructuringConfig(BaseModel):
     # `line_anchored` where the drafting standard puts the marker on its own
     # line and the sources keep it, so a mid-sentence citation cannot anchor.
     marker_boundary: Literal["relaxed", "line_anchored"] = "relaxed"
+    # `number_first` where the number precedes the keyword ("15. §", "I. FEJEZET").
+    marker_order: Literal["keyword_first", "number_first"] = "keyword_first"
     # Words ending the previous line when a citation wraps onto the next, which
     # a boundary rule cannot see. Empty falls back to the script pack's list.
     prose_precursors: list[str] = Field(default_factory=list)

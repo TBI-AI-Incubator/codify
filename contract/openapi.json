@@ -3700,6 +3700,15 @@
             "title": "Marker Boundary",
             "type": "string"
           },
+          "marker_order": {
+            "default": "keyword_first",
+            "enum": [
+              "keyword_first",
+              "number_first"
+            ],
+            "title": "Marker Order",
+            "type": "string"
+          },
           "marker_tolerances": {
             "items": {
               "enum": [
