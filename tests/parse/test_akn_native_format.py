@@ -7,6 +7,8 @@ from pathlib import Path
 
 from lxml import etree
 
+from codify.akn.document import Document
+from codify.akn.elements import BodyElement
 from codify.akn.io import parse_akn
 from codify.pipeline import ingest_document
 from codify.pipeline.events import Complete
@@ -384,3 +386,112 @@ async def test_a_publisher_s_old_act_does_not_grade_as_a_misparse(tmp_path: Path
     assert not [c for c in checks if c and c.startswith(("identity_", "number_gap"))], checks
     # The same document read without its provenance is still flagged.
     assert "identity_year_implausible" in {i["check"] for i in validate_akn(_OLD_NATIVE)}
+
+
+def _annex_act(attachments: str, body: str = "") -> str:
+    """An invented act in the shape a national publisher serves: attachments with no eIds."""
+    return f"""<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+ <act>
+  <meta><identification source="#src"><FRBRWork>
+    <FRBRthis value="/akn/xz/act/legge/stato/2001-03-28/9/!main"/>
+    <FRBRuri value="/akn/xz/act/legge/stato/2001-03-28/9"/>
+    <FRBRdate date="2001-03-28" name="enacted"/>
+  </FRBRWork>
+  <FRBRExpression>
+    <FRBRthis value="/akn/xz/act/legge/stato/2001-03-28/9/xzz@2001-03-28/!main"/>
+    <FRBRuri value="/akn/xz/act/legge/stato/2001-03-28/9/xzz@2001-03-28"/>
+    <FRBRdate date="2001-03-28" name="enacted"/>
+    <FRBRlanguage language="xzz"/>
+  </FRBRExpression></identification></meta>
+  <body>
+    <article eId="art_1"><num>1</num><content><p>Operative text.</p></content></article>
+    {body}
+  </body>
+  <attachments>{attachments}</attachments>
+ </act>
+</akomaNtoso>"""
+
+
+def _annex(*paragraphs: str) -> str:
+    inner = "".join(f"<paragraph><content><p>{p}</p></content></paragraph>" for p in paragraphs)
+    return f'<attachment><doc name="Allegato"><mainBody>{inner}</mainBody></doc></attachment>'
+
+
+def _all_ids(doc: Document) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+
+    def walk(el: BodyElement) -> None:
+        out.append((el.akn_eid, el.akn_wid))
+        for child in el.children:
+            walk(child)
+
+    for top in [*doc.body, *doc.attachments]:
+        walk(top)
+    return out
+
+
+def test_normalise_names_unnumbered_attachment_elements() -> None:
+    xml = _annex_act(_annex("First note.", "Second note.") + _annex("Third note."))
+    doc, synth = normalise_native_akn(parse_akn(xml))
+    ids = _all_ids(doc)
+    assert all(eid and wid for eid, wid in ids), ids
+    assert len({eid for eid, _ in ids}) == len(ids), ids
+    assert synth == 3
+    # The attachment keeps its positional id; its children are scoped under it.
+    assert [(a.akn_eid, [c.akn_eid for c in a.children]) for a in doc.attachments] == [
+        ("att_1", ["att_1__paragraph_1", "att_1__paragraph_2"]),
+        ("att_2", ["att_2__paragraph_1"]),
+    ]
+
+
+def test_normalise_attachment_ids_keep_published_and_avoid_collisions() -> None:
+    held = (
+        '<article eId="att_2__paragraph_1"><num>2</num><content><p>Holds.</p></content></article>'
+    )
+    kept = '<paragraph eId="kept"><content><p>Published id.</p></content></paragraph>'
+    named = (
+        f'<attachment eId="annex_a"><doc name="A"><mainBody>{kept}</mainBody></doc></attachment>'
+    )
+    xml = _annex_act(named + _annex("Unnumbered."), body=held)
+    doc, synth = normalise_native_akn(parse_akn(xml))
+    ids = _all_ids(doc)
+    assert len({eid for eid, _ in ids}) == len(ids), ids
+    assert synth == 1
+    assert doc.attachments[0].akn_eid == "annex_a"
+    assert doc.attachments[0].children[0].akn_eid == "kept"
+    # The minted id steps past the published one it would have matched.
+    assert doc.attachments[1].children[0].akn_eid == "att_2__paragraph_2"
+
+
+def test_normalise_is_stable_across_runs() -> None:
+    xml = _annex_act(_annex("One.", "Two.") + _annex("Three."))
+    first = _all_ids(normalise_native_akn(parse_akn(xml))[0])
+    again = _all_ids(normalise_native_akn(parse_akn(xml))[0])
+    assert first == again
+    assert all(eid for eid, _ in first)
+
+
+def test_unnumbered_annex_flattens_to_storable_rows() -> None:
+    """A provision with an empty wid fails the database check; two empty eIds also
+    collide on the (version, eId) unique key."""
+    from codify.storage.mappers import document_to_rows
+
+    xml = _annex_act(_annex("First note.", "Second note.") + _annex("Third note."))
+    doc, _ = normalise_native_akn(parse_akn(xml))
+    _, sections, provisions, *_ = document_to_rows(doc, uuid.uuid4())
+    rows = [*sections, *provisions]
+    assert all(r.akn_wid for r in rows), [r.akn_eid for r in rows]
+    eids = [r.akn_eid for r in rows]
+    assert len(set(eids)) == len(eids), eids
+    assert sum(1 for p in provisions if p.text.endswith("note.")) == 3
+
+
+async def test_ingest_counts_attachment_ids_as_synthesised(tmp_path: Path) -> None:
+    from codify.pipeline.events import ValidationIssued
+    from codify.pipeline.formats.akn_native import ingest
+
+    src = tmp_path / "act.akn"
+    src.write_text(_annex_act(_annex("First note.", "Second note.")), encoding="utf-8")
+    events = [e async for e in ingest(src, "xz")]
+    issues = [e.issue for e in events if isinstance(e, ValidationIssued)]
+    assert {"synthesised_eids": 2} in issues

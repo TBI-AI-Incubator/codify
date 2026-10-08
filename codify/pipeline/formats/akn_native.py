@@ -9,7 +9,7 @@ unnumbered elements that would violate the provisions eId/wId constraints.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import cast
 
@@ -27,7 +27,8 @@ logger = structlog.get_logger()
 
 
 def normalise_native_akn(doc: Document) -> tuple[Document, int]:
-    """Canonicalise the document's FRBR URIs and fill missing eIds in place.
+    """Canonicalise the document's FRBR URIs and fill missing eIds in place,
+    in the body and in attachments (annexes, schedules).
 
     The work URI is derived from the document's own FRBRWork value via the
     core source-href tables, so any publisher `parse_source_ref` understands
@@ -44,13 +45,27 @@ def normalise_native_akn(doc: Document) -> tuple[Document, int]:
             )
     synth = 0
     seen: dict[str, int] = {}
+    # Published ids are claimed up front so a minted one never lands on one.
+    taken = {eid for top in (*doc.body, *doc.attachments) for eid in _eids(top)}
+    counts: dict[tuple[str, str], int] = {}
 
-    def _fill(el: object) -> None:
+    def _mint_scoped(parent: str, kind: str) -> str:
+        """`att_1__paragraph_2`: the parent's id plus a per-kind counter, the
+        shape the EU annex mappers use."""
+        while True:
+            n = counts[(parent, kind)] = counts.get((parent, kind), 0) + 1
+            eid = f"{parent}__{kind}_{n}" if parent else f"{kind}_{n}"
+            if eid not in taken:
+                taken.add(eid)
+                return eid
+
+    def _fill(el: object, parent: str | None = None, kind: str = "att") -> None:
+        # `parent` is None in the body, whose gaps get a document-wide counter.
         nonlocal synth
         eid = getattr(el, "akn_eid", None)
         if not eid:
             synth += 1
-            eid = f"codify-synth-{synth}"
+            eid = f"codify-synth-{synth}" if parent is None else _mint_scoped(parent, kind)
         elif eid in seen:
             # Publishers occasionally repeat an eId; the first keeps it.
             seen[eid] += 1
@@ -60,11 +75,20 @@ def normalise_native_akn(doc: Document) -> tuple[Document, int]:
         if not getattr(el, "akn_wid", None):  # keep real source wIds
             el.akn_wid = eid  # type: ignore[attr-defined]
         for child in getattr(el, "children", []) or []:
-            _fill(child)
+            _fill(child, eid if parent is not None else None, str(child.akn_type).lower())
 
     for top in doc.body:
         _fill(top)
+    for att in doc.attachments:
+        _fill(att, "")
     return doc, synth
+
+
+def _eids(el: object) -> Iterator[str]:
+    if eid := getattr(el, "akn_eid", None):
+        yield eid
+    for child in getattr(el, "children", []) or []:
+        yield from _eids(child)
 
 
 def canonicalise_identification(xml: str, work: str, expression: str | None) -> str:
