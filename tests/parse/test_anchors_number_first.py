@@ -39,7 +39,9 @@ A Fejezet hatálya a próbaügyekre terjed ki.
 2. § Az eljárást a hivatal folytatja, a
 3. §-a szerinti határidőben.
 
-2/A. § A kérelmet írásban kell benyújtani.
+2/A. § A kérelmet írásban kell benyújtani, a díjra a Ptv. 3. § (2) bekezdése irányadó.
+
+3. §-ában foglalt határidő nem hosszabbítható.
 
 II. FEJEZET
 
