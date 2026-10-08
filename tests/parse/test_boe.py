@@ -375,7 +375,9 @@ UNCLOSED = _item(
     <p class="parrafo">Se cita «un texto que no se cierra.</p>
     <p class="capitulo_num">CAPÍTULO II</p>
     <p class="articulo">Artículo 2.</p>
-    <p class="parrafo">Texto propio.</p>"""
+    <p class="parrafo">Otra cita «que tampoco se cierra.</p>
+    <p class="articulo">Disposición final única.</p>
+    <p class="parrafo">Entra en vigor mañana.</p>"""
 )
 
 
@@ -383,8 +385,9 @@ UNCLOSED = _item(
 QUOTED_ARTICLE = _item(
     """
     <p class="articulo">Artículo 1.</p>
-    <p class="parrafo">El artículo 5 de la Ley 7/2001 queda redactado así:</p>
-    <p class="articulo">«Artículo 5. Plazos.</p>
+    <p class="parrafo">Se añaden a la Ley 7/2001 un apartado y un artículo:</p>
+    <p class="parrafo">«Uno. El registro es público.</p>
+    <p class="articulo">Artículo 5 bis. Plazos.</p>
     <p class="parrafo">El plazo es de dos meses.»</p>
     <p class="articulo">Artículo 2.</p>
     <p class="parrafo">Texto propio.</p>"""
@@ -394,12 +397,13 @@ QUOTED_ARTICLE = _item(
 def test_a_quoted_article_in_article_class_stays_text() -> None:
     root, _ = _convert(QUOTED_ARTICLE)
     assert _eids(root, "article") == ["art_1", "art_2"]
-    assert "«Artículo 5. Plazos." in _text(root.find(".//a:article[@eId='art_1']", NS))
+    assert "Artículo 5 bis. Plazos." in _text(root.find(".//a:article[@eId='art_1']", NS))
 
 
 def test_an_unclosed_quote_does_not_hide_the_next_chapter() -> None:
     root, _ = _convert(UNCLOSED)
     assert _eids(root, "article") == ["chp_I__art_1", "chp_II__art_2"]
+    assert _eids(root, "hcontainer") == ["hcontainer_df-unica"]
 
 
 def test_an_item_without_text_is_refused() -> None:
