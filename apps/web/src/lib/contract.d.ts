@@ -1667,6 +1667,12 @@ export interface components {
              * @enum {string}
              */
             marker_boundary: "relaxed" | "line_anchored";
+            /**
+             * Marker Order
+             * @default keyword_first
+             * @enum {string}
+             */
+            marker_order: "keyword_first" | "number_first";
             /** Marker Tolerances */
             marker_tolerances?: ("missing_separator" | "keyword_glyph" | "digit_glyph" | "split_number")[];
             /** Ordinal Words */

@@ -199,7 +199,11 @@ def _split_num(chars: str) -> str:
 
 
 def _num_pattern_with(
-    ordinals: Mapping[str, int], *, digit_glyphs: bool = False, split_numbers: bool = False
+    ordinals: Mapping[str, int],
+    *,
+    digit_glyphs: bool = False,
+    split_numbers: bool = False,
+    slash_letter: bool = False,
 ) -> str:
     """`_NUM_PATTERN`, with declared ordinal words tried first.
 
@@ -215,6 +219,9 @@ def _num_pattern_with(
     )
     if digit_glyphs:
         extra += f"{_GLYPHED_NUM}|"
+    if slash_letter:
+        # A lettered insertion after a slash ("5/A").
+        extra += r"\d+/(?-i:[A-Z])(?![A-Za-z])|"
     if not ordinals:
         return rf"(?P<num>(?:{extra}{_NUM_ALTS}){_BIS_SUFFIX})" if extra else _NUM_PATTERN
     forms = {f for w in ordinals for f in (w, w.upper())}
@@ -528,12 +535,13 @@ def _compile_anchor_regex(
     if not parts:
         return re.compile(r"$^")  # never matches
     keyword_group = "|".join(parts)
-    num_pattern = _num_pattern_with(
-        structuring.ordinal_words if structuring else {},
-        digit_glyphs="digit_glyph" in tolerances,
-        split_numbers="split_number" in tolerances,
-    )
+    num_pattern = _marker_num_pattern(config)
     flags = "(?im)" if case_insensitive else "(?m)"
+    if _number_first(config):
+        return re.compile(
+            rf"{flags}{_BOUNDARIES[boundary or _policy(config)]}"
+            + _number_first_marker(keyword_group, num_pattern)
+        )
     pattern = (
         rf"{flags}{_BOUNDARIES[boundary or _policy(config)]}(?:{keyword_group})"
         rf"{_separator_for(tolerances)}{num_pattern}"
@@ -541,6 +549,29 @@ def _compile_anchor_regex(
         rf"{_MARKER_NUM_TAIL if 'missing_separator' in tolerances else ''}"
     )
     return re.compile(pattern)
+
+
+def _marker_num_pattern(config: JurisdictionConfig | None) -> str:
+    """The marker number grammar, widened by the config's tolerances and ordinals."""
+    structuring = config.structuring if config else None
+    tolerances = set(structuring.marker_tolerances if structuring else ())
+    numbering = config.numbering if config else None
+    return _num_pattern_with(
+        structuring.ordinal_words if structuring else {},
+        digit_glyphs="digit_glyph" in tolerances,
+        split_numbers="split_number" in tolerances,
+        slash_letter=numbering is not None and numbering.insertion_style == "slash_alpha",
+    )
+
+
+def _number_first(config: JurisdictionConfig | None) -> bool:
+    return bool(config and config.structuring and config.structuring.marker_order == "number_first")
+
+
+def _number_first_marker(keyword_group: str, number: str) -> str:
+    """Number, an optional full stop, then the keyword ("15. §", "I. FEJEZET"). A lone
+    letter needs its stop ("A fejezet" is prose), and a keyword running on ("§-a") cites."""
+    return rf"{number}(?:\.[^\S\n]*|(?<!\b[A-Za-z])[^\S\n]+)(?:{keyword_group})(?![\w-])"
 
 
 # Scanned Arabic drops the hamza (أ إ آ -> ا), so a precursor spelled with one
@@ -2903,17 +2934,15 @@ def _basic_unit_line_re(country: str) -> re.Pattern[str] | None:
 def _keyword_line_branch(config: JurisdictionConfig, entries: Sequence[HierarchyEntry]) -> str:
     """A line opening with one of these levels' keywords and a number, or ""."""
     terms = {form for entry in entries for form in _alias_terms_for(entry)}
-    if not terms:
+    # Number-first amendments quote a subtitle with its units, so a unit line
+    # inside a quote does not mean its closer was dropped.
+    if not terms or _number_first(config):
         return ""
     alts = "|".join(re.escape(t) for t in sorted(terms, key=lambda t: (-len(t), t)))
     # The scanner's own separator and number grammar: what it would anchor is a
     # provision heading here, and a keyword opening prose is not.
     tolerances = set(config.structuring.marker_tolerances if config.structuring else ())
-    number = _num_pattern_with(
-        config.structuring.ordinal_words if config.structuring else {},
-        digit_glyphs="digit_glyph" in tolerances,
-        split_numbers="split_number" in tolerances,
-    )
+    number = _marker_num_pattern(config)
     return rf"^[^\S\n]{{0,8}}(?:{alts}){_separator_for(tolerances)}{number}{_MARKER_NUM_END}"
 
 
@@ -4008,7 +4037,7 @@ def _normalise_number(num: str | None) -> str:
         if rank is not None:
             return str(rank)
     # A slashed insertion keys as the parser's own eId form.
-    return latinise_arabic_ordinal(stripped) or re.sub(r"(?<=\d)/(?=\d)", "-", stripped)
+    return latinise_arabic_ordinal(stripped) or re.sub(r"(?<=\d)/(?=[\dA-Za-z])", "-", stripped)
 
 
 @lru_cache(maxsize=64)
