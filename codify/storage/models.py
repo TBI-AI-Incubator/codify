@@ -173,6 +173,8 @@ class Version(SQLModel, table=True):
     # translation is stale when the parent no longer hashes to it. Not
     # source_sha256, which is the uploaded file.
     source_akn_sha256: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    # `is_current` (0024) is kept by trigger and read in SQL only; unmapped, so
+    # no session holds a copy the trigger has since moved.
     # The span of a multi-act source this version was cut from (migration 0023).
     source_span_id: uuid.UUID | None = Field(
         default=None,

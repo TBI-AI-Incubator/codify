@@ -10,8 +10,8 @@ silently.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
-from pgvector.sqlalchemy import HALFVEC
 from pydantic import BaseModel
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -21,6 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from codify.search import tokenise
 from codify.storage.lexicon import expand_terms
 from codify.storage.models import Jurisdiction, Law, Provision, Version
+from codify.storage.versions import (
+    CurrentScope,
+    VersionScope,
+    scope_filter,
+    scoped_text,
+)
 
 # Measured, not conventional. Sweeping lexical:dense weights 0.25-4.0 against
 # rrf_k 10-100 at every pool production fuses found equal weight best everywhere:
@@ -56,28 +62,43 @@ RRF_K = 60
 # orders by `distance + 0`: the relaxed scan is approximately ordered and the
 # planner would otherwise take its order for the window's. The anti-join
 # excludes fallback vectors wherever a preferred vector exists.
-_HYBRID_SQL = text(
-    """
+_HYBRID_TEMPLATE = """
     WITH fts AS (
-      SELECT id, ROW_NUMBER() OVER (
-               ORDER BY search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')
+      SELECT p.id, ROW_NUMBER() OVER (
+               ORDER BY p.search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')
              ) AS rn
-      FROM provisions
-      WHERE version_id = ANY(:version_ids)
-        AND search_tsv @@ to_tsquery('simple', :query_match)
-        AND (CAST(:akn_type AS text) IS NULL OR akn_type = CAST(:akn_type AS text))
-        AND (normative OR CAST(:include_non_normative AS boolean))
-        AND excluded_from_pool IS NOT TRUE
+      FROM provisions p {fts_join}
+      WHERE {fts_scope}
+        AND p.search_tsv @@ to_tsquery('simple', :query_match)
+        AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
+        AND (p.normative OR CAST(:include_non_normative AS boolean))
+        AND p.excluded_from_pool IS NOT TRUE
       LIMIT :pool
     ),
     vec AS (
       SELECT id, ROW_NUMBER() OVER (ORDER BY distance + 0) AS rn
       FROM (
-        SELECT e.provision_id AS id, e.embedding <=> :query_vec AS distance
+        SELECT {dense_body}
+        LIMIT :pool
+      ) nearest
+    ),
+    fused AS (
+      SELECT id, SUM(1.0 / (:rrf_k + rn)) AS rrf_score
+      FROM (SELECT id, rn FROM fts UNION ALL SELECT id, rn FROM vec) t
+      GROUP BY id
+    )
+    SELECT p.id, p.akn_eid, p.text, fused.rrf_score
+    FROM fused
+    JOIN provisions p ON p.id = fused.id
+    ORDER BY fused.rrf_score DESC, fused.id
+    LIMIT :k
+"""
+
+# The dense arm's body after SELECT, shared with the dense-only query.
+_DENSE_TEMPLATE = """e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
         FROM provision_embeddings e
-        JOIN provisions p ON p.id = e.provision_id
-        WHERE e.jurisdiction_id = ANY(:jurisdiction_ids)
-          AND e.version_id = ANY(:version_ids)
+        JOIN provisions p ON p.id = e.provision_id {vec_join}
+        WHERE {vec_partitions} {vec_scope}
           AND (
             e.model_id = :model_id
             OR (
@@ -93,47 +114,64 @@ _HYBRID_SQL = text(
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
           AND p.excluded_from_pool IS NOT TRUE
-        ORDER BY e.embedding <=> :query_vec
-        LIMIT :pool
-      ) nearest
-    ),
-    fused AS (
-      SELECT id, SUM(1.0 / (:rrf_k + rn)) AS rrf_score
-      FROM (SELECT id, rn FROM fts UNION ALL SELECT id, rn FROM vec) t
-      GROUP BY id
-    )
-    SELECT p.id, p.akn_eid, p.text, fused.rrf_score
-    FROM fused
-    JOIN provisions p ON p.id = fused.id
-    ORDER BY fused.rrf_score DESC, fused.id
+        ORDER BY e.embedding <=> :query_vec"""
+
+# The relaxed scan may hand back its candidates a little out of order, so the
+# limited set is sorted once more outside it; `+ 0` so the planner does not
+# take the scan's claimed order for the sort's.
+_DENSE_ONLY_TEMPLATE = """
+    SELECT id, akn_eid, text, 0.0 AS rrf_score
+    FROM (
+    SELECT {dense_body}
     LIMIT :k
-    """
-).bindparams(
-    bindparam("query_vec", type_=HALFVEC(768)),
-    bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+    ) nearest
+    ORDER BY distance + 0, id
+"""
+
+
+def _dense_body(scope: VersionScope, partitioned: bool) -> tuple[str, dict[str, Any]]:
+    joins, pred, params = scope_filter(scope, "e.version_id")
+    partitions = "e.jurisdiction_id = ANY(:jurisdiction_ids) AND" if partitioned else ""
+    body = _DENSE_TEMPLATE.format(vec_join=joins, vec_partitions=partitions, vec_scope=pred)
+    return body, params
+
+
+def _hybrid_sql(scope: VersionScope, partitioned: bool = True) -> tuple[str, dict[str, Any]]:
+    fts_join, fts_pred, params = scope_filter(scope, "p.version_id")
+    body, dense_params = _dense_body(scope, partitioned)
+    sql = _HYBRID_TEMPLATE.format(fts_join=fts_join, fts_scope=fts_pred, dense_body=body)
+    return sql, params | dense_params
+
+
+def _dense_only_sql(scope: VersionScope, partitioned: bool = True) -> tuple[str, dict[str, Any]]:
+    body, params = _dense_body(scope, partitioned)
+    return _DENSE_ONLY_TEMPLATE.format(dense_body=body), params
+
+
+# The id-list forms, named so tests and the benchmark can read them.
+_HYBRID_SQL = scoped_text(
+    _hybrid_sql([])[0], {"query_vec": 0, "version_ids": 0, "jurisdiction_ids": 0}
+)
+_DENSE_ONLY_SQL = scoped_text(
+    _dense_only_sql([])[0], {"query_vec": 0, "version_ids": 0, "jurisdiction_ids": 0}
 )
 
 
-_LANGUAGES_SQL = text(
-    "SELECT DISTINCT language FROM versions WHERE id = ANY(:version_ids)"
-).bindparams(bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))))
-
-
-async def query_tokens_for(
-    session: AsyncSession, query_text: str, version_ids: list[uuid.UUID]
-) -> str:
+async def query_tokens_for(session: AsyncSession, query_text: str, scope: VersionScope) -> str:
     """Tokenise `query_text` under every language present in the searched set. A
     mixed set has no single right language and guessing would stem the query
     wrongly. Tokens from different scripts cannot collide, and a term absent from
     the corpus contributes nothing to BM25, so the union costs less than a guess.
     """
-    # `= ANY(array)` rather than `IN (...)`, matching `_HYBRID_SQL` above: a
-    # global search passes one version per law across every jurisdiction, and
-    # `.in_()` renders a bind parameter each, against a 32767 cap.
-    languages = (
-        (await session.execute(_LANGUAGES_SQL, {"version_ids": version_ids})).scalars().all()
+    # `= ANY(array)` rather than `IN (...)`: a global search passes one version
+    # per law across every jurisdiction, and `.in_()` renders a bind parameter
+    # each, against a 32767 cap.
+    joins, pred, params = scope_filter(scope, "v.id")
+    statement = scoped_text(
+        f"SELECT DISTINCT v.language FROM versions v {joins} WHERE {pred}",  # noqa: S608
+        params,
     )
+    languages = (await session.execute(statement, params)).scalars().all()
     seen: set[str] = set()
     tokens: list[str] = []
     for language in languages or ["eng"]:
@@ -146,44 +184,6 @@ async def query_tokens_for(
     # are per-language and three of the corpus's languages have none.
     return " ".join(await expand_terms(session, tokens))
 
-
-# The relaxed scan may hand back its candidates a little out of order, so the
-# limited set is sorted once more outside it; `+ 0` so the planner does not
-# take the scan's claimed order for the sort's.
-_DENSE_ONLY_SQL = text(
-    """
-    SELECT id, akn_eid, text, 0.0 AS rrf_score
-    FROM (
-    SELECT p.id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
-    FROM provision_embeddings e
-    JOIN provisions p ON p.id = e.provision_id
-    WHERE e.jurisdiction_id = ANY(:jurisdiction_ids)
-      AND e.version_id = ANY(:version_ids)
-      AND (
-        e.model_id = :model_id
-        OR (
-          e.model_id = CAST(:fallback_model_id AS text)
-          AND NOT EXISTS (
-            SELECT 1 FROM provision_embeddings preferred
-            WHERE preferred.provision_id = e.provision_id
-              AND preferred.jurisdiction_id = e.jurisdiction_id
-              AND preferred.model_id = :model_id
-          )
-        )
-      )
-      AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-      AND (p.normative OR CAST(:include_non_normative AS boolean))
-      AND p.excluded_from_pool IS NOT TRUE
-    ORDER BY e.embedding <=> :query_vec
-    LIMIT :k
-    ) nearest
-    ORDER BY distance + 0, id
-    """
-).bindparams(
-    bindparam("query_vec", type_=HALFVEC(768)),
-    bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-    bindparam("jurisdiction_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-)
 
 _JURISDICTIONS_SQL = text(
     "SELECT DISTINCT l.jurisdiction_id FROM versions v JOIN laws l ON l.id = v.law_id "
@@ -199,11 +199,18 @@ async def scope_jurisdictions(
     return [row[0] for row in rows.all()]
 
 
+async def _partitions(session: AsyncSession, scope: VersionScope) -> list[uuid.UUID] | None:
+    """The partitions to prune to, or None to read them all."""
+    if isinstance(scope, CurrentScope):
+        return None if scope.jurisdiction_ids is None else list(scope.jurisdiction_ids)
+    return await scope_jurisdictions(session, list(scope))
+
+
 async def _dense_only(
     session: AsyncSession,
     query_vec: list[float],
-    version_ids: list[uuid.UUID],
-    jurisdiction_ids: list[uuid.UUID],
+    scope: VersionScope,
+    jurisdiction_ids: list[uuid.UUID] | None,
     k: int,
     model_id: str,
     akn_type: str | None = None,
@@ -211,19 +218,18 @@ async def _dense_only(
     fallback_model_id: str | None = None,
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """Dense arm alone, for a query the tokeniser finds nothing lexical in."""
-    result = await session.execute(
-        _DENSE_ONLY_SQL,
-        {
-            "query_vec": query_vec,
-            "version_ids": version_ids,
-            "jurisdiction_ids": jurisdiction_ids,
-            "k": k,
-            "model_id": model_id,
-            "fallback_model_id": fallback_model_id,
-            "akn_type": akn_type,
-            "include_non_normative": include_non_normative,
-        },
-    )
+    sql, params = _dense_only_sql(scope, jurisdiction_ids is not None)
+    params |= {
+        "query_vec": query_vec,
+        "k": k,
+        "model_id": model_id,
+        "fallback_model_id": fallback_model_id,
+        "akn_type": akn_type,
+        "include_non_normative": include_non_normative,
+    }
+    if jurisdiction_ids is not None:
+        params["jurisdiction_ids"] = jurisdiction_ids
+    result = await session.execute(scoped_text(sql, params), params)
     return [(row[0], row[1], row[2], float(row[3])) for row in result.all()]
 
 
@@ -232,7 +238,7 @@ async def hybrid_search(
     *,
     query_vec: list[float],
     query_text: str,
-    version_ids: list[uuid.UUID],
+    version_ids: VersionScope,
     k: int,
     candidate_pool: int,
     rrf_k: int,
@@ -243,6 +249,8 @@ async def hybrid_search(
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """RRF-fused dense + BM25.
 
+    `version_ids` is an id list or a `CurrentScope`; pass the latter for a
+    jurisdiction-wide search, which otherwise spends seconds planning.
     `fallback_model_id` is read per provision where the preferred construction
     has not been written yet, so a re-embed in progress never empties the arm.
 
@@ -250,7 +258,8 @@ async def hybrid_search(
     Normative only unless `include_non_normative`: an elucidation cannot be a
     legal basis, so it does not compete with law for a first page. On the flag
     alone, never on where a provision sits, because a normative annex is law."""
-    if not version_ids:
+    scope = version_ids
+    if not scope:
         return []
     # Continue the approximate index scan past rows the version and model
     # filters discard, rather than stopping at pgvector's default 40 candidates.
@@ -258,8 +267,8 @@ async def hybrid_search(
     # 0.96 s measured) and the window above re-sorts the pool anyway.
     # Transaction-local: never change the next borrower's search settings.
     await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
-    jurisdiction_ids = await scope_jurisdictions(session, version_ids)
-    tokens = (await query_tokens_for(session, query_text, version_ids)).split()
+    jurisdiction_ids = await _partitions(session, scope)
+    tokens = (await query_tokens_for(session, query_text, scope)).split()
     if not tokens:
         # An empty tokenisation means the query carried no letters or digits.
         # Dense-only rather than the raw text, which scores every row zero:
@@ -267,7 +276,7 @@ async def hybrid_search(
         return await _dense_only(
             session,
             query_vec,
-            version_ids,
+            scope,
             jurisdiction_ids,
             k,
             model_id,
@@ -275,25 +284,24 @@ async def hybrid_search(
             include_non_normative,
             fallback_model_id,
         )
-    result = await session.execute(
-        _HYBRID_SQL,
-        {
-            "query_vec": query_vec,
-            "query_tokens": " ".join(tokens),
-            # ORed: the tokens span every language in the searched set, so an
-            # AND would demand one language's stem and another's at once.
-            "query_match": " | ".join(tokens),
-            "version_ids": version_ids,
-            "jurisdiction_ids": jurisdiction_ids,
-            "k": k,
-            "pool": candidate_pool,
-            "rrf_k": rrf_k,
-            "model_id": model_id,
-            "fallback_model_id": fallback_model_id,
-            "akn_type": akn_type,
-            "include_non_normative": include_non_normative,
-        },
-    )
+    sql, params = _hybrid_sql(scope, jurisdiction_ids is not None)
+    params |= {
+        "query_vec": query_vec,
+        "query_tokens": " ".join(tokens),
+        # ORed: the tokens span every language in the searched set, so an
+        # AND would demand one language's stem and another's at once.
+        "query_match": " | ".join(tokens),
+        "k": k,
+        "pool": candidate_pool,
+        "rrf_k": rrf_k,
+        "model_id": model_id,
+        "fallback_model_id": fallback_model_id,
+        "akn_type": akn_type,
+        "include_non_normative": include_non_normative,
+    }
+    if jurisdiction_ids is not None:
+        params["jurisdiction_ids"] = jurisdiction_ids
+    result = await session.execute(scoped_text(sql, params), params)
     return [(row[0], row[1], row[2], float(row[3])) for row in result.all()]
 
 

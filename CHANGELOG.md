@@ -54,6 +54,17 @@ New, additive:
   segmenter's outcome, acts, held regions and reconciliation table) into the
   bundle. `codify segment <bundle>` re-runs the segmenter over that stored
   text under the current config, with no model.
+- Migration `0024_current_versions`: `versions.is_current` marks each law's
+  current original version, kept by trigger on insert, delete and any update
+  of the columns that order versions, and unique per law.
+  `latest_versions_global` and `latest_versions_for_jurisdiction` read it when
+  no language is asked for. `CurrentScope` (built from jurisdiction codes by
+  `current_scope`) names those versions by jurisdiction, year range and
+  doctype; `hybrid_search`, `query_tokens_for` and `count_embedded_versions`
+  take one in place of an id list, `count_in_scope` counts it, and `retrieve`
+  uses one for a jurisdiction searched in its original language. The search
+  then joins the flag instead of binding every id, which the planner estimated
+  element by element: seconds of planning per query on a large corpus.
 
 Fixed:
 
