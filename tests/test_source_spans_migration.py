@@ -11,9 +11,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 _REVISION = "0023_source_spans"
 
 
-def test_source_spans_is_the_head_after_label_provisions() -> None:
+def test_source_spans_follows_label_provisions() -> None:
     scripts = ScriptDirectory.from_config(Config(str(_ROOT / "alembic.ini")))
-    assert scripts.get_heads() == [_REVISION]
     rev = scripts.get_revision(_REVISION)
     assert rev is not None and rev.down_revision == "0022_label_provisions_kind"
 

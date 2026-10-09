@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.embed.client import EmbeddingClient
 from codify.retrieve.hybrid import ProvisionMatch, retrieve
+from codify.storage.versions import CurrentScope
 
 
 @pytest.fixture
@@ -68,9 +69,29 @@ async def test_law_id_resolves_via_storage(
     assert mock_hybrid.await_args.kwargs["version_ids"] == [resolved_vid]
 
 
+@patch("codify.retrieve.hybrid.current_scope", new_callable=AsyncMock)
+@patch("codify.retrieve.hybrid.hybrid_search", new_callable=AsyncMock)
+async def test_jurisdiction_code_searches_its_current_versions(
+    mock_hybrid: AsyncMock,
+    mock_scope: AsyncMock,
+    mock_session: AsyncMock,
+    mock_client: AsyncMock,
+) -> None:
+    scope = CurrentScope(jurisdiction_ids=(uuid.uuid4(),))
+    mock_scope.return_value = scope
+    mock_hybrid.return_value = []
+    await retrieve(
+        mock_session, "q", embedding_client=mock_client, jurisdiction_code="al", doctype="act"
+    )
+    assert mock_scope.await_args is not None
+    assert mock_scope.await_args.kwargs == {"jurisdictions": ("al",), "doctype": "act"}
+    assert mock_hybrid.await_args is not None
+    assert mock_hybrid.await_args.kwargs["version_ids"] == scope
+
+
 @patch("codify.retrieve.hybrid.latest_versions_for_jurisdiction", new_callable=AsyncMock)
 @patch("codify.retrieve.hybrid.hybrid_search", new_callable=AsyncMock)
-async def test_jurisdiction_code_resolves_via_storage(
+async def test_a_preferred_language_resolves_ids(
     mock_hybrid: AsyncMock,
     mock_latest_juris: AsyncMock,
     mock_session: AsyncMock,
@@ -79,7 +100,9 @@ async def test_jurisdiction_code_resolves_via_storage(
     vids = [uuid.uuid4(), uuid.uuid4()]
     mock_latest_juris.return_value = vids
     mock_hybrid.return_value = []
-    await retrieve(mock_session, "q", embedding_client=mock_client, jurisdiction_code="al")
+    await retrieve(
+        mock_session, "q", embedding_client=mock_client, jurisdiction_code="al", language="eng"
+    )
     assert mock_hybrid.await_args is not None
     assert mock_hybrid.await_args.kwargs["version_ids"] == vids
 
@@ -113,11 +136,11 @@ async def test_projects_storage_rows_to_matches(
     ]
 
 
-@patch("codify.retrieve.hybrid.latest_versions_for_jurisdiction", new_callable=AsyncMock)
+@patch("codify.retrieve.hybrid.current_scope", new_callable=AsyncMock)
 async def test_empty_resolution_short_circuits_embedding(
-    mock_latest_juris: AsyncMock, mock_session: AsyncMock, mock_client: AsyncMock
+    mock_scope: AsyncMock, mock_session: AsyncMock, mock_client: AsyncMock
 ) -> None:
-    mock_latest_juris.return_value = []
+    mock_scope.return_value = CurrentScope(jurisdiction_ids=())
     matches = await retrieve(
         mock_session, "q", embedding_client=mock_client, jurisdiction_code="zz"
     )
