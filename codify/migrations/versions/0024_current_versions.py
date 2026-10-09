@@ -71,6 +71,12 @@ END $$;
 """
 
 
+_NEXT_LAWS = sa.text(
+    "SELECT id FROM laws WHERE CAST(:after AS uuid) IS NULL OR id > CAST(:after AS uuid) "
+    "ORDER BY id LIMIT 2000"
+)
+
+
 def upgrade() -> None:
     # `versions` is live: wait briefly for its lock, never queue reads behind it.
     op.execute("SET lock_timeout = '5s'")
@@ -103,22 +109,17 @@ def upgrade() -> None:
         EXECUTE FUNCTION versions_refresh_current_row()
         """
     )
-    # After the triggers, in the same transaction, so no insert slips between.
-    # The immutability guard would compare every row's akn_xml under this lock.
-    op.execute("ALTER TABLE versions DISABLE TRIGGER versions_enforce_immutable")
-    op.execute(
-        """
-        UPDATE versions v SET is_current = true
-        FROM (
-            SELECT DISTINCT ON (law_id) id FROM versions
-            WHERE parent_version_id IS NULL
-            ORDER BY law_id, expression_date DESC, ingested_at DESC, id ASC
-        ) w
-        WHERE v.id = w.id AND NOT v.is_current
-        """
-    )
-    op.execute("ALTER TABLE versions ENABLE TRIGGER versions_enforce_immutable")
+    # The column and triggers commit first, so the table lock ends here. The
+    # backfill then runs in batches through the trigger's own refresh, which
+    # takes row locks per law and so cannot race a concurrent writer.
     with op.get_context().autocommit_block():
+        bind = op.get_bind()
+        after = None
+        while ids := list(bind.execute(_NEXT_LAWS, {"after": after}).scalars()):
+            bind.execute(
+                sa.text("SELECT refresh_current_versions(CAST(:ids AS uuid[]))"), {"ids": ids}
+            )
+            after = ids[-1]
         # A cancelled concurrent build leaves an unusable index under the name.
         if _index_valid() is False:
             op.execute(f"DROP INDEX CONCURRENTLY {_INDEX}")

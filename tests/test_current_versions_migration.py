@@ -23,4 +23,8 @@ def test_versions_is_altered_under_a_short_lock_and_indexed_concurrently() -> No
     assert "SET lock_timeout = '5s'" in source
     assert "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS {_INDEX}" in source
     assert "pg_advisory" not in source  # one lock per law exhausts the lock table
+    # The backfill runs after the DDL commits, so it holds no table lock.
+    ddl, _, backfill = source.partition("autocommit_block()")
+    assert "ADD COLUMN" in ddl and "refresh_current_versions(CAST" in backfill
+    assert "DISABLE TRIGGER" not in source
     assert "indisvalid" in source and "DROP INDEX CONCURRENTLY {_INDEX}" in source
