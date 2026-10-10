@@ -109,9 +109,9 @@ Fixed:
   longer fails as a void boundary policy; those units show the layout held, and
   `anchor_boundary_policy_held` is logged.
 - `recurring_furniture`: a line that opens an attachment is never furniture, so
-  a schedule's caption printed inside a repeated head block stays, once however
-  many pages repeat it, and a caption block printed on a head's row is not part
-  of the row.
+  a schedule's caption printed inside a repeated head block stays, and a head
+  that prints the previous page's caption again does not repeat it; a caption
+  block printed on a head's row is not part of the row.
 
 ## 0.6.0 (2026-10-02)
 

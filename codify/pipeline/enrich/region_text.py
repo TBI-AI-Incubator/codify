@@ -306,7 +306,7 @@ def combine_text_for_structure(
 
     lines = text.split("\n")
     verdicts: list[tuple[int | None, str]] = []
-    captions: set[str] = set()
+    captions: dict[str, int | None] = {}  # a caption's text, and the page it last printed on
     # Offsets index the text as given, which is what the spans were built over.
     offset = 0
     for line in lines:
@@ -319,10 +319,13 @@ def combine_text_for_structure(
             maybe = bare and _digits(found) in numbers.get(page or 0, ())
             verdicts.append((page, "bare" if maybe else "keep"))
         elif recurring and opens_attachment(line.strip(), country):
-            # A caption is never furniture, nor a note; a running head that prints one again is.
+            # A caption is never furniture, nor a note; a running head that prints the page
+            # before's again is.
             key = " ".join(line.split()).upper()
-            again = key in captions and any(_matches(line, block) for block in _blocks(drop, page))
-            captions.add(key)
+            before = captions.get(key)
+            carried = key in captions and (page is None or before is None or page - before <= 1)
+            again = carried and any(_matches(line, block) for block in _blocks(drop, page))
+            captions[key] = page
             verdicts.append((page, "drop" if again else "keep"))
         elif any(_matches(line, block) for block in _blocks(drop, page)):
             verdicts.append((page, "drop"))  # header/footer furniture
