@@ -294,13 +294,26 @@ def _unit(
     ("units", "held"),
     [
         ((_unit("1"), _unit("2", at=10)), True),
+        ((_unit("2", at=10), _unit("1")), True),
+        ((_unit("1"), _unit("2", at=10), _unit("7", at=20)), True),
+        ((_unit("7"), _unit("1", at=10), _unit("2", at=20)), False),
         ((_unit("1"),), False),
         ((_unit("2"), _unit("3", at=10)), False),
         ((_unit("1", "regex"), _unit("2", "regex", at=10)), False),
         ((_unit("1"), _unit("2", "regex", at=10)), False),
         ((_unit("1", kind="subsection"), _unit("2", kind="subsection", at=10)), False),
     ],
-    ids=["one and two", "one alone", "two and three", "other pass", "mixed passes", "subsections"],
+    ids=[
+        "one and two",
+        "out of order",
+        "a later stray",
+        "an earlier stray",
+        "one alone",
+        "two and three",
+        "other pass",
+        "mixed passes",
+        "subsections",
+    ],
 )
 def test_the_layout_is_held_when_the_uk_scan_read_units_one_and_two(
     units: tuple[StructuralAnchor, ...], held: bool
@@ -625,6 +638,38 @@ def test_a_running_head_split_across_blocks_leaves_the_structure_text(recurring:
     assert "Social Security" not in out
     assert "No. 148" not in out
     assert "The register records the matters." in out
+
+
+def _split_head_blocks() -> list[OcrBlock]:
+    return [
+        _block("header", "843", 78, 40),
+        _block("header", "Social Security", 83, 270),
+        _block("header", "No. 148", 74, 520),
+        _block("text", "Text of page two.", 200),
+    ]
+
+
+def test_a_head_printed_whole_on_one_page_and_split_on_another_leaves_both(
+    recurring: None,
+) -> None:
+    """No part of the split head shares enough with the whole one; the joined row does."""
+    first = ["842 Social Security No. 148", "The register records the matters."]
+    second = ["843 Social Security No. 148", "Text of page two."]
+    pages = [
+        _page(1, first, [_block("header", first[0], 78), _block("text", first[1], 200)]),
+        _page(2, second, _split_head_blocks()),
+    ]
+    assert _lines(_structure_text(pages)) == [first[1], second[1]]
+
+
+def test_a_split_head_the_text_layer_prints_in_parts_leaves_in_parts(recurring: None) -> None:
+    first = ["842 Social Security No. 148", "The register records the matters."]
+    second = ["843", "Social Security", "No. 148", "Text of page two."]
+    pages = [
+        _page(1, first, [_block("header", first[0], 78), _block("text", first[1], 200)]),
+        _page(2, second, _split_head_blocks()),
+    ]
+    assert _lines(_structure_text(pages)) == [first[1], second[3]]
 
 
 def test_a_caption_the_engine_filed_as_furniture_stays_where_it_is(recurring: None) -> None:

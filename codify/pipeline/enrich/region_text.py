@@ -126,13 +126,33 @@ def _notes_of(regs: list[Region]) -> list[str]:
     ]
 
 
+def _heads(
+    entries: list[tuple[Region, frozenset[str]]],
+) -> list[tuple[str, frozenset[str], list[str]]]:
+    """Each furniture block as the engine cut it, and each row of blocks joined, with the
+    blocks each is made of. Matching reads the words, not their order."""
+    rows: list[list[Region]] = []
+    for region, _ in sorted(entries, key=lambda e: e[0].top):
+        if rows and abs(region.top - rows[-1][0].top) <= _ROW_TOLERANCE:
+            rows[-1].append(region)
+        else:
+            rows.append([region])
+    heads = [(region.text, content, [region.text]) for region, content in entries]
+    for row in rows:
+        if len(row) > 1:
+            parts = [r.text for r in row]
+            joined = " ".join(parts)
+            heads.append((joined, _tokens(joined), parts))
+    return heads
+
+
 def _recurring_candidates(
     regions: dict[int, list[Region]], country: str
 ) -> tuple[dict[int, list[str]], dict[int, Counter[str]], dict[int, list[str]]]:
-    """Per page: repeated short furniture (a split head also joined by row), the bare numbers
-    its blocks hold and how many of each, and furniture or footnote blocks opening on a marker,
-    returned apart as notes. A caption that opens an attachment is not a running head, whatever
-    else the page carries beside it."""
+    """Per page: short furniture another page repeats, as one block or as a row of them, the
+    bare numbers its blocks hold and how many of each, and furniture or footnote blocks opening
+    on a marker, returned apart as notes. A caption that opens an attachment is not a running
+    head, whatever else the page carries beside it."""
     notes = {page: _notes_of(regs) for page, regs in regions.items()}
     blocks = {
         page: [
@@ -142,36 +162,30 @@ def _recurring_candidates(
         ]
         for page, regs in regions.items()
     }
+    heads = {page: _heads(entries) for page, entries in blocks.items()}
     texts: dict[int, list[str]] = {}
     numbers: dict[int, Counter[str]] = {}
     for page, entries in blocks.items():
-        kept: list[Region] = []
         for region, content in entries:
-            if all(t.isdigit() for t in content):
-                if content:
-                    numbers.setdefault(page, Counter())[_digits(content)] += 1
-            elif opens_attachment(region.text, country):
+            if content and all(t.isdigit() for t in content):
+                numbers.setdefault(page, Counter())[_digits(content)] += 1
+        candidates: list[str] = []
+        for text, content, parts in heads[page]:
+            if (
+                not content
+                or all(t.isdigit() for t in content)
+                or opens_attachment(text, country)
+                or sum(not t.isdigit() for t in content) > _RUNNING_HEAD_MAX_WORDS
+            ):
                 continue
-            elif sum(not t.isdigit() for t in content) <= _RUNNING_HEAD_MAX_WORDS and any(
+            if any(
                 _same_block(content, other)
-                for q, others in blocks.items()
+                for q, others in heads.items()
                 if q != page
-                for _, other in others
+                for _, other, _ in others
                 if other
             ):
-                kept.append(region)
-        rows: list[list[Region]] = []
-        for region in sorted(kept, key=lambda r: r.top):
-            if rows and abs(region.top - rows[-1][0].top) <= _ROW_TOLERANCE:
-                rows[-1].append(region)
-            else:
-                rows.append([region])
-        candidates = [r.text for r in kept]
-        candidates += [
-            " ".join(r.text for r in sorted(row, key=lambda r: r.block_index))
-            for row in rows
-            if len(row) > 1
-        ]
+                candidates += [text, *parts]
         if candidates:
             texts[page] = candidates
     return texts, numbers, {page: found for page, found in notes.items() if found}
