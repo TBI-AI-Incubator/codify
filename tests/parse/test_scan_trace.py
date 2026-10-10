@@ -10,6 +10,8 @@ compared, and that a trace is emitted on the paths that produce no scaffold.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from structlog.testing import capture_logs
 
@@ -463,6 +465,59 @@ async def test_markers_outside_the_boundary_still_fail_under_the_landing_policy(
             doctype="act",
             halt_policy="land",
         )
+
+
+def _stamped_by(monkeypatch: pytest.MonkeyPatch, source_pass: str, first: int) -> None:
+    """The scan as it is, its anchors credited to one pass and numbered on from `first`."""
+    from dataclasses import replace
+
+    from codify.pipeline.enrich import structure as mod
+
+    real = mod.scan_anchors_with_ambiguity
+
+    def scan(*args: Any, **kwargs: Any) -> Any:
+        found = real(*args, **kwargs)
+        anchors = [
+            replace(a, source_pass=source_pass, number=str(first + i))
+            for i, a in enumerate(found.anchors)
+        ]
+        return replace(found, anchors=anchors)
+
+    monkeypatch.setattr(mod, "scan_anchors_with_ambiguity", scan)
+    monkeypatch.setattr(mod, "markers_outside_boundary", lambda *a, **k: 1)
+    _coverage(monkeypatch, ratio=None, expected=0)
+
+
+async def _scaffold() -> str:
+    return await text_to_bluebell_scaffolded(
+        _KEYWORDED, client=_EmptyBodies(), country="xz", doctype="act", halt_policy="land"
+    )
+
+
+async def test_a_first_provision_the_keywordless_uk_scan_read_shows_the_layout_held(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Such provisions leave the keyword denominator empty while a mid-sentence mention
+    still counts as stranded; with the first one read the policy is not void."""
+    _stamped_by(monkeypatch, "uk_provisions", first=1)
+    with capture_logs() as logs:
+        assert await _scaffold()
+    assert [e["event"] for e in logs if e["event"].startswith("anchor_boundary_policy")] == [
+        "anchor_boundary_policy_held"
+    ]
+
+
+@pytest.mark.parametrize(("source_pass", "first"), [("regex", 1), ("uk_provisions", 7)])
+async def test_units_that_are_not_a_first_uk_provision_do_not_show_the_layout_held(
+    monkeypatch: pytest.MonkeyPatch, source_pass: str, first: int
+) -> None:
+    """A flattened source can still yield a keyword unit, or a stray line that reads as a
+    provision numbered 7; neither shows a line layout."""
+    from codify.pipeline.enrich.structure import AnchorCoverageError
+
+    _stamped_by(monkeypatch, source_pass, first)
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold()
 
 
 _PARTS_ONLY = """PART I — PRELIMINARY

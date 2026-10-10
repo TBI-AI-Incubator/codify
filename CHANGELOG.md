@@ -5,6 +5,20 @@ the launch tag.
 
 ## Unreleased
 
+Breaks, in that the structurer's output changes for documents it already read:
+
+1. The UK keyword-less scan (`gb`, `gb-eng`, `gb-wls`, `gb-sct`, `gb-nir`) reads
+   the shapes a statutory instrument prints in a PDF. An article opening on its
+   first paragraph (`2.—(1)`, `2.-(1)`, with a space or a bold number) is a
+   unit. A stray middle dot or tilde after a number does not hide it, and a
+   Welsh month after a number reads as a date, not a heading. A short run of
+   sections, each numbered 100 or more and the smallest over eight times the
+   larger of the two beside the run, is dropped as page numbers. Where
+   `amendments.trigger_phrases` is declared, embedded amendment marking covers
+   the UK sections before the first schedule, which restarts the numbering. An
+   em dash or a soft hyphen ends a lead-in, and the quoted unit follows it
+   directly, under at most a heading line.
+
 New, additive:
 
 - `codify.pipeline.formats.boe` converts a Boletín Oficial del Estado item's
@@ -54,12 +68,31 @@ New, additive:
   segmenter's outcome, acts, held regions and reconciliation table) into the
   bundle. `codify segment <bundle>` re-runs the segmenter over that stored
   text under the current config, with no model.
+- `structuring.recurring_furniture`: for a layout engine that files footnotes
+  and page-top captions under header or footer. Furniture is then a bare page
+  number or a short block another page repeats, a running head split across
+  blocks included. A block that opens with a declared attachment caption is not
+  a running head. A one-off block stays in the text, and so does a number of
+  one or two digits among its page's text; a page loses no more lines of a number
+  than its layout holds blocks of it. A footnote is a block the engine filed as a
+  footer or reference and the run of lines at the foot of its page that says what
+  it says; it moves to the foot as its own paragraph, and where no such run is
+  found it stays where it is and `footnote_run_unplaced` is logged. A text block
+  at the foot that opens on a marker is a provision, whatever its place suggests.
+  `combine_text_for_structure` takes the jurisdiction as `country`.
+- `attachments[].always_opens`: a caption that titles no table in the body, so
+  numbering that continues past it does not read it as a table caption, and the
+  keyword reading of its line is dropped.
 
 Fixed:
 
 - `segment`: where several headings name one listed act, the contents entry
   goes to the one on its listed page, so a prose mention elsewhere no longer
   makes the source abstain.
+- Scaffold: a `line_anchored` document whose first two units, 1 and 2, the UK
+  keyword-less scan read before any schedule no longer fails as a void boundary
+  policy; those units show the layout held, and `anchor_boundary_policy_held` is
+  logged.
 
 ## 0.6.0 (2026-10-02)
 
