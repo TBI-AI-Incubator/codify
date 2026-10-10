@@ -2198,6 +2198,27 @@ def test_a_schedule_paragraph_printed_above_its_caption_keeps_its_anchor(
     assert _sections(_scan(text).anchors) == ["1", "2", "1"]
 
 
+def test_a_contents_entry_does_not_make_the_printed_caption_a_repeat(captioned: None) -> None:
+    """The head that carries the schedule's caption, pages after the contents entry that names
+    it, prints it first; the next page's head prints it again."""
+    entry = "SCHEDULE 1 Fees"
+    pages = [
+        _page(
+            1,
+            ["Contents", entry],
+            [_block("text", "Contents", 100), _block("text", entry, 130)],
+        )
+    ]
+    for number in (2, 3):
+        pages.append(_head_page(number, 69, left="No. 100", middle="Pensions", right=f"41{number}"))
+    for number in (4, 5):
+        page = _head_page(number, 69, left="No. 100", middle=f"Pensions {entry}", right="41")
+        page.text = page.text.replace(f"Pensions {entry}", f"Pensions\n{entry}")
+        pages.append(page)
+    lines = _lines(_structure_text(pages))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == [entry, entry]
+
+
 def test_a_caption_the_text_prints_on_two_pages_stays_on_both(captioned: None) -> None:
     pages = [
         _head_page(1, 69, left="No. 100", middle="Pensions", right="411"),
