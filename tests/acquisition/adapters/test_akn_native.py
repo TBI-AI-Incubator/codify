@@ -459,6 +459,13 @@ async def test_a_pdf_that_redirects_off_the_publisher_is_not_taken() -> None:
     assert not any("elsewhere.example" in url for url in seen)
 
 
+async def test_a_pdf_redirect_to_http_on_the_publisher_is_not_taken() -> None:
+    seen, acquirer = _redirecting("http://www.legislation.gov.uk/xsi/1982/7/pdfs/moved.pdf")
+    with pytest.raises(FileNotFoundError, match="or to http"):
+        await acquirer.fetch(_fallback_ref())
+    assert not any(url.startswith("http://") for url in seen)
+
+
 async def test_a_pdf_redirect_that_stays_on_the_publisher_is_followed() -> None:
     seen, acquirer = _redirecting("/xsi/1982/7/pdfs/moved.pdf")
     acquired = await acquirer.fetch(_fallback_ref())

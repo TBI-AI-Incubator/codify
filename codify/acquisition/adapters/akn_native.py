@@ -230,15 +230,17 @@ class AknNativeAcquirer:
         )
 
     async def _get_on_host(self, url: str, host: str) -> httpx.Response:
-        """GET `url`, following a redirect only while it stays on the publisher's host: the
-        address came from the document's metadata, so where it leads is not the metadata's say."""
+        """GET `url`, following a redirect only while it stays on the publisher's host over
+        https: the address came from the document's metadata, so where it leads is not the
+        metadata's say."""
         for _ in range(_MAX_REDIRECTS + 1):
             response = await self._client.get(url, follow_redirects=False)
             if not response.is_redirect:
                 return response
             url = str(response.url.join(response.headers.get("location", "")))
-            if urlparse(url).hostname != host:
-                raise FileNotFoundError(f"{url} -> a redirect off the publisher's host")
+            target = urlparse(url)
+            if target.hostname != host or target.scheme != "https":
+                raise FileNotFoundError(f"{url} -> a redirect off the publisher's host or to http")
         raise FileNotFoundError(f"{url} -> too many redirects")
 
     async def _fetch_pdf(

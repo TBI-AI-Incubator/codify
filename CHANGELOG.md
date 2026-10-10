@@ -33,7 +33,7 @@ New, additive:
   document of metadata alone names, instead of failing as PDF-only. The PDF is the
   untitled alternative in the ref's language (English unless `languages` names Welsh), on
   the document's own host, upgraded to https, and it must open with `%PDF-`. A redirect is
-  followed only while it stays on that host. A ref for a
+  followed only while it stays on that host over https. A ref for a
   language other than English takes that PDF even where the document has text, which is
   English. An English ref to a document with text, and a ref without the flag, behave as
   before.
