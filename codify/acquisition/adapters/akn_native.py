@@ -128,6 +128,9 @@ def _pdf_alternative(content: bytes, language: str, host: str) -> str | None:
     return None
 
 
+_MAX_REDIRECTS = 5
+
+
 class AknNativeAcquirer:
     """Implements the Acquirer protocol without a fixed JURISDICTION."""
 
@@ -226,6 +229,18 @@ class AknNativeAcquirer:
             licence=self._adapter.licence,
         )
 
+    async def _get_on_host(self, url: str, host: str) -> httpx.Response:
+        """GET `url`, following a redirect only while it stays on the publisher's host: the
+        address came from the document's metadata, so where it leads is not the metadata's say."""
+        for _ in range(_MAX_REDIRECTS):
+            response = await self._client.get(url, follow_redirects=False)
+            if not response.is_redirect:
+                return response
+            url = str(response.url.join(response.headers.get("location", "")))
+            if urlparse(url).hostname != host:
+                raise FileNotFoundError(f"{url} -> a redirect off the publisher's host")
+        raise FileNotFoundError(f"{url} -> too many redirects")
+
     async def _fetch_pdf(
         self, ref: DocumentRef, work_uri: str, url: str, meta: httpx.Response
     ) -> AcquiredDocument:
@@ -234,7 +249,7 @@ class AknNativeAcquirer:
         pdf_url = _pdf_alternative(meta.content, language, urlparse(url).hostname or "")
         if pdf_url is None:
             raise FileNotFoundError(f"{url} -> no {language} PDF to take")
-        response = await self._client.get(pdf_url)
+        response = await self._get_on_host(pdf_url, urlparse(url).hostname or "")
         if response.status_code == 404:
             raise FileNotFoundError(f"{pdf_url} -> 404")
         response.raise_for_status()
