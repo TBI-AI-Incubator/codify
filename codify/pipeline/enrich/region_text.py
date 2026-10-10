@@ -166,6 +166,13 @@ def _recurring_candidates(
         for page, regs in regions.items()
     }
     heads = {page: _heads(entries, country) for page, entries in blocks.items()}
+    # What a candidate is compared with: a caption is no evidence that a block recurs.
+    evidence = {
+        page: [
+            content for text, content, _ in found if content and not opens_attachment(text, country)
+        ]
+        for page, found in heads.items()
+    }
     texts: dict[int, list[str]] = {}
     numbers: dict[int, Counter[str]] = {}
     for page, entries in blocks.items():
@@ -183,10 +190,9 @@ def _recurring_candidates(
                 continue
             if any(
                 _same_block(content, other)
-                for q, others in heads.items()
+                for q, others in evidence.items()
                 if q != page
-                for caption, other, _ in others
-                if other and not opens_attachment(caption, country)
+                for other in others
             ):
                 candidates += [text, *parts]
         if candidates:
@@ -300,6 +306,7 @@ def combine_text_for_structure(
 
     lines = text.split("\n")
     verdicts: list[tuple[int | None, str]] = []
+    captions: set[str] = set()
     # Offsets index the text as given, which is what the spans were built over.
     offset = 0
     for line in lines:
@@ -312,7 +319,11 @@ def combine_text_for_structure(
             maybe = bare and _digits(found) in numbers.get(page or 0, ())
             verdicts.append((page, "bare" if maybe else "keep"))
         elif recurring and opens_attachment(line.strip(), country):
-            verdicts.append((page, "keep"))  # a caption is never furniture, nor a note
+            # A caption is never furniture, nor a note; a running head that prints one again is.
+            key = " ".join(line.split()).upper()
+            again = key in captions and any(_matches(line, block) for block in _blocks(drop, page))
+            captions.add(key)
+            verdicts.append((page, "drop" if again else "keep"))
         elif any(_matches(line, block) for block in _blocks(drop, page)):
             verdicts.append((page, "drop"))  # header/footer furniture
         elif any(_matches(line, block) for block in _blocks(tail, page)):

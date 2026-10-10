@@ -128,6 +128,11 @@
       0,
       5
     ],
+    "drop_front_matter_attachments": [
+      0,
+      0,
+      5
+    ],
     "drop_lone_compilation_container": [
       0,
       0,
@@ -271,6 +276,11 @@
         0,
         1
       ],
+      "drop_front_matter_attachments": [
+        0,
+        0,
+        1
+      ],
       "drop_lone_compilation_container": [
         0,
         0,
@@ -399,6 +409,11 @@
         4
       ],
       "drop_embedded_schedule_captions": [
+        0,
+        0,
+        4
+      ],
+      "drop_front_matter_attachments": [
         0,
         0,
         4

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import statistics
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
@@ -1312,7 +1312,7 @@ def scan_anchors_with_ambiguity(
             fires,
             "drop_uk_toc_sections",
             raw,
-            _drop_uk_toc_sections(text, raw),
+            _drop_uk_toc_sections(text, raw, country),
             spans,
             reads_as="contents_entry",
         )
@@ -1384,6 +1384,14 @@ def scan_anchors_with_ambiguity(
     fires["unnumbered_annex"] = len(annexes)
     raw.extend(annexes)
     raw.sort(key=lambda a: a.char_offset)
+    raw = _fire_dropped(
+        fires,
+        "drop_front_matter_attachments",
+        raw,
+        _drop_front_matter_attachments(text, raw, country),
+        spans,
+        reads_as="contents_entry",
+    )
     raw = _fire_dropped(
         fires,
         "drop_caption_twins",
@@ -1620,24 +1628,33 @@ def opens_attachment(text: str, country: str) -> bool:
     return bool(country) and _annex_caption_re(country).match(text) is not None
 
 
-def _caption_label(line: str) -> tuple[str, str, str]:
-    """A caption's keyword and number, or its whole title where it has no number, so a schedule
-    listed in a contents entry and printed again as its own caption has one label."""
-    words = line.split()
-    if words and words[0].upper() in ("THE", "YR"):
-        words = words[1:]
-    keyword = words[0].upper() if words else ""
-    if len(words) > 1 and re.fullmatch(r"\d+[A-Za-z]?", words[1]):
-        return (keyword, words[1].upper(), "")
-    return (keyword, "", " ".join(words[1:]).upper())
+_CAPTION_LABEL_RE = re.compile(
+    r"(?:(?:THE|YR)[ \t]+)?(?P<keyword>[^\W\d_]+)(?:[ \t]*(?P<number>\d+[A-Za-z]?))?", re.IGNORECASE
+)
+# A contents entry opens on its number and is short.
+_CONTENTS_ENTRY_RE = re.compile(r"\d+[A-Za-z]?[.)]?[ \t]+\S")
+_CONTENTS_ENTRY_MAX = 160
+_CONTENTS_LOOKBACK = 4
 
 
-def _body_end(text: str, anchors: Iterable[StructuralAnchor], country: str) -> int:
-    """Where the first attachment begins, by anchor or by declared caption; the end of the text
-    when there is none. A caption before the first provision the UK scan read is front matter
-    when it is a cover note or a contents entry (a caption the scan vetted prints it again
-    later); any other is an attachment, so a flat body beside a schedule in lines has no
-    provision before it."""
+def _caption_label(line: str) -> tuple[str, str]:
+    """A caption's keyword and number, so a schedule listed in a contents entry and printed
+    again as its own caption has one label whatever follows the number."""
+    found = _CAPTION_LABEL_RE.match(line.strip())
+    if found is None:
+        return ("", "")
+    return (found.group("keyword").upper(), (found.group("number") or "").upper())
+
+
+def _attachments(
+    text: str, anchors: Iterable[StructuralAnchor], country: str
+) -> tuple[set[int], set[int]]:
+    """The line start of every attachment caption, anchored or declared, and those of them that
+    are front matter: a cover note, or a caption before the first provision the UK scan read
+    that lists a schedule in a contents list. That one sits under a numbered entry or another
+    such caption and is printed again as a caption later. Anything else before the first
+    provision is an attachment, so a flat body beside a schedule in lines has no provision
+    before it."""
     anchors = list(anchors)
     first = min(
         (
@@ -1647,32 +1664,71 @@ def _body_end(text: str, anchors: Iterable[StructuralAnchor], country: str) -> i
         ),
         default=0,
     )
+    declared = {m.start() for m in _annex_caption_re(country).finditer(text)}
     at = {_marker_line_start(text, a.char_offset) for a in anchors if a.kind in _ATTACHMENT_KINDS}
-    at |= {m.start() for m in _annex_caption_re(country).finditer(text)}
+    at |= declared
 
     def caption(pos: int) -> str:
         stop = text.find("\n", pos)
         return text[pos : len(text) if stop == -1 else stop].strip()
 
-    vetted = {_marker_line_start(text, a.char_offset) for a in anchors if a.kind == "schedule"}
+    notes = tuple(c.upper() for c, normative in _attachment_captions(country) if not normative)
+    cover = [pos for pos in at if pos < first and caption(pos).upper().startswith(notes)]
+    front = set(cover)
+    if cover:
+        # A line the keyword scan opened on inside the note ("Schedule 1 sets out") is its prose.
+        front |= {pos for pos in at - declared if min(cover) < pos < first}
     later = {
         _caption_label(caption(pos))
         for pos in at
-        if pos >= first and (pos in vetted or opens_attachment(caption(pos), country))
+        if pos >= first and opens_attachment(caption(pos), country)
     }
-    notes = tuple(c.upper() for c, normative in _attachment_captions(country) if not normative)
 
-    def front_matter(pos: int) -> bool:
-        line = caption(pos)
-        return pos < first and (line.upper().startswith(notes) or _caption_label(line) in later)
+    def listed(pos: int) -> bool:
+        base = max(0, pos - 800)
+        lines, offset = [], base
+        for line in text[base:pos].split("\n"):
+            lines.append((offset, line.strip()))
+            offset += len(line) + 1
+        above = [(at_, line) for at_, line in lines[(1 if base else 0) :] if line]
+        return any(
+            at_ in front
+            or (len(line) <= _CONTENTS_ENTRY_MAX and _CONTENTS_ENTRY_RE.match(line) is not None)
+            for at_, line in above[-_CONTENTS_LOOKBACK:]
+        )
 
-    return min([len(text), *(pos for pos in at if not front_matter(pos))])
+    for pos in sorted(p for p in at if p < first and p not in front):
+        if _caption_label(caption(pos)) in later and listed(pos):
+            front.add(pos)
+    return at, front
+
+
+def _body_end(text: str, anchors: Iterable[StructuralAnchor], country: str) -> int:
+    """Where the first attachment begins, by anchor or by declared caption; the end of the text
+    when there is none. Front matter ends no body."""
+    at, front = _attachments(text, anchors, country)
+    return min([len(text), *(pos for pos in at if pos not in front)])
+
+
+def _drop_front_matter_attachments(
+    text: str, anchors: list[StructuralAnchor], country: str
+) -> list[StructuralAnchor]:
+    """A contents entry that lists a schedule, or a cover note, opens no attachment."""
+    if country not in _UK_JURISDICTIONS:
+        return anchors
+    front = _attachments(text, anchors, country)[1]
+    return [
+        a
+        for a in anchors
+        if not (a.kind in _ATTACHMENT_KINDS and _marker_line_start(text, a.char_offset) in front)
+    ]
 
 
 def _scan_unnumbered_annexes(
     text: str, existing: list[StructuralAnchor], toc_end: int, country: str = ""
 ) -> list[StructuralAnchor]:
     taken = {a.char_offset for a in existing if a.kind == "schedule"}
+    front = _attachments(text, existing, country)[1] if country in _UK_JURISDICTIONS else set()
     # Candidates must follow the first body anchor, or a colon-form TOC entry
     # escapes the continuity filter and owns the body as attachment.
     first_body = min((a.char_offset for a in existing if a.kind != "schedule"), default=None)
@@ -1687,7 +1743,7 @@ def _scan_unnumbered_annexes(
     )
     out: list[StructuralAnchor] = []
     for m in _annex_caption_re(country).finditer(text):
-        if m.start() < toc_end or m.start() <= first_body or m.start() in taken:
+        if m.start() < toc_end or m.start() <= first_body or m.start() in taken | front:
             continue
         if floor is not None and m.start() < floor:
             continue
@@ -2959,31 +3015,44 @@ def _drop_uk_page_number_sections(anchors: list[StructuralAnchor]) -> list[Struc
     return [a for a in anchors if id(a) not in dropped]
 
 
-def _drop_uk_toc_sections(text: str, anchors: list[StructuralAnchor]) -> list[StructuralAnchor]:
+def _drop_uk_toc_sections(
+    text: str, anchors: list[StructuralAnchor], country: str = ""
+) -> list[StructuralAnchor]:
     """Drop Arrangement-of-Sections TOC entries: a real section is followed by
     its subsections or body before the next section/container; a contents entry
-    is immediately followed by the next heading with nothing between."""
+    is immediately followed by the next heading with nothing between. The last entry of a
+    list that goes on to name its schedules is followed by a caption, anchored or not."""
     from codify.pipeline.enrich.kinds import KIND_RANK
 
     sec_rank = KIND_RANK.get("section", 6)
+    captions = sorted(m.start() for m in _annex_caption_re(country).finditer(text))
     out: list[StructuralAnchor] = []
+    # Once an entry has a body the contents list is behind us; a paragraph of a schedule
+    # then ends where the next unit does, since its caption may print below its first line.
+    in_body = False
+    listed = False  # the entry above was one, so this may be the list's last
     for i, a in enumerate(anchors):
         if a.kind != "section":
             out.append(a)
             continue
+        run = listed and not in_body
         end = len(text)
         for b in anchors[i + 1 :]:
-            if KIND_RANK.get(b.kind, 8) <= sec_rank or b.kind in _ATTACHMENT_KINDS:
+            if KIND_RANK.get(b.kind, 8) <= sec_rank or (run and b.kind in _ATTACHMENT_KINDS):
                 end = b.char_offset
                 break
+        if run and (at := bisect_right(captions, a.char_offset)) < len(captions):
+            end = min(end, captions[at])
         after_heading = text[a.char_offset : end].split("\n", 1)
         rest = after_heading[1] if len(after_heading) > 1 else ""
         # A genuine section has subsections or ANY body line before the next
         # anchor; a contents entry is followed by the next heading with
         # nothing between. (Short single-sentence sections are real, Finance
         # Act charging sections are one line.)
-        if re.search(r"^\(\d", rest, re.MULTILINE) or rest.strip():
+        listed = not (re.search(r"^\(\d", rest, re.MULTILINE) or rest.strip())
+        if not listed:
             out.append(a)
+            in_body = True
     return out
 
 
