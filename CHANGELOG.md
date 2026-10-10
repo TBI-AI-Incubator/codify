@@ -21,6 +21,13 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- `akn_native` acquirer: a ref carrying `extra["pdf_fallback"]` takes the PDF that a
+  document of metadata alone names, instead of failing as PDF-only. The PDF is the
+  untitled alternative in the ref's language (English unless `languages` names Welsh), on
+  the document's own host, upgraded to https, and it must open with `%PDF-`. A ref for a
+  language other than English takes that PDF even where the document has text, which is
+  English. An English ref to a document with text, and a ref without the flag, behave as
+  before.
 - `codify.pipeline.formats.boe` converts a Boletín Oficial del Estado item's
   XML to AKN without a model: books, titles, chapters, sections, articles
   (ordinal, cardinal and `bis` numbers), apartados and letters, the four kinds
