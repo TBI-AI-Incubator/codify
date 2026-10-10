@@ -466,6 +466,29 @@ async def test_a_pdf_redirect_that_stays_on_the_publisher_is_followed() -> None:
     assert acquired.primary().content == b"%PDF-1.4 moved"
 
 
+@pytest.mark.parametrize(("hops", "taken"), [(5, True), (6, False)])
+async def test_a_chain_of_five_redirects_is_followed_and_a_sixth_is_not(
+    hops: int, taken: bool
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/pdfs/xsi_19820007_en.pdf"):
+            return httpx.Response(302, headers={"location": "/hop/1.pdf"})
+        if "/hop/" in url:
+            n = int(url.rsplit("/", 1)[1].split(".")[0])
+            if n < hops:
+                return httpx.Response(302, headers={"location": f"/hop/{n + 1}.pdf"})
+            return httpx.Response(200, content=b"%PDF-1.4 end")
+        return httpx.Response(200, content=_stub_naming(_ENGLISH))
+
+    acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
+    if taken:
+        assert (await acquirer.fetch(_fallback_ref())).primary().content == b"%PDF-1.4 end"
+    else:
+        with pytest.raises(FileNotFoundError, match="too many redirects"):
+            await acquirer.fetch(_fallback_ref())
+
+
 async def test_a_pdf_that_redirects_forever_is_not_taken() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if str(request.url).endswith(".pdf"):
