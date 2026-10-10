@@ -1695,17 +1695,21 @@ def _scan_unnumbered_annexes(
 
 
 def uk_layout_held(text: str, anchors: Iterable[StructuralAnchor], kind: str, country: str) -> bool:
-    """Whether the keyword-less UK scan read the body's first two units of this kind, 1 and 2: a
-    source flattened to one line leaves nothing at a line start, so the stray unit it yields is
-    alone. A schedule laid out in lines does not count, since its paragraphs restart at 1."""
+    """Whether the body's first two units of this kind, as the keyword-less UK scan read them,
+    are 1 and 2: a source flattened to one line leaves nothing at a line start, so the stray
+    unit it yields is alone. A schedule laid out in lines does not count, since its paragraphs
+    restart at 1."""
     anchors = list(anchors)
     body_end = _body_end(text, anchors, country)
-    read = {
-        a.number
-        for a in anchors
-        if a.kind == kind and a.source_pass == UK_PROVISIONS_PASS and a.char_offset < body_end
-    }
-    return {"1", "2"} <= read
+    read = sorted(
+        (
+            a
+            for a in anchors
+            if a.kind == kind and a.source_pass == UK_PROVISIONS_PASS and a.char_offset < body_end
+        ),
+        key=lambda a: a.char_offset,
+    )
+    return [a.number for a in read[:2]] == ["1", "2"]
 
 
 def _drop_caption_twins(

@@ -96,10 +96,10 @@ Fixed:
 - `segment`: where several headings name one listed act, the contents entry
   goes to the one on its listed page, so a prose mention elsewhere no longer
   makes the source abstain.
-- Scaffold: a `line_anchored` document whose first two units, 1 and 2, the UK
-  keyword-less scan read before any schedule no longer fails as a void boundary
-  policy; those units show the layout held, and `anchor_boundary_policy_held` is
-  logged.
+- Scaffold: a `line_anchored` document whose first two units, in text order,
+  are 1 and 2 as the UK keyword-less scan read them before any schedule no
+  longer fails as a void boundary policy; those units show the layout held, and
+  `anchor_boundary_policy_held` is logged.
 
 ## 0.6.0 (2026-10-02)
 
