@@ -24,6 +24,7 @@ from codify.pipeline.enrich.anchors import (
     cached_regex,
     markers_outside_boundary,
     scan_anchors_with_ambiguity,
+    uk_layout_held,
     windows_from_anchors,
 )
 from codify.pipeline.enrich.arabic_normalise import JOINER_STRIP_TABLE
@@ -738,6 +739,11 @@ async def text_to_bluebell_scaffolded(
         # `line_anchored` it can instead mean the source lost its line layout,
         # which that pattern cannot tell apart, so ask the relaxed boundary first.
         stranded = markers_outside_boundary(text, config, doctype, kind) if expected == 0 else 0
+        if stranded and uk_layout_held(text, anchors, kind, country):
+            logger.info(
+                "anchor_boundary_policy_held", country=country, kind=kind, stranded=stranded
+            )
+            stranded = 0
         if stranded:
             logger.warning(
                 "anchor_boundary_policy_void",

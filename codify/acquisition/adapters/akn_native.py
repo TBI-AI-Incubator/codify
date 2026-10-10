@@ -10,11 +10,16 @@ such as `ukpga/Geo6/14-15/48` has no calendar year until fetched); the fetched
 document's FRBRWork then names the work. `as_of="enacted"` asks for the
 original expression (`/enacted` or `/made`) instead of the current text.
 legislation.gov.uk answers 404 for documents that exist only as PDF.
+
+A ref that sets `extra["pdf_fallback"]` takes that PDF instead of failing: where the
+original expression is a document of metadata alone, naming its PDFs, the one in the
+ref's language is fetched (English unless `languages` says otherwise).
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from urllib.parse import urlparse
 
 import httpx
 import structlog
@@ -89,6 +94,41 @@ def _pdf_only_alternative(content: bytes) -> str | None:
         if uri.lower().endswith(".pdf"):
             return str(uri)
     return None
+
+
+# `Alternative@Language` names a translation; an alternative without one is the English original.
+_ALTERNATIVE_LANGUAGE = {"eng": "English", "cym": "Welsh"}
+
+
+def _language_of(ref: DocumentRef) -> str:
+    return ref.languages[0] if ref.languages else "eng"
+
+
+def _pdf_alternative(content: bytes, language: str, host: str) -> str | None:
+    """The PDF of the original text in `language`, upgraded to https, or None.
+
+    A titled alternative is a companion document (an explanatory memorandum), and one on
+    another host is not the publisher's own."""
+    wanted = _ALTERNATIVE_LANGUAGE.get(language)
+    try:
+        root = parse_xml(content)
+    except (etree.XMLSyntaxError, ValueError):
+        return None
+    for alt in root.iter("{*}Alternative"):
+        uri = alt.get("URI") or ""
+        parsed = urlparse(uri)
+        if (
+            wanted is not None
+            and uri.lower().endswith(".pdf")
+            and not alt.get("Title")
+            and (alt.get("Language") or "English") == wanted
+            and parsed.hostname == host
+        ):
+            return parsed._replace(scheme="https").geturl()
+    return None
+
+
+_MAX_REDIRECTS = 5
 
 
 class AknNativeAcquirer:
@@ -166,6 +206,9 @@ class AknNativeAcquirer:
             )
         response.raise_for_status()
         pdf = _pdf_only_alternative(response.content)
+        if ref.extra.get("pdf_fallback") and (pdf is not None or _language_of(ref) != "eng"):
+            # The text a document carries is English, so another language's is its PDF.
+            return await self._fetch_pdf(ref, work_uri, url, response)
         if pdf is not None:
             # Metadata only, the text published as PDF: the 404 case served as 200.
             raise FileNotFoundError(
@@ -181,6 +224,54 @@ class AknNativeAcquirer:
             expression_uri=expression,
             bodies=[Body(media_type="application/xml", content=response.content, role="primary")],
             source_url=url,
+            etag=response.headers.get("etag"),
+            last_modified=response.headers.get("last-modified"),
+            licence=self._adapter.licence,
+        )
+
+    async def _get_on_host(self, url: str, host: str) -> httpx.Response:
+        """GET `url`, following a redirect only while it stays on the publisher's host over
+        https: the address came from the document's metadata, so where it leads is not the
+        metadata's say."""
+        for _ in range(_MAX_REDIRECTS + 1):
+            response = await self._client.get(url, follow_redirects=False)
+            if not response.is_redirect:
+                return response
+            url = str(response.url.join(response.headers.get("location", "")))
+            target = urlparse(url)
+            if target.hostname != host or target.scheme != "https":
+                raise FileNotFoundError(f"{url} -> a redirect off the publisher's host or to http")
+        raise FileNotFoundError(f"{url} -> too many redirects")
+
+    async def _fetch_pdf(
+        self, ref: DocumentRef, work_uri: str, url: str, meta: httpx.Response
+    ) -> AcquiredDocument:
+        """The PDF a meta-only document names, as the document the ref asked for."""
+        language = _language_of(ref)
+        pdf_url = _pdf_alternative(meta.content, language, urlparse(url).hostname or "")
+        if pdf_url is None:
+            raise FileNotFoundError(f"{url} -> no {language} PDF to take")
+        response = await self._get_on_host(pdf_url, urlparse(url).hostname or "")
+        if response.status_code == 404:
+            raise FileNotFoundError(f"{pdf_url} -> 404")
+        response.raise_for_status()
+        if not response.content.startswith(b"%PDF-"):
+            raise FileNotFoundError(f"{pdf_url} -> not a PDF")
+        document_work, expression = _frbr_from_document(meta.content)
+        logger.info("akn_native_pdf_fetched", url=pdf_url, bytes=len(response.content))
+        return AcquiredDocument(
+            ref=ref,
+            frbr_work_uri=document_work or work_uri,
+            expression_uri=expression if language == "eng" else None,
+            bodies=[
+                Body(
+                    media_type="application/pdf",
+                    content=response.content,
+                    role="primary",
+                    language=language,
+                )
+            ],
+            source_url=pdf_url,
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
             licence=self._adapter.licence,

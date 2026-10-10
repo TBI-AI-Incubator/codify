@@ -118,7 +118,17 @@
       0,
       5
     ],
+    "drop_caption_twins": [
+      0,
+      0,
+      5
+    ],
     "drop_embedded_schedule_captions": [
+      0,
+      0,
+      5
+    ],
+    "drop_front_matter_attachments": [
       0,
       0,
       5
@@ -134,6 +144,11 @@
       5
     ],
     "drop_preamble_citation_articles": [
+      0,
+      0,
+      5
+    ],
+    "drop_schedule_cross_references": [
       0,
       0,
       5
@@ -251,7 +266,17 @@
         0,
         1
       ],
+      "drop_caption_twins": [
+        0,
+        0,
+        1
+      ],
       "drop_embedded_schedule_captions": [
+        0,
+        0,
+        1
+      ],
+      "drop_front_matter_attachments": [
         0,
         0,
         1
@@ -267,6 +292,11 @@
         1
       ],
       "drop_preamble_citation_articles": [
+        0,
+        0,
+        1
+      ],
+      "drop_schedule_cross_references": [
         0,
         0,
         1
@@ -373,7 +403,17 @@
         0,
         4
       ],
+      "drop_caption_twins": [
+        0,
+        0,
+        4
+      ],
       "drop_embedded_schedule_captions": [
+        0,
+        0,
+        4
+      ],
+      "drop_front_matter_attachments": [
         0,
         0,
         4
@@ -389,6 +429,11 @@
         4
       ],
       "drop_preamble_citation_articles": [
+        0,
+        0,
+        4
+      ],
+      "drop_schedule_cross_references": [
         0,
         0,
         4
