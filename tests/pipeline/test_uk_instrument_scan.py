@@ -1975,3 +1975,14 @@ async def test_nothing_stranded_logs_nothing_about_the_boundary(line_anchored: N
     with capture_logs() as logs:
         assert await _scaffold_gb(text)
     assert [e for e in logs if e["event"].startswith("anchor_boundary_policy")] == []
+
+
+def test_a_caption_on_another_page_does_not_make_a_one_off_head_recur(captioned: None) -> None:
+    """`Fees SCHEDULE 1` shares two of three words with the caption, which is not a head."""
+    first = ["Fees SCHEDULE 1", "The register records the matters."]
+    second = ["SCHEDULE 1", "Text of page two."]
+    pages = [
+        _page(1, first, [_block("header", first[0], 78), _block("text", first[1], 200)]),
+        _page(2, second, [_block("header", second[0], 80), _block("text", second[1], 200)]),
+    ]
+    assert _lines(_structure_text(pages)) == [first[0], first[1], second[0], second[1]]
