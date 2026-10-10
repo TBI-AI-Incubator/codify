@@ -118,6 +118,11 @@
       0,
       5
     ],
+    "drop_caption_twins": [
+      0,
+      0,
+      5
+    ],
     "drop_embedded_schedule_captions": [
       0,
       0,
@@ -251,6 +256,11 @@
         0,
         1
       ],
+      "drop_caption_twins": [
+        0,
+        0,
+        1
+      ],
       "drop_embedded_schedule_captions": [
         0,
         0,
@@ -369,6 +379,11 @@
         4
       ],
       "declare_untwinned_tail": [
+        0,
+        0,
+        4
+      ],
+      "drop_caption_twins": [
         0,
         0,
         4

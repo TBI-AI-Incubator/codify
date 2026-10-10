@@ -238,6 +238,11 @@
         "additionalProperties": true,
         "description": "A caption line opening an attachment. AKN models a schedule and a\nmandatory companion alike, so legal force is declared per caption.",
         "properties": {
+          "always_opens": {
+            "default": false,
+            "title": "Always Opens",
+            "type": "boolean"
+          },
           "caption": {
             "title": "Caption",
             "type": "string"
@@ -3758,6 +3763,11 @@
             },
             "title": "Prose Precursors",
             "type": "array"
+          },
+          "recurring_furniture": {
+            "default": false,
+            "title": "Recurring Furniture",
+            "type": "boolean"
           },
           "reference_nouns": {
             "items": {
