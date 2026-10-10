@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import httpx
@@ -256,3 +257,181 @@ async def test_an_alternative_that_is_not_a_pdf_does_not_classify() -> None:
     acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
     acquired = await acquirer.fetch(_ref(doctype="nisi", year=1982, number="7", as_of="enacted"))
     assert acquired.primary().content == html_alt
+
+
+# ── opt-in PDF fallback ────────────────────────────────────────────────────────
+
+_UK_STUB = _STUB.replace(b"https://publisher.test", b"http://www.legislation.gov.uk")
+_PDFS = "http://www.legislation.gov.uk/xsi/1982/7/pdfs"
+_ENGLISH = f'<ukm:Alternative URI="{_PDFS}/xsi_19820007_en.pdf" Date="1982-11-12"/>'
+_WELSH = f'<ukm:Alternative URI="{_PDFS}/xsi_19820007_we.pdf" Language="Welsh"/>'
+_MEMORANDUM = (
+    f'<ukm:Alternative URI="{_PDFS}/xsiem_19820007_en.pdf" Title="NI Explanatory Memorandum"/>'
+)
+_ELSEWHERE = '<ukm:Alternative URI="http://elsewhere.example/xsi_19820007_en.pdf"/>'
+_PAGE = f'<ukm:Alternative URI="{_PDFS.rsplit("/", 1)[0]}/xsi_19820007_en.html"/>'
+
+
+def _stub_naming(*alternatives: str) -> bytes:
+    block = "<ukm:Alternatives>" + "".join(alternatives) + "</ukm:Alternatives>"
+    return re.sub(
+        rb"<ukm:Alternatives>.*?</ukm:Alternatives>", block.encode(), _UK_STUB, flags=re.DOTALL
+    )
+
+
+def _fallback_ref(*languages: str) -> DocumentRef:
+    return DocumentRef(
+        jurisdiction_code="gb",
+        doctype="nisi",
+        year=1982,
+        number="7",
+        as_of="enacted",
+        languages=list(languages),
+        extra={"pdf_fallback": "1"},
+    )
+
+
+def _serving(meta: bytes, pdf: bytes | None = None) -> tuple[list[str], AknNativeAcquirer]:
+    """The metadata document at its own URL, and a PDF naming the URL it was asked at."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if str(request.url).endswith(".pdf"):
+            return httpx.Response(200, content=pdf or b"%PDF-1.4 " + str(request.url).encode())
+        return httpx.Response(200, content=meta)
+
+    return seen, AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
+
+
+async def test_the_fallback_takes_the_pdf_the_metadata_names_over_https() -> None:
+    seen, acquirer = _serving(_stub_naming(_ENGLISH))
+    acquired = await acquirer.fetch(_fallback_ref())
+    assert seen == [
+        "https://www.legislation.gov.uk/nisi/1982/7/made/data.akn",
+        "https://www.legislation.gov.uk/xsi/1982/7/pdfs/xsi_19820007_en.pdf",
+    ]
+    body = acquired.primary()
+    assert (body.media_type, body.language) == ("application/pdf", "eng")
+    assert body.content == b"%PDF-1.4 " + seen[1].encode()
+    assert acquired.source_url == seen[1]
+    assert acquired.frbr_work_uri == "/akn/gb/act/nisi/1982/7"
+    assert acquired.expression_uri == "http://www.legislation.gov.uk/xsi/1982/7/made"
+
+
+async def test_the_fallback_is_opt_in() -> None:
+    seen, acquirer = _serving(_stub_naming(_ENGLISH))
+    ref = _fallback_ref().model_copy(update={"extra": {}})
+    with pytest.raises(FileNotFoundError, match="PDF-only"):
+        await acquirer.fetch(ref)
+    assert len(seen) == 1
+
+
+async def test_a_document_with_text_is_taken_as_text_whatever_the_flag() -> None:
+    with_body = _stub_naming(_ENGLISH).replace(b"</meta>", b"</meta><body><p>Text.</p></body>")
+    _, acquirer = _serving(with_body)
+    acquired = await acquirer.fetch(_fallback_ref())
+    assert acquired.primary().media_type == "application/xml"
+
+
+_WITH_BODY = b"</meta><body><p>Text.</p></body>"
+
+
+async def test_a_welsh_ref_takes_the_welsh_pdf_of_a_document_that_has_text() -> None:
+    """The text a document carries is English; its Welsh is the Welsh PDF."""
+    meta = _stub_naming(_WELSH, _ENGLISH).replace(b"</meta>", _WITH_BODY)
+    seen, acquirer = _serving(meta)
+    acquired = await acquirer.fetch(_fallback_ref("cym"))
+    assert (acquired.primary().media_type, acquired.primary().language) == (
+        "application/pdf",
+        "cym",
+    )
+    assert seen[1].endswith("xsi_19820007_we.pdf")
+
+
+async def test_a_welsh_ref_finds_no_welsh_text_in_a_document_with_only_english() -> None:
+    meta = _stub_naming(_ENGLISH).replace(b"</meta>", _WITH_BODY)
+    seen, acquirer = _serving(meta)
+    with pytest.raises(FileNotFoundError, match="no cym PDF"):
+        await acquirer.fetch(_fallback_ref("cym"))
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize(
+    ("languages", "taken"),
+    [((), "en"), (("eng",), "en"), (("cym",), "we"), (("cym", "eng"), "we")],
+)
+async def test_the_fallback_takes_the_pdf_in_the_ref_language(
+    languages: tuple[str, ...], taken: str
+) -> None:
+    """Welsh is listed first, as it is for a bilingual instrument; the language decides."""
+    seen, acquirer = _serving(_stub_naming(_WELSH, _ENGLISH))
+    acquired = await acquirer.fetch(_fallback_ref(*languages))
+    assert seen[1].endswith(f"xsi_19820007_{taken}.pdf")
+    assert acquired.primary().language == (languages[0] if languages else "eng")
+    # The metadata names the English expression; a Welsh text is not that expression.
+    assert (acquired.expression_uri is None) == (taken == "we")
+
+
+async def test_the_fallback_takes_only_a_pdf() -> None:
+    seen, acquirer = _serving(_stub_naming(_PAGE, _ENGLISH))
+    await acquirer.fetch(_fallback_ref())
+    assert seen[1].endswith("xsi_19820007_en.pdf")
+
+
+async def test_the_fallback_document_carries_the_adapter_licence() -> None:
+    adapter = SourceAdapter(
+        kind="akn_native",
+        name="legislation.gov.uk",
+        url_template="https://www.legislation.gov.uk/{source_path}/data.akn",
+        licence="OGL-UK-3.0",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        pdf = str(request.url).endswith(".pdf")
+        return httpx.Response(200, content=b"%PDF-1.4" if pdf else _stub_naming(_ENGLISH))
+
+    acquirer = AknNativeAcquirer("gb", adapter, client=_client(httpx.MockTransport(handler)))
+    assert (await acquirer.fetch(_fallback_ref())).licence == "OGL-UK-3.0"
+
+
+async def test_the_fallback_takes_no_titled_alternative() -> None:
+    seen, acquirer = _serving(_stub_naming(_MEMORANDUM, _ENGLISH))
+    await acquirer.fetch(_fallback_ref())
+    assert seen[1].endswith("xsi_19820007_en.pdf")
+
+    seen, acquirer = _serving(_stub_naming(_MEMORANDUM))
+    with pytest.raises(FileNotFoundError, match="no eng PDF"):
+        await acquirer.fetch(_fallback_ref())
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize(
+    ("alternatives", "languages"),
+    [((_ELSEWHERE,), ()), ((_ENGLISH,), ("cym",)), ((_ENGLISH,), ("gla",))],
+)
+async def test_the_fallback_without_a_pdf_to_take_asks_for_none(
+    alternatives: tuple[str, ...], languages: tuple[str, ...]
+) -> None:
+    """Another host's PDF is not taken, and no Welsh or Gaelic PDF is made from the English."""
+    seen, acquirer = _serving(_stub_naming(*alternatives))
+    with pytest.raises(FileNotFoundError, match="PDF to take"):
+        await acquirer.fetch(_fallback_ref(*languages))
+    assert len(seen) == 1
+
+
+async def test_a_download_that_is_not_a_pdf_is_not_taken() -> None:
+    _, acquirer = _serving(_stub_naming(_ENGLISH), pdf=b"<html>Not found</html>")
+    with pytest.raises(FileNotFoundError, match="not a PDF"):
+        await acquirer.fetch(_fallback_ref())
+
+
+async def test_a_pdf_the_publisher_does_not_have_is_not_found() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith(".pdf"):
+            return httpx.Response(404)
+        return httpx.Response(200, content=_stub_naming(_ENGLISH))
+
+    acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
+    with pytest.raises(FileNotFoundError, match="404"):
+        await acquirer.fetch(_fallback_ref())
