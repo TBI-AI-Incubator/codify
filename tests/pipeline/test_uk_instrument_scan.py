@@ -344,32 +344,71 @@ def _front_text(front: str, caption: str) -> tuple[str, list[StructuralAnchor]]:
 _NOTE = "EXPLANATORY NOTE\nNot part of the Order.\n\n"
 
 
+_ENTRY = "3. Fees\n"
+
+
 @pytest.mark.parametrize(
     ("front", "caption", "held"),
     [
-        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", True),
-        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 1", True),
-        ("SCHEDULE Fees\n\n", "SCHEDULE Fees", True),
-        ("SCHEDULE Fees\n\n", "SCHEDULE", False),
-        ("THE SCHEDULE TO THE\n\n", "THE SCHEDULE TO THE SCHEME", False),
+        (f"{_ENTRY}SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", True),
+        (f"{_ENTRY}SCHEDULE 1 Fees\n\n", "SCHEDULE 1", True),
+        (f"{_ENTRY}SCHEDULE Fees\n\n", "SCHEDULE Fees", True),
+        (f"{_ENTRY}SCHEDULE Fees\n\n", "SCHEDULE", True),
+        (f"{_ENTRY}SCHEDULE 1\u2014Fees\n\n", "SCHEDULE 1", True),
+        (f"{_ENTRY}SCHEDULE 1: Fees\n\n", "SCHEDULE 1", True),
+        ("3 Fees\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1", True),
+        ("3. Registration of widgets\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", True),
+        (
+            "3. Registration of widgets and their keepers in\n"
+            "the register kept for the purposes of\n"
+            "these Regulations\nSCHEDULE 1 Fees\n\n",
+            "SCHEDULE 1 Fees",
+            True,
+        ),
+        ("30th April 1990\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", False),
+        (
+            "3. Fees\nThe Minister makes this Order\nin exercise of the powers\n"
+            "conferred by section 1\nof the Act\nand all other powers.\n"
+            "SCHEDULE 1 Fees\n\n",
+            "SCHEDULE 1 Fees",
+            False,
+        ),
+        (f"{_ENTRY}SCHEDULE 1 Fees\nSCHEDULE 2 Forms\n\n", "SCHEDULE 2 Forms", False),
         (_NOTE, "SCHEDULE 1 Fees", True),
-        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 2 Forms", False),
-        ("SCHEDULE 1 Fees\n\n", "SCHEDULE Fees", False),
-        ("SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE", False),
+        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", False),
+        ("CONTENTS\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", False),
+        ("THE SCHEDULE TO THE\n\n", "THE SCHEDULE TO THE SCHEME", False),
+        (f"{_ENTRY}SCHEDULE 1 Fees\n\n", "SCHEDULE 2 Forms", False),
+        (f"{_ENTRY}SCHEDULE 1 Fees\n\n", "SCHEDULE Fees", False),
+        (f"{_ENTRY}SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE", False),
+        ("The fee is 3. Fees\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", False),
+        (f"3. {'x ' * 90}\nSCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", False),
     ],
     ids=[
         "contents entry",
         "contents entry, caption without its title",
         "contents entry, unnumbered and printed again",
         "contents entry, unnumbered and printed without its title",
-        "a schedule whose caption wraps, then another",
+        "a dash before the title",
+        "a colon before the title",
+        "an entry numbered without a dot",
+        "a longer entry",
+        "an entry wrapped over three lines",
+        "a date above the caption",
+        "an entry far above the caption",
+        "a caption under a schedule entry whose own twin is missing",
         "cover note",
+        "a caption under no entry",
+        "a caption under a heading",
+        "a schedule whose caption wraps, then another",
         "a schedule not printed again",
         "numbered then unnumbered",
         "a schedule the caption below is not",
+        "an entry that opens on a word",
+        "a numbered paragraph, not an entry",
     ],
 )
-def test_a_caption_before_the_first_provision_is_front_matter_only_if_a_note_or_printed_again(
+def test_a_caption_before_the_first_provision_is_front_matter_only_if_a_note_or_listed(
     front: str, caption: str, held: bool, declare_gb: Declare
 ) -> None:
     declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
@@ -380,14 +419,18 @@ def test_a_caption_before_the_first_provision_is_front_matter_only_if_a_note_or_
 @pytest.mark.parametrize(
     ("line", "label"),
     [
-        ("SCHEDULE 1 Fees", ("SCHEDULE", "1", "")),
-        ("THE SCHEDULE TO THE SCHEME", ("SCHEDULE", "", "TO THE SCHEME")),
-        ("YR ATODLEN 2a Ffioedd", ("ATODLEN", "2A", "")),
-        ("SCHEDULE Fees 3", ("SCHEDULE", "", "FEES 3")),
-        ("", ("", "", "")),
+        ("SCHEDULE 1 Fees", ("SCHEDULE", "1")),
+        ("SCHEDULE 1\u2014Fees", ("SCHEDULE", "1")),
+        ("SCHEDULE 1: Fees", ("SCHEDULE", "1")),
+        ("THE SCHEDULE TO THE SCHEME", ("SCHEDULE", "")),
+        ("The Schedule", ("SCHEDULE", "")),
+        ("YR ATODLEN 2a Ffioedd", ("ATODLEN", "2A")),
+        ("Yr Atodlen 1", ("ATODLEN", "1")),
+        ("SCHEDULE Fees 3", ("SCHEDULE", "")),
+        ("", ("", "")),
     ],
 )
-def test_a_caption_label_is_its_keyword_and_number(line: str, label: tuple[str, str, str]) -> None:
+def test_a_caption_label_is_its_keyword_and_number(line: str, label: tuple[str, str]) -> None:
     assert _caption_label(line) == label
 
 
@@ -416,7 +459,7 @@ def test_an_anchored_caption_before_the_first_provision_is_front_matter_when_pri
     declare_gb: Declare,
 ) -> None:
     declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
-    text, units = _front_text("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees")
+    text, units = _front_text(f"{_ENTRY}SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees")
     units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
     assert uk_layout_held(text, units, "section", "gb") is True
 
@@ -424,20 +467,11 @@ def test_an_anchored_caption_before_the_first_provision_is_front_matter_when_pri
 def test_a_prose_line_that_starts_like_a_caption_is_no_twin(declare_gb: Declare) -> None:
     """A contents entry is front matter only when a caption the scan can stand behind follows."""
     declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
-    text, units = _front_text("SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE")
+    text, units = _front_text(f"{_ENTRY}SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE")
     text += "Schedule 1 sets out the fees.\n"
     units.append(_unit("1", "regex", kind="hcontainer", at=text.index("Schedule 1 sets")))
     units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
     assert uk_layout_held(text, units, "section", "gb") is False
-
-
-def test_a_schedule_the_scan_anchored_vouches_for_its_contents_entry(declare_gb: Declare) -> None:
-    """With no caption declared, the annex scan's own anchor is the caption that follows."""
-    declare_gb()
-    text, units = _front_text("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees")
-    units[2] = _unit("1", "unnumbered_annex", kind="schedule", at=text.rindex("SCHEDULE 1 Fees"))
-    units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
-    assert uk_layout_held(text, units, "section", "gb") is True
 
 
 def test_the_first_attachment_after_the_provisions_still_ends_the_body(declare_gb: Declare) -> None:
@@ -1916,6 +1950,24 @@ async def test_a_flat_body_stays_void_whatever_its_openers_look_like(
         await _scaffold_gb(_FLAT_VARIANTS[body] + _LINED_SCHEDULE)
 
 
+_REPEATED = {
+    "caption printed again inside the schedule": _LINED_SCHEDULE
+    + "SCHEDULE 1\n3 Fee for transfer of a widget\nThe fee is payable once.\n",
+    "a later schedule reproduces Schedule 1 of another instrument": _LINED_SCHEDULE
+    + "SCHEDULE 2\nSCHEDULE 1 TO THE PRINCIPAL REGULATIONS AS AMENDED\n1 Fee payable\nThe fee.\n",
+    "two schedules, the second titled like the first": _LINED_SCHEDULE
+    + "SCHEDULE 2\nForms\n1 Form of application\nThe form is signed.\n",
+}
+
+
+@pytest.mark.parametrize("schedules", list(_REPEATED))
+async def test_a_flat_body_stays_void_beside_schedules_that_repeat_a_caption(
+    schedules: str, instrument: None
+) -> None:
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold_gb(_FLAT_BODY + _REPEATED[schedules])
+
+
 _REGULATIONS = (
     "The Minister makes the following Regulations:\n"
     "1.-(1) These Regulations may be cited as the Widget Regulations.\n"
@@ -1941,23 +1993,141 @@ _CONTENTS = {
     "numbers without a dot": (
         "CONTENTS\n1 Citation and commencement\n2 Registration\n3 Fees\nSCHEDULE 1 Fees\n\n"
     ),
+    "in title case": (
+        "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\nSchedule 1 Fees\n\n"
+    ),
     "the schedule alone": "CONTENTS\nSCHEDULE 1 Fees\n\n",
     "a cover note first": _COVER_NOTE
     + "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\nSCHEDULE 1 Fees\n\n",
 }
 
 
-@pytest.mark.parametrize("front", list(_CONTENTS))
+_LISTED = [front for front in _CONTENTS if front != "the schedule alone"]
+
+
+@pytest.mark.parametrize("front", _LISTED)
 async def test_a_contents_list_ending_on_a_schedule_leaves_the_layout_held(
     front: str, instrument: None
 ) -> None:
     text = _CONTENTS[front] + _REGULATIONS + _FEES
     with capture_logs() as logs:
-        assert await _scaffold_gb(text)
+        scaffold = await _scaffold_gb(text)
     events = [e["event"] for e in logs if e["event"].startswith("anchor_boundary_policy")]
     assert events == ["anchor_boundary_policy_held"]
     sections = _sections(_scan(text).anchors)
     assert sections == ["1", "2", "3", "1", "2"]
+    preface, body = scaffold.split("\nBODY\n", 1)
+    assert "Citation and commencement" in preface
+    assert body.splitlines()[0] == "  SECTION 1"
+    assert [line for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1 - SCHEDULE 1 Regulation 3"
+    ]
+
+
+async def test_a_contents_list_of_schedules_alone_is_not_taken_for_front_matter(
+    instrument: None,
+) -> None:
+    """No entry above the caption vouches for it, so the gate keeps its refusal."""
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold_gb(_CONTENTS["the schedule alone"] + _REGULATIONS + _FEES)
+
+
+async def test_a_contents_list_of_several_schedules_opens_no_attachment(instrument: None) -> None:
+    contents = (
+        "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\n"
+        "SCHEDULE 1 Fees\nSCHEDULE 2 Forms\n\n"
+    )
+    forms = "SCHEDULE 2 Regulation 3\nForms\n1 Form of application\nThe form is signed.\n"
+    text = contents + _REGULATIONS + _FEES + forms
+    scaffold = await _scaffold_gb(text)
+    body = scaffold.split("\nBODY\n", 1)[1]
+    assert [line for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1 - SCHEDULE 1 Regulation 3",
+        "SCHEDULE 2 - SCHEDULE 2 Regulation 3",
+    ]
+
+
+async def test_a_contents_entry_wrapped_over_two_lines_still_lists_the_next(
+    instrument: None,
+) -> None:
+    contents = (
+        "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\n"
+        "SCHEDULE 1 Particulars to be included in\na safety case for a fixed installation\n"
+        "SCHEDULE 2 Forms\n\n"
+    )
+    forms = "SCHEDULE 2 Regulation 3\nForms\n1 Form of application\nThe form is signed.\n"
+    scaffold = await _scaffold_gb(contents + _REGULATIONS + _FEES + forms)
+    body = scaffold.split("\nBODY\n", 1)[1]
+    assert [line[:10] for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1",
+        "SCHEDULE 2",
+    ]
+
+
+async def test_a_list_of_wrapped_schedule_entries_is_front_matter_to_its_last(
+    instrument: None,
+) -> None:
+    """Only the first entry sits under a numbered one; the others hang on each other."""
+    entries = "".join(
+        f"SCHEDULE {n} Particulars to be included in\na safety case for installation {n}\n"
+        for n in (1, 2, 3)
+    )
+    contents = f"CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\n{entries}\n"
+    printed = "".join(
+        f"SCHEDULE {n} Regulation 3\nParticulars\n1 Row {n}\nThe row is paid.\n" for n in (2, 3)
+    )
+    scaffold = await _scaffold_gb(contents + _REGULATIONS + _FEES + printed)
+    body = scaffold.split("\nBODY\n", 1)[1]
+    assert [line[:10] for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1",
+        "SCHEDULE 2",
+        "SCHEDULE 3",
+    ]
+
+
+async def test_an_unnumbered_schedule_listed_in_the_contents_is_front_matter(
+    instrument: None,
+) -> None:
+    contents = "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\nTHE SCHEDULE\n\n"
+    fees = _FEES.replace("SCHEDULE 1 Regulation 3", "THE SCHEDULE Regulation 3")
+    scaffold = await _scaffold_gb(contents + _REGULATIONS + fees)
+    body = scaffold.split("\nBODY\n", 1)[1]
+    assert [line for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1 - THE SCHEDULE Regulation 3"
+    ]
+
+
+def test_a_first_article_of_one_line_before_a_schedule_is_not_a_contents_entry(
+    declare_gb: Declare,
+) -> None:
+    """With no entry above it, an article followed by a caption is a provision."""
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = (
+        "Made today:\n1.-(1) This Order shall come into operation on 1st May 1990.\n"
+        "SCHEDULE 1\nFees\n1.-(1) A fee is paid.\n(2) It is due each year.\n"
+    )
+    sections = [a.char_offset for a in _scan(text).anchors if a.kind == "section"]
+    assert sections[0] < text.index("SCHEDULE 1")
+
+
+def test_a_one_line_article_before_a_schedule_stays_once_the_body_has_begun(
+    declare_gb: Declare,
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = (
+        "Made today:\n1.-(1) These Regulations may be cited as the Widget Regulations.\n"
+        "(2) They come into force at once.\n2.-(1) A widget is registered.\n"
+        "3.-(1) The fees in the Schedule apply.\n"
+        "SCHEDULE 1\nFees\n1.-(1) A fee is paid.\n(2) It is due each year.\n"
+    )
+    assert _sections(_scan(text).anchors) == ["1", "3", "1"]
+
+
+def test_a_contents_entry_that_lists_a_schedule_is_no_anchor(instrument: None) -> None:
+    scan = _scan(_CONTENTS["regulations then the schedule"] + _REGULATIONS + _FEES)
+    schedules = [(a.kind, a.number, a.matched_text) for a in scan.anchors if a.kind == "schedule"]
+    assert schedules == [("schedule", "1", "SCHEDULE 1 Regulation 3")]
+    assert scan.fires["drop_front_matter_attachments"] < 0
 
 
 def test_a_contents_list_ending_on_a_schedule_does_not_switch_off_the_marking(
@@ -1986,3 +2156,80 @@ def test_a_caption_on_another_page_does_not_make_a_one_off_head_recur(captioned:
         _page(2, second, [_block("header", second[0], 80), _block("text", second[1], 200)]),
     ]
     assert _lines(_structure_text(pages)) == [first[0], first[1], second[0], second[1]]
+
+
+def _schedule_one_heads(texts: list[str]) -> list[PageResult]:
+    """A schedule over several pages whose running head carries its caption on each."""
+    pages = [_head_page(1, 69, left="No. 100", middle="Pensions", right="411")]
+    for number, text in enumerate(texts, start=2):
+        page = _head_page(number, 69, left="No. 100", middle="Pensions SCHEDULE 1", right="41")
+        page.text = page.text.replace("Pensions SCHEDULE 1", text)
+        pages.append(page)
+    return pages
+
+
+def test_a_running_head_that_prints_a_schedules_caption_on_each_page_leaves_one(
+    captioned: None,
+) -> None:
+    pages = _schedule_one_heads(["Pensions\nSCHEDULE 1", "Pensions\nSCHEDULE  1 "])
+    lines = _lines(_structure_text(pages))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == ["SCHEDULE 1"]
+
+
+def test_a_running_head_does_not_print_again_a_caption_the_text_carries(captioned: None) -> None:
+    pages = _schedule_one_heads(["Pensions SCHEDULE 1"] * 3)
+    pages[1].text += "\nSCHEDULE 1"
+    pages[1].layout.blocks.append(_block("text", "SCHEDULE 1", 150))
+    lines = _lines(_structure_text(pages))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == ["SCHEDULE 1"]
+
+
+def test_a_schedule_paragraph_printed_above_its_caption_keeps_its_anchor(
+    declare_gb: Declare,
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    a1, a2, _, _ = _ARTICLES
+    text = (
+        f"Made today:\n{a1}{a2}Dated 1st April 2031.\n\n"
+        "SCHEDULE 1\nFees\n1. The fee is paid in advance to the Department.\n"
+        "Interpretation\n1.-(1) In this Schedule\u2014\nSCHEDULE 2\nTraining bursaries\n"
+        '"holder" means a person in receipt of a training bursary;\n'
+    )
+    assert _sections(_scan(text).anchors) == ["1", "2", "1"]
+
+
+def test_a_caption_the_text_prints_on_two_pages_stays_on_both(captioned: None) -> None:
+    pages = [
+        _head_page(1, 69, left="No. 100", middle="Pensions", right="411"),
+        _head_page(2, 69, left="No. 100", middle="Pensions", right="412"),
+        _head_page(3, 69, left="No. 100", middle="Pensions", right="413"),
+    ]
+    for page in pages[1:]:
+        page.text += "\nSCHEDULE 1"
+        page.layout.blocks.append(_block("text", "SCHEDULE 1", 150))
+    lines = _lines(_structure_text(pages))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == ["SCHEDULE 1", "SCHEDULE 1"]
+
+
+async def test_a_cover_note_that_opens_lines_on_schedule_leaves_the_layout_held(
+    instrument: None,
+) -> None:
+    """The keyword scan reads `Schedule 1 sets out` as a container; it is the note's prose."""
+    note = (
+        "EXPLANATORY NOTE\n(This note is not part of the Regulations)\n"
+        "These Regulations register widgets.\n"
+        "Schedule 1 sets out the fees.\nSchedule 2 states the forms.\n\n"
+    )
+    with capture_logs() as logs:
+        scaffold = await _scaffold_gb(note + _REGULATIONS + _FEES)
+    events = [e["event"] for e in logs if e["event"].startswith("anchor_boundary_policy")]
+    assert events == ["anchor_boundary_policy_held"]
+    body = scaffold.split("\nBODY\n", 1)[1]
+    assert [line for line in body.splitlines() if line.startswith("SCHEDULE")] == [
+        "SCHEDULE 1 - SCHEDULE 1 Regulation 3"
+    ]
+
+
+async def test_a_cover_note_does_not_hold_a_flat_body_beside_a_schedule(instrument: None) -> None:
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold_gb(_COVER_NOTE + _FLAT_BODY + _LINED_SCHEDULE)
