@@ -84,7 +84,7 @@ New, additive:
   and page-top captions under header or footer. Furniture is then a bare page
   number or a short block another page repeats, a running head split across
   blocks included. A block that opens with a declared attachment caption is not
-  a running head. A one-off block stays in the text, and so does a number of
+  a running head, nor evidence that another is. A one-off block stays in the text, and so does a number of
   one or two digits among its page's text; a page loses no more lines of a number
   than its layout holds blocks of it. A footnote is a block the engine filed as a
   footer or reference and the run of lines at the foot of its page that says what

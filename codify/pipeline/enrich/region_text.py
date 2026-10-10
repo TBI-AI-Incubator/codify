@@ -155,7 +155,7 @@ def _recurring_candidates(
     """Per page: short furniture another page repeats, as one block or as a row of them, the
     bare numbers its blocks hold and how many of each, and furniture or footnote blocks opening
     on a marker, returned apart as notes. A caption that opens an attachment is not a running
-    head, whatever else the page carries beside it."""
+    head, nor evidence that another block is one."""
     notes = {page: _notes_of(regs) for page, regs in regions.items()}
     blocks = {
         page: [
@@ -185,8 +185,8 @@ def _recurring_candidates(
                 _same_block(content, other)
                 for q, others in heads.items()
                 if q != page
-                for _, other, _ in others
-                if other
+                for caption, other, _ in others
+                if other and not opens_attachment(caption, country)
             ):
                 candidates += [text, *parts]
         if candidates:
