@@ -143,6 +143,11 @@
       0,
       5
     ],
+    "drop_schedule_cross_references": [
+      0,
+      0,
+      5
+    ],
     "drop_toc_duplicates": [
       -3,
       1,
@@ -281,6 +286,11 @@
         0,
         1
       ],
+      "drop_schedule_cross_references": [
+        0,
+        0,
+        1
+      ],
       "drop_toc_duplicates": [
         0,
         0,
@@ -404,6 +414,11 @@
         4
       ],
       "drop_preamble_citation_articles": [
+        0,
+        0,
+        4
+      ],
+      "drop_schedule_cross_references": [
         0,
         0,
         4

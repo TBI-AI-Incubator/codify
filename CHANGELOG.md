@@ -17,7 +17,12 @@ Breaks, in that the structurer's output changes for documents it already read:
    `amendments.trigger_phrases` is declared, embedded amendment marking covers
    the UK sections before the first schedule, which restarts the numbering. An
    em dash or a soft hyphen ends a lead-in, and the quoted unit follows it
-   directly, under at most a heading line.
+   directly, under at most a heading line. A caption before the first
+   provision read is front matter when it is a cover note or a contents entry
+   for a schedule that the text prints again, and ends no body; a contents
+   entry before a schedule's caption is no section. A line of a keyword and a
+   number inside a schedule, or beside its caption, is the citation of the
+   provision that introduces it, not a section.
 
 New, additive:
 
@@ -100,6 +105,9 @@ Fixed:
   are 1 and 2 as the UK keyword-less scan read them before any schedule no
   longer fails as a void boundary policy; those units show the layout held, and
   `anchor_boundary_policy_held` is logged.
+- `recurring_furniture`: a line that opens an attachment is never furniture, so
+  a schedule's caption printed inside a repeated head block stays, and a caption
+  block printed on a head's row is not part of the row.
 
 ## 0.6.0 (2026-10-02)
 

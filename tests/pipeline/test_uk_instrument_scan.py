@@ -20,6 +20,9 @@ from codify.pipeline.enrich import anchors as anchor_module
 from codify.pipeline.enrich.anchors import (
     UK_PROVISIONS_PASS,
     StructuralAnchor,
+    _body_end,
+    _caption_label,
+    _drop_schedule_cross_references,
     build_anchor_regex,
     cached_regex,
     scan_anchors,
@@ -67,6 +70,11 @@ def declare_gb(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[Decl
 
 
 _SUBSTITUTION = {"trigger_phrases": ["shall be substituted the following"]}
+_INSTRUMENT_ATTACHMENTS = [
+    {"caption": "EXPLANATORY NOTE", "normative": False, "prefix": True, "always_opens": True},
+    {"caption": "THE SCHEDULE", "prefix": True, "always_opens": True},
+    {"caption": "SCHEDULE", "prefix": True, "always_opens": True},
+]
 
 
 def _scan(text: str) -> Any:
@@ -322,6 +330,123 @@ def test_the_layout_is_held_when_the_uk_scan_read_units_one_and_two(
     assert uk_layout_held("x" * 100, units, "section", "gb") is held
 
 
+def _front_text(front: str, caption: str) -> tuple[str, list[StructuralAnchor]]:
+    """Front matter, two lined provisions, then a schedule whose caption is `caption`."""
+    text = f"Made.\n{front}1. First\n2. Second\n" + "x" * 20 + f"\n{caption}\n1. Row\n"
+    units = [
+        _unit("1", at=text.index("1. First")),
+        _unit("2", at=text.index("2. Second")),
+        _unit("1", "regex", kind="hcontainer", at=text.index(f"\n{caption}\n") + 1),
+    ]
+    return text, units
+
+
+_NOTE = "EXPLANATORY NOTE\nNot part of the Order.\n\n"
+
+
+@pytest.mark.parametrize(
+    ("front", "caption", "held"),
+    [
+        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees", True),
+        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 1", True),
+        ("SCHEDULE Fees\n\n", "SCHEDULE Fees", True),
+        ("SCHEDULE Fees\n\n", "SCHEDULE", False),
+        ("THE SCHEDULE TO THE\n\n", "THE SCHEDULE TO THE SCHEME", False),
+        (_NOTE, "SCHEDULE 1 Fees", True),
+        ("SCHEDULE 1 Fees\n\n", "SCHEDULE 2 Forms", False),
+        ("SCHEDULE 1 Fees\n\n", "SCHEDULE Fees", False),
+        ("SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE", False),
+    ],
+    ids=[
+        "contents entry",
+        "contents entry, caption without its title",
+        "contents entry, unnumbered and printed again",
+        "contents entry, unnumbered and printed without its title",
+        "a schedule whose caption wraps, then another",
+        "cover note",
+        "a schedule not printed again",
+        "numbered then unnumbered",
+        "a schedule the caption below is not",
+    ],
+)
+def test_a_caption_before_the_first_provision_is_front_matter_only_if_a_note_or_printed_again(
+    front: str, caption: str, held: bool, declare_gb: Declare
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text, units = _front_text(front, caption)
+    assert uk_layout_held(text, units, "section", "gb") is held
+
+
+@pytest.mark.parametrize(
+    ("line", "label"),
+    [
+        ("SCHEDULE 1 Fees", ("SCHEDULE", "1", "")),
+        ("THE SCHEDULE TO THE SCHEME", ("SCHEDULE", "", "TO THE SCHEME")),
+        ("YR ATODLEN 2a Ffioedd", ("ATODLEN", "2A", "")),
+        ("SCHEDULE Fees 3", ("SCHEDULE", "", "FEES 3")),
+        ("", ("", "", "")),
+    ],
+)
+def test_a_caption_label_is_its_keyword_and_number(line: str, label: tuple[str, str, str]) -> None:
+    assert _caption_label(line) == label
+
+
+@pytest.mark.parametrize(
+    "stray",
+    [_unit("2", kind="paragraph"), _unit("3", "regex")],
+    ids=["a parenthesised number", "a keyword section"],
+)
+def test_only_a_unit_the_uk_scan_read_as_a_section_is_the_first_provision(
+    stray: StructuralAnchor, declare_gb: Declare
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text, units = _front_text(_NOTE, "SCHEDULE 1 Fees")
+    assert uk_layout_held(text, [stray, *units], "section", "gb") is True
+
+
+def test_with_no_provision_read_the_body_is_sought_from_the_start(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = "Made.\nSCHEDULE 1 Fees\n1. Row\n"
+    assert _body_end(text, [], "gb") == text.index("SCHEDULE")
+    note = "Made.\nEXPLANATORY NOTE\nNot part of the Order.\n"
+    assert _body_end(note, [], "gb") == note.index("EXPLANATORY")
+
+
+def test_an_anchored_caption_before_the_first_provision_is_front_matter_when_printed_again(
+    declare_gb: Declare,
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text, units = _front_text("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees")
+    units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
+    assert uk_layout_held(text, units, "section", "gb") is True
+
+
+def test_a_prose_line_that_starts_like_a_caption_is_no_twin(declare_gb: Declare) -> None:
+    """A contents entry is front matter only when a caption the scan can stand behind follows."""
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text, units = _front_text("SCHEDULE 1 Fees\n\n", "EXPLANATORY NOTE")
+    text += "Schedule 1 sets out the fees.\n"
+    units.append(_unit("1", "regex", kind="hcontainer", at=text.index("Schedule 1 sets")))
+    units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
+    assert uk_layout_held(text, units, "section", "gb") is False
+
+
+def test_a_schedule_the_scan_anchored_vouches_for_its_contents_entry(declare_gb: Declare) -> None:
+    """With no caption declared, the annex scan's own anchor is the caption that follows."""
+    declare_gb()
+    text, units = _front_text("SCHEDULE 1 Fees\n\n", "SCHEDULE 1 Fees")
+    units[2] = _unit("1", "unnumbered_annex", kind="schedule", at=text.rindex("SCHEDULE 1 Fees"))
+    units.append(_unit("1", "regex", kind="hcontainer", at=text.index("SCHEDULE 1 Fees")))
+    assert uk_layout_held(text, units, "section", "gb") is True
+
+
+def test_the_first_attachment_after_the_provisions_still_ends_the_body(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = "Made.\n1. First\nSCHEDULE 1 Fees\n2. Row\n"
+    units = [_unit("1", at=text.index("1. First")), _unit("2", at=text.index("2. Row"))]
+    assert uk_layout_held(text, units, "section", "gb") is False
+
+
 def test_large_article_numbers_in_sequence_are_not_page_numbers(declare_gb: Declare) -> None:
     declare_gb()
     text = "Made today:\n" + "".join(
@@ -365,8 +490,15 @@ def test_a_regulation_quoted_in_a_substitution_is_not_a_unit(
     """The lead-in ends on a dash and the quoted number is not the next in sequence. The
     quotation is left open, as it is where the closing mark was lost."""
     declare_gb(amendments=_SUBSTITUTION)
-    text = (
+    anchors = _scan(_quoted_regulation(dash)).anchors
+    assert [a.number for a in anchors if a.kind == "section" and a.quoted_amendment] == ["9"]
+    assert _sections(anchors) == ["3", "4", "5"]
+
+
+def _quoted_regulation(dash: str, opening: str = "") -> str:
+    return (
         "The Minister makes the following Regulations:\n"
+        f"{opening}"
         "3.-(1) These Regulations may be cited as the Widget Regulations.\n"
         "(2) They come into force at once.\n"
         f"4. {_LEAD_IN.format(n=9, dash=dash)}\n"
@@ -377,9 +509,26 @@ def test_a_regulation_quoted_in_a_substitution_is_not_a_unit(
         "(2) The Schedule takes effect at once.\n"
         "Dated 1st April 2031.\n"
     )
+
+
+_COVER_NOTE = (
+    "EXPLANATORY NOTE\n(This note is not part of the Regulations)\n"
+    "These Regulations register widgets.\n\n"
+)
+_ONE_AND_TWO = (
+    "1.-(1) These Regulations may be cited as the Widget Regulations.\n"
+    "(2) They come into force at once.\n"
+    "2.-(1) A widget is registered.\n(2) The register is public.\n"
+)
+
+
+def test_a_cover_note_does_not_switch_off_the_marking_of_a_quoted_article(
+    declare_gb: Declare,
+) -> None:
+    declare_gb(amendments=_SUBSTITUTION, attachments=_INSTRUMENT_ATTACHMENTS)
+    text = _COVER_NOTE + _quoted_regulation(_DASHES[0], _ONE_AND_TWO)
     anchors = _scan(text).anchors
     assert [a.number for a in anchors if a.kind == "section" and a.quoted_amendment] == ["9"]
-    assert _sections(anchors) == ["3", "4", "5"]
 
 
 def test_an_article_in_sequence_after_a_substitution_lead_in_is_a_unit(
@@ -633,6 +782,16 @@ def recurring(declare_gb: Declare) -> None:
     declare_gb(structuring={**base["structuring"], "recurring_furniture": True})
 
 
+@pytest.fixture
+def captioned(declare_gb: Declare) -> None:
+    """Recurring furniture, with the captions the shipped gb config declares for attachments."""
+    base = json.loads((jurisdictions.JURISDICTIONS_DIR / "gb" / "config.json").read_text())
+    declare_gb(
+        structuring={**base["structuring"], "recurring_furniture": True},
+        attachments=_INSTRUMENT_ATTACHMENTS,
+    )
+
+
 def test_a_running_head_split_across_blocks_leaves_the_structure_text(recurring: None) -> None:
     out = _structure_text(_instrument_pages())
     assert "Social Security" not in out
@@ -670,6 +829,61 @@ def test_a_split_head_the_text_layer_prints_in_parts_leaves_in_parts(recurring: 
         _page(2, second, _split_head_blocks()),
     ]
     assert _lines(_structure_text(pages)) == [first[1], second[3]]
+
+
+def _head_page(number: int, top: int, *, middle: str, left: str, right: str) -> PageResult:
+    """Three header blocks across the page, then one line of text."""
+    body = f"Provisions of the Act {number}."
+    return _page(
+        number,
+        [left, middle, right, body],
+        [
+            _block("header", left, top, 68),
+            _block("header", middle, top, 280),
+            _block("header", right, top, 503),
+            _block("text", body, 200),
+        ],
+    )
+
+
+def _schedule_head_pages() -> list[PageResult]:
+    """The head of a schedule's page carries the schedule's number, so its text repeats with
+    only the number changed; the caption line is a subset of it and is not the head."""
+    pages = [
+        _head_page(1, 69, left="No. 100", middle="Pensions", right="411"),
+        _head_page(2, 69, left="No. 100", middle="Pensions SCHEDULE 1", right="412 Regulation 2"),
+        _head_page(3, 67, left="No. 100", middle="Pensions SCHEDULE 2", right="413 Regulation 3"),
+    ]
+    pages[1].text = pages[1].text.replace("Pensions SCHEDULE 1", "Pensions\nSCHEDULE 1")
+    pages[2].text = pages[2].text.replace("Pensions SCHEDULE 2", "Pensions\nSCHEDULE 2")
+    return pages
+
+
+def test_a_caption_inside_a_repeated_head_block_stays(captioned: None) -> None:
+    lines = _lines(_structure_text(_schedule_head_pages()))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == ["SCHEDULE 1", "SCHEDULE 2"]
+    assert "No. 100" not in lines
+
+
+def test_without_the_flag_that_caption_leaves_with_the_head(declare_gb: Declare) -> None:
+    """The guard belongs to `recurring_furniture`; a jurisdiction without it reads as before."""
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    lines = _lines(_structure_text(_schedule_head_pages()))
+    assert [line for line in lines if line.startswith("SCHEDULE")] == []
+
+
+def test_a_caption_printed_on_the_head_row_stays_and_the_head_still_leaves(
+    captioned: None,
+) -> None:
+    first = ["842 Social Security No. 148", "The register records the matters."]
+    second = ["843", "Social Security", "No. 148", "SCHEDULE 1", "Text of page two."]
+    blocks = _split_head_blocks()
+    blocks.insert(3, _block("header", "SCHEDULE 1", 80, 150))
+    pages = [
+        _page(1, first, [_block("header", first[0], 78), _block("text", first[1], 200)]),
+        _page(2, second, blocks),
+    ]
+    assert _lines(_structure_text(pages)) == [first[1], "SCHEDULE 1", second[4]]
 
 
 def test_a_caption_the_engine_filed_as_furniture_stays_where_it_is(recurring: None) -> None:
@@ -1302,6 +1516,101 @@ def test_the_keyword_anchor_stays_where_the_annex_scan_declines_the_caption(
     assert kinds == ["hcontainer"]
 
 
+_CITING = (
+    "The Minister makes the following Order:\n"
+    "1.-(1) This Order may be cited as the Widget Order.\n(2) It applies at once.\n"
+    "2.-(1) A widget is registered under Regulation 6.\n(2) The register is public.\n"
+)
+
+
+def _keyword_sections(text: str) -> list[str | None]:
+    return [
+        a.number for a in _scan(text).anchors if a.source_pass == "regex" and a.kind == "section"
+    ]
+
+
+@pytest.mark.parametrize(
+    "schedule",
+    [
+        "SCHEDULE 1\nRegulation 6\nForm of notice\n1. The form is as follows.\n",
+        "Regulation 6\nSCHEDULE\n1. The form is as follows.\n",
+        "SCHEDULE 1\nNo. 221\nRegulation 2\nRegulation 4\nFees\n1. The fee is payable.\n",
+        "SCHEDULE 1\nForm of notice\n1. The form is as follows.\n411\nRegulation 2\n"
+        "2. The form is signed.\n",
+    ],
+    ids=["below the caption", "above the caption", "two citations", "a page head inside"],
+)
+def test_a_schedule_citing_its_article_has_no_section_for_the_citation(
+    schedule: str, declare_gb: Declare
+) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    assert _keyword_sections(_CITING + schedule) == []
+
+
+def test_a_keyword_and_number_in_the_body_is_a_unit_still(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = (
+        _CITING
+        + "Regulation 3\nThe fee is payable in advance.\nSCHEDULE 1\n1. The form is as follows.\n"
+    )
+    assert _keyword_sections(text) == ["3"]
+
+
+def test_a_document_of_keyword_headings_keeps_every_one(declare_gb: Declare) -> None:
+    """Nothing was read as a UK provision, so there is no body to tell a citation from."""
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = (
+        "The Minister makes this Order:\nRegulation 1\nCitation\nThis Order may be cited.\n"
+        "Regulation 2\nCommencement\nThis Order applies at once.\n"
+        "SCHEDULE 1\nRegulation 2\nForm\nThe form is as follows.\n"
+    )
+    assert _keyword_sections(text) == ["1", "2", "2"]
+
+
+def test_a_citation_is_dropped_and_declared(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    scan = _scan(_CITING + "SCHEDULE 1\nRegulation 6\n1. The form is as follows.\n")
+    reads = [
+        s.detail["reads_as"]
+        for s in scan.ambiguity
+        if s.emitted_by == "drop_schedule_cross_references"
+    ]
+    assert reads == ["cross_reference"]
+
+
+def test_another_jurisdictions_citation_stays(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = _CITING + "SCHEDULE 1\nRegulation 6\n1. The form is as follows.\n"
+    cited = StructuralAnchor(
+        kind="section",
+        keyword="Regulation",
+        number="6",
+        char_offset=text.index("Regulation 6\n"),
+        line=1,
+        matched_text="Regulation 6",
+        source_pass="regex",
+    )
+    anchors = [*_scan(text).anchors, cited]
+    assert _drop_schedule_cross_references(text, anchors, "gb") == anchors[:-1]
+    assert _drop_schedule_cross_references(text, anchors, "xz") == anchors
+
+
+def test_a_schedule_line_that_says_more_than_the_citation_is_kept(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = _CITING + "SCHEDULE 1\nRegulation 6 Citation\n1. The form is as follows.\n"
+    assert _keyword_sections(text) == ["6"]
+
+
+def test_a_schedule_paragraph_that_names_a_regulation_is_kept(declare_gb: Declare) -> None:
+    declare_gb(attachments=_INSTRUMENT_ATTACHMENTS)
+    text = (
+        _CITING
+        + "SCHEDULE 1\nForms\n1. Form of notice\nThe form is signed.\n"
+        + "2. Regulation 4 does not apply\nIt takes effect at once.\n"
+    )
+    assert _sections(_scan(text).anchors) == ["1", "2", "1", "2"]
+
+
 def test_only_a_caption_declared_always_opening_drops_its_twin(declare_gb: Declare) -> None:
     declare_gb(
         attachments=[
@@ -1536,6 +1845,16 @@ def line_anchored(declare_gb: Declare) -> None:
     declare_gb(structuring={**base["structuring"], "marker_boundary": "line_anchored"})
 
 
+@pytest.fixture
+def instrument(declare_gb: Declare) -> None:
+    """Line-anchored markers and the captions the shipped gb config declares for attachments."""
+    base = json.loads((jurisdictions.JURISDICTIONS_DIR / "gb" / "config.json").read_text())
+    declare_gb(
+        structuring={**base["structuring"], "marker_boundary": "line_anchored"},
+        attachments=_INSTRUMENT_ATTACHMENTS,
+    )
+
+
 async def _scaffold_gb(text: str) -> str:
     return await text_to_bluebell_scaffolded(
         text, client=_EmptyBodies(), country="gb", doctype="nisr", halt_policy="land"
@@ -1559,6 +1878,96 @@ async def test_a_line_laid_schedule_does_not_hold_a_flat_body(line_anchored: Non
     """The schedule's paragraphs read 1 and 2, but they are not the body's."""
     with pytest.raises(AnchorCoverageError):
         await _scaffold_gb(_FLAT_BODY + _LINED_SCHEDULE)
+
+
+async def test_a_flat_body_stays_void_where_the_schedule_caption_is_declared(
+    instrument: None,
+) -> None:
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold_gb(_FLAT_BODY + _LINED_SCHEDULE)
+
+
+async def test_a_cover_note_before_the_body_leaves_the_layout_held(instrument: None) -> None:
+    with capture_logs() as logs:
+        assert await _scaffold_gb(_COVER_NOTE + _LINED_BODY)
+    events = [e["event"] for e in logs if e["event"].startswith("anchor_boundary_policy")]
+    assert events == ["anchor_boundary_policy_held"]
+
+
+_FLAT_VARIANTS = {
+    "one paragraph a regulation": (
+        "The Minister makes the following Regulations: 1. These Regulations may be cited as the "
+        "Widget Regulations and come into force at once. 2. A widget is registered under "
+        "Regulation 3 of the principal Regulations. 3. The fees in the Schedule apply. "
+        "Dated 1st April 2031."
+    ),
+    "the dash lost": _FLAT_BODY.replace("1.-(1)", "1.(1)").replace("2.-(1)", "2. (1)"),
+    "one opener": _FLAT_BODY.replace("2.-(1) A widget", "2. A widget").replace(
+        " (2) The register is public.", ""
+    ),
+}
+
+
+@pytest.mark.parametrize("body", list(_FLAT_VARIANTS))
+async def test_a_flat_body_stays_void_whatever_its_openers_look_like(
+    body: str, instrument: None
+) -> None:
+    with pytest.raises(AnchorCoverageError):
+        await _scaffold_gb(_FLAT_VARIANTS[body] + _LINED_SCHEDULE)
+
+
+_REGULATIONS = (
+    "The Minister makes the following Regulations:\n"
+    "1.-(1) These Regulations may be cited as the Widget Regulations.\n"
+    "(2) They come into force at once.\n"
+    "2.-(1) A widget is registered under Regulation 3 of the principal Regulations.\n"
+    "(2) The register is public.\n"
+    "3.-(1) The fees in Schedule 1 apply.\n(2) They are payable in advance.\n"
+    "Dated 1st April 2031.\n"
+)
+_FEES = (
+    "\nSCHEDULE 1 Regulation 3\nTable of fees\n"
+    "1 Fee for registration of a widget\nThe fee is payable in advance.\n"
+    "2 Fee for renewal of a widget\nThe fee is payable each year.\n"
+)
+_CONTENTS = {
+    "regulations then the schedule": (
+        "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\nSCHEDULE 1 Fees\n\n"
+    ),
+    "a dash before the title": (
+        "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\n"
+        "SCHEDULE 1 \u2014 Fees\n\n"
+    ),
+    "numbers without a dot": (
+        "CONTENTS\n1 Citation and commencement\n2 Registration\n3 Fees\nSCHEDULE 1 Fees\n\n"
+    ),
+    "the schedule alone": "CONTENTS\nSCHEDULE 1 Fees\n\n",
+    "a cover note first": _COVER_NOTE
+    + "CONTENTS\n1. Citation and commencement\n2. Registration\n3. Fees\nSCHEDULE 1 Fees\n\n",
+}
+
+
+@pytest.mark.parametrize("front", list(_CONTENTS))
+async def test_a_contents_list_ending_on_a_schedule_leaves_the_layout_held(
+    front: str, instrument: None
+) -> None:
+    text = _CONTENTS[front] + _REGULATIONS + _FEES
+    with capture_logs() as logs:
+        assert await _scaffold_gb(text)
+    events = [e["event"] for e in logs if e["event"].startswith("anchor_boundary_policy")]
+    assert events == ["anchor_boundary_policy_held"]
+    sections = _sections(_scan(text).anchors)
+    assert sections == ["1", "2", "3", "1", "2"]
+
+
+def test_a_contents_list_ending_on_a_schedule_does_not_switch_off_the_marking(
+    declare_gb: Declare,
+) -> None:
+    declare_gb(amendments=_SUBSTITUTION, attachments=_INSTRUMENT_ATTACHMENTS)
+    contents = "CONTENTS\n1. Citation\n2. Registration\n3. Fees\nSCHEDULE 1 Fees\n\n"
+    text = contents + _quoted_regulation(_DASHES[0], _ONE_AND_TWO) + _FEES
+    anchors = _scan(text).anchors
+    assert [a.number for a in anchors if a.kind == "section" and a.quoted_amendment] == ["9"]
 
 
 async def test_nothing_stranded_logs_nothing_about_the_boundary(line_anchored: None) -> None:

@@ -1460,6 +1460,14 @@ def scan_anchors_with_ambiguity(
         spans,
         reads_as="table_caption",
     )
+    raw = _fire_dropped(
+        fires,
+        "drop_schedule_cross_references",
+        raw,
+        _drop_schedule_cross_references(text, raw, country),
+        spans,
+        reads_as="cross_reference",
+    )
     # Every drop has run, so `raw` is the surviving set and the measure can ask
     # what each drop left behind. Declaring, not dropping: the count is spans.
     _declare_orphaned_drops(text, raw, spans)
@@ -1612,13 +1620,53 @@ def opens_attachment(text: str, country: str) -> bool:
     return bool(country) and _annex_caption_re(country).match(text) is not None
 
 
+def _caption_label(line: str) -> tuple[str, str, str]:
+    """A caption's keyword and number, or its whole title where it has no number, so a schedule
+    listed in a contents entry and printed again as its own caption has one label."""
+    words = line.split()
+    if words and words[0].upper() in ("THE", "YR"):
+        words = words[1:]
+    keyword = words[0].upper() if words else ""
+    if len(words) > 1 and re.fullmatch(r"\d+[A-Za-z]?", words[1]):
+        return (keyword, words[1].upper(), "")
+    return (keyword, "", " ".join(words[1:]).upper())
+
+
 def _body_end(text: str, anchors: Iterable[StructuralAnchor], country: str) -> int:
     """Where the first attachment begins, by anchor or by declared caption; the end of the text
-    when there is none. A contents entry for a schedule ends the body early, which leaves more
-    to doubt rather than less."""
-    starts = [a.char_offset for a in anchors if a.kind in _ATTACHMENT_KINDS]
-    match = _annex_caption_re(country).search(text)
-    return min([*starts, match.start() if match else len(text)])
+    when there is none. A caption before the first provision the UK scan read is front matter
+    when it is a cover note or a contents entry (a caption the scan vetted prints it again
+    later); any other is an attachment, so a flat body beside a schedule in lines has no
+    provision before it."""
+    anchors = list(anchors)
+    first = min(
+        (
+            a.char_offset
+            for a in anchors
+            if a.kind == "section" and a.source_pass == UK_PROVISIONS_PASS
+        ),
+        default=0,
+    )
+    at = {_marker_line_start(text, a.char_offset) for a in anchors if a.kind in _ATTACHMENT_KINDS}
+    at |= {m.start() for m in _annex_caption_re(country).finditer(text)}
+
+    def caption(pos: int) -> str:
+        stop = text.find("\n", pos)
+        return text[pos : len(text) if stop == -1 else stop].strip()
+
+    vetted = {_marker_line_start(text, a.char_offset) for a in anchors if a.kind == "schedule"}
+    later = {
+        _caption_label(caption(pos))
+        for pos in at
+        if pos >= first and (pos in vetted or opens_attachment(caption(pos), country))
+    }
+    notes = tuple(c.upper() for c, normative in _attachment_captions(country) if not normative)
+
+    def front_matter(pos: int) -> bool:
+        line = caption(pos)
+        return pos < first and (line.upper().startswith(notes) or _caption_label(line) in later)
+
+    return min([len(text), *(pos for pos in at if not front_matter(pos))])
 
 
 def _scan_unnumbered_annexes(
@@ -1710,6 +1758,37 @@ def uk_layout_held(text: str, anchors: Iterable[StructuralAnchor], kind: str, co
         key=lambda a: a.char_offset,
     )
     return [a.number for a in read[:2]] == ["1", "2"]
+
+
+_KEYWORD_AND_NUMBER_RE = re.compile(r"[^\W\d_]+ \d+[A-Z]?")
+
+
+def _drop_schedule_cross_references(
+    text: str, anchors: list[StructuralAnchor], country: str
+) -> list[StructuralAnchor]:
+    """A UK schedule's heading cites the provision that introduces it ("SCHEDULE 1" beside
+    "Article 6"), and a page head inside it repeats the citation. Its paragraphs carry no
+    keyword, so a line of a keyword and a number there, or beside the caption, is that citation."""
+    read = any(a.kind == "section" and a.source_pass == UK_PROVISIONS_PASS for a in anchors)
+    if country not in _UK_JURISDICTIONS or not read:
+        return anchors
+    end = _body_end(text, anchors, country)
+
+    def cites(a: StructuralAnchor) -> bool:
+        marker = " ".join(a.matched_text.split())
+        if a.kind != "section" or not _KEYWORD_AND_NUMBER_RE.fullmatch(marker):
+            return False
+        start = _marker_line_start(text, a.char_offset)
+        stop = text.find("\n", start)
+        stop = len(text) if stop == -1 else stop
+        if " ".join(text[start:stop].split()) != marker:
+            return False
+        if a.char_offset >= end:
+            return True
+        below = (line.strip() for line in text[stop : stop + 300].split("\n"))
+        return opens_attachment(next((line for line in below if line), ""), country)
+
+    return [a for a in anchors if not cites(a)]
 
 
 def _drop_caption_twins(
@@ -2894,7 +2973,7 @@ def _drop_uk_toc_sections(text: str, anchors: list[StructuralAnchor]) -> list[St
             continue
         end = len(text)
         for b in anchors[i + 1 :]:
-            if KIND_RANK.get(b.kind, 8) <= sec_rank:
+            if KIND_RANK.get(b.kind, 8) <= sec_rank or b.kind in _ATTACHMENT_KINDS:
                 end = b.char_offset
                 break
         after_heading = text[a.char_offset : end].split("\n", 1)

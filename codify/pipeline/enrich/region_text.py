@@ -127,12 +127,15 @@ def _notes_of(regs: list[Region]) -> list[str]:
 
 
 def _heads(
-    entries: list[tuple[Region, frozenset[str]]],
+    entries: list[tuple[Region, frozenset[str]]], country: str
 ) -> list[tuple[str, frozenset[str], list[str]]]:
     """Each furniture block as the engine cut it, and each row of blocks joined, with the
-    blocks each is made of. Matching reads the words, not their order."""
+    blocks each is made of. A caption that opens an attachment is not part of a row, whatever
+    it is printed beside. Matching reads the words, not their order."""
     rows: list[list[Region]] = []
     for region, _ in sorted(entries, key=lambda e: e[0].top):
+        if opens_attachment(region.text, country):
+            continue
         if rows and abs(region.top - rows[-1][0].top) <= _ROW_TOLERANCE:
             rows[-1].append(region)
         else:
@@ -162,7 +165,7 @@ def _recurring_candidates(
         ]
         for page, regs in regions.items()
     }
-    heads = {page: _heads(entries) for page, entries in blocks.items()}
+    heads = {page: _heads(entries, country) for page, entries in blocks.items()}
     texts: dict[int, list[str]] = {}
     numbers: dict[int, Counter[str]] = {}
     for page, entries in blocks.items():
@@ -276,7 +279,8 @@ def combine_text_for_structure(
     drop, tail = _acted(regions)
     numbers: dict[int, Counter[str]] = {}
     notes: dict[int, list[str]] = {}
-    if _recurring_furniture(country):
+    recurring = _recurring_furniture(country)
+    if recurring:
         drop, numbers, notes = _recurring_candidates(regions, country)
         if page_spans:  # a run is read page by page; without spans notes move line by line
             tail = {
@@ -307,6 +311,8 @@ def combine_text_for_structure(
             bare = bool(found) and all(t.isdigit() for t in found)
             maybe = bare and _digits(found) in numbers.get(page or 0, ())
             verdicts.append((page, "bare" if maybe else "keep"))
+        elif recurring and opens_attachment(line.strip(), country):
+            verdicts.append((page, "keep"))  # a caption is never furniture, nor a note
         elif any(_matches(line, block) for block in _blocks(drop, page)):
             verdicts.append((page, "drop"))  # header/footer furniture
         elif any(_matches(line, block) for block in _blocks(tail, page)):
