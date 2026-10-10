@@ -435,3 +435,43 @@ async def test_a_pdf_the_publisher_does_not_have_is_not_found() -> None:
     acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
     with pytest.raises(FileNotFoundError, match="404"):
         await acquirer.fetch(_fallback_ref())
+
+
+def _redirecting(location: str) -> tuple[list[str], AknNativeAcquirer]:
+    """The metadata, then a PDF address that redirects to `location`, which serves a PDF."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        if str(request.url).endswith("xsi_19820007_en.pdf"):
+            return httpx.Response(302, headers={"location": location})
+        if str(request.url).endswith(".pdf"):
+            return httpx.Response(200, content=b"%PDF-1.4 moved")
+        return httpx.Response(200, content=_stub_naming(_ENGLISH))
+
+    return seen, AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
+
+
+async def test_a_pdf_that_redirects_off_the_publisher_is_not_taken() -> None:
+    seen, acquirer = _redirecting("https://elsewhere.example/stolen.pdf")
+    with pytest.raises(FileNotFoundError, match="off the publisher"):
+        await acquirer.fetch(_fallback_ref())
+    assert not any("elsewhere.example" in url for url in seen)
+
+
+async def test_a_pdf_redirect_that_stays_on_the_publisher_is_followed() -> None:
+    seen, acquirer = _redirecting("/xsi/1982/7/pdfs/moved.pdf")
+    acquired = await acquirer.fetch(_fallback_ref())
+    assert seen[-1] == "https://www.legislation.gov.uk/xsi/1982/7/pdfs/moved.pdf"
+    assert acquired.primary().content == b"%PDF-1.4 moved"
+
+
+async def test_a_pdf_that_redirects_forever_is_not_taken() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith(".pdf"):
+            return httpx.Response(302, headers={"location": "/xsi/1982/7/pdfs/again.pdf"})
+        return httpx.Response(200, content=_stub_naming(_ENGLISH))
+
+    acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(httpx.MockTransport(handler)))
+    with pytest.raises(FileNotFoundError, match="too many redirects"):
+        await acquirer.fetch(_fallback_ref())
