@@ -387,6 +387,11 @@ export interface components {
          *     mandatory companion alike, so legal force is declared per caption.
          */
         AttachmentCaption: {
+            /**
+             * Always Opens
+             * @default false
+             */
+            always_opens: boolean;
             /** Caption */
             caption: string;
             /** Hierarchy */
@@ -1685,6 +1690,11 @@ export interface components {
             prompt_variant?: string | null;
             /** Prose Precursors */
             prose_precursors?: string[];
+            /**
+             * Recurring Furniture
+             * @default false
+             */
+            recurring_furniture: boolean;
             /** Reference Nouns */
             reference_nouns?: string[];
             /** Sameline Precursors */

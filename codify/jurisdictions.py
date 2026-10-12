@@ -643,6 +643,9 @@ class AttachmentCaption(BaseModel):
     # True where the caption opens a longer title on the same line ("SCHEDULE of
     # fees…"), so the caption need only begin the line. The line is the heading.
     prefix: bool = False
+    # True where no table in the body carries this caption, so a line that opens
+    # with it always begins the attachment.
+    always_opens: bool = False
 
 
 def heading_line_pattern(pattern: str) -> re.Pattern[str]:
@@ -741,6 +744,9 @@ class StructuringConfig(BaseModel):
     # Words that, following a marker's number on its own line, make the line a
     # citation list rather than a provision ("Article 5 to Article 9 apply").
     citation_successors: list[str] = Field(default_factory=list)
+    # True where the layout engine files footnotes and page-top captions under header
+    # or footer: furniture is then only what repeats, and a block opening on a marker is a note.
+    recurring_furniture: bool = False
 
     @field_validator("insertion_suffixes")
     @classmethod
