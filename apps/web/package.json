@@ -55,14 +55,14 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/ui": "^4.1.11",
+    "@vitest/ui": "^5.0.0",
     "jsdom": "^30.1.1",
     "openapi-typescript": "^7.9.1",
     "shadcn": "^4.18.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^8.3.1",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "packageManager": "pnpm@11.22.0"
 }
