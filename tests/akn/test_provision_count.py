@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from lxml import etree
 
 from codify.akn import AKN_NS
@@ -149,3 +150,22 @@ def test_a_named_bis_hcontainer_is_a_basic_unit() -> None:
     bare = _root('<hcontainer eId="hcontainer_1"><p>scaffolding</p></hcontainer>')
     assert basic_unit_numbers(named) == frozenset({"mukrrar:1"})
     assert basic_unit_numbers(bare) == frozenset()
+
+
+@pytest.mark.parametrize(
+    "digit",
+    ["5", "٥", "۵", "५", "৫", "๕"],
+    ids=["ascii", "arabic_indic", "persian", "devanagari", "bengali", "thai"],
+)
+def test_every_digit_block_the_anchor_scan_accepts_keys_a_unit(digit: str) -> None:
+    """The anchor scan keys Devanagari, Bengali and Thai numerals through
+    `normalise_digits`; the unit set must fold the same scripts, or an article
+    numbered in them is invisible to every comparison built on it (#2)."""
+    root = _root(f'<article eId="art_5"><num>{digit}</num><content><p>x</p></content></article>')
+    assert basic_unit_numbers(root) == frozenset({"article:5"})
+
+
+def test_a_dropped_bengali_article_shows_in_the_set_difference() -> None:
+    before = _root('<article eId="a"><num>৫</num></article><article eId="b"><num>৬</num></article>')
+    after = _root('<article eId="a"><num>৫</num></article>')
+    assert basic_unit_numbers(before) - basic_unit_numbers(after) == frozenset({"article:6"})
