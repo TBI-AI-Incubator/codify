@@ -34,6 +34,13 @@ class FeedEffect:
     #: effect without saying so, which is not the same as "not applied".
     applied: bool | None
     is_meta: bool
+    #: Whether the publisher's wording was narrower than the verb mapped from
+    #: it: a quantifier ("words", "entry", "heading") or "in part" was dropped
+    #: to reach `akn_action`. A narrowed repeal takes words out of a provision
+    #: that stays in force, which `raw_type` says and `akn_action` cannot.
+    #: Last, with a default, so an adapter that builds the record today is
+    #: unchanged; one that can read a quantifier sets it.
+    narrowed: bool = False
 
 
 @dataclass

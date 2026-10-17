@@ -54,13 +54,32 @@ _CROSSWALK: dict[str, tuple[str, AknCategory]] = {
 }
 
 # Leading modifiers that don't change the effect verb ("words omitted" == omit,
-# "entry inserted" == insert, "heading substituted" == substitute).
+# "entry inserted" == insert, "heading substituted" == substitute). They narrow
+# it: the words go and the provision stays.
 _QUANTIFIER = re.compile(
     r"^(?:word|words|sum|para|paras|comma|and comma|entry|entries|heading)\s+", re.I
 )
 _PARENS = re.compile(r"\([^)]*\)")
 _PROVENANCE = re.compile(r"\s+(?:by|in earlier|for|of|conferred)\b.*$", re.I)
+# "repealed in part", "applied in part (with modifications)": the same verb,
+# reaching part of the provision.
+_IN_PART = re.compile(r"\bin part\b")
 _META_MARK = re.compile(r"earlier affecting|earlier amending provision", re.I)
+
+
+def _verb(type_of_effect: str) -> tuple[str, bool]:
+    """The verb the publisher's wording reduces to, and whether what was
+    dropped to reach it narrowed the effect to part of the provision."""
+    s = type_of_effect.strip().lower()
+    # Before the parentheses go, so "(in part)" reads as "in part" does.
+    narrowed = bool(_IN_PART.search(s))
+    s = _PARENS.sub("", s)  # drop "(with modifications)", "(S.N.I.)"
+    s = _PROVENANCE.sub("", s)  # drop "... by S.I. ...", "... for ss. 49, 50"
+    s = _IN_PART.sub("", s)
+    while _QUANTIFIER.match(s):
+        s = _QUANTIFIER.sub("", s, count=1)
+        narrowed = True
+    return re.sub(r"\s+", " ", s).strip().rstrip("."), narrowed
 
 
 def crosswalk(type_of_effect: str) -> tuple[str | None, AknCategory | None]:
@@ -69,18 +88,20 @@ def crosswalk(type_of_effect: str) -> tuple[str | None, AknCategory | None]:
     Returns (None, None) when no confident mapping exists; the caller keeps the
     raw string regardless.
     """
-    s = type_of_effect.strip().lower()
-    s = _PARENS.sub("", s)  # drop "(with modifications)", "(S.N.I.)"
-    s = _PROVENANCE.sub("", s)  # drop "... by S.I. ...", "... for ss. 49, 50"
-    s = s.replace(" in part", "")
-    while _QUANTIFIER.match(s):
-        s = _QUANTIFIER.sub("", s, count=1)
-    s = re.sub(r"\s+", " ", s).strip().rstrip(".")
+    s, _ = _verb(type_of_effect)
     if s in _CROSSWALK:
         return _CROSSWALK[s]
     if s == "substututed":  # tolerate a recurring editorial typo
         return _CROSSWALK["substituted"]
     return (None, None)
+
+
+def narrows(type_of_effect: str) -> bool:
+    """Whether the wording reaches its verb by dropping a quantifier or "in
+    part". "words omitted" and "repealed in part" do and "repealed" does not;
+    all three map to `repeal`, and only the last ends the provision.
+    """
+    return _verb(type_of_effect)[1]
 
 
 # CSV legislation labels → legislation.gov.uk `/id/` document-type. "2018 c. 012"
@@ -166,6 +187,7 @@ def parse_effects_csv(text: str, dates: dict[str, str]) -> FeedResult:
                 raw_type=raw_type.strip(),
                 akn_action=action,
                 akn_category=category,
+                narrowed=narrows(raw_type),
                 # The sidecar first: the export's own column is blank on every
                 # row it serves, so the column is a fallback, not the source.
                 in_force_date=_parse_date(dates.get(pid) or row.get("IF Date", "")),

@@ -110,6 +110,13 @@ New, additive:
 - `attachments[].always_opens`: a caption that titles no table in the body, so
   numbering that continues past it does not read it as a table caption, and the
   keyword reading of its line is dropped.
+- `FeedEffect.narrowed`: the UK crosswalk records when it reached a verb by
+  dropping a quantifier or "in part". "words omitted" and "repealed in part"
+  still map to `repeal`, and are now told apart from "repealed", so a timeline
+  consumer can read a narrowed repeal as a change to the provision's words
+  rather than its end. The field is last and defaults to False, so an adapter
+  that builds `FeedEffect` today is unchanged. `narrows` answers the same for
+  one effect type; `state_at` is unchanged.
 
 Fixed:
 
