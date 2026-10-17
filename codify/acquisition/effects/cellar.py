@@ -195,6 +195,8 @@ def parse_results(text: str, celexes: list[str]) -> dict[str, FeedResult]:
                 raw_type=f"{role or '-'}:{relation.removeprefix('resource_legal_')}",
                 akn_action=action,
                 akn_category=category,
+                # A change code carries no quantifier for this adapter to read.
+                narrowed=False,
                 in_force_date=effective,
                 applied=None,
                 is_meta=False,
