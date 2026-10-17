@@ -169,3 +169,34 @@ def test_a_dropped_bengali_article_shows_in_the_set_difference() -> None:
     before = _root('<article eId="a"><num>৫</num></article><article eId="b"><num>৬</num></article>')
     after = _root('<article eId="a"><num>৫</num></article>')
     assert basic_unit_numbers(before) - basic_unit_numbers(after) == frozenset({"article:6"})
+
+
+def test_a_unit_lettered_before_its_number_is_its_own_unit() -> None:
+    """A UK Act inserts sections before section 1 as A1, A2 and after it as 1A,
+    1B, and one Act can hold both. Gathering digits ahead of letters keyed A1
+    as 1A, the same as its neighbour, so two units read as one."""
+    root = _root(
+        '<section eId="sec_A1"><num>A1</num></section>'
+        '<section eId="sec_1"><num>1</num></section>'
+        '<section eId="sec_1A"><num>1A</num></section>'
+    )
+    assert basic_unit_numbers(root) == frozenset({"section:A1", "section:1", "section:1A"})
+
+
+def test_a_dropped_a1_shows_beside_a_kept_1a() -> None:
+    """The case the floor exists for: the candidate lost section A1 and kept
+    section 1A, and under the old key the difference was empty."""
+    before = _root(
+        '<section eId="sec_A1"><num>A1</num></section><section eId="sec_1A"><num>1A</num></section>'
+    )
+    after = _root('<section eId="sec_1A"><num>1A</num></section>')
+    assert basic_unit_numbers(before) - basic_unit_numbers(after) == frozenset({"section:A1"})
+
+
+@pytest.mark.parametrize("num", ["1 bis", "1bis", "1-bis"])
+def test_spacing_in_a_number_does_not_make_a_new_unit(num: str) -> None:
+    """Keeping the order written must not start charging for a rendering that
+    spaces or hyphenates a bis marker differently."""
+    assert basic_unit_numbers(_root(f'<article eId="a"><num>{num}</num></article>')) == frozenset(
+        {"article:1bis"}
+    )

@@ -113,6 +113,9 @@ New, additive:
 
 Fixed:
 
+- `basic_unit_numbers`: a unit's key keeps its number in the order written, so
+  a section A1, inserted before section 1, is no longer keyed as 1A, and a lost
+  A1 shows in the set difference beside a kept 1A.
 - `segment`: where several headings name one listed act, the contents entry
   goes to the one on its listed page, so a prose mention elsewhere no longer
   makes the source abstain.
