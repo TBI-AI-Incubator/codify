@@ -33,20 +33,24 @@ def ensure_unique_eids(xml: str | bytes, *, huge_tree: bool = False) -> tuple[st
     if tree.docinfo.internalDTD is not None or tree.docinfo.doctype:
         raise ValueError("AKN document declares a DOCTYPE; refusing to persist it")
     root = tree.getroot()
+    carriers: list[tuple[etree._Element, str]] = []
+    for el in root.iter():
+        if isinstance(el.tag, str) and (eid := el.get("eId")):
+            carriers.append((el, eid))
+    # Every id the publisher wrote, wherever it sits in the document. A minted
+    # name must never take one of them: with ids ``x, x, x_dup2`` the second
+    # ``x`` must not become ``x_dup2``, or a reference to ``#x_dup2`` silently
+    # changes which element it names while every id still looks unique.
+    published = {eid for _, eid in carriers}
     seen: set[str] = set()
     renamed = 0
-    for el in root.iter():
-        if not isinstance(el.tag, str):
-            continue
-        eid = el.get("eId")
-        if not eid:
-            continue
+    for el, eid in carriers:
         if eid not in seen:
             seen.add(eid)
             continue
         n = 2
         candidate = f"{eid}_dup{n}"
-        while candidate in seen:
+        while candidate in seen or candidate in published:
             n += 1
             candidate = f"{eid}_dup{n}"
         el.set("eId", candidate)
