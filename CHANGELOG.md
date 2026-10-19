@@ -127,6 +127,8 @@ Fixed:
   a schedule's caption printed inside a repeated head block stays, and a head
   that prints the previous page's caption again does not repeat it; a caption
   block printed on a head's row is not part of the row.
+- `basic_unit_numbers` folds digits through `normalise_digits`, so an article
+  numbered in Devanagari, Bengali or Thai digits is in the unit set.
 
 ## 0.6.0 (2026-10-02)
 
