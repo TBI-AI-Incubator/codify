@@ -21,6 +21,7 @@ import re
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any, ClassVar
 
 import httpx
@@ -41,6 +42,17 @@ from codify.lang import normalise_digits
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
 DOC_PATH = "/ocs-api/public/doc/getLawDoc"
 GAZETTE_NAME = "ราชกิจจานุเบกษา"
+
+
+def user_agent() -> str:
+    """The crawler identity this source is sent: the Core release and its home."""
+    try:
+        release = version("codify-core")
+    except PackageNotFoundError:
+        release = "0"
+    return f"Codify/{release} (+https://github.com/TBI-AI-Incubator/codify)"
+
+
 TIMELINE_KINDS = {"1": "original", "2": "amending", "3": "consolidated", "4": "current"}
 
 # "ราชกิจจานุเบกษา เล่ม ๑๓๖/ตอนที่ ๖๗ ก/หน้า ๕๗/๒๒ พฤษภาคม ๒๕๖๒", digits folded.
@@ -119,7 +131,7 @@ class OcsAcquirer(BaseAcquirer):
         title_rule: TitleIdentity | None = None,
     ) -> None:
         super().__init__(adapter, client=client)
-        self._client = client or make_polite_client(adapter)
+        self._client = client or make_polite_client(adapter, user_agent=user_agent())
         self._licence = adapter.licence
         self._title_rule = title_rule
         self._session = str(uuid.uuid4())

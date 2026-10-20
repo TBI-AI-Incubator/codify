@@ -157,6 +157,10 @@ def test_default_client_is_polite() -> None:
     acquirer = OcsAcquirer(_adapter(), title_rule=RULE)
     assert isinstance(acquirer._client._transport, PoliteTransport)
     assert acquirer.politeness.rate_limit_per_minute == 12
+    sent = acquirer._client._transport.profile.user_agent
+    assert sent.startswith("Codify/") and sent.endswith(
+        "(+https://github.com/TBI-AI-Incubator/codify)"
+    )
 
 
 def test_section_text_joins_split_spans_and_keeps_paragraphs() -> None:
