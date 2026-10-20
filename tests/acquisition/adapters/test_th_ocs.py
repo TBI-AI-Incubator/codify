@@ -104,7 +104,11 @@ _DOCS = {
         "พระราชบัญญัติแปล พ.ศ. 2562",
         "4",
         "2019-05-22",
-        [_timeline(TRANSLATED, "4", "ข0001-1B-0001-00", "2019-05-23", en=True)],
+        [
+            # The source lists one id under both its original and current kinds.
+            _timeline(TRANSLATED, "1", "ข0001-1B-0001-00", "2019-05-20"),
+            _timeline(TRANSLATED, "4", "ข0001-1B-0001-00", "2019-05-23", en=True),
+        ],
     ),
     (TRANSLATED, True): _ENGLISH,
 }
@@ -190,6 +194,7 @@ async def test_amending_act_is_its_own_work_dated_by_publication() -> None:
 
 async def test_translation_rides_with_its_stated_provenance() -> None:
     doc, seen = await _fetch(TRANSLATED)
+    assert doc.expression_uri.endswith("/tha@2019-05-23")
     english = [b for b in doc.bodies if b.role == "translation"]
     assert [(b.language, b.content.decode()) for b in english] == [("eng", "Section 1. A test.")]
     assert doc.upstream_metadata["translation_note"] == "This Translation is provided by an agency."
