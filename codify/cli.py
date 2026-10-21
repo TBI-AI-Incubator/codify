@@ -642,12 +642,15 @@ def _run_index_ocs(args: argparse.Namespace) -> int:
     def progress(page: int, pages: int, laws: int) -> None:
         print(f"  page {page}/{pages}: {laws} laws", file=sys.stderr)
 
+    # The walk checkpoints beside the index, so a failed rebuild leaves the last good one.
+    partial = out.with_name(f"{out.name}.partial")
+
     async def run() -> dict[str, Any]:
         acquirer = OcsAcquirer(adapter)
         try:
             return await build_index(
                 acquirer,
-                checkpoint=out,
+                checkpoint=partial,
                 resume=args.resume,
                 on_progress=None if args.quiet else progress,
             )
@@ -655,14 +658,18 @@ def _run_index_ocs(args: argparse.Namespace) -> int:
             await acquirer._client.aclose()
 
     payload = asyncio.run(run())
-    write_index(out, payload)
     print(f"{out}: {payload['stats']}", file=sys.stderr)
+    if not payload["complete"]:
+        print(f"short of the catalogue's total; checkpoint kept at {partial}", file=sys.stderr)
+        return 1
+    write_index(out, payload)
+    partial.unlink(missing_ok=True)
     return 0
 
 
 def _run_crawl_ocs(args: argparse.Namespace) -> int:
     """Save the raw document of every timeline an OCS index lists, resumably."""
-    from codify.acquisition.adapters.th.ocs import OcsAcquirer, crawl
+    from codify.acquisition.adapters.th.ocs import TIMELINE_KINDS, OcsAcquirer, crawl
     from codify.acquisition.index import index_path
     from codify.jurisdictions import SourceAdapter
 
@@ -672,6 +679,10 @@ def _run_crawl_ocs(args: argparse.Namespace) -> int:
         return 2
     adapter = SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=args.rate)
     kinds = frozenset(k.strip() for k in args.kinds.split(",") if k.strip())
+    unknown = sorted(kinds - set(TIMELINE_KINDS.values()))
+    if unknown:
+        print(f"unknown timeline kinds: {', '.join(unknown)}", file=sys.stderr)
+        return 2
 
     def progress(done: int, total: int, tid: str) -> None:
         if done % 50 == 0 or done == total:
@@ -691,13 +702,12 @@ def _run_crawl_ocs(args: argparse.Namespace) -> int:
             await acquirer._client.aclose()
 
     result = asyncio.run(run())
-    (Path(args.out) / "failures.json").write_text(json.dumps(result["failures"], indent=1))
     print(
         f"{args.out}: {result['timelines']} timelines, {result['fetched']} fetched, "
-        f"{len(result['failures'])} failed",
+        f"{result['textless']} without text, {len(result['failures'])} failed",
         file=sys.stderr,
     )
-    return 0
+    return 1 if result["failures"] else 0
 
 
 def _run_scan_corpus(args: argparse.Namespace) -> int:
@@ -983,7 +993,12 @@ def main(argv: list[str] | None = None) -> int:
     crawl_ocs = sub.add_parser(
         "crawl-ocs", help="save the raw document of every timeline an OCS index lists"
     )
-    crawl_ocs.add_argument("--out", required=True, help="directory for raw documents")
+    crawl_ocs.add_argument(
+        "--out",
+        required=True,
+        help="directory for raw documents; the configured acquirer reads "
+        "<ACQUISITION_INDEX_DIR>/th/raw",
+    )
     crawl_ocs.add_argument(
         "--index", default=None, help="index JSON (default: <ACQUISITION_INDEX_DIR>/th/index.json)"
     )

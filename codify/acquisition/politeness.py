@@ -455,10 +455,16 @@ def make_polite_client(
     etag_lookup: EtagLookup | None = None,
     timeout: httpx.Timeout | None = None,
     user_agent: str | None = None,
+    profile: PolitenessProfile | None = None,
 ) -> httpx.AsyncClient:
-    profile = PolitenessProfile(
-        rate_limit_per_minute=adapter.rate_limit_per_minute,
-        robots_respect=adapter.robots_respect,
+    """`profile`, when given, is the acquirer's resolved pace and concurrency."""
+    profile = (
+        profile.model_copy()
+        if profile is not None
+        else PolitenessProfile(
+            rate_limit_per_minute=adapter.rate_limit_per_minute,
+            robots_respect=adapter.robots_respect,
+        )
     )
     if user_agent:
         profile.user_agent = user_agent

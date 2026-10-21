@@ -12,6 +12,7 @@ from lxml import etree
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, registered_kinds
 from codify.acquisition.adapters.th.ocs import (
+    IndexEmpty,
     IndexMoved,
     OcsAcquirer,
     OcsItemMissing,
@@ -19,6 +20,7 @@ from codify.acquisition.adapters.th.ocs import (
     build_index,
     crawl,
     dump_name,
+    failures_path,
     index_entry,
     section_text,
 )
@@ -360,6 +362,7 @@ async def test_index_walks_every_page_and_counts_shared_children_once(tmp_path: 
     assert payload["stats"] == {
         "laws": 3,
         "missing": 0,
+        "dropped_hits": 0,
         "children": 2,
         "child_types": {"พระราชกฤษฎีกา": 1, "กฎกระทรวง": 1},
         "states": {"01": 3},
@@ -381,8 +384,8 @@ async def test_index_resumes_after_the_last_page_written(tmp_path: Any) -> None:
 
     out.write_text(_checkpoint(3, "z"))
     payload = await _build(handle, checkpoint=out, resume=True)
-    # Page 1 is asked once for the total; its laws come from the checkpoint.
-    assert seen == [1, 2]
+    # Page 1 is asked for the total, before and after; its laws come from the checkpoint.
+    assert seen == [1, 2, 1]
     assert [e["law_code"] for e in payload["entries"]] == ["z", "b", "c"]
 
 
@@ -439,7 +442,7 @@ async def test_crawl_saves_each_listed_timeline_once_and_follows_only_asked_kind
             dump_name(AMENDING),
         ]
     )
-    assert result == {"timelines": 3, "fetched": 4, "failures": {}}
+    assert result == {"timelines": 3, "fetched": 4, "textless": 0, "failures": {}}
 
 
 async def test_crawl_resumes_without_fetching_what_is_saved(tmp_path: Any) -> None:
@@ -503,11 +506,11 @@ def test_dump_names_are_safe_filenames() -> None:
     assert dump_name("a/b", english=True) == "a_b.en.json"
 
 
-def _unit(seq: int, kind: str, html: str) -> dict[str, Any]:
-    return {"sectionSeq": seq, "sectionTypeId": kind, "sectionContent": html}
+def _unit(seq: int, kind: str, html: str, label: str = "") -> dict[str, Any]:
+    return {"sectionSeq": seq, "sectionTypeId": kind, "sectionContent": html, "sectionLabel": label}
 
 
-def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
+def test_units_nest_under_their_groups_and_a_trailing_law_is_annexed() -> None:
     units = [
         _unit(1, "1", "<p>พระราชบัญญัติทดสอบ</p>"),
         _unit(2, "3", "<p>โดยที่สมควร</p>"),
@@ -517,7 +520,7 @@ def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
         _unit(6, "4", "<p>มาตรา ๒/๑ ข้อความ</p><p>(๑) รายการ</p>"),
         _unit(7, "8", "<p>หมวด ๒ บทสุดท้าย</p>"),
         _unit(8, "13", "<p>บทเฉพาะกาล</p>"),
-        _unit(9, "4", "<p>มาตรา ๓ ทวิ ข้อความ</p>"),
+        _unit(9, "4", "<p>มาตรา ๓ ทวิ ข้อความ</p>", "มาตรา 3 ทวิ"),
         _unit(10, "14", "<p>ผู้รับสนองพระบรมราชโองการ</p>"),
         _unit(11, "1", "<p>พระราชบัญญัติทดสอบ (ฉบับที่ ๒)</p>"),
         _unit(12, "16", "<p>บัญชีอัตรา</p><p>ร้อยละ ๕</p>"),
@@ -530,7 +533,7 @@ def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
         "BODY",
         "  CHAPTER ๑ - บททั่วไป",
         "    SEC ๑",
-        "      ข้อความ \\**ตัวหนา\\**",
+        "      ข้อความ \\*\\*ตัวหนา\\*\\*",
         "    DIVISION ๑ - การยื่น",
         "      SEC ๒/๑",
         "        ข้อความ",
@@ -541,13 +544,12 @@ def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
         "      ข้อความ",
         "CONCLUSIONS",
         "  ผู้รับสนองพระบรมราชโองการ",
-        "  พระราชบัญญัติทดสอบ (ฉบับที่ ๒)",
         "",
-        "SCHEDULE บัญชีอัตรา",
-        "  BODY",
-        "    ร้อยละ ๕",
+        "SCHEDULE พระราชบัญญัติทดสอบ (ฉบับที่ ๒)",
+        "  บัญชีอัตรา",
+        "  ร้อยละ ๕",
     ]
-    root = etree.fromstring(to_akn(units, doctype="act", date="2001-01-01", number="x").encode())
+    root = _akn(units)
     ns = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
     assert root.xpath("//a:hcontainer", namespaces=ns) == []
     assert [
@@ -586,3 +588,248 @@ async def test_configured_acquirer_reads_a_saved_crawl_before_the_network(
         assert _asked(seen) == [(AMENDING, False)]
     finally:
         await acquirer._client.aclose()
+
+
+_AKN = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
+
+
+def _akn(units: list[dict[str, Any]], **kw: Any) -> Any:
+    xml = to_akn(
+        units,
+        doctype="act",
+        number="t-1",
+        work="/akn/th/act/2001/t-1",
+        published="2001-01-02",
+        expression="/akn/th/act/2001/t-1/tha@2010-05-02",
+        as_of="2010-05-02",
+        **kw,
+    )
+    return etree.fromstring(xml.encode())
+
+
+def _x(root: Any, path: str) -> list[str]:
+    return [" ".join(str(v).split()) for v in root.xpath(path, namespaces=_AKN)]
+
+
+def test_an_appended_amending_law_is_an_attachment_not_body_sections() -> None:
+    units = [
+        _unit(1, "1", "<p>พระราชบัญญัติหลัก</p>"),
+        _unit(2, "4", "<p>มาตรา ๑ ข้อความหลัก</p>"),
+        _unit(3, "1", "<p>พระราชบัญญัติหลัก (ฉบับที่ ๒)</p>"),
+        _unit(4, "4", "<p>มาตรา ๑ ให้ใช้บังคับ</p>"),
+        _unit(5, "15", "<p>หมายเหตุ เหตุผล</p>"),
+    ]
+    root = _akn(units)
+    assert _x(root, "//a:body//a:section/a:num/text()") == ["๑"]
+    assert _x(root, "//a:attachments//a:heading//text()") == ["พระราชบัญญัติหลัก (ฉบับที่ ๒)"]
+    assert _x(root, "//a:attachments//a:p//text()") == ["มาตรา ๑ ให้ใช้บังคับ", "หมายเหตุ เหตุผล"]
+
+
+def test_the_segment_titled_as_the_law_is_its_body() -> None:
+    # A code follows the Act that enacts it; the code is the law.
+    units = [
+        _unit(1, "1", "<p>พระราชบัญญัติให้ใช้ประมวล</p>"),
+        _unit(2, "4", "<p>มาตรา ๑ ให้ใช้ประมวลท้ายนี้</p>"),
+        _unit(3, "1", "<p>ประมวล</p><p>ทดสอบ</p>"),
+        _unit(4, "4", "<p>มาตรา ๑ บทนิยาม</p>"),
+        _unit(5, "4", "<p>มาตรา ๒ บทลงโทษ</p>"),
+    ]
+    root = _akn(units, title="ประมวลทดสอบ")
+    assert _x(root, "//a:preface//a:p/text()") == ["ประมวล", "ทดสอบ"]
+    assert _x(root, "//a:body//a:section/a:num/text()") == ["๑", "๒"]
+    assert _x(root, "//a:attachments//a:heading//text()") == ["พระราชบัญญัติให้ใช้ประมวล"]
+
+
+def test_numbers_take_an_ordinal_only_where_the_label_has_it() -> None:
+    units = [
+        _unit(1, "4", "<p>มาตรา ๓ เอกาทศ ความ</p>", "มาตรา 3 เอกาทศ"),
+        _unit(2, "4", "<p>มาตรา ๓ สัตตรส ความ</p>", "มาตรา 3 สัตตรส"),
+        # ฉลาก begins with the ordinal ฉ; the label says this clause has none.
+        _unit(3, "10", "<p>ข้อ ๔ ฉลากต้องแสดง</p>", "ข้อ 4"),
+    ]
+    root = _akn(units)
+    assert _x(root, "//a:section/a:num/text()") == ["๓ เอกาทศ", "๓ สัตตรส", "๔"]
+    assert _x(root, "//a:section/a:content/a:p/text()") == ["ความ", "ความ", "ฉลากต้องแสดง"]
+
+
+def test_parts_prose_images_and_inner_schedules_are_placed() -> None:
+    units = [
+        _unit(1, "6", "<p>ภาค ๑</p><p>ทั่วไป</p>"),
+        _unit(2, "18", "<p>ให้กำหนดชนิดเหรียญ</p>"),
+        _unit(3, "16", "<p>การอุทธรณ์</p>"),
+        _unit(4, "4", '<p>มาตรา ๑ ตามแบบ</p><p><img src="data:image/png;base64,AAAA"></p>'),
+        _unit(5, "20", "<p>แบบท้าย</p>"),
+    ]
+    root = _akn(units)
+    assert _x(root, "//a:part/a:heading/text()") == ["ทั่วไป"]
+    assert "ให้กำหนดชนิดเหรียญ" in _x(root, "//a:part//a:p/text()")
+    # A schedule-typed unit followed by provisions heads them; a trailing one is an annex.
+    assert _x(root, "//a:part//a:crossHeading//text()") == ["การอุทธรณ์"]
+    assert root.xpath("//a:section//a:img/@src", namespaces=_AKN) == ["data:image/png;base64,AAAA"]
+    assert _x(root, "//a:attachments//a:heading//text()") == ["แบบท้าย"]
+    assert "BODY" not in _x(root, "//a:attachments//text()")
+
+
+def test_runs_of_marker_characters_stay_text() -> None:
+    root = _akn([_unit(1, "4", "<p>มาตรา ๑ ชื่อ _____ ก *** ข /// ค {{x}} [[y]]</p>")])
+    assert root.xpath("//a:b|//a:i|//a:u|//a:img|//a:ref", namespaces=_AKN) == []
+    assert _x(root, "//a:section//a:p/text()") == ["ชื่อ _____ ก *** ข /// ค {{x}} [[y]]"]
+
+
+def test_the_akn_is_dated_as_the_work_and_expression_it_names() -> None:
+    root = _akn([_unit(1, "4", "<p>มาตรา ๑ ก</p>")])
+    ident = "//a:meta/a:identification"
+    assert _x(root, f"{ident}/a:FRBRWork/a:FRBRdate/@date") == ["2001-01-02"]
+    assert _x(root, f"{ident}/a:FRBRExpression/a:FRBRdate/@date") == ["2010-05-02"]
+    assert _x(root, f"{ident}/a:FRBRExpression/a:FRBRthis/@value") == [
+        "/akn/th/act/2001/t-1/tha@2010-05-02"
+    ]
+
+
+def test_enabling_words_are_the_body_of_a_decree_with_nothing_else() -> None:
+    units = [_unit(1, "1", "<p>พระราชกฤษฎีกาเรียกประชุม</p>"), _unit(2, "17", "<p>ให้เรียกประชุม</p>")]
+    assert _x(_akn(units), "//a:body//a:p/text()") == ["ให้เรียกประชุม"]
+
+
+def test_an_unnumbered_provision_is_prose_and_a_labelled_one_takes_its_label() -> None:
+    units = [
+        _unit(1, "4", "<p>ให้กำหนดชนิด</p>", "มาตรา"),
+        _unit(2, "4", "<p>ความที่สอง</p>", "มาตรา 2"),
+    ]
+    root = _akn(units)
+    assert _x(root, "//a:body/a:hcontainer//a:p/text()") == ["ให้กำหนดชนิด"]
+    assert _x(root, "//a:section/a:num/text()") == ["2"]
+
+
+def test_a_body_with_no_operative_text_is_refused() -> None:
+    with pytest.raises(UnmappedUnit, match="no operative text"):
+        to_bluebell([_unit(1, "1", "<p>ชื่อ</p>"), _unit(2, "14", "<p>ผู้รับสนอง</p>")])
+
+
+def test_only_the_laws_own_gazette_note_is_read() -> None:
+    from codify.acquisition.adapters.th.ocs import gazette_ref
+
+    notes = [
+        {"footnoteContent": "ราชกิจจานุเบกษา เล่ม ๙๒/ตอนที่ ๒๒/ฉบับพิเศษ หน้า ๑/๑๓ กุมภาพันธ์ ๒๕๑๘"},
+        {"footnoteContent": "ราชกิจจานุเบกษา เล่ม ๑๐๙/ตอนที่ ๑๐/หน้า ๑/๑ มกราคม ๒๕๓๕"},
+    ]
+    ref = gazette_ref(notes, "1975-02-13")
+    assert ref is not None and (ref.issue, ref.page) == ("92/22", "1")
+    # A note in a form not read gives no reference, never a later citation's.
+    unread = [{"footnoteContent": "ราชกิจจานุเบกษา ฉบับที่ไม่รู้จัก"}, notes[1]]
+    assert gazette_ref(unread, "1975-02-13") is None
+
+
+async def test_index_refuses_a_search_that_answers_no_catalogue() -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": []})
+
+    with pytest.raises(IndexEmpty):
+        await _build(handle)
+
+
+async def test_index_refuses_a_total_that_moved_by_the_end_and_flags_a_short_walk() -> None:
+    calls: list[int] = []
+    inner = _catalogue(_PAGES, {})
+
+    def moved_at_end(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        resp = inner(request)
+        if len(calls) == 3:
+            return httpx.Response(200, json={"meta": {"total": 4, "pages": 2}, "data": []})
+        return resp
+
+    with pytest.raises(IndexMoved):
+        await _build(moved_at_end)
+    short = await _build(_catalogue({1: [_hit("a")], 2: [_hit("b")]}, {}))
+    assert (short["complete"], short["stats"]["missing"]) == (False, 1)
+
+
+async def test_index_counts_dropped_hits_and_merges_a_law_listed_twice() -> None:
+    nameless = _hit("x")
+    nameless["lawCode"] = ""
+    pages = {
+        1: [_hit("a", (("กฎกระทรวง", "r1"),)), nameless],
+        2: [_hit("a", (("กฎกระทรวง", "r2"),)), _hit("c")],
+    }
+    payload = await _build(_catalogue(pages, {}))
+    assert payload["stats"]["dropped_hits"] == 1
+    assert [c["timeline_id"] for c in payload["entries"][0]["children"]] == ["r1", "r2"]
+
+
+async def test_crawl_writes_its_failures_even_when_it_stops(tmp_path: Any) -> None:
+    out = tmp_path / "raw"
+    index = {"entries": [{"timeline_id": "gone-1"}, {"timeline_id": "gone-2"}]}
+    with pytest.raises(SourceDown):
+        await _crawl_index(out, index, stop_after_failures=2)
+    assert sorted(json.loads(failures_path(out).read_text())) == [
+        dump_name("gone-1"),
+        dump_name("gone-2"),
+    ]
+    assert not (out / "failures.json").exists()
+
+
+async def test_a_resumed_crawl_counts_saved_files_as_success(tmp_path: Any) -> None:
+    out = tmp_path / "raw"
+    index = {
+        "entries": [{"timeline_id": t} for t in ("gone-1", BASE, "gone-2", AMENDING, "gone-3")]
+    }
+    await _crawl_index(out, index, stop_after_failures=2)
+    # On resume the saved files sit between the same failures; none is a streak.
+    result = await _crawl_index(out, index, stop_after_failures=2)
+    assert len(result["failures"]) == 3
+
+
+async def test_a_crawl_refetches_a_saved_file_it_cannot_read(tmp_path: Any) -> None:
+    out = tmp_path / "raw"
+    out.mkdir()
+    (out / dump_name(BASE)).write_text('{"lawInfo": ')
+    seen: list[dict[str, Any]] = []
+    await _crawl_index(out, {"entries": [{"timeline_id": BASE}]}, seen=seen)
+    assert _asked(seen) == [(BASE, False)]
+    assert json.loads((out / dump_name(BASE)).read_text())["lawInfo"]
+
+
+async def test_a_failed_translation_keeps_the_thai_text(tmp_path: Any) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if body["reqBody"]["isTransEng"]:
+            return httpx.Response(503)
+        return httpx.Response(200, json=_DOCS[(TRANSLATED, False)])
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    try:
+        doc = await OcsAcquirer(_adapter(), client=client, title_rule=RULE).fetch(_ref(TRANSLATED))
+    finally:
+        await client.aclose()
+    assert [b.language for b in doc.bodies] == ["tha"]
+    assert "503" in doc.upstream_metadata["translation_error"]
+
+
+async def test_a_timeline_of_an_unread_kind_is_refused() -> None:
+    doc = json.loads(json.dumps(_DOCS[(BASE, False)]))
+    doc["respBody"]["lawInfo"]["timelineTypeId"] = "5"
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=doc)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    try:
+        with pytest.raises(OcsItemMissing, match="unread kind"):
+            await OcsAcquirer(_adapter(), client=client, title_rule=RULE).fetch(_ref(BASE))
+    finally:
+        await client.aclose()
+
+
+async def test_a_fetched_expression_is_dated_in_its_own_akn() -> None:
+    doc, _ = await _fetch(AMENDING)
+    root = etree.fromstring(doc.primary().content)
+    ident = "//a:meta/a:identification"
+    assert _x(root, f"{ident}/a:FRBRExpression/a:FRBRdate/@date") == ["2010-05-01"]
+    assert _x(root, f"{ident}/a:FRBRExpression/a:FRBRthis/@value") == [doc.expression_uri]
+
+
+def test_a_configured_client_keeps_the_acquirers_pace_and_one_connection() -> None:
+    bare = SourceAdapter(kind="json_portal", name="ocs")
+    profile = OcsAcquirer(bare, title_rule=RULE)._client._transport.profile
+    assert (profile.rate_limit_per_minute, profile.concurrency) == (12, 1)

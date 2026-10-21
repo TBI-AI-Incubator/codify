@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import uuid
 from collections import Counter
@@ -92,9 +93,12 @@ def doctype_for_title(title: str) -> str | None:
 
 
 # "ราชกิจจานุเบกษา เล่ม ๑๓๖/ตอนที่ ๖๗ ก/หน้า ๕๗/๒๒ พฤษภาคม ๒๕๖๒", digits folded.
-_GAZETTE_NOTE = re.compile(r"เล่ม\s*(\d+)\s*/\s*ตอนที่\s*([^/]+?)\s*/\s*หน้า\s*(\d+)")
+# "เล่ม 136/ตอนที่ 67 ก/หน้า 57", "…/ตอนพิเศษ 85 ก/…", "…/ตอนที่ 33/ฉบับพิเศษ หน้า 8".
+_GAZETTE_NOTE = re.compile(
+    r"เล่ม\s*(\d+)\s*/\s*ตอน(?:ที่)?\s*([^/]+?)\s*/\s*(?:ฉบับพิเศษ\s*)?หน้า\s*(\d+)"
+)
 _TAG = re.compile(r"<[^>]+>")
-_BREAK = re.compile(r"<br\s*/?>|</p>|</div>", re.IGNORECASE)
+_BREAK = re.compile(r"<br\s*/?>|</(?:p|div|td|th|tr|li)>", re.IGNORECASE)
 
 
 class OcsItemMissing(LookupError):
@@ -116,20 +120,20 @@ def render_text(sections: list[dict[str, Any]]) -> str:
 
 
 def gazette_ref(footnotes: list[dict[str, Any]], published: str) -> GazetteRef | None:
-    """The first footnote citing the Gazette, which is the law's own publication."""
-    for note in footnotes:
-        content = normalise_digits(str(note.get("footnoteContent") or ""))
-        if GAZETTE_NAME in content and (m := _GAZETTE_NOTE.search(content)):
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
-                return None
-            return GazetteRef(
-                name=GAZETTE_NAME,
-                year=int(published[:4]),
-                issue=f"{m.group(1)}/{m.group(2)}",
-                page=m.group(3),
-                date=published,
-            )
-    return None
+    """The first footnote citing the Gazette, which is the law's own publication;
+    None when that note is in a form not read, never a later citation's."""
+    notes = (normalise_digits(str(n.get("footnoteContent") or "")) for n in footnotes)
+    content = next((n for n in notes if GAZETTE_NAME in n), "")
+    m = _GAZETTE_NOTE.search(content)
+    if m is None or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
+        return None
+    return GazetteRef(
+        name=GAZETTE_NAME,
+        year=int(published[:4]),
+        issue=f"{m.group(1)}/{m.group(2)}",
+        page=m.group(3),
+        date=published,
+    )
 
 
 def timelines(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -168,12 +172,15 @@ class OcsAcquirer(BaseAcquirer):
         dump_dir: Path | None = None,
     ) -> None:
         super().__init__(adapter, client=client)
-        self._client = client or make_polite_client(adapter, user_agent=user_agent())
+        self._client = client or make_polite_client(
+            adapter, user_agent=user_agent(), profile=self.politeness
+        )
         self._licence = adapter.licence
         self._title_rule = title_rule
         self._session = str(uuid.uuid4())
         # A crawl's raw documents, read before the network is asked.
         self._dump = dump_dir
+        self._dump_absent_logged = False
 
     @classmethod
     def from_config(cls, jurisdiction_code: str, adapter: object) -> OcsAcquirer:
@@ -194,11 +201,31 @@ class OcsAcquirer(BaseAcquirer):
             self._title_rule = rule
         return self._title_rule
 
+    def _saved(self, timeline_id: str, *, english: bool) -> tuple[dict[str, Any], float] | None:
+        """A crawl's saved document and when it was saved, or None."""
+        if self._dump is None:
+            return None
+        if not self._dump.is_dir():
+            if not self._dump_absent_logged:
+                logger.info("ocs_dump_absent", path=str(self._dump.resolve()))
+                self._dump_absent_logged = True
+            return None
+        saved = self._dump / dump_name(timeline_id, english=english)
+        if not saved.exists():
+            return None
+        try:
+            return dict(json.loads(saved.read_text())), saved.stat().st_mtime
+        except ValueError as exc:
+            logger.warning("ocs_dump_unreadable", path=str(saved), detail=str(exc))
+            return None
+
     async def _law_doc(self, timeline_id: str, *, english: bool) -> dict[str, Any]:
-        if self._dump is not None:
-            saved = self._dump / dump_name(timeline_id, english=english)
-            if saved.exists():
-                return dict(json.loads(saved.read_text()))
+        saved = self._saved(timeline_id, english=english)
+        if saved is not None:
+            return saved[0]
+        return await self._fetch_doc(timeline_id, english=english)
+
+    async def _fetch_doc(self, timeline_id: str, *, english: bool) -> dict[str, Any]:
         now = datetime.now(UTC)
         body = {
             "reqHeader": {
@@ -214,11 +241,16 @@ class OcsAcquirer(BaseAcquirer):
         }
         resp = await self._client.post(f"{self._base}{DOC_PATH}", json=body)
         resp.raise_for_status()
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as exc:
+            # A maintenance or firewall page answers 200 with HTML.
+            raise OcsItemMissing(f"timeline {timeline_id!r} answered no JSON") from exc
         code = (data.get("respHeader") or {}).get("errorCode")
         payload = data.get("respBody")
+        what = "English" if english else "Thai"
         if code != "SUCCESS" or not isinstance(payload, dict) or not payload.get("lawInfo"):
-            raise OcsItemMissing(f"timeline {timeline_id!r} answered {code!r}")
+            raise OcsItemMissing(f"timeline {timeline_id!r} ({what}) answered {code!r}")
         return payload
 
     def work_number(self, title: str) -> str:
@@ -234,11 +266,14 @@ class OcsAcquirer(BaseAcquirer):
         timeline_id = ref.extra.get("timeline_id", "")
         if not timeline_id:
             raise ValueError(f"OCS ref {ref.number!r} needs extra['timeline_id']")
-        payload = await self._law_doc(timeline_id, english=False)
+        saved = self._saved(timeline_id, english=False)
+        payload = saved[0] if saved else await self._fetch_doc(timeline_id, english=False)
         info = payload["lawInfo"]
         if not render_text(payload.get("lawSections") or []):
             raise OcsItemMissing(f"timeline {timeline_id!r} carries no text")
         kind = TIMELINE_KINDS.get(str(info.get("timelineTypeId")), "unknown")
+        if kind == "unknown":
+            raise OcsItemMissing(f"timeline {timeline_id!r} is of an unread kind")
         this = next(
             (
                 t
@@ -258,9 +293,20 @@ class OcsAcquirer(BaseAcquirer):
         number = self.work_number(title)
         work = build_frbr_work_uri(self.JURISDICTION, ref.doctype, published[:4], number)
         from codify.acquisition.adapters.th.ocs_akn import to_akn
+        from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 
-        akn = to_akn(
-            payload.get("lawSections") or [], doctype=ref.doctype, date=as_of, number=number
+        # Bluebell parsing is CPU-bound; it runs on the pipeline's pool, not the loop.
+        akn = await on_the_cpu_pool(
+            lambda: to_akn(
+                payload.get("lawSections") or [],
+                doctype=ref.doctype,
+                number=number,
+                work=work,
+                published=published,
+                expression=f"{work}/tha@{as_of}",
+                as_of=as_of,
+                title=title,
+            )
         )
         bodies = [Body(media_type="application/xml", content=akn.encode(), language="tha")]
         upstream: dict[str, Any] = {
@@ -273,11 +319,21 @@ class OcsAcquirer(BaseAcquirer):
             "title_en": info.get("lawNameEn") or "",
             "footnotes": len(payload.get("footnoteList") or []),
             "timelines": timelines(payload),
+            "from_crawl": saved is not None,
         }
-        if this is not None and this["has_translation"]:
-            english = await self._law_doc(timeline_id, english=True)
+        if any(
+            t["timeline_id"] == timeline_id and t["has_translation"] for t in timelines(payload)
+        ):
+            try:
+                english = await self._law_doc(timeline_id, english=True)
+            except (OcsItemMissing, httpx.HTTPError) as exc:
+                # The Thai text stands without it; the gap is recorded.
+                english = {}
+                upstream["translation_error"] = str(exc)
             translation = english.get("lawTranslation") or {}
             en_text = render_text(translation.get("lawSections") or [])
+            if english and not en_text:
+                upstream["translation_error"] = "flagged as translated; no English text"
             if en_text:
                 bodies.append(
                     Body(
@@ -302,7 +358,8 @@ class OcsAcquirer(BaseAcquirer):
             expression_uri=f"{work}/tha@{as_of}",
             bodies=bodies,
             source_url=f"{self._base}/council-of-state/#/public/doc/{timeline_id}",
-            fetched_at=datetime.now(UTC),
+            # A crawled document is as old as the crawl that saved it.
+            fetched_at=datetime.fromtimestamp(saved[1], UTC) if saved else datetime.now(UTC),
             licence=self._licence,
             citation_alt=title or None,
             gazette_ref=gazette_ref(payload.get("footnoteList") or [], published),
@@ -356,16 +413,15 @@ class OcsAcquirer(BaseAcquirer):
                     query.year_to and year > query.year_to
                 ):
                     continue
+                title = strip_marks(str(hit.get("lawNameTh") or ""))
                 yield DocumentRef(
                     jurisdiction_code=self.jurisdiction_code,
-                    doctype=query.doctype or "act",
+                    # The title's own term names its class; a keyword search mixes classes.
+                    doctype=doctype_for_title(title) or query.doctype or "act",
                     year=year,
                     number=str(hit.get("lawCode") or ""),
                     languages=["tha"],
-                    extra={
-                        "timeline_id": str(hit.get("encTimelineID") or ""),
-                        "title": strip_marks(str(hit.get("lawNameTh") or "")),
-                    },
+                    extra={"timeline_id": str(hit.get("encTimelineID") or ""), "title": title},
                 )
                 yielded += 1
                 if query.limit and yielded >= query.limit:
@@ -404,6 +460,10 @@ class IndexMoved(RuntimeError):
     """The catalogue's total changed mid-walk, so its pages shifted under us."""
 
 
+class IndexEmpty(RuntimeError):
+    """The search answered no catalogue; a maintenance page is not an empty law base."""
+
+
 def _index_payload(
     entries: dict[str, dict[str, Any]],
     total: int,
@@ -411,6 +471,7 @@ def _index_payload(
     done: int,
     *,
     complete: bool,
+    dropped: int = 0,
 ) -> dict[str, Any]:
     laws = list(entries.values())
     children = {c["timeline_id"]: c for e in laws for c in e["children"] if c["timeline_id"]}
@@ -426,6 +487,7 @@ def _index_payload(
         "stats": {
             "laws": len(laws),
             "missing": total - len(laws),
+            "dropped_hits": dropped,
             "children": len(children),
             "child_types": dict(Counter(c["type"] for c in children.values())),
             "states": dict(Counter(e["state"] for e in laws)),
@@ -448,7 +510,10 @@ async def build_index(
     first = await acquirer.search("", page=1, per_page=per_page, states="", all_children=True)
     meta = first.get("meta") or {}
     total, pages = int(meta.get("total") or 0), int(meta.get("pages") or 0)
+    if total <= 0 or pages <= 0:
+        raise IndexEmpty(f"the search answered total={total}, pages={pages}")
     entries: dict[str, dict[str, Any]] = {}
+    dropped = 0
     page = 1
     if resume and checkpoint is not None and checkpoint.exists():
         prior = json.loads(checkpoint.read_text())
@@ -468,17 +533,28 @@ async def build_index(
             raise IndexMoved(f"catalogue total moved from {total} to {now} at page {page}")
         for hit in data.get("data") or []:
             entry = index_entry(hit)
-            if entry["law_code"] and entry["timeline_id"]:
-                entries.setdefault(entry["law_code"], entry)
+            if not (entry["law_code"] and entry["timeline_id"]):
+                dropped += 1
+                continue
+            known = entries.setdefault(entry["law_code"], entry)
+            if known is not entry:
+                # A law listed twice keeps the subordinate laws of both listings.
+                ids = {c["timeline_id"] for c in known["children"]}
+                known["children"] += [c for c in entry["children"] if c["timeline_id"] not in ids]
         if checkpoint is not None:
             write_index(
                 checkpoint,
-                _index_payload(entries, total, per_page, page, complete=False),
+                _index_payload(entries, total, per_page, page, complete=False, dropped=dropped),
             )
         if on_progress is not None:
             on_progress(page, pages, len(entries))
         page, data = page + 1, None
-    return _index_payload(entries, total, per_page, pages, complete=True)
+    last = await acquirer.search("", page=1, per_page=per_page, states="", all_children=True)
+    if int((last.get("meta") or {}).get("total") or 0) != total:
+        raise IndexMoved(f"catalogue total moved from {total} during the walk")
+    # ponytail: counts only; a law withdrawn and another added between pages balance out.
+    complete = len(entries) >= total
+    return _index_payload(entries, total, per_page, pages, complete=complete, dropped=dropped)
 
 
 def dump_name(timeline_id: str, *, english: bool = False) -> str:
@@ -488,8 +564,12 @@ def dump_name(timeline_id: str, *, english: bool = False) -> str:
 
 
 def _write_raw(path: Path, payload: dict[str, Any]) -> None:
+    """Whole file or nothing: temp file, fsync, rename."""
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False))
+    with tmp.open("w") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False))
+        fh.flush()
+        os.fsync(fh.fileno())
     tmp.replace(path)
 
 
@@ -501,6 +581,11 @@ def index_timelines(index: dict[str, Any]) -> list[str]:
         for tid in [e["timeline_id"], *(c["timeline_id"] for c in e.get("children") or [])]
     )
     return list(dict.fromkeys(t for t in ids if t))
+
+
+def failures_path(out: Path) -> Path:
+    """Beside the crawl directory, so a reader of its documents never meets it."""
+    return out.with_name(f"{out.name}-failures.json")
 
 
 class SourceDown(RuntimeError):
@@ -518,19 +603,25 @@ async def crawl(
 ) -> dict[str, Any]:
     """Save the raw document of every listed timeline under `out`, then of every
     other timeline of the `kinds` asked for, and the English of each that has one.
-    A file already there is not fetched again, so a stopped crawl resumes."""
+    A file already there is not fetched again, so a stopped crawl resumes.
+    The failures are written beside `out` however the crawl ends."""
     out.mkdir(parents=True, exist_ok=True)
     failures: dict[str, str] = {}
-    fetched = 0
+    fetched = textless = 0
     streak = 0
 
     async def save(tid: str, *, english: bool) -> dict[str, Any] | None:
         nonlocal fetched, streak
         path = out / dump_name(tid, english=english)
         if path.exists():
-            return dict(json.loads(path.read_text()))
+            try:
+                saved = dict(json.loads(path.read_text()))
+                streak = 0
+                return saved
+            except ValueError:
+                logger.warning("ocs_dump_unreadable", path=str(path))
         try:
-            payload = await acquirer._law_doc(tid, english=english)
+            payload = await acquirer._fetch_doc(tid, english=english)
         except (OcsItemMissing, httpx.HTTPError) as exc:
             failures[dump_name(tid, english=english)] = f"{type(exc).__name__}: {exc}"
             streak += 1
@@ -545,25 +636,31 @@ async def crawl(
     queue = index_timelines(index)
     seen = set(queue)
     done = 0
-    while done < len(queue):
-        tid = queue[done]
-        done += 1
-        doc = await save(tid, english=False)
-        if on_progress is not None:
-            on_progress(done, len(queue), tid)
-        if doc is None:
-            continue
-        for t in timelines(doc):
-            if t["kind"] in kinds and t["timeline_id"] and t["timeline_id"] not in seen:
-                seen.add(t["timeline_id"])
-                queue.append(t["timeline_id"])
-            if t["timeline_id"] == tid and t["has_translation"]:
-                await save(tid, english=True)
-    return {"timelines": len(queue), "fetched": fetched, "failures": failures}
+    try:
+        while done < len(queue):
+            tid = queue[done]
+            done += 1
+            doc = await save(tid, english=False)
+            if on_progress is not None:
+                on_progress(done, len(queue), tid)
+            if doc is None:
+                continue
+            # The source holds some laws only as a scan; the document says so by having no units.
+            textless += not doc.get("lawSections")
+            for t in timelines(doc):
+                if t["kind"] in kinds and t["timeline_id"] and t["timeline_id"] not in seen:
+                    seen.add(t["timeline_id"])
+                    queue.append(t["timeline_id"])
+                if t["timeline_id"] == tid and t["has_translation"]:
+                    await save(tid, english=True)
+    finally:
+        _write_raw(failures_path(out), failures)
+    return {"timelines": len(queue), "fetched": fetched, "textless": textless, "failures": failures}
 
 
 __all__ = [
     "GAZETTE_NAME",
+    "IndexEmpty",
     "IndexMoved",
     "OcsAcquirer",
     "OcsItemMissing",
@@ -573,6 +670,7 @@ __all__ = [
     "doctype_for_title",
     "crawl",
     "dump_name",
+    "failures_path",
     "gazette_ref",
     "index_entry",
     "index_timelines",
