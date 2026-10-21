@@ -732,6 +732,8 @@ def test_the_akn_is_dated_as_the_work_and_expression_it_names() -> None:
 def test_enabling_words_are_the_body_of_a_decree_with_nothing_else() -> None:
     units = [_unit(1, "1", "<p>พระราชกฤษฎีกาเรียกประชุม</p>"), _unit(2, "17", "<p>ให้เรียกประชุม</p>")]
     assert _x(_akn(units), "//a:body//a:p/text()") == ["ให้เรียกประชุม"]
+    announced = [_unit(1, "1", "<p>ประกาศคณะ</p>"), _unit(2, "3", "<p>ให้ยกเลิกการห้าม</p>")]
+    assert _x(_akn(announced), "//a:body//a:p/text()") == ["ให้ยกเลิกการห้าม"]
 
 
 def test_an_unnumbered_provision_is_prose_and_a_labelled_one_takes_its_label() -> None:
@@ -922,3 +924,33 @@ async def test_fetch_keeps_the_source_document_as_provenance() -> None:
     cards = [b for b in doc.bodies if b.role == "card"]
     assert [b.media_type for b in cards] == ["application/json"]
     assert json.loads(cards[0].content) == _DOCS[(BASE, False)]["respBody"]
+
+
+def test_a_pointer_to_the_gazette_site_is_no_text() -> None:
+    from codify.acquisition.adapters.th.ocs import holds_text
+
+    stub = {
+        "lawSections": [
+            _unit(1, "1", "<p>พระราชบัญญัติเก่า (ยกเลิก)</p>"),
+            _unit(2, "16", "<p>โปรดดูรายละเอียดที่ https://ratchakitcha.soc.go.th/</p>"),
+        ]
+    }
+    assert not holds_text(stub)
+    assert not holds_text({"lawSections": []})
+    assert holds_text({"lawSections": [_unit(1, "4", "<p>มาตรา ๑ ก</p>")]})
+
+
+async def test_fetch_dates_the_work_by_the_laws_own_gazette_note() -> None:
+    doc = json.loads(json.dumps(_DOCS[(BASE, False)]))
+    # The record carries a later act's date; the law's own note does not.
+    doc["respBody"]["lawInfo"]["publishDateAd"] = "2015-06-01"
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=doc)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handle))
+    try:
+        got = await OcsAcquirer(_adapter(), client=client, title_rule=RULE).fetch(_ref(BASE))
+    finally:
+        await client.aclose()
+    assert got.frbr_work_uri.startswith("/akn/th/act/2001/t-")

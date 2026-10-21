@@ -114,6 +114,16 @@ def section_text(content: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
+_GAZETTE_SITE = "ratchakitcha.soc.go.th"
+
+
+def holds_text(payload: dict[str, Any]) -> bool:
+    """Whether the source holds the law's text. Some laws it holds only as a scan
+    (no units), others only as a pointer to the Gazette's own site."""
+    units = [u for u in payload.get("lawSections") or [] if str(u.get("sectionTypeId")) != "1"]
+    return any(_GAZETTE_SITE not in section_text(u.get("sectionContent") or "") for u in units)
+
+
 def render_text(sections: list[dict[str, Any]]) -> str:
     """The units in their stated order, a blank line between units."""
     ordered = sorted(sections, key=lambda s: s.get("sectionSeq") or 0)
@@ -292,7 +302,7 @@ class OcsAcquirer(BaseAcquirer):
         saved = self._saved(timeline_id, english=False)
         payload = saved[0] if saved else await self._fetch_doc(timeline_id, english=False)
         info = payload["lawInfo"]
-        if not render_text(payload.get("lawSections") or []):
+        if not holds_text(payload):
             raise OcsItemMissing(f"timeline {timeline_id!r} carries no text")
         kind = TIMELINE_KINDS.get(str(info.get("timelineTypeId")), "unknown")
         if kind == "unknown":
@@ -676,8 +686,7 @@ async def crawl(
                 on_progress(done, len(queue), tid)
             if doc is None:
                 continue
-            # The source holds some laws only as a scan; the document says so by having no units.
-            textless += not doc.get("lawSections")
+            textless += not holds_text(doc)
             for t in timelines(doc):
                 if t["kind"] in kinds and t["timeline_id"] and t["timeline_id"] not in seen:
                     seen.add(t["timeline_id"])
@@ -703,6 +712,7 @@ __all__ = [
     "dump_name",
     "failures_path",
     "gazette_ref",
+    "holds_text",
     "own_gazette_note",
     "publication_date",
     "index_entry",
