@@ -42,7 +42,30 @@ def _th_config(tmp_path_factory: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
         **config.get("frbr", {}),
         "country_code": "th",
         "uri_patterns": {"act": "/akn/th/act/{year}/{number}"},
+        "calendar_conversion": {
+            "kind": "buddhist",
+            "epoch_year": -543,
+            "month_names": [
+                "มกราคม",
+                "กุมภาพันธ์",
+                "มีนาคม",
+                "เมษายน",
+                "พฤษภาคม",
+                "มิถุนายน",
+                "กรกฎาคม",
+                "สิงหาคม",
+                "กันยายน",
+                "ตุลาคม",
+                "พฤศจิกายน",
+                "ธันวาคม",
+            ],
+            "month_day_is_gregorian": True,
+            "date_cues": ["ประกาศ ณ วันที่"],
+            "new_year_month": 4,
+            "new_year_reform_year": 2484,
+        },
     }
+    config["calendar"] = "buddhist_era"
     (root / "th").mkdir()
     (root / "th" / "config.json").write_text(json.dumps(config))
     clear = getattr(jurisdictions.try_load_config, "cache_clear", lambda: None)
@@ -91,6 +114,28 @@ _TIMELINES = [
 ]
 
 
+_MONTHS = [
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม",
+]
+
+
+def _gazette_note(published: str) -> str:
+    """Each invented law's own Gazette note, dated as it was published."""
+    y, m, d = (int(x) for x in published.split("-"))
+    return f"ราชกิจจานุเบกษา เล่ม ๑๑๘/ตอนที่ ๑๒ ก/หน้า ๓/{d} {_MONTHS[m - 1]} {y + 543}"
+
+
 def _doc(
     title: str, type_id: str, published: str, timelines: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -111,9 +156,7 @@ def _doc(
                 _section(2, "4", "มาตรา 1", "<p><span>มาตรา ๑</span><span> ทด</span>สอบ</p>"),
                 _section(1, "1", "ชื่อกฎหมาย", f"<p>{title}</p>"),
             ],
-            "footnoteList": [
-                {"footnoteContent": "ราชกิจจานุเบกษา เล่ม ๑๑๘/ตอนที่ ๑๒ ก/หน้า ๓/๒ มกราคม ๒๕๔๔"}
-            ],
+            "footnoteList": [{"footnoteContent": _gazette_note(published)}],
             "timelines": timelines,
         },
     }
@@ -802,7 +845,8 @@ async def test_a_failed_translation_keeps_the_thai_text(tmp_path: Any) -> None:
         doc = await OcsAcquirer(_adapter(), client=client, title_rule=RULE).fetch(_ref(TRANSLATED))
     finally:
         await client.aclose()
-    assert [b.language for b in doc.bodies] == ["tha"]
+    assert [b.role for b in doc.bodies if b.role == "translation"] == []
+    assert doc.primary().language == "tha"
     assert "503" in doc.upstream_metadata["translation_error"]
 
 
@@ -833,3 +877,48 @@ def test_a_configured_client_keeps_the_acquirers_pace_and_one_connection() -> No
     bare = SourceAdapter(kind="json_portal", name="ocs")
     profile = OcsAcquirer(bare, title_rule=RULE)._client._transport.profile
     assert (profile.rate_limit_per_minute, profile.concurrency) == (12, 1)
+
+
+def test_a_record_dated_after_its_own_gazette_note_takes_the_notes_date() -> None:
+    from codify.acquisition.adapters.th.ocs import publication_date
+
+    notes = [{"footnoteContent": "ราชกิจจานุเบกษา เล่ม ๙๖/ตอนที่ ๘/ฉบับพิเศษ หน้า ๑/๒๙ มกราคม ๒๕๒๒"}]
+    assert publication_date({"publishDateAd": "1991-02-28"}, notes) == "1979-01-29"
+    # A note dated after the record, or one not read, leaves the record's date.
+    assert publication_date({"publishDateAd": "1978-12-01"}, notes) == "1978-12-01"
+    assert publication_date({"publishDateAd": "1991-02-28"}, [{"footnoteContent": "อื่น"}]) == (
+        "1991-02-28"
+    )
+
+
+def test_the_law_is_found_by_its_title_in_either_digit_script() -> None:
+    units = [
+        _unit(1, "1", "<p>พระราชบัญญัติให้ใช้ประมวล</p>"),
+        _unit(2, "4", "<p>มาตรา ๑ ให้ใช้</p>"),
+        _unit(3, "1", "<p>ประมวลทดสอบ พ.ศ. ๒๕๔๔</p>"),
+        _unit(4, "4", "<p>มาตรา ๑ บทนิยาม</p>"),
+    ]
+    root = _akn(units, title="ประมวลทดสอบ พ.ศ. 2544")
+    assert _x(root, "//a:body//a:section//a:p/text()") == ["บทนิยาม"]
+
+
+def test_a_provision_keeps_its_images_where_they_stand() -> None:
+    html = '<p>มาตรา</p><p>๑ ก่อนภาพ</p><p><img src="data:image/png;base64,AA"></p><p>หลังภาพ</p>'
+    root = _akn([_unit(1, "4", html, "มาตรา 1")])
+    content = root.xpath("//a:section/a:content/*", namespaces=_AKN)
+    assert [
+        ("img" if c.xpath(".//a:img", namespaces=_AKN) else c.xpath("string(.)", namespaces=_AKN))
+        for c in content
+    ] == [
+        "ก่อนภาพ",
+        "img",
+        "หลังภาพ",
+    ]
+    assert _x(root, "//a:section/a:num/text()") == ["๑"]
+
+
+async def test_fetch_keeps_the_source_document_as_provenance() -> None:
+    doc, _ = await _fetch(BASE)
+    cards = [b for b in doc.bodies if b.role == "card"]
+    assert [b.media_type for b in cards] == ["application/json"]
+    assert json.loads(cards[0].content) == _DOCS[(BASE, False)]["respBody"]

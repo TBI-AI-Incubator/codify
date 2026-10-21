@@ -41,8 +41,9 @@ from codify.acquisition.base import (
 )
 from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
+from codify.calendar import local_date_from_text
 from codify.frbr import build_frbr_work_uri, identity_from_title
-from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config
+from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config, try_load_config
 from codify.lang import normalise_digits
 
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
@@ -119,12 +120,34 @@ def render_text(sections: list[dict[str, Any]]) -> str:
     return "\n\n".join(t for s in ordered if (t := section_text(s.get("sectionContent") or "")))
 
 
-def gazette_ref(footnotes: list[dict[str, Any]], published: str) -> GazetteRef | None:
-    """The first footnote citing the Gazette, which is the law's own publication;
-    None when that note is in a form not read, never a later citation's."""
+def own_gazette_note(footnotes: list[dict[str, Any]]) -> str:
+    """The first footnote citing the Gazette, which is the law's own publication."""
     notes = (normalise_digits(str(n.get("footnoteContent") or "")) for n in footnotes)
-    content = next((n for n in notes if GAZETTE_NAME in n), "")
-    m = _GAZETTE_NOTE.search(content)
+    return next((n for n in notes if GAZETTE_NAME in n), "")
+
+
+def publication_date(info: dict[str, Any], footnotes: list[dict[str, Any]]) -> str:
+    """The earlier of the record's date and its own Gazette note's: a consolidation's
+    record can carry a later act's date (an Act of 1979 dated 1991)."""
+    # ponytail: a note misdated earlier than the law wins; one in ~3,000 today.
+    stated = str(info.get("publishDateAd") or "")
+    cfg = try_load_config("th")
+    rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
+    note = own_gazette_note(footnotes)
+    if not (note and rule and rule.date_cues):
+        return stated
+    noted = local_date_from_text(f"{rule.date_cues[0]} {note.rsplit('/', 1)[-1]}", "th")
+    if noted is None or (
+        re.fullmatch(r"\d{4}-\d{2}-\d{2}", stated) and noted.isoformat() >= stated
+    ):
+        return stated
+    return noted.isoformat()
+
+
+def gazette_ref(footnotes: list[dict[str, Any]], published: str) -> GazetteRef | None:
+    """The law's own Gazette note as a reference; None when that note is in a form
+    not read, never a later citation's."""
+    m = _GAZETTE_NOTE.search(own_gazette_note(footnotes))
     if m is None or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
         return None
     return GazetteRef(
@@ -282,7 +305,7 @@ class OcsAcquirer(BaseAcquirer):
             ),
             None,
         )
-        published = str(info.get("publishDateAd") or "")
+        published = publication_date(info, payload.get("footnoteList") or [])
         # An enactment is dated by its publication; a consolidation by its own date.
         as_of = published if kind in ("original", "amending") else (this or {}).get("date", "")
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published) or not re.fullmatch(
@@ -308,7 +331,15 @@ class OcsAcquirer(BaseAcquirer):
                 title=title,
             )
         )
-        bodies = [Body(media_type="application/xml", content=akn.encode(), language="tha")]
+        bodies = [
+            Body(media_type="application/xml", content=akn.encode(), language="tha"),
+            # The source document itself, so the conversion and its footnotes can be audited.
+            Body(
+                media_type="application/json",
+                content=json.dumps(payload, ensure_ascii=False).encode(),
+                role="card",
+            ),
+        ]
         upstream: dict[str, Any] = {
             "law_code": info.get("lawCode", ""),
             "timeline_id": timeline_id,
@@ -672,6 +703,8 @@ __all__ = [
     "dump_name",
     "failures_path",
     "gazette_ref",
+    "own_gazette_note",
+    "publication_date",
     "index_entry",
     "index_timelines",
     "render_text",

@@ -18,6 +18,7 @@ from lxml import etree
 from codify.acquisition.adapters.th.ocs import section_text
 from codify.akn import parse_xml
 from codify.akn.bluebell import bluebell_to_akn
+from codify.lang import normalise_digits
 from codify.pipeline.formats.akn_native import canonicalise_identification
 
 PREFACE = {"1", "2"}
@@ -63,27 +64,51 @@ def _html(unit: dict[str, Any]) -> str:
     return str(unit.get("sectionContent") or "")
 
 
-def _lines(html: str) -> list[str]:
-    """Escaped text lines, each image its own line, in source order."""
-    out: list[str] = []
+def _stream(html: str) -> list[tuple[str, bool]]:
+    """Text lines and images (as `(src, True)`), in source order."""
+    out: list[tuple[str, bool]] = []
     for i, part in enumerate(_IMG.split(html)):
         if i % 2:
-            out.append(f"{{{{IMG {part}}}}}")
+            out.append((part, True))
         else:
-            out += [escape(x) for x in section_text(part).splitlines()]
+            out += [(x, False) for x in section_text(part).splitlines()]
     return out
 
 
-def _numbered(unit: dict[str, Any], term: str) -> tuple[str, str] | None:
-    """(number as printed, the text after it). An ordinal suffix (ทวิ, เอกาทศ, ...)
-    is part of the number only where the unit's own label carries it."""
+def _render(stream: list[tuple[str, bool]]) -> list[str]:
+    return [f"{{{{IMG {x}}}}}" if image else escape(x) for x, image in stream]
+
+
+def _lines(html: str) -> list[str]:
+    """Escaped text lines, each image its own line, in source order."""
+    return _render(_stream(html))
+
+
+def _without_label(stream: list[tuple[str, bool]], label: str) -> list[tuple[str, bool]]:
+    """The stream with its leading label removed, across lines, images kept in place."""
+    want = re.sub(r"\s+", "", label)
+    out: list[tuple[str, bool]] = []
+    for text, image in stream:
+        if want and not image:
+            kept = text.lstrip()
+            while want and kept and kept[0] == want[0]:
+                kept, want = kept[1:].lstrip(), want[1:]
+            text = kept
+        if text:
+            out.append((text, image))
+    return out
+
+
+def _numbered(unit: dict[str, Any], term: str) -> tuple[str, str, str] | None:
+    """(number as printed, the text after it, the label as printed). An ordinal
+    suffix (ทวิ, เอกาทศ, ...) is part of the number only where the unit's label has it."""
     tokens = str(unit.get("sectionLabel") or "").split()
     suffix = tokens[2] if len(tokens) > 2 and tokens[2] != "ถึง" else ""
     text = section_text(_IMG.sub("", _html(unit)))
     for tail in ([rf"\s*{re.escape(suffix)}"] if suffix else []) + [""]:
         m = re.match(rf"^{term}\s*({_NUM}{tail})", text)
         if m:
-            return " ".join(m.group(1).split()), text[m.end(1) :].strip()
+            return " ".join(m.group(1).split()), text[m.end(1) :].strip(), text[: m.end(1)]
     return None
 
 
@@ -100,7 +125,7 @@ def _segments(units: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
 
 
 def _squash(text: str) -> str:
-    return re.sub(r"\s+", "", text)
+    return re.sub(r"\s+", "", normalise_digits(text))
 
 
 def _title(segment: list[dict[str, Any]]) -> str:
@@ -149,7 +174,7 @@ def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
             while open_levels and open_levels[-1] >= level:
                 open_levels.pop()
             got = _numbered(unit, _GROUP_TERM)
-            num, heading = got if got else ("", " ".join(section_text(_html(unit)).split()))
+            num, heading = got[:2] if got else ("", " ".join(section_text(_html(unit)).split()))
             heading = " ".join(heading.split())
             pad = "  " * (len(open_levels) + 1)
             body.append(
@@ -168,11 +193,10 @@ def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
                     # A lone unnumbered provision is printed as prose; so it stays.
                     body += [f"{pad}{x}" for x in lines]
                     continue
-                got = (labelled.group(0), section_text(_IMG.sub("", _html(unit))))
+                got = (labelled.group(0), section_text(_IMG.sub("", _html(unit))), "")
             body.append(f"{pad}SEC {got[0]}")
-            rest = [escape(x) for x in got[1].splitlines() if x]
-            images = [x for x in lines if x.startswith("{{IMG ")]
-            body += [f"{pad}  {x}" for x in rest + images]
+            label = got[2]
+            body += [f"{pad}  {x}" for x in _render(_without_label(_stream(_html(unit)), label))]
         elif kind in PROSE:
             body += [f"{pad}{x}" for x in lines]
         elif kind in CONCLUSIONS:
