@@ -62,6 +62,35 @@ def user_agent() -> str:
 
 TIMELINE_KINDS = {"1": "original", "2": "amending", "3": "consolidated", "4": "current"}
 
+# Title prefix to document class, longest first. Council announcements class as
+# notifications, as the works already ingested from Gazette scans do.
+DOCTYPE_PREFIXES = (
+    ("พระราชบัญญัติประกอบรัฐธรรมนูญ", "organic_act"),
+    ("พระราชบัญญัติ", "act"),
+    ("พระราชกำหนด", "emergency_decree"),
+    ("พระราชกฤษฎีกา", "royal_decree"),
+    ("ประมวลกฎหมาย", "code"),
+    ("ประมวลรัษฎากร", "code"),
+    ("ธรรมนูญการปกครอง", "constitution"),
+    ("รัฐธรรมนูญ", "constitution"),
+    ("กฎกระทรวง", "ministerial_regulation"),
+    ("คำสั่งหัวหน้าคณะ", "council_order"),
+    ("คำสั่งคณะ", "council_order"),
+    ("ประกาศ", "notification"),
+    ("ระเบียบ", "regulation"),
+    ("ข้อบังคับ", "rule"),
+    ("ข้อกำหนด", "requirement"),
+    ("คำสั่ง", "order"),
+    ("กฎ", "commission_rule"),
+)
+
+
+def doctype_for_title(title: str) -> str | None:
+    """The document class a Thai title's leading term names, or None."""
+    head = title.strip()
+    return next((doctype for prefix, doctype in DOCTYPE_PREFIXES if head.startswith(prefix)), None)
+
+
 # "ราชกิจจานุเบกษา เล่ม ๑๓๖/ตอนที่ ๖๗ ก/หน้า ๕๗/๒๒ พฤษภาคม ๒๕๖๒", digits folded.
 _GAZETTE_NOTE = re.compile(r"เล่ม\s*(\d+)\s*/\s*ตอนที่\s*([^/]+?)\s*/\s*หน้า\s*(\d+)")
 _TAG = re.compile(r"<[^>]+>")
@@ -136,12 +165,15 @@ class OcsAcquirer(BaseAcquirer):
         *,
         client: httpx.AsyncClient | None = None,
         title_rule: TitleIdentity | None = None,
+        dump_dir: Path | None = None,
     ) -> None:
         super().__init__(adapter, client=client)
         self._client = client or make_polite_client(adapter, user_agent=user_agent())
         self._licence = adapter.licence
         self._title_rule = title_rule
         self._session = str(uuid.uuid4())
+        # A crawl's raw documents, read before the network is asked.
+        self._dump = dump_dir
 
     def _rule(self) -> TitleIdentity:
         if self._title_rule is None:
@@ -153,6 +185,10 @@ class OcsAcquirer(BaseAcquirer):
         return self._title_rule
 
     async def _law_doc(self, timeline_id: str, *, english: bool) -> dict[str, Any]:
+        if self._dump is not None:
+            saved = self._dump / dump_name(timeline_id, english=english)
+            if saved.exists():
+                return dict(json.loads(saved.read_text()))
         now = datetime.now(UTC)
         body = {
             "reqHeader": {
@@ -175,11 +211,14 @@ class OcsAcquirer(BaseAcquirer):
             raise OcsItemMissing(f"timeline {timeline_id!r} answered {code!r}")
         return payload
 
-    def work_uri(self, title: str, doctype: str, year: str) -> str:
+    def work_number(self, title: str) -> str:
         identity = identity_from_title(normalise_digits(title), self._rule())
         if not identity.segment:
             raise OcsItemMissing(f"no title identity in {title!r}")
-        return build_frbr_work_uri(self.JURISDICTION, doctype, year, identity.segment)
+        return identity.segment
+
+    def work_uri(self, title: str, doctype: str, year: str) -> str:
+        return build_frbr_work_uri(self.JURISDICTION, doctype, year, self.work_number(title))
 
     async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
         timeline_id = ref.extra.get("timeline_id", "")
@@ -187,8 +226,7 @@ class OcsAcquirer(BaseAcquirer):
             raise ValueError(f"OCS ref {ref.number!r} needs extra['timeline_id']")
         payload = await self._law_doc(timeline_id, english=False)
         info = payload["lawInfo"]
-        text = render_text(payload.get("lawSections") or [])
-        if not text:
+        if not render_text(payload.get("lawSections") or []):
             raise OcsItemMissing(f"timeline {timeline_id!r} carries no text")
         kind = TIMELINE_KINDS.get(str(info.get("timelineTypeId")), "unknown")
         this = next(
@@ -207,8 +245,14 @@ class OcsAcquirer(BaseAcquirer):
         ):
             raise OcsItemMissing(f"timeline {timeline_id!r} has no usable date")
         title = str(info.get("lawNameTh") or "")
-        work = self.work_uri(title, ref.doctype, published[:4])
-        bodies = [Body(media_type="text/plain", content=text.encode(), language="tha")]
+        number = self.work_number(title)
+        work = build_frbr_work_uri(self.JURISDICTION, ref.doctype, published[:4], number)
+        from codify.acquisition.adapters.th.ocs_akn import to_akn
+
+        akn = to_akn(
+            payload.get("lawSections") or [], doctype=ref.doctype, date=as_of, number=number
+        )
+        bodies = [Body(media_type="application/xml", content=akn.encode(), language="tha")]
         upstream: dict[str, Any] = {
             "law_code": info.get("lawCode", ""),
             "timeline_id": timeline_id,
@@ -516,6 +560,7 @@ __all__ = [
     "SourceDown",
     "TIMELINE_KINDS",
     "build_index",
+    "doctype_for_title",
     "crawl",
     "dump_name",
     "gazette_ref",

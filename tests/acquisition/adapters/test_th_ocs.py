@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 import pytest
+from lxml import etree
 
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, registered_kinds
@@ -21,9 +22,33 @@ from codify.acquisition.adapters.th.ocs import (
     index_entry,
     section_text,
 )
+from codify.acquisition.adapters.th.ocs_akn import UnmappedUnit, to_akn, to_bluebell
 from codify.acquisition.base import DiscoveryQuery
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter, TitleIdentity
+
+
+@pytest.fixture(autouse=True)
+def _th_config(tmp_path_factory: Any, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """An invented th config, from the fictional xa one, for the AKN parse."""
+    import codify.jurisdictions as jurisdictions
+
+    root = tmp_path_factory.mktemp("jurisdictions")
+    config = json.loads((jurisdictions.JURISDICTIONS_DIR / "xa" / "config.json").read_text())
+    config |= {"code": "th", "languages": ["tha"], "authoritative_language": "tha"}
+    config["frbr"] = {
+        **config.get("frbr", {}),
+        "country_code": "th",
+        "uri_patterns": {"act": "/akn/th/act/{year}/{number}"},
+    }
+    (root / "th").mkdir()
+    (root / "th" / "config.json").write_text(json.dumps(config))
+    clear = getattr(jurisdictions.try_load_config, "cache_clear", lambda: None)
+    monkeypatch.setattr(jurisdictions, "JURISDICTIONS_DIR", root)
+    clear()
+    yield
+    clear()
+
 
 RULE = TitleIdentity(
     strip_prefixes=["พระราชบัญญัติ"],
@@ -181,8 +206,15 @@ async def test_current_text_lands_on_the_base_work_dated_by_its_timeline() -> No
     assert work.startswith("/akn/th/act/2001/t-")
     assert doc.expression_uri == f"{work}/tha@2010-05-02"
     assert doc.upstream_metadata["timeline_kind"] == "current"
-    # Units in their stated order, not the order the API lists them.
-    assert doc.primary().content.decode().splitlines()[0] == "พระราชบัญญัติทดสอบ พ.ศ. 2544"
+    # AKN built from the units in their stated order, not the order the API lists them.
+    assert doc.primary().media_type == "application/xml"
+    root = etree.fromstring(doc.primary().content)
+    ns = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
+    assert root.xpath("string(//a:preface/a:p[1])", namespaces=ns) == "พระราชบัญญัติทดสอบ พ.ศ. 2544"
+    assert [
+        (s.xpath("string(a:num)", namespaces=ns), s.xpath("string(.//a:p)", namespaces=ns))
+        for s in root.xpath("//a:body/a:section", namespaces=ns)
+    ] == [("๑", "ทดสอบ")]
     assert [t["kind"] for t in doc.upstream_metadata["timelines"]] == [
         "original",
         "amending",
@@ -469,3 +501,65 @@ async def _crawl_index(
 def test_dump_names_are_safe_filenames() -> None:
     assert dump_name("a/b+c==") == "a_b-c==.json"
     assert dump_name("a/b", english=True) == "a_b.en.json"
+
+
+def _unit(seq: int, kind: str, html: str) -> dict[str, Any]:
+    return {"sectionSeq": seq, "sectionTypeId": kind, "sectionContent": html}
+
+
+def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
+    units = [
+        _unit(1, "1", "<p>พระราชบัญญัติทดสอบ</p>"),
+        _unit(2, "3", "<p>โดยที่สมควร</p>"),
+        _unit(3, "8", "<p>หมวด ๑</p><p>บททั่วไป</p>"),
+        _unit(4, "4", "<p>มาตรา</p><p>๑ ข้อความ **ตัวหนา**</p>"),
+        _unit(5, "9", "<p>ส่วนที่ ๑ การยื่น</p>"),
+        _unit(6, "4", "<p>มาตรา ๒/๑ ข้อความ</p><p>(๑) รายการ</p>"),
+        _unit(7, "8", "<p>หมวด ๒ บทสุดท้าย</p>"),
+        _unit(8, "13", "<p>บทเฉพาะกาล</p>"),
+        _unit(9, "4", "<p>มาตรา ๓ ทวิ ข้อความ</p>"),
+        _unit(10, "14", "<p>ผู้รับสนองพระบรมราชโองการ</p>"),
+        _unit(11, "1", "<p>พระราชบัญญัติทดสอบ (ฉบับที่ ๒)</p>"),
+        _unit(12, "16", "<p>บัญชีอัตรา</p><p>ร้อยละ ๕</p>"),
+    ]
+    assert to_bluebell(units).splitlines() == [
+        "PREFACE",
+        "  พระราชบัญญัติทดสอบ",
+        "PREAMBLE",
+        "  โดยที่สมควร",
+        "BODY",
+        "  CHAPTER ๑ - บททั่วไป",
+        "    SEC ๑",
+        "      ข้อความ \\**ตัวหนา\\**",
+        "    DIVISION ๑ - การยื่น",
+        "      SEC ๒/๑",
+        "        ข้อความ",
+        "        (๑) รายการ",
+        "  CHAPTER ๒ - บทสุดท้าย",
+        "    CROSSHEADING บทเฉพาะกาล",
+        "    SEC ๓ ทวิ",
+        "      ข้อความ",
+        "CONCLUSIONS",
+        "  ผู้รับสนองพระบรมราชโองการ",
+        "  พระราชบัญญัติทดสอบ (ฉบับที่ ๒)",
+        "",
+        "SCHEDULE บัญชีอัตรา",
+        "  BODY",
+        "    ร้อยละ ๕",
+    ]
+    root = etree.fromstring(to_akn(units, doctype="act", date="2001-01-01", number="x").encode())
+    ns = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
+    assert root.xpath("//a:hcontainer", namespaces=ns) == []
+    assert [
+        s.xpath("string(a:num)", namespaces=ns) for s in root.xpath("//a:section", namespaces=ns)
+    ] == [
+        "๑",
+        "๒/๑",
+        "๓ ทวิ",
+    ]
+    assert "ตัวหนา" in root.xpath("string(//a:section[1])", namespaces=ns)
+
+
+def test_an_unknown_unit_kind_is_refused_not_dropped() -> None:
+    with pytest.raises(UnmappedUnit, match="unit type 99"):
+        to_bluebell([_unit(1, "99", "<p>x</p>"), _unit(2, "4", "<p>มาตรา ๑ x</p>")])
