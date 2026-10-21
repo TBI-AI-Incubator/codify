@@ -256,9 +256,16 @@ class OcsAcquirer(BaseAcquirer):
         )
 
     async def search(
-        self, keyword: str, *, page: int, per_page: int = 50, states: str = "01,02"
+        self,
+        keyword: str,
+        *,
+        page: int,
+        per_page: int = 50,
+        states: str = "01,02",
+        all_children: bool = False,
     ) -> dict[str, Any]:
-        """One page of the public search over law titles; `states` "" is every state."""
+        """One page of the public search over law titles; `states` "" is every state.
+        Each hit lists its subordinate laws: those matching `keyword`, or all of them."""
         form = {
             "query[letter]": "",
             "query[tab_type]": "law",
@@ -271,7 +278,7 @@ class OcsAcquirer(BaseAcquirer):
             "query[lawCategoryName]": "",
             "query[stateName]": states,
             "query[year]": "",
-            "query[onlyMatchChild]": "1",
+            "query[onlyMatchChild]": "0" if all_children else "1",
             "pagination[page]": str(page),
             "pagination[perpage]": str(per_page),
         }
@@ -384,7 +391,7 @@ async def build_index(
     """Walk every page of the unfiltered search, every state included. With
     `checkpoint` the payload is written after each page; with `resume` a build
     there over the same total and page size continues where it stopped."""
-    first = await acquirer.search("", page=1, per_page=per_page, states="")
+    first = await acquirer.search("", page=1, per_page=per_page, states="", all_children=True)
     meta = first.get("meta") or {}
     total, pages = int(meta.get("total") or 0), int(meta.get("pages") or 0)
     entries: dict[str, dict[str, Any]] = {}
@@ -399,7 +406,9 @@ async def build_index(
             logger.info("ocs_index_restarted", was=prior.get("total"), now=total)
     data: dict[str, Any] | None = first if page == 1 else None
     while page <= pages:
-        data = data or await acquirer.search("", page=page, per_page=per_page, states="")
+        data = data or await acquirer.search(
+            "", page=page, per_page=per_page, states="", all_children=True
+        )
         now = int((data.get("meta") or {}).get("total") or 0)
         if now != total:
             raise IndexMoved(f"catalogue total moved from {total} to {now} at page {page}")

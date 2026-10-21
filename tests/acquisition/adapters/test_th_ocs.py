@@ -284,6 +284,7 @@ def _catalogue(pages: dict[int, list[dict[str, Any]]], totals: dict[int, int]) -
     def handle(request: httpx.Request) -> httpx.Response:
         form = request.content.decode()
         assert "query%5BstateName%5D=&" in form  # every state, not only in force
+        assert "query%5BonlyMatchChild%5D=0" in form  # every child, not only matches
         page = int(form.split("pagination%5Bpage%5D=")[1].split("&")[0])
         meta = {"total": totals.get(page, 3), "pages": len(pages)}
         return httpx.Response(200, json={"meta": meta, "data": pages[page]})
