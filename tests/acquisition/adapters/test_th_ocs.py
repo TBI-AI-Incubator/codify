@@ -563,3 +563,26 @@ def test_units_nest_under_their_groups_and_trailing_titles_conclude() -> None:
 def test_an_unknown_unit_kind_is_refused_not_dropped() -> None:
     with pytest.raises(UnmappedUnit, match="unit type 99"):
         to_bluebell([_unit(1, "99", "<p>x</p>"), _unit(2, "4", "<p>มาตรา ๑ x</p>")])
+
+
+async def test_configured_acquirer_reads_a_saved_crawl_before_the_network(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ACQUISITION_INDEX_DIR", str(tmp_path))
+    (tmp_path / "th" / "raw").mkdir(parents=True)
+    (tmp_path / "th" / "raw" / dump_name(BASE)).write_text(
+        json.dumps(_DOCS[(BASE, False)]["respBody"])
+    )
+    acquirer = OcsAcquirer.from_config("th", _adapter())
+    seen: list[dict[str, Any]] = []
+    acquirer._client = httpx.AsyncClient(transport=httpx.MockTransport(_handler(seen)))
+    acquirer._title_rule = RULE
+    try:
+        doc = await acquirer.fetch(_ref(BASE))
+        assert doc.expression_uri.endswith("/tha@2010-05-02")
+        assert seen == []
+        # A timeline the crawl did not save is still fetched.
+        await acquirer.fetch(_ref(AMENDING))
+        assert _asked(seen) == [(AMENDING, False)]
+    finally:
+        await acquirer._client.aclose()

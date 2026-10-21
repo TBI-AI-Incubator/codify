@@ -38,7 +38,7 @@ from codify.acquisition.base import (
     DocumentRef,
     GazetteRef,
 )
-from codify.acquisition.index import write_index
+from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_work_uri, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config
@@ -174,6 +174,16 @@ class OcsAcquirer(BaseAcquirer):
         self._session = str(uuid.uuid4())
         # A crawl's raw documents, read before the network is asked.
         self._dump = dump_dir
+
+    @classmethod
+    def from_config(cls, jurisdiction_code: str, adapter: object) -> OcsAcquirer:
+        """As configured, reading a crawl saved beside the index before the network."""
+        if jurisdiction_code != cls.JURISDICTION:
+            raise ValueError(
+                f"OcsAcquirer only supports {cls.JURISDICTION!r}, got {jurisdiction_code!r}"
+            )
+        assert isinstance(adapter, SourceAdapter)
+        return cls(adapter, dump_dir=index_path(cls.JURISDICTION).parent / "raw")
 
     def _rule(self) -> TitleIdentity:
         if self._title_rule is None:
