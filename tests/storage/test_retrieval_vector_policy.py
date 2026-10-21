@@ -12,8 +12,7 @@ from codify.storage.retrieval import _DENSE_ONLY_SQL, _HYBRID_SQL, hybrid_search
 
 
 @pytest.mark.parametrize("hybrid", [False, True])
-@pytest.mark.parametrize("fallback", [None, "old", "new"])
-def test_indexable_vector_selection_preserves_preferred_and_scope(hybrid, fallback):
+def test_indexable_vector_selection_reads_one_model_in_scope(hybrid):
     sql = str(_HYBRID_SQL if hybrid else _DENSE_ONLY_SQL)
     # Guard the performance regression: ORDER BY must see the indexed relation,
     # not a separately limited embedding lookup for each provision.
@@ -59,14 +58,13 @@ def test_indexable_vector_selection_preserves_preferred_and_scope(hybrid, fallba
                 query_vec=0.0,
                 version_id=1,
                 model_id="new",
-                fallback_model_id=fallback,
                 akn_type="article",
                 include_non_normative=False,
                 pool=10,
                 k=10,
             ),
         ).fetchall()
-    assert [row[0] for row in rows] == ([2, 3, 1] if fallback == "old" else [3, 1])
+    assert [row[0] for row in rows] == [3, 1]
 
 
 @pytest.mark.parametrize("tokens", ["", "example"])

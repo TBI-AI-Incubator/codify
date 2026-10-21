@@ -78,7 +78,6 @@ async def retrieve(
     candidate_pool: int = 30,
     rrf_k: int = RRF_K,
     model_id: str | None = None,
-    fallback_model_id: str | None = None,
     doctype: str | None = None,
     akn_type: str | None = None,
     include_non_normative: bool = False,
@@ -121,7 +120,6 @@ async def retrieve(
         candidate_pool=candidate_pool,
         rrf_k=rrf_k,
         model_id=model_id,
-        fallback_model_id=fallback_model_id,
         akn_type=akn_type,
         include_non_normative=include_non_normative,
     )
