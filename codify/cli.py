@@ -629,6 +629,37 @@ def _run_index_legislation_gov_uk(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_index_ocs(args: argparse.Namespace) -> int:
+    """Walk the Council of State's public search for every law and its subordinates."""
+    from codify.acquisition.adapters.th.ocs import OcsAcquirer, build_index
+    from codify.acquisition.index import index_path, write_index
+    from codify.jurisdictions import SourceAdapter
+
+    adapter = SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=args.rate)
+    out = Path(args.out or index_path("th"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    def progress(page: int, pages: int, laws: int) -> None:
+        print(f"  page {page}/{pages}: {laws} laws", file=sys.stderr)
+
+    async def run() -> dict[str, Any]:
+        acquirer = OcsAcquirer(adapter)
+        try:
+            return await build_index(
+                acquirer,
+                checkpoint=out,
+                resume=args.resume,
+                on_progress=None if args.quiet else progress,
+            )
+        finally:
+            await acquirer._client.aclose()
+
+    payload = asyncio.run(run())
+    write_index(out, payload)
+    print(f"{out}: {payload['stats']}", file=sys.stderr)
+    return 0
+
+
 def _run_scan_corpus(args: argparse.Namespace) -> int:
     """Measure the anchor scan over a directory of raw sources."""
     from codify.quality.corpus_scan import aggregate, scan_corpus
@@ -892,6 +923,22 @@ def main(argv: list[str] | None = None) -> int:
         help="continue the build at --out (same types and years); otherwise --out is overwritten",
     )
     leg.set_defaults(func=_run_index_legislation_gov_uk)
+
+    ocs = sub.add_parser(
+        "index-ocs",
+        help="enumerate every law and subordinate law the Thai Council of State's search lists",
+    )
+    ocs.add_argument(
+        "--out",
+        default=None,
+        help="index JSON to write (default: <ACQUISITION_INDEX_DIR>/th/index.json)",
+    )
+    ocs.add_argument("--rate", type=int, default=30, help="requests per minute, one at a time")
+    ocs.add_argument("--quiet", action="store_true", help="suppress per-page progress")
+    ocs.add_argument(
+        "--resume", action="store_true", help="continue the build at --out if its total still holds"
+    )
+    ocs.set_defaults(func=_run_index_ocs)
 
     from codify.cli_store import register as _register_store
 

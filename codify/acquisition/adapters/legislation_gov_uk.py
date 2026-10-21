@@ -5,7 +5,6 @@ empty page and reconciled against its `leg:facetYears` count."""
 from __future__ import annotations
 
 import json
-import os
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -16,6 +15,8 @@ from typing import Any
 import httpx
 import structlog
 from lxml import etree
+
+from codify.acquisition.index import write_index
 
 logger = structlog.get_logger()
 
@@ -167,21 +168,6 @@ def _payload(
             "done": sorted(done, key=lambda d: (rank.get(d.split("/")[0], len(rank)), d)),
         },
     }
-
-
-def write_index(path: Path, payload: dict[str, Any]) -> None:
-    """Whole file or nothing, durable: temp file, fsync, rename, fsync the directory."""
-    tmp = path.with_name(path.name + ".tmp")
-    with tmp.open("w") as fh:
-        fh.write(json.dumps(payload, indent=2) + "\n")
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp, path)
-    dir_fd = os.open(path.parent, os.O_RDONLY)
-    try:
-        os.fsync(dir_fd)
-    finally:
-        os.close(dir_fd)
 
 
 class CheckpointMismatch(ValueError):

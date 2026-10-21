@@ -11,8 +11,11 @@ import pytest
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, registered_kinds
 from codify.acquisition.adapters.th.ocs import (
+    IndexMoved,
     OcsAcquirer,
     OcsItemMissing,
+    build_index,
+    index_entry,
     section_text,
 )
 from codify.acquisition.base import DiscoveryQuery
@@ -254,3 +257,106 @@ async def test_discover_pages_and_filters_by_year() -> None:
         ("c", "enc-c", "พระราชบัญญัติc"),
     ]
     assert len(forms) == 2
+
+
+def _hit(code: str, children: tuple[tuple[str, str], ...] = ()) -> dict[str, Any]:
+    return {
+        "lawCode": code,
+        "encTimelineID": f"enc-{code}",
+        "lawNameTh": f"<mark>พระราชบัญญัติ</mark>{code}",
+        "year": 2001,
+        "state": "01",
+        "lawEn": code == "a",
+        "childrens": [
+            {"name": kind, "items": [{"title": f"<mark>x</mark>{tid}", "encTimelineID": tid}]}
+            for kind, tid in children
+        ],
+    }
+
+
+def _checkpoint(total: int, code: str) -> str:
+    return json.dumps(
+        {"total": total, "per_page": 2, "pages_done": 1, "entries": [index_entry(_hit(code))]}
+    )
+
+
+def _catalogue(pages: dict[int, list[dict[str, Any]]], totals: dict[int, int]) -> Any:
+    def handle(request: httpx.Request) -> httpx.Response:
+        form = request.content.decode()
+        assert "query%5BstateName%5D=&" in form  # every state, not only in force
+        page = int(form.split("pagination%5Bpage%5D=")[1].split("&")[0])
+        meta = {"total": totals.get(page, 3), "pages": len(pages)}
+        return httpx.Response(200, json={"meta": meta, "data": pages[page]})
+
+    return handle
+
+
+_PAGES = {
+    1: [
+        _hit("a", (("พระราชกฤษฎีกา", "d1"), ("กฎกระทรวง", "r1"))),
+        _hit("b", (("กฎกระทรวง", "r1"),)),
+    ],
+    2: [_hit("b"), _hit("c")],
+}
+
+
+async def _build(handler: Any, **kw: Any) -> dict[str, Any]:
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        acquirer = OcsAcquirer(_adapter(), client=client, title_rule=RULE)
+        return await build_index(acquirer, per_page=2, **kw)
+    finally:
+        await client.aclose()
+
+
+async def test_index_walks_every_page_and_counts_shared_children_once(tmp_path: Any) -> None:
+    out = tmp_path / "index.json"
+    payload = await _build(_catalogue(_PAGES, {}), checkpoint=out)
+    assert [e["law_code"] for e in payload["entries"]] == ["a", "b", "c"]
+    assert payload["entries"][0]["children"][0] == {
+        "type": "พระราชกฤษฎีกา",
+        "title": "xd1",
+        "timeline_id": "d1",
+        "date": "",
+        "state": "",
+        "english": False,
+    }
+    assert payload["stats"] == {
+        "laws": 3,
+        "missing": 0,
+        "children": 2,
+        "child_types": {"พระราชกฤษฎีกา": 1, "กฎกระทรวง": 1},
+        "states": {"01": 3},
+        "english": 1,
+    }
+    assert payload["complete"] is True
+    # The last checkpoint is the walk so far, never marked complete.
+    assert json.loads(out.read_text())["complete"] is False
+
+
+async def test_index_resumes_after_the_last_page_written(tmp_path: Any) -> None:
+    out = tmp_path / "index.json"
+    seen: list[int] = []
+    inner = _catalogue(_PAGES, {})
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(int(request.content.decode().split("pagination%5Bpage%5D=")[1].split("&")[0]))
+        return inner(request)
+
+    out.write_text(_checkpoint(3, "z"))
+    payload = await _build(handle, checkpoint=out, resume=True)
+    # Page 1 is asked once for the total; its laws come from the checkpoint.
+    assert seen == [1, 2]
+    assert [e["law_code"] for e in payload["entries"]] == ["z", "b", "c"]
+
+
+async def test_index_restarts_when_the_total_has_moved(tmp_path: Any) -> None:
+    out = tmp_path / "index.json"
+    out.write_text(_checkpoint(9, "z"))
+    payload = await _build(_catalogue(_PAGES, {}), checkpoint=out, resume=True)
+    assert [e["law_code"] for e in payload["entries"]] == ["a", "b", "c"]
+
+
+async def test_index_refuses_a_catalogue_that_moves_mid_walk() -> None:
+    with pytest.raises(IndexMoved):
+        await _build(_catalogue(_PAGES, {2: 4}))

@@ -17,14 +17,18 @@ the timeline has one, with the translator's note as provenance.
 from __future__ import annotations
 
 import html
+import json
 import re
 import uuid
-from collections.abc import AsyncIterator
+from collections import Counter
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any, ClassVar
 
 import httpx
+import structlog
 
 from codify.acquisition.base import (
     AcquiredDocument,
@@ -34,6 +38,7 @@ from codify.acquisition.base import (
     DocumentRef,
     GazetteRef,
 )
+from codify.acquisition.index import write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_work_uri, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config
@@ -42,6 +47,8 @@ from codify.lang import normalise_digits
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
 DOC_PATH = "/ocs-api/public/doc/getLawDoc"
 GAZETTE_NAME = "ราชกิจจานุเบกษา"
+
+logger = structlog.get_logger(__name__)
 
 
 def user_agent() -> str:
@@ -248,8 +255,10 @@ class OcsAcquirer(BaseAcquirer):
             upstream_metadata=upstream,
         )
 
-    async def search(self, keyword: str, *, page: int, per_page: int = 50) -> dict[str, Any]:
-        """One page of the public search over law titles in force."""
+    async def search(
+        self, keyword: str, *, page: int, per_page: int = 50, states: str = "01,02"
+    ) -> dict[str, Any]:
+        """One page of the public search over law titles; `states` "" is every state."""
         form = {
             "query[letter]": "",
             "query[tab_type]": "law",
@@ -260,7 +269,7 @@ class OcsAcquirer(BaseAcquirer):
             "query[sublaw]": "0",
             "query[synonyms]": "0",
             "query[lawCategoryName]": "",
-            "query[stateName]": "01,02",
+            "query[stateName]": states,
             "query[year]": "",
             "query[onlyMatchChild]": "1",
             "pagination[page]": str(page),
@@ -306,12 +315,118 @@ class OcsAcquirer(BaseAcquirer):
             page += 1
 
 
+def index_entry(hit: dict[str, Any]) -> dict[str, Any]:
+    """One search hit as an index entry, with the subordinate laws listed under it."""
+    return {
+        "law_code": str(hit.get("lawCode") or ""),
+        "timeline_id": str(hit.get("encTimelineID") or ""),
+        "title": strip_marks(str(hit.get("lawNameTh") or "")),
+        "year": int(hit.get("year") or 0),
+        "state": str(hit.get("state") or ""),
+        "english": bool(hit.get("lawEn")),
+        "children": [
+            {
+                "type": strip_marks(str(group.get("name") or "")),
+                "title": strip_marks(str(item.get("title") or "")),
+                "timeline_id": str(item.get("encTimelineID") or ""),
+                "date": str(item.get("date") or ""),
+                "state": str(item.get("state") or ""),
+                "english": bool(item.get("lawEn")),
+            }
+            for group in hit.get("childrens") or []
+            for item in group.get("items") or []
+        ],
+    }
+
+
+class IndexMoved(RuntimeError):
+    """The catalogue's total changed mid-walk, so its pages shifted under us."""
+
+
+def _index_payload(
+    entries: dict[str, dict[str, Any]],
+    total: int,
+    per_page: int,
+    done: int,
+    *,
+    complete: bool,
+) -> dict[str, Any]:
+    laws = list(entries.values())
+    children = {c["timeline_id"]: c for e in laws for c in e["children"] if c["timeline_id"]}
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "base_url": SEARCH_URL,
+        "total": total,
+        "per_page": per_page,
+        "pages_done": done,
+        # False on every checkpoint; a reader must not sample a build still running.
+        "complete": complete,
+        "entries": laws,
+        "stats": {
+            "laws": len(laws),
+            "missing": total - len(laws),
+            "children": len(children),
+            "child_types": dict(Counter(c["type"] for c in children.values())),
+            "states": dict(Counter(e["state"] for e in laws)),
+            "english": sum(e["english"] for e in laws),
+        },
+    }
+
+
+async def build_index(
+    acquirer: OcsAcquirer,
+    *,
+    per_page: int = 50,
+    checkpoint: Path | None = None,
+    resume: bool = False,
+    on_progress: Callable[[int, int, int], None] | None = None,
+) -> dict[str, Any]:
+    """Walk every page of the unfiltered search, every state included. With
+    `checkpoint` the payload is written after each page; with `resume` a build
+    there over the same total and page size continues where it stopped."""
+    first = await acquirer.search("", page=1, per_page=per_page, states="")
+    meta = first.get("meta") or {}
+    total, pages = int(meta.get("total") or 0), int(meta.get("pages") or 0)
+    entries: dict[str, dict[str, Any]] = {}
+    page = 1
+    if resume and checkpoint is not None and checkpoint.exists():
+        prior = json.loads(checkpoint.read_text())
+        if prior.get("total") == total and prior.get("per_page") == per_page:
+            entries = {e["law_code"]: e for e in prior.get("entries") or []}
+            page = int(prior.get("pages_done") or 0) + 1
+            logger.info("ocs_index_resumed", page=page, laws=len(entries))
+        else:
+            logger.info("ocs_index_restarted", was=prior.get("total"), now=total)
+    data: dict[str, Any] | None = first if page == 1 else None
+    while page <= pages:
+        data = data or await acquirer.search("", page=page, per_page=per_page, states="")
+        now = int((data.get("meta") or {}).get("total") or 0)
+        if now != total:
+            raise IndexMoved(f"catalogue total moved from {total} to {now} at page {page}")
+        for hit in data.get("data") or []:
+            entry = index_entry(hit)
+            if entry["law_code"] and entry["timeline_id"]:
+                entries.setdefault(entry["law_code"], entry)
+        if checkpoint is not None:
+            write_index(
+                checkpoint,
+                _index_payload(entries, total, per_page, page, complete=False),
+            )
+        if on_progress is not None:
+            on_progress(page, pages, len(entries))
+        page, data = page + 1, None
+    return _index_payload(entries, total, per_page, pages, complete=True)
+
+
 __all__ = [
     "GAZETTE_NAME",
+    "IndexMoved",
     "OcsAcquirer",
     "OcsItemMissing",
     "TIMELINE_KINDS",
+    "build_index",
     "gazette_ref",
+    "index_entry",
     "render_text",
     "section_text",
     "timelines",
