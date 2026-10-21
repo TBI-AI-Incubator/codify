@@ -11,6 +11,7 @@ from codify.acquisition.adapters import (
     es,  # noqa: F401  (registers gazette_xml)
     eu,  # noqa: F401  (registers eurlex_cellar)
     rs,  # noqa: F401  (registers paragraf_propisi)
+    th,  # noqa: F401  (registers json_portal)
     ua,  # noqa: F401  (registers html_portal)
 )
 from codify.acquisition.adapters.akn_native import AknNativeAcquirer

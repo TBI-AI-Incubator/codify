@@ -3544,7 +3544,8 @@
               "paragraf_propisi",
               "sparql",
               "bulk_xml_archive",
-              "gazette_xml"
+              "gazette_xml",
+              "json_portal"
             ],
             "title": "Kind",
             "type": "string"
