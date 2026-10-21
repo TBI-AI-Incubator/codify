@@ -13,13 +13,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from lxml import etree
-
 from codify.acquisition.adapters.th.ocs import section_text
-from codify.akn import parse_xml
 from codify.akn.bluebell import bluebell_to_akn
 from codify.lang import normalise_digits
-from codify.pipeline.formats.akn_native import canonicalise_identification
+from codify.pipeline.enrich.cobalt import set_work_uri
 
 PREFACE = {"1", "2"}
 PREAMBLE = {"3", "17"}
@@ -193,12 +190,17 @@ def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
         elif kind in PROVISIONS:
             got = _numbered(unit, "(?:มาตรา|ข้อ)")
             labelled = re.search(rf"{_NUM}(?:\s+\S+)?$", str(unit.get("sectionLabel") or ""))
-            if got is None:
-                if labelled is None:
-                    # A lone unnumbered provision is printed as prose; so it stays.
-                    body += [f"{pad}{x}" for x in lines]
-                    continue
+            ranged = " ถึง " in f" {unit.get('sectionLabel') or ''} "
+            if got is None and labelled is not None and not ranged:
                 got = (labelled.group(0), section_text(_IMG.sub("", _html(unit))), "")
+            if got is None or ranged:
+                # A lone unnumbered provision, or a range repealed together
+                # ("มาตรา 4 ถึง 8"), is printed as prose; so it stays.
+                said = (
+                    [escape(str(unit.get("sectionLabel") or ""))] if ranged and got is None else []
+                )
+                body += [f"{pad}{x}" for x in said + lines]
+                continue
             body.append(f"{pad}SEC {got[0]}")
             label = got[2]
             body += [f"{pad}  {x}" for x in _render(_without_label(_stream(_html(unit)), label))]
@@ -250,13 +252,8 @@ def to_akn(
     if errors:
         e = errors[0]
         raise UnmappedUnit(f"Bluebell rejected line {e.line}:{e.column}: {e.message}")
-    root = parse_xml(canonicalise_identification(akn, work, expression))
-    for level, day in (("FRBRWork", published), ("FRBRExpression", as_of)):
-        for node in root.iterfind(
-            f"./{{*}}*/{{*}}meta/{{*}}identification/{{*}}{level}/{{*}}FRBRdate"
-        ):
-            node.set("date", day)
-    return str(etree.tostring(root, encoding="unicode"))
+    # Every component's identity, manifestation and attachments included.
+    return set_work_uri(akn, work, expression, as_of) or akn
 
 
 __all__ = ["UnmappedUnit", "escape", "to_akn", "to_bluebell"]

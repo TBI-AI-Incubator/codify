@@ -1036,3 +1036,38 @@ def test_the_failures_report_sits_beside_a_relative_crawl_dir(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     assert failures_path(Path(".")) == tmp_path.resolve().parent / f"{tmp_path.name}-failures.json"
+
+
+def test_a_range_repealed_together_stays_one_line_not_one_section() -> None:
+    units = [
+        _unit(1, "4", "<p>มาตรา ๓ ก</p>", "มาตรา 3"),
+        _unit(2, "4", "<p>(ยกเลิก)</p>", "มาตรา 4 ถึง 8"),
+        _unit(3, "4", "<p>มาตรา ๙ ถึง มาตรา ๑๒ (ยกเลิก)</p>", "มาตรา 9 ถึง มาตรา 12"),
+    ]
+    root = _akn(units)
+    assert _x(root, "//a:section/a:num/text()") == ["๓"]
+    assert _x(root, "//a:body/a:hcontainer//a:p/text()") == [
+        "มาตรา 4 ถึง 8",
+        "(ยกเลิก)",
+        "มาตรา ๙ ถึง มาตรา ๑๒ (ยกเลิก)",
+    ]
+
+
+def test_every_component_names_the_work_and_expression() -> None:
+    units = [
+        _unit(1, "4", "<p>มาตรา ๑ ก</p>"),
+        _unit(2, "1", "<p>พระราชบัญญัติแก้ไข</p>"),
+        _unit(3, "4", "<p>มาตรา ๑ ข</p>"),
+    ]
+    root = _akn(units)
+    works = _x(root, "//a:FRBRWork/a:FRBRthis/@value")
+    expressions = _x(root, "//a:FRBRExpression/a:FRBRthis/@value")
+    manifestations = _x(root, "//a:FRBRManifestation/a:FRBRthis/@value")
+    assert len(works) > 1, "the attachment carries its own identification"
+    assert all(w.startswith("/akn/th/act/2001/t-1") for w in works)
+    assert all(e.startswith("/akn/th/act/2001/t-1/tha@2010-05-02") for e in expressions)
+    assert all(m.startswith("/akn/th/act/2001/t-1/tha@2010-05-02") for m in manifestations)
+    assert set(_x(root, "//a:FRBRExpression/a:FRBRdate/@date")) == {"2010-05-02"}
+    assert set(_x(root, "/a:akomaNtoso/*/a:meta/a:identification/a:FRBRWork/a:FRBRdate/@date")) == {
+        "2001-01-02"
+    }
