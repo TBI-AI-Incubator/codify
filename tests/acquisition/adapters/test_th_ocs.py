@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from lxml import etree
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, registered_kinds
 from codify.acquisition.adapters.th.ocs import (
+    LAW_CODE_IDENTITY,
     IndexEmpty,
     IndexMoved,
     OcsAcquirer,
@@ -23,11 +25,13 @@ from codify.acquisition.adapters.th.ocs import (
     dump_name,
     failures_path,
     index_entry,
+    law_code_number,
     section_text,
 )
 from codify.acquisition.adapters.th.ocs_akn import UnmappedUnit, to_akn, to_bluebell
 from codify.acquisition.base import DiscoveryQuery
 from codify.acquisition.politeness import PoliteTransport
+from codify.frbr import TITLE_DIGEST_PREFIX, identity_from_code
 from codify.jurisdictions import SourceAdapter, TitleIdentity
 
 
@@ -85,6 +89,9 @@ RULE = TitleIdentity(
 BASE = "tl-base"
 AMENDING = "tl-amend"
 TRANSLATED = "tl-en"
+TWIN = "tl-twin"
+TWIN_OTHER = "tl-twin-2"
+TWIN_TITLE = "พระราชบัญญัติแฝด พ.ศ. 2568"
 
 
 def _section(seq: int, type_id: str, label: str, html: str) -> dict[str, Any]:
@@ -138,15 +145,20 @@ def _gazette_note(published: str) -> str:
 
 
 def _doc(
-    title: str, type_id: str, published: str, timelines: list[dict[str, Any]]
+    title: str,
+    type_id: str,
+    published: str,
+    timelines: list[dict[str, Any]],
+    *,
+    law: str = "ก0001-1B-0001",
 ) -> dict[str, Any]:
     return {
         "respHeader": {"errorCode": "SUCCESS"},
         "respBody": {
             "lawInfo": {
                 "timelineTypeId": type_id,
-                "timelineLawCode": "ก0001-1B-0001-xx",
-                "lawCode": "ก0001-1B-0001",
+                "timelineLawCode": f"{law}-xx",
+                "lawCode": law,
                 "lawNameTh": title,
                 "lawNameEn": "TEST ACT",
                 "stateId": "01",
@@ -188,6 +200,21 @@ _DOCS = {
         ],
     ),
     (TRANSLATED, True): _ENGLISH,
+    # Two laws one title names: the source tells them apart by law code alone.
+    (TWIN, False): _doc(
+        TWIN_TITLE,
+        "4",
+        "2025-05-15",
+        [_timeline(TWIN, "4", "ร0006-2A-0036-00", "2025-05-15")],
+        law="ร0006-2A-0036",
+    ),
+    (TWIN_OTHER, False): _doc(
+        TWIN_TITLE,
+        "4",
+        "2025-11-28",
+        [_timeline(TWIN_OTHER, "4", "ร0006-2A-0064-00", "2025-11-28")],
+        law="ร0006-2A-0064",
+    ),
 }
 
 
@@ -195,13 +222,13 @@ def _adapter() -> SourceAdapter:
     return SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=12)
 
 
-def _ref(timeline_id: str) -> DocumentRef:
+def _ref(timeline_id: str, **extra: str) -> DocumentRef:
     return DocumentRef(
         jurisdiction_code="th",
         doctype="act",
         year=2001,
         number="ก0001-1B-0001",
-        extra={"timeline_id": timeline_id},
+        extra={"timeline_id": timeline_id, **extra},
     )
 
 
@@ -216,12 +243,12 @@ def _handler(seen: list[dict[str, Any]]) -> Any:
     return handle
 
 
-async def _fetch(timeline_id: str) -> tuple[Any, list[dict[str, Any]]]:
+async def _fetch(timeline_id: str, **extra: str) -> tuple[Any, list[dict[str, Any]]]:
     seen: list[dict[str, Any]] = []
     client = httpx.AsyncClient(transport=httpx.MockTransport(_handler(seen)))
     try:
         acquirer = OcsAcquirer(_adapter(), client=client, title_rule=RULE)
-        return await acquirer.fetch(_ref(timeline_id)), seen
+        return await acquirer.fetch(_ref(timeline_id, **extra)), seen
     finally:
         await client.aclose()
 
@@ -1071,3 +1098,52 @@ def test_every_component_names_the_work_and_expression() -> None:
     assert set(_x(root, "/a:akomaNtoso/*/a:meta/a:identification/a:FRBRWork/a:FRBRdate/@date")) == {
         "2001-01-02"
     }
+
+
+async def test_laws_one_title_names_are_two_works_by_their_law_codes() -> None:
+    by_title = {(await _fetch(t))[0].frbr_work_uri for t in (TWIN, TWIN_OTHER)}
+    assert len(by_title) == 1
+    first, _ = await _fetch(TWIN, identity=LAW_CODE_IDENTITY)
+    second, _ = await _fetch(TWIN_OTHER, identity=LAW_CODE_IDENTITY)
+    assert first.frbr_work_uri == f"/akn/th/act/2025/{identity_from_code('ร0006-2A-0036')}"
+    assert second.frbr_work_uri == f"/akn/th/act/2025/{identity_from_code('ร0006-2A-0064')}"
+    assert first.frbr_work_uri != second.frbr_work_uri
+    assert first.expression_uri == f"{first.frbr_work_uri}/tha@2025-05-15"
+    root = etree.fromstring(first.primary().content)
+    assert root.xpath("string(//a:FRBRWork/a:FRBRuri/@value)", namespaces=_AKN) == (
+        first.frbr_work_uri
+    )
+
+
+async def test_a_law_not_asked_for_by_code_keeps_its_title_uri() -> None:
+    """The URI this law took before law-code identities existed."""
+    doc, _ = await _fetch(BASE)
+    assert doc.frbr_work_uri == "/akn/th/act/2001/t-907299549cfc"
+
+
+async def test_an_amending_text_asked_for_by_code_takes_its_own_timelines_code() -> None:
+    """Its text is another act's, so the law's own code would file it as the law's text."""
+    base, _ = await _fetch(BASE, identity=LAW_CODE_IDENTITY)
+    amending, _ = await _fetch(AMENDING, identity=LAW_CODE_IDENTITY)
+    assert base.frbr_work_uri == f"/akn/th/act/2001/{identity_from_code('ก0001-1B-0001')}"
+    assert amending.frbr_work_uri == (f"/akn/th/act/2010/{identity_from_code('ก0001-1B-0001-xx')}")
+
+
+async def test_an_identity_the_acquirer_does_not_know_is_refused() -> None:
+    with pytest.raises(ValueError, match="unknown identity 'lawcode'"):
+        await _fetch(TWIN, identity="lawcode")
+
+
+def test_a_law_code_number_is_a_digest_of_the_code_however_its_digits_are_written() -> None:
+    number = law_code_number({"timelineTypeId": "4", "lawCode": "ร0006-2A-0036"})
+    assert re.fullmatch(r"l-[0-9a-f]{12}", number)
+    assert number == law_code_number({"timelineTypeId": "4", "lawCode": " ร๐๐๐๖-2A-๐๐๓๖ "})
+    assert number != law_code_number({"timelineTypeId": "4", "lawCode": "ร0006-2A-0064"})
+    assert not number.startswith(TITLE_DIGEST_PREFIX)
+
+
+def test_a_document_naming_no_law_code_has_no_law_code_number() -> None:
+    with pytest.raises(OcsItemMissing, match="names no law code"):
+        law_code_number({"timelineId": "x", "timelineTypeId": "4", "lawCode": " "})
+    with pytest.raises(OcsItemMissing, match="names no law code"):
+        law_code_number({"timelineId": "x", "timelineTypeId": "2", "lawCode": "ก0001-1B-0001"})

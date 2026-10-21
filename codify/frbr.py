@@ -47,6 +47,10 @@ DRAFT_PREFIX = "draft-"
 #: above, and no shape a stated number or a content address can take.
 TITLE_DIGEST_PREFIX = "t-"
 
+#: Namespace of an identity from the code a source files a law under, for laws
+#: whose titles do not tell them apart.
+SOURCE_CODE_DIGEST_PREFIX = "l-"
+
 
 _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
 
@@ -220,6 +224,16 @@ def identity_from_title(title: str, rule: TitleIdentity) -> TitleDerivedIdentity
     return TitleDerivedIdentity(
         segment=f"{TITLE_DIGEST_PREFIX}{digest}", body=canonical, edition=edition, year=year
     )
+
+
+def identity_from_code(code: str) -> str:
+    """A citable segment from a source's own code for a law; "" for no code. A
+    digest, as a title's is, so no character of the code's script reaches the URI."""
+    folded = normalise_digits(code).strip()
+    if not folded:
+        return ""
+    digest = hashlib.sha256(folded.encode()).hexdigest()[:SLUG_DIGEST_CHARS]
+    return f"{SOURCE_CODE_DIGEST_PREFIX}{digest}"
 
 
 def law_number_token(value: object) -> str:
