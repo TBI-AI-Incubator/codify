@@ -41,7 +41,7 @@ BODY_KINDS = PROVISIONS | set(GROUPS) | CROSSHEADINGS | PROSE
 _DIGIT = "[0-9๐-๙]"
 _NUM = rf"{_DIGIT}+(?:/{_DIGIT}+)?"
 _GROUP_TERM = r"(?:บรรพ|ภาค|ลักษณะ|หมวด|ส่วน)(?:ที่)?"
-_IMG = re.compile(r"<img\b[^>]*?\bsrc=\"([^\"\s]+)\"[^>]*>", re.IGNORECASE)
+_IMG = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']([^\"'\s]+)[\"'][^>]*>", re.IGNORECASE)
 # Every character an inline marker can start with; Bluebell takes `\` before any.
 _MARKER_CHAR = re.compile(r"([*/_{}\[\]^\\])")
 _KEYWORD_START = re.compile(r"^[A-Z]{2,}")
@@ -120,7 +120,8 @@ def _segments(units: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
             segments.append([])
             in_body = False
         segments[-1].append(unit)
-        in_body = in_body or _kind(unit) in BODY_KINDS
+        # Past its title and promulgation a law has begun, numbered or not.
+        in_body = in_body or _kind(unit) not in PREFACE
     return segments
 
 

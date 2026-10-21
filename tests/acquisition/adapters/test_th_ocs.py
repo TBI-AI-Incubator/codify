@@ -984,3 +984,38 @@ async def test_index_walks_again_from_a_checkpoint_that_ended_short(tmp_path: An
         True,
         ["a", "b", "c"],
     )
+
+
+async def test_a_resumed_index_keeps_the_hits_it_dropped(tmp_path: Any) -> None:
+    out = tmp_path / "index.json"
+    prior = {
+        "total": 3,
+        "per_page": 2,
+        "pages_done": 1,
+        "entries": [index_entry(_hit("a"))],
+        "stats": {"dropped_hits": 2},
+    }
+    out.write_text(json.dumps(prior))
+    payload = await _build(_catalogue(_PAGES, {}), checkpoint=out, resume=True)
+    assert payload["stats"]["dropped_hits"] == 2
+
+
+def test_an_image_is_kept_however_its_source_is_quoted() -> None:
+    html = "<p>มาตรา ๑ ตามแบบ</p><p><img alt='x' src = 'data:image/png;base64,BB'></p>"
+    root = _akn([_unit(1, "4", html, "มาตรา 1")])
+    assert root.xpath("//a:section//a:img/@src", namespaces=_AKN) == ["data:image/png;base64,BB"]
+
+
+def test_a_law_without_sections_is_still_split_from_one_appended_after_it() -> None:
+    for kind in ("17", "3"):
+        units = [
+            _unit(1, "1", "<p>ประกาศหลัก</p>"),
+            _unit(2, kind, "<p>ให้ใช้ความนี้</p>"),
+            _unit(3, "19", "<p>ประกาศ ณ วันที่</p>"),
+            _unit(4, "1", "<p>ประกาศแก้ไข</p>"),
+            _unit(5, "4", "<p>มาตรา ๑ แก้ไข</p>"),
+        ]
+        root = _akn(units)
+        assert _x(root, "//a:body//a:p/text()") == ["ให้ใช้ความนี้"], kind
+        assert _x(root, "//a:attachments//a:heading//text()") == ["ประกาศแก้ไข"], kind
+        assert root.xpath("//a:body//a:section", namespaces=_AKN) == [], kind

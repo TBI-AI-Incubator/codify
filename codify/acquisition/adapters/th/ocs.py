@@ -567,6 +567,7 @@ async def build_index(
         exhausted = int(prior.get("pages_done") or 0) >= pages
         if prior.get("total") == total and prior.get("per_page") == per_page and not exhausted:
             entries = {e["law_code"]: e for e in prior.get("entries") or []}
+            dropped = int((prior.get("stats") or {}).get("dropped_hits") or 0)
             page = int(prior.get("pages_done") or 0) + 1
             logger.info("ocs_index_resumed", page=page, laws=len(entries))
         else:
