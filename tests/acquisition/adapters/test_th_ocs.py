@@ -732,8 +732,22 @@ def test_the_akn_is_dated_as_the_work_and_expression_it_names() -> None:
 def test_enabling_words_are_the_body_of_a_decree_with_nothing_else() -> None:
     units = [_unit(1, "1", "<p>พระราชกฤษฎีกาเรียกประชุม</p>"), _unit(2, "17", "<p>ให้เรียกประชุม</p>")]
     assert _x(_akn(units), "//a:body//a:p/text()") == ["ให้เรียกประชุม"]
-    announced = [_unit(1, "1", "<p>ประกาศคณะ</p>"), _unit(2, "3", "<p>ให้ยกเลิกการห้าม</p>")]
-    assert _x(_akn(announced), "//a:body//a:p/text()") == ["ให้ยกเลิกการห้าม"]
+    announced = [
+        _unit(1, "1", "<p>ประกาศคณะ</p>"),
+        _unit(2, "3", "<p>ให้ยกเลิกการห้าม</p>"),
+        _unit(3, "3", "<p>ตั้งแต่บัดนี้</p>"),
+    ]
+    assert _x(_akn(announced), "//a:body//a:p/text()") == ["ให้ยกเลิกการห้าม", "ตั้งแต่บัดนี้"]
+    # With enabling words, those are the body and the preamble stays a preamble.
+    decree = [
+        _unit(1, "1", "<p>พระราชกฤษฎีกา</p>"),
+        _unit(2, "3", "<p>มีพระบรมราชโองการ</p>"),
+        _unit(3, "17", "<p>อาศัยอำนาจ</p>"),
+        _unit(4, "17", "<p>ให้เรียกประชุม</p>"),
+    ]
+    root = _akn(decree)
+    assert _x(root, "//a:body//a:p/text()") == ["อาศัยอำนาจ", "ให้เรียกประชุม"]
+    assert _x(root, "//a:preamble//a:p/text()") == ["มีพระบรมราชโองการ"]
 
 
 def test_an_unnumbered_provision_is_prose_and_a_labelled_one_takes_its_label() -> None:
@@ -937,6 +951,11 @@ def test_a_pointer_to_the_gazette_site_is_no_text() -> None:
     }
     assert not holds_text(stub)
     assert not holds_text({"lawSections": []})
+    empty = {"lawSections": [_unit(1, "1", "<p>ชื่อ</p>"), _unit(2, "4", "<p><span> </span></p>")]}
+    assert not holds_text(empty)
+    assert holds_text(
+        {"lawSections": [_unit(1, "20", '<p><img src="data:image/png;base64,AA"></p>')]}
+    )
     assert holds_text({"lawSections": [_unit(1, "4", "<p>มาตรา ๑ ก</p>")]})
 
 
@@ -954,3 +973,14 @@ async def test_fetch_dates_the_work_by_the_laws_own_gazette_note() -> None:
     finally:
         await client.aclose()
     assert got.frbr_work_uri.startswith("/akn/th/act/2001/t-")
+
+
+async def test_index_walks_again_from_a_checkpoint_that_ended_short(tmp_path: Any) -> None:
+    out = tmp_path / "index.json"
+    short = {"total": 3, "per_page": 2, "pages_done": 2, "entries": [index_entry(_hit("a"))]}
+    out.write_text(json.dumps(short))
+    payload = await _build(_catalogue(_PAGES, {}), checkpoint=out, resume=True)
+    assert (payload["complete"], [e["law_code"] for e in payload["entries"]]) == (
+        True,
+        ["a", "b", "c"],
+    )

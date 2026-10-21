@@ -153,20 +153,23 @@ def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
     depth = 0  # indent of the next provision, under the open groups
     open_levels: list[int] = []
     last_body = max((i for i, u in enumerate(main) if _kind(u) in BODY_KINDS), default=-1)
-    # A decree or announcement whose whole operative text is its preamble has no other body.
-    enacting_is_body = last_body < 0
+    # A decree or announcement whose whole operative text is its preamble has no other
+    # body: its enabling words where it has them, else its preamble.
+    enacting = (
+        ({"17"} if any(_kind(u) == "17" for u in main) else {"3"}) if last_body < 0 else set()
+    )
     for i, unit in enumerate(main):
         kind = _kind(unit)
         lines = _lines(_html(unit))
         if not lines:
             continue
         pad = "  " * (depth + 1)
-        if kind in PREFACE | PREAMBLE and body:
+        if kind in enacting:
+            body += [f"{pad}{x}" for x in lines]
+        elif kind in PREFACE | PREAMBLE and body:
             conclusions += lines
         elif kind in PREFACE:
             preface += lines
-        elif kind in PREAMBLE and enacting_is_body:
-            body += [f"{pad}{x}" for x in lines]
         elif kind in PREAMBLE:
             preamble += lines
         elif kind in GROUPS:

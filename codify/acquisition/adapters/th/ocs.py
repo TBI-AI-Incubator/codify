@@ -120,8 +120,13 @@ _GAZETTE_SITE = "ratchakitcha.soc.go.th"
 def holds_text(payload: dict[str, Any]) -> bool:
     """Whether the source holds the law's text. Some laws it holds only as a scan
     (no units), others only as a pointer to the Gazette's own site."""
-    units = [u for u in payload.get("lawSections") or [] if str(u.get("sectionTypeId")) != "1"]
-    return any(_GAZETTE_SITE not in section_text(u.get("sectionContent") or "") for u in units)
+    for unit in payload.get("lawSections") or []:
+        html_ = str(unit.get("sectionContent") or "")
+        text = section_text(html_)
+        if str(unit.get("sectionTypeId")) != "1" and _GAZETTE_SITE not in text:
+            if text or "<img" in html_.lower():
+                return True
+    return False
 
 
 def render_text(sections: list[dict[str, Any]]) -> str:
@@ -558,7 +563,9 @@ async def build_index(
     page = 1
     if resume and checkpoint is not None and checkpoint.exists():
         prior = json.loads(checkpoint.read_text())
-        if prior.get("total") == total and prior.get("per_page") == per_page:
+        # A checkpoint that walked every page and still fell short is walked again.
+        exhausted = int(prior.get("pages_done") or 0) >= pages
+        if prior.get("total") == total and prior.get("per_page") == per_page and not exhausted:
             entries = {e["law_code"]: e for e in prior.get("entries") or []}
             page = int(prior.get("pages_done") or 0) + 1
             logger.info("ocs_index_resumed", page=page, laws=len(entries))
