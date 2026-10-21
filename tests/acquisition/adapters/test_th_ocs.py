@@ -439,6 +439,33 @@ async def test_crawl_records_a_missing_timeline_and_stops_on_a_failing_streak(
         await client.aclose()
 
 
+async def test_crawl_counts_only_failures_in_a_row(tmp_path: Any) -> None:
+    index = {"entries": [{"timeline_id": t} for t in ("gone-1", BASE, "gone-2", AMENDING)]}
+    result = await _crawl_index(tmp_path / "raw", index, stop_after_failures=2)
+    assert sorted(result["failures"]) == [dump_name("gone-1"), dump_name("gone-2")]
+
+
+async def test_crawl_fetches_a_timeline_two_documents_list_once(tmp_path: Any) -> None:
+    seen: list[dict[str, Any]] = []
+    # BASE and AMENDING list each other; each is fetched once.
+    index = {"entries": [{"timeline_id": BASE}, {"timeline_id": AMENDING}]}
+    await _crawl_index(tmp_path / "raw", index, seen=seen, kinds=frozenset({"amending", "current"}))
+    assert _asked(seen) == [(BASE, False), (AMENDING, False)]
+
+
+async def _crawl_index(
+    out: Any, index: dict[str, Any], *, seen: list[dict[str, Any]] | None = None, **kw: Any
+) -> dict[str, Any]:
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(_handler([] if seen is None else seen))
+    )
+    try:
+        acquirer = OcsAcquirer(_adapter(), client=client, title_rule=RULE)
+        return await crawl(acquirer, index, out, **kw)
+    finally:
+        await client.aclose()
+
+
 def test_dump_names_are_safe_filenames() -> None:
     assert dump_name("a/b+c==") == "a_b-c==.json"
     assert dump_name("a/b", english=True) == "a_b.en.json"
