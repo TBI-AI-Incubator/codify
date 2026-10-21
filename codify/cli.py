@@ -580,8 +580,8 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
 def _run_index_legislation_gov_uk(args: argparse.Namespace) -> int:
     """Walk the publisher's feeds for every type token the jurisdiction declares."""
     from codify.acquisition import selected_adapter
-    from codify.acquisition.adapters.legislation_gov_uk import build_index, write_index
-    from codify.acquisition.index import index_path
+    from codify.acquisition.adapters.legislation_gov_uk import build_index
+    from codify.acquisition.index import index_path, write_index
     from codify.acquisition.politeness import make_polite_client
     from codify.frbr import token_family
     from codify.jurisdictions import load_config
