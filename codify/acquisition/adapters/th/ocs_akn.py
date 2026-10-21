@@ -80,7 +80,7 @@ def _numbered(unit: dict[str, Any], term: str) -> tuple[str, str] | None:
     tokens = str(unit.get("sectionLabel") or "").split()
     suffix = tokens[2] if len(tokens) > 2 and tokens[2] != "ถึง" else ""
     text = section_text(_IMG.sub("", _html(unit)))
-    for tail in ([rf"\s*{re.escape(suffix)}(?=\s|$)"] if suffix else []) + [""]:
+    for tail in ([rf"\s*{re.escape(suffix)}"] if suffix else []) + [""]:
         m = re.match(rf"^{term}\s*({_NUM}{tail})", text)
         if m:
             return " ".join(m.group(1).split()), text[m.end(1) :].strip()
