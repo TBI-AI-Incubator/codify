@@ -9,9 +9,10 @@ Gazette and amendment footnotes, plus every timeline of the law:
 
 The work URI is the title-derived identity the `th` config declares, so an Act
 lands on the work an earlier ingest minted and an amending Act, whose title
-carries its edition, on its own. The primary body is the Thai text in unit
-order, for the structuring lane; an English translation rides alongside when
-the timeline has one, with the translator's note as provenance.
+carries its edition, on its own. A ref may ask for the law-code identity
+instead, for laws whose titles do not tell them apart. The primary body is the
+Thai text in unit order, for the structuring lane; an English translation rides
+alongside when the timeline has one, with the translator's note as provenance.
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ from codify.acquisition.base import (
 from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.calendar import local_date_from_text
-from codify.frbr import build_frbr_work_uri, identity_from_title
+from codify.frbr import build_frbr_work_uri, identity_from_code, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config, try_load_config
 from codify.lang import normalise_digits
 
@@ -194,6 +195,20 @@ def strip_marks(text: str) -> str:
     return html.unescape(_TAG.sub("", text or "")).strip()
 
 
+# The `ref.extra["identity"]` asking for a work by law code, not by title.
+LAW_CODE_IDENTITY = "law_code"
+
+
+def law_code_number(info: dict[str, Any]) -> str:
+    """A work number from the source's code for a document: its law's, or an amending
+    text's own timeline code, since that text is another act and not the law's."""
+    amending = TIMELINE_KINDS.get(str(info.get("timelineTypeId"))) == "amending"
+    number = identity_from_code(str(info.get("timelineLawCode" if amending else "lawCode") or ""))
+    if not number:
+        raise OcsItemMissing(f"timeline {info.get('timelineId')!r} names no law code")
+    return number
+
+
 class OcsAcquirer(BaseAcquirer):
     JURISDICTION: ClassVar[str] = "th"
     DEFAULT_BASE_URL: ClassVar[str] = "https://searchlaw.ocs.go.th"
@@ -304,6 +319,10 @@ class OcsAcquirer(BaseAcquirer):
         timeline_id = ref.extra.get("timeline_id", "")
         if not timeline_id:
             raise ValueError(f"OCS ref {ref.number!r} needs extra['timeline_id']")
+        identity = ref.extra.get("identity", "")
+        if identity not in ("", LAW_CODE_IDENTITY):
+            # Read as the title, a misspelt ask would file the law on the work it shares.
+            raise ValueError(f"OCS ref {ref.number!r} asks for an unknown identity {identity!r}")
         saved = self._saved(timeline_id, english=False)
         payload = saved[0] if saved else await self._fetch_doc(timeline_id, english=False)
         info = payload["lawInfo"]
@@ -328,7 +347,8 @@ class OcsAcquirer(BaseAcquirer):
         ):
             raise OcsItemMissing(f"timeline {timeline_id!r} has no usable date")
         title = str(info.get("lawNameTh") or "")
-        number = self.work_number(title)
+        by_code = identity == LAW_CODE_IDENTITY
+        number = law_code_number(info) if by_code else self.work_number(title)
         work = build_frbr_work_uri(self.JURISDICTION, ref.doctype, published[:4], number)
         from codify.acquisition.adapters.th.ocs_akn import to_akn
         from codify.pipeline.formats.eu_directive import on_the_cpu_pool
@@ -711,6 +731,7 @@ __all__ = [
     "GAZETTE_NAME",
     "IndexEmpty",
     "IndexMoved",
+    "LAW_CODE_IDENTITY",
     "OcsAcquirer",
     "OcsItemMissing",
     "SourceDown",
@@ -726,6 +747,7 @@ __all__ = [
     "publication_date",
     "index_entry",
     "index_timelines",
+    "law_code_number",
     "render_text",
     "section_text",
     "timelines",
