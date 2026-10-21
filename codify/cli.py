@@ -660,6 +660,46 @@ def _run_index_ocs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_crawl_ocs(args: argparse.Namespace) -> int:
+    """Save the raw document of every timeline an OCS index lists, resumably."""
+    from codify.acquisition.adapters.th.ocs import OcsAcquirer, crawl
+    from codify.acquisition.index import index_path
+    from codify.jurisdictions import SourceAdapter
+
+    index = json.loads(Path(args.index or index_path("th")).read_text())
+    if index.get("complete") is not True:
+        print("the index is a checkpoint of a build still running", file=sys.stderr)
+        return 2
+    adapter = SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=args.rate)
+    kinds = frozenset(k.strip() for k in args.kinds.split(",") if k.strip())
+
+    def progress(done: int, total: int, tid: str) -> None:
+        if done % 50 == 0 or done == total:
+            print(f"  {done}/{total}", file=sys.stderr, flush=True)
+
+    async def run() -> dict[str, Any]:
+        acquirer = OcsAcquirer(adapter)
+        try:
+            return await crawl(
+                acquirer,
+                index,
+                Path(args.out),
+                kinds=kinds,
+                on_progress=None if args.quiet else progress,
+            )
+        finally:
+            await acquirer._client.aclose()
+
+    result = asyncio.run(run())
+    (Path(args.out) / "failures.json").write_text(json.dumps(result["failures"], indent=1))
+    print(
+        f"{args.out}: {result['timelines']} timelines, {result['fetched']} fetched, "
+        f"{len(result['failures'])} failed",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def _run_scan_corpus(args: argparse.Namespace) -> int:
     """Measure the anchor scan over a directory of raw sources."""
     from codify.quality.corpus_scan import aggregate, scan_corpus
@@ -939,6 +979,24 @@ def main(argv: list[str] | None = None) -> int:
         "--resume", action="store_true", help="continue the build at --out if its total still holds"
     )
     ocs.set_defaults(func=_run_index_ocs)
+
+    crawl_ocs = sub.add_parser(
+        "crawl-ocs", help="save the raw document of every timeline an OCS index lists"
+    )
+    crawl_ocs.add_argument("--out", required=True, help="directory for raw documents")
+    crawl_ocs.add_argument(
+        "--index", default=None, help="index JSON (default: <ACQUISITION_INDEX_DIR>/th/index.json)"
+    )
+    crawl_ocs.add_argument(
+        "--kinds",
+        default="current",
+        help="timeline kinds to follow beyond those listed: original,amending,consolidated,current",
+    )
+    crawl_ocs.add_argument(
+        "--rate", type=int, default=30, help="requests per minute, one at a time"
+    )
+    crawl_ocs.add_argument("--quiet", action="store_true", help="suppress progress")
+    crawl_ocs.set_defaults(func=_run_crawl_ocs)
 
     from codify.cli_store import register as _register_store
 

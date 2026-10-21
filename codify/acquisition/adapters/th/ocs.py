@@ -427,15 +427,100 @@ async def build_index(
     return _index_payload(entries, total, per_page, pages, complete=True)
 
 
+def dump_name(timeline_id: str, *, english: bool = False) -> str:
+    """A timeline's raw-document filename; ids are base64, so `/` and `+` are mapped."""
+    safe = timeline_id.replace("/", "_").replace("+", "-")
+    return f"{safe}.en.json" if english else f"{safe}.json"
+
+
+def _write_raw(path: Path, payload: dict[str, Any]) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False))
+    tmp.replace(path)
+
+
+def index_timelines(index: dict[str, Any]) -> list[str]:
+    """The listed timeline of every law and subordinate law, each once, in index order."""
+    ids = (
+        tid
+        for e in index.get("entries") or []
+        for tid in [e["timeline_id"], *(c["timeline_id"] for c in e.get("children") or [])]
+    )
+    return list(dict.fromkeys(t for t in ids if t))
+
+
+class SourceDown(RuntimeError):
+    """Too many fetches in a row failed; the crawl stops rather than press on."""
+
+
+async def crawl(
+    acquirer: OcsAcquirer,
+    index: dict[str, Any],
+    out: Path,
+    *,
+    kinds: frozenset[str] = frozenset({"current"}),
+    stop_after_failures: int = 20,
+    on_progress: Callable[[int, int, str], None] | None = None,
+) -> dict[str, Any]:
+    """Save the raw document of every listed timeline under `out`, then of every
+    other timeline of the `kinds` asked for, and the English of each that has one.
+    A file already there is not fetched again, so a stopped crawl resumes."""
+    out.mkdir(parents=True, exist_ok=True)
+    failures: dict[str, str] = {}
+    fetched = 0
+    streak = 0
+
+    async def save(tid: str, *, english: bool) -> dict[str, Any] | None:
+        nonlocal fetched, streak
+        path = out / dump_name(tid, english=english)
+        if path.exists():
+            return dict(json.loads(path.read_text()))
+        try:
+            payload = await acquirer._law_doc(tid, english=english)
+        except (OcsItemMissing, httpx.HTTPError) as exc:
+            failures[dump_name(tid, english=english)] = f"{type(exc).__name__}: {exc}"
+            streak += 1
+            if streak >= stop_after_failures:
+                raise SourceDown(f"{streak} fetches in a row failed; last: {exc}") from exc
+            return None
+        streak = 0
+        fetched += 1
+        _write_raw(path, payload)
+        return payload
+
+    queue = index_timelines(index)
+    seen = set(queue)
+    done = 0
+    while done < len(queue):
+        tid = queue[done]
+        done += 1
+        doc = await save(tid, english=False)
+        if on_progress is not None:
+            on_progress(done, len(queue), tid)
+        if doc is None:
+            continue
+        for t in timelines(doc):
+            if t["kind"] in kinds and t["timeline_id"] and t["timeline_id"] not in seen:
+                seen.add(t["timeline_id"])
+                queue.append(t["timeline_id"])
+            if t["timeline_id"] == tid and t["has_translation"]:
+                await save(tid, english=True)
+    return {"timelines": len(queue), "fetched": fetched, "failures": failures}
+
+
 __all__ = [
     "GAZETTE_NAME",
     "IndexMoved",
     "OcsAcquirer",
     "OcsItemMissing",
+    "SourceDown",
     "TIMELINE_KINDS",
     "build_index",
+    "crawl",
+    "dump_name",
     "gazette_ref",
     "index_entry",
+    "index_timelines",
     "render_text",
     "section_text",
     "timelines",

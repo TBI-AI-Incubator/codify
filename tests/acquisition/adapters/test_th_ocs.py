@@ -14,7 +14,10 @@ from codify.acquisition.adapters.th.ocs import (
     IndexMoved,
     OcsAcquirer,
     OcsItemMissing,
+    SourceDown,
     build_index,
+    crawl,
+    dump_name,
     index_entry,
     section_text,
 )
@@ -361,3 +364,81 @@ async def test_index_restarts_when_the_total_has_moved(tmp_path: Any) -> None:
 async def test_index_refuses_a_catalogue_that_moves_mid_walk() -> None:
     with pytest.raises(IndexMoved):
         await _build(_catalogue(_PAGES, {2: 4}))
+
+
+_INDEX = {
+    "entries": [
+        {"timeline_id": BASE, "children": [{"timeline_id": TRANSLATED}]},
+        {"timeline_id": TRANSLATED, "children": []},
+    ]
+}
+
+
+async def _crawl(out: Any, seen: list[dict[str, Any]], **kw: Any) -> dict[str, Any]:
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_handler(seen)))
+    try:
+        acquirer = OcsAcquirer(_adapter(), client=client, title_rule=RULE)
+        return await crawl(acquirer, _INDEX, out / "raw", **kw)
+    finally:
+        await client.aclose()
+
+
+def _asked(seen: list[dict[str, Any]]) -> list[tuple[str, bool]]:
+    return [(s["reqBody"]["timelineId"], s["reqBody"]["isTransEng"]) for s in seen]
+
+
+async def test_crawl_saves_each_listed_timeline_once_and_follows_only_asked_kinds(
+    tmp_path: Any,
+) -> None:
+    seen: list[dict[str, Any]] = []
+    result = await _crawl(tmp_path, seen, kinds=frozenset({"amending"}))
+    # The original (BASE-0) is a kind not asked for, so it is never fetched.
+    assert _asked(seen) == [
+        (BASE, False),
+        (TRANSLATED, False),
+        (TRANSLATED, True),
+        (AMENDING, False),
+    ]
+    assert sorted(p.name for p in (tmp_path / "raw").iterdir()) == sorted(
+        [
+            dump_name(BASE),
+            dump_name(TRANSLATED),
+            dump_name(TRANSLATED, english=True),
+            dump_name(AMENDING),
+        ]
+    )
+    assert result == {"timelines": 3, "fetched": 4, "failures": {}}
+
+
+async def test_crawl_resumes_without_fetching_what_is_saved(tmp_path: Any) -> None:
+    await _crawl(tmp_path, [], kinds=frozenset({"amending"}))
+    seen: list[dict[str, Any]] = []
+    result = await _crawl(tmp_path, seen, kinds=frozenset({"amending"}))
+    assert seen == []
+    assert result["fetched"] == 0
+
+
+async def test_crawl_records_a_missing_timeline_and_stops_on_a_failing_streak(
+    tmp_path: Any,
+) -> None:
+    index = {"entries": [{"timeline_id": "gone-1"}, {"timeline_id": BASE}]}
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_handler([])))
+    try:
+        acquirer = OcsAcquirer(_adapter(), client=client, title_rule=RULE)
+        result = await crawl(acquirer, index, tmp_path / "raw")
+        assert list(result["failures"]) == [dump_name("gone-1")]
+        assert (tmp_path / "raw" / dump_name(BASE)).exists()
+        with pytest.raises(SourceDown):
+            await crawl(
+                acquirer,
+                {"entries": [{"timeline_id": "gone-2"}, {"timeline_id": "gone-3"}]},
+                tmp_path / "raw",
+                stop_after_failures=2,
+            )
+    finally:
+        await client.aclose()
+
+
+def test_dump_names_are_safe_filenames() -> None:
+    assert dump_name("a/b+c==") == "a_b-c==.json"
+    assert dump_name("a/b", english=True) == "a_b.en.json"
