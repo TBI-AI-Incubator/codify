@@ -163,11 +163,11 @@ def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
         elif kind in PROVISIONS:
             got = _numbered(unit, "(?:มาตรา|ข้อ)")
             labelled = re.search(rf"{_NUM}(?:\s+\S+)?$", str(unit.get("sectionLabel") or ""))
-            if got is None and labelled is None:
-                # A lone unnumbered provision is printed as prose; so it stays.
-                body += [f"{pad}{x}" for x in lines]
-                continue
             if got is None:
+                if labelled is None:
+                    # A lone unnumbered provision is printed as prose; so it stays.
+                    body += [f"{pad}{x}" for x in lines]
+                    continue
                 got = (labelled.group(0), section_text(_IMG.sub("", _html(unit))))
             body.append(f"{pad}SEC {got[0]}")
             rest = [escape(x) for x in got[1].splitlines() if x]
