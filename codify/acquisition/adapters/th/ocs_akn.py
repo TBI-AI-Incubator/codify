@@ -143,7 +143,8 @@ def _attachment(segment: list[dict[str, Any]]) -> list[str]:
 def to_bluebell(units: list[dict[str, Any]], *, title: str = "") -> str:
     """Units in their stated order as one Bluebell document. `title` picks the
     segment that is the law itself; otherwise the first."""
-    segments = _segments(units)
+    # A unit with neither text nor an image places nothing, so it decides nothing.
+    segments = _segments([u for u in units if _lines(_html(u))])
     main = next((s for s in segments if title and _squash(_title(s)) == _squash(title)), None)
     main = main or segments[0]
     preface: list[str] = []

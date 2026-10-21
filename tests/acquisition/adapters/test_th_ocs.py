@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -1019,3 +1020,19 @@ def test_a_law_without_sections_is_still_split_from_one_appended_after_it() -> N
         assert _x(root, "//a:body//a:p/text()") == ["ให้ใช้ความนี้"], kind
         assert _x(root, "//a:attachments//a:heading//text()") == ["ประกาศแก้ไข"], kind
         assert root.xpath("//a:body//a:section", namespaces=_AKN) == [], kind
+
+
+def test_an_empty_provision_does_not_hide_a_preamble_only_body() -> None:
+    units = [
+        _unit(1, "1", "<p>ประกาศคณะ</p>"),
+        _unit(2, "3", "<p>ให้ยกเลิก</p>"),
+        _unit(3, "4", "<p><span> </span></p>", "มาตรา 1"),
+    ]
+    assert _x(_akn(units), "//a:body//a:p/text()") == ["ให้ยกเลิก"]
+
+
+def test_the_failures_report_sits_beside_a_relative_crawl_dir(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert failures_path(Path(".")) == tmp_path.resolve().parent / f"{tmp_path.name}-failures.json"

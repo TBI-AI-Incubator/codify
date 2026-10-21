@@ -634,6 +634,7 @@ def index_timelines(index: dict[str, Any]) -> list[str]:
 
 def failures_path(out: Path) -> Path:
     """Beside the crawl directory, so a reader of its documents never meets it."""
+    out = out.resolve()
     return out.with_name(f"{out.name}-failures.json")
 
 
