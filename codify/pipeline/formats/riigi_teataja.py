@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict
 from collections.abc import AsyncIterator
-from contextvars import ContextVar
 from html import unescape
 from pathlib import Path
 from typing import Any, cast
@@ -21,6 +20,7 @@ from lxml import html as lxml_html
 from codify.acquisition.adapters.ee.identity import read_identity
 from codify.akn._schema import AKN_NS, parse_xml, validate_akn
 from codify.akn.document import Document
+from codify.akn.eid import eid_abbrev
 from codify.akn.eids import ensure_unique_eids
 from codify.akn.io import parse_akn
 from codify.akn.vocabulary import table_row_eid
@@ -228,10 +228,12 @@ class _Blocks:
         p_eid: str | None,
         owner: etree._Element,
         owner_eid: str,
+        left_out: Counter[str],
         *,
         in_cell: bool = False,
     ) -> None:
         self.container = container
+        self.left_out = left_out
         self.p_eid = p_eid
         self.owner = owner
         self.owner_eid = owner_eid
@@ -325,15 +327,11 @@ def _layout_kind(rows: list[list[str]], spanned: bool = False) -> str | None:
     return "signed" if all(_SIGNED.search(c) for c in texts) else None
 
 
-# Tables the document being converted leaves out of its body, by kind.
-_LEFT_OUT: ContextVar[Counter[str]] = ContextVar("riigi_teataja_left_out")
-
-
-def _leave_out(rows: list[list[str]], spanned: bool = False) -> bool:
-    """Whether a table stays out of the body; one that does is counted."""
+def _leave_out(rows: list[list[str]], left_out: Counter[str], spanned: bool = False) -> bool:
+    """Whether a table stays out of the body; one that does is counted in ``left_out``."""
     kind = _layout_kind(rows, spanned)
     if kind is not None:
-        _LEFT_OUT.get(Counter())[kind] += 1
+        left_out[kind] += 1
     return kind is not None
 
 
@@ -379,13 +377,15 @@ def _write_native_table(tabel: etree._Element, w: _Blocks) -> None:
     table = w.table([[("td", tc) for tc in r] for r in rows])
     for tr, src_row in zip(table, rows, strict=True):
         for td, tc in zip(tr, src_row, strict=True):
-            cell = _Blocks(td, None, w.owner, w.owner_eid, in_cell=True)
+            cell = _Blocks(td, None, w.owner, w.owner_eid, w.left_out, in_cell=True)
             for st in tc:
                 if _local(st) not in _NOT_TEXT:
                     _write_source(st, cell)
             cell.finish()
     # Classified on the text as written, so markup inside a cell is not read.
-    if _leave_out([[" ".join("".join(td.itertext()).split()) for td in tr] for tr in table]):
+    if _leave_out(
+        [[" ".join("".join(td.itertext()).split()) for td in tr] for tr in table], w.left_out
+    ):
         w.container.remove(table)
     w.line_break()
 
@@ -441,7 +441,7 @@ def _write_html_table(src: etree._Element, w: _Blocks) -> None:
         return
     texts = [[" ".join(c.text_content().split()) for c in r] for r in rows]
     spanned = any(_span(c, k) for r in rows for c in r for k in ("colspan", "rowspan"))
-    if _leave_out(texts, spanned):
+    if _leave_out(texts, w.left_out, spanned):
         return
     for caption in src.iterchildren("caption"):
         _walk_html(caption, w)
@@ -449,7 +449,7 @@ def _write_html_table(src: etree._Element, w: _Blocks) -> None:
     table = w.table([[(c.tag.lower(), c) for c in r] for r in rows])
     for tr, src_row in zip(table, rows, strict=True):
         for td, cell_src in zip(tr, src_row, strict=True):
-            cell = _Blocks(td, None, w.owner, w.owner_eid, in_cell=True)
+            cell = _Blocks(td, None, w.owner, w.owner_eid, w.left_out, in_cell=True)
             _walk_html(cell_src, cell)
             cell.finish()
     w.line_break()
@@ -471,15 +471,18 @@ def _fill(
     p_eid: str,
     owner: etree._Element,
     owner_eid: str,
+    left_out: Counter[str],
     fallback: str = "",
 ) -> None:
-    w = _Blocks(container, p_eid, owner, owner_eid)
+    w = _Blocks(container, p_eid, owner, owner_eid, left_out)
     for src in sources:
         _write_source(src, w)
     w.finish(fallback)
 
 
 _TEXT_TAGS = frozenset({"sisuTekst", "HTMLKonteiner"})
+_INTRO = eid_abbrev("intro")
+_WRAP_UP = eid_abbrev("wrapUp")
 
 
 def _split_text(src: etree._Element, unit_tag: str | None) -> list[list[etree._Element]]:
@@ -494,7 +497,11 @@ def _split_text(src: etree._Element, unit_tag: str | None) -> list[list[etree._E
 
 
 def _fill_unit(
-    unit: etree._Element, src: etree._Element, eid: str, trailing: list[etree._Element]
+    unit: etree._Element,
+    src: etree._Element,
+    eid: str,
+    trailing: list[etree._Element],
+    left_out: Counter[str],
 ) -> None:
     """A lõige, alampunkt or punkt body and the points under it, then
     ``trailing``: text the source puts between it and the next unit."""
@@ -502,10 +509,12 @@ def _fill_unit(
     runs = _split_text(src, "alampunkt")
     if not subs:
         c = etree.SubElement(unit, _q("content"))
-        _fill(c, runs[0] + trailing, p_eid=f"{eid}__p", owner=unit, owner_eid=eid)
+        _fill(
+            c, runs[0] + trailing, p_eid=f"{eid}__p", owner=unit, owner_eid=eid, left_out=left_out
+        )
         return
     intro = etree.SubElement(unit, _q("intro"))
-    _fill(intro, runs[0], p_eid=f"{eid}__intro__p", owner=unit, owner_eid=eid)
+    _fill(intro, runs[0], p_eid=f"{eid}__{_INTRO}__p", owner=unit, owner_eid=eid, left_out=left_out)
     for ap_idx, ap in enumerate(subs, start=1):
         ap_nr = _extract_number(ap.find("{*}alampunktNr"), default=str(ap_idx))
         ap_eid = f"{eid}__point_{ap_nr}"
@@ -514,13 +523,17 @@ def _fill_unit(
         if ap_knr and ap_knr.strip():
             pt_num = etree.SubElement(pt, _q("num"))
             pt_num.text = _display_number(ap_knr)
-        _fill_unit(pt, ap, ap_eid, runs[ap_idx] if ap_idx < len(subs) else [])
+        _fill_unit(pt, ap, ap_eid, runs[ap_idx] if ap_idx < len(subs) else [], left_out)
     if tail := runs[-1] + trailing:
         wrap = etree.SubElement(unit, _q("wrapUp"))
-        _fill(wrap, tail, p_eid=f"{eid}__wrapup__p", owner=unit, owner_eid=eid)
+        _fill(
+            wrap, tail, p_eid=f"{eid}__{_WRAP_UP}__p", owner=unit, owner_eid=eid, left_out=left_out
+        )
 
 
-def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
+def _convert_paragrahv(
+    p_src: etree._Element, parent_akn: etree._Element, parent_eid: str, left_out: Counter[str]
+) -> None:
     p_nr = _extract_number(p_src.find("{*}paragrahvNr"))
     p_eid = f"{parent_eid}__art_{p_nr}" if parent_eid else f"art_{p_nr}"
     art = etree.SubElement(parent_akn, _q("article"), eId=p_eid, wId=p_eid)
@@ -542,7 +555,15 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
         c = etree.SubElement(art, _q("content"))
         mm = p_src.find("{*}muutmismarge")
         fallback = "" if before or mm is None else _clean_text(mm)
-        _fill(c, before, p_eid=f"{p_eid}__p", owner=art, owner_eid=p_eid, fallback=fallback)
+        _fill(
+            c,
+            before,
+            p_eid=f"{p_eid}__p",
+            owner=art,
+            owner_eid=p_eid,
+            left_out=left_out,
+            fallback=fallback,
+        )
         return
 
     # Single unnumbered loige: collapse only if it has NO sub-items (alampunkt)
@@ -552,13 +573,27 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
     if single_unnumbered and not single_has_points:
         own = _split_text(loiked[0], None)[0]
         c = etree.SubElement(art, _q("content"))
-        _fill(c, before + own + runs[-1], p_eid=f"{p_eid}__p", owner=art, owner_eid=p_eid)
+        _fill(
+            c,
+            before + own + runs[-1],
+            p_eid=f"{p_eid}__p",
+            owner=art,
+            owner_eid=p_eid,
+            left_out=left_out,
+        )
         return
 
     # Text the paragrahv holds beside its lõiked introduces or closes them.
     if before:
         intro = etree.SubElement(art, _q("intro"))
-        _fill(intro, before, p_eid=f"{p_eid}__intro__p", owner=art, owner_eid=p_eid)
+        _fill(
+            intro,
+            before,
+            p_eid=f"{p_eid}__{_INTRO}__p",
+            owner=art,
+            owner_eid=p_eid,
+            left_out=left_out,
+        )
 
     for l_idx, loige_el in enumerate(loiked, start=1):
         raw_l_nr = loige_el.find("{*}loigeNr")
@@ -571,14 +606,23 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
             num = etree.SubElement(para, _q("num"))
             num.text = _display_number(l_knr)
 
-        _fill_unit(para, loige_el, l_eid, runs[l_idx] if l_idx < len(loiked) else [])
+        _fill_unit(para, loige_el, l_eid, runs[l_idx] if l_idx < len(loiked) else [], left_out)
 
     if runs[-1]:
         wrap = etree.SubElement(art, _q("wrapUp"))
-        _fill(wrap, runs[-1], p_eid=f"{p_eid}__wrapup__p", owner=art, owner_eid=p_eid)
+        _fill(
+            wrap,
+            runs[-1],
+            p_eid=f"{p_eid}__{_WRAP_UP}__p",
+            owner=art,
+            owner_eid=p_eid,
+            left_out=left_out,
+        )
 
 
-def _convert_jaotis(jt_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
+def _convert_jaotis(
+    jt_src: etree._Element, parent_akn: etree._Element, parent_eid: str, left_out: Counter[str]
+) -> None:
     raw_nr = jt_src.find("{*}jaotisNr")
     if raw_nr is None:
         raw_nr = jt_src.find("{*}alljaotisNr")
@@ -601,12 +645,14 @@ def _convert_jaotis(jt_src: etree._Element, parent_akn: etree._Element, parent_e
     for child in jt_src:
         ctag = etree.QName(child).localname
         if ctag == "paragrahv":
-            _convert_paragrahv(child, subsec, jt_eid)
+            _convert_paragrahv(child, subsec, jt_eid, left_out)
         elif ctag in {"jaotis", "alljaotis"}:
-            _convert_jaotis(child, subsec, jt_eid)
+            _convert_jaotis(child, subsec, jt_eid, left_out)
 
 
-def _convert_jagu(j_src: etree._Element, parent_akn: etree._Element, parent_eid: str) -> None:
+def _convert_jagu(
+    j_src: etree._Element, parent_akn: etree._Element, parent_eid: str, left_out: Counter[str]
+) -> None:
     raw_nr = j_src.find("{*}jaguNr")
     j_nr = _extract_number(raw_nr)
     j_eid = f"{parent_eid}__sec_{j_nr}" if parent_eid else f"sec_{j_nr}"
@@ -625,13 +671,13 @@ def _convert_jagu(j_src: etree._Element, parent_akn: etree._Element, parent_eid:
     for child in j_src:
         ctag = etree.QName(child).localname
         if ctag == "paragrahv":
-            _convert_paragrahv(child, sec, j_eid)
+            _convert_paragrahv(child, sec, j_eid, left_out)
         elif ctag in {"jaotis", "alljaotis"}:
-            _convert_jaotis(child, sec, j_eid)
+            _convert_jaotis(child, sec, j_eid, left_out)
 
 
 def _convert_peatykk(
-    p_src: etree._Element, parent_akn: etree._Element, parent_eid: str
+    p_src: etree._Element, parent_akn: etree._Element, parent_eid: str, left_out: Counter[str]
 ) -> tuple[etree._Element, str]:
     prefix = "jagu" if etree.QName(p_src).localname == "jagu" else "peatykk"
     raw_nr = p_src.find(f"{{*}}{prefix}Nr")
@@ -652,16 +698,18 @@ def _convert_peatykk(
     for child in p_src:
         ctag = etree.QName(child).localname
         if ctag == "jagu":
-            _convert_jagu(child, chp, c_eid)
+            _convert_jagu(child, chp, c_eid, left_out)
         elif ctag == "paragrahv":
-            _convert_paragrahv(child, chp, c_eid)
+            _convert_paragrahv(child, chp, c_eid, left_out)
         elif ctag in {"jaotis", "alljaotis"}:
-            _convert_jaotis(child, chp, c_eid)
+            _convert_jaotis(child, chp, c_eid, left_out)
 
     return chp, c_eid
 
 
-def _convert_osa(o_src: etree._Element, parent_akn: etree._Element) -> tuple[etree._Element, str]:
+def _convert_osa(
+    o_src: etree._Element, parent_akn: etree._Element, left_out: Counter[str]
+) -> tuple[etree._Element, str]:
     raw_nr = o_src.find("{*}osaNr")
     o_nr = _extract_number(raw_nr)
     o_eid = f"part_{o_nr}"
@@ -680,11 +728,11 @@ def _convert_osa(o_src: etree._Element, parent_akn: etree._Element) -> tuple[etr
     for child in o_src:
         ctag = etree.QName(child).localname
         if ctag == "peatykk":
-            _convert_peatykk(child, part, o_eid)
+            _convert_peatykk(child, part, o_eid, left_out)
         elif ctag == "jagu":
-            _convert_jagu(child, part, o_eid)
+            _convert_jagu(child, part, o_eid, left_out)
         elif ctag == "paragrahv":
-            _convert_paragrahv(child, part, o_eid)
+            _convert_paragrahv(child, part, o_eid, left_out)
 
     return part, o_eid
 
@@ -818,7 +866,6 @@ def riigi_teataja_to_akn(
     p_title.text = title
 
     left_out: Counter[str] = Counter()
-    _LEFT_OUT.set(left_out)
 
     # Preamble
     sisu = root.find("{*}sisu")
@@ -833,6 +880,7 @@ def riigi_teataja_to_akn(
                 p_eid="preamble__formula__p",
                 owner=preamble,
                 owner_eid="preamble",
+                left_out=left_out,
             )
 
     # Body
@@ -847,13 +895,15 @@ def riigi_teataja_to_akn(
         for child in sisu:
             ctag = etree.QName(child).localname
             if ctag == "osa":
-                current_osa_akn, current_osa_eid = _convert_osa(child, body)
+                current_osa_akn, current_osa_eid = _convert_osa(child, body, left_out)
                 current_peatykk_akn = None
                 current_peatykk_eid = ""
             elif ctag == "peatykk":
                 current_osa_akn = None
                 current_osa_eid = ""
-                current_peatykk_akn, current_peatykk_eid = _convert_peatykk(child, body, "")
+                current_peatykk_akn, current_peatykk_eid = _convert_peatykk(
+                    child, body, "", left_out
+                )
             elif ctag == "jagu":
                 target_parent = (
                     current_peatykk_akn
@@ -866,9 +916,9 @@ def riigi_teataja_to_akn(
                     else (current_osa_eid if current_osa_akn is not None else "")
                 )
                 if doctype == "constitution":
-                    _convert_peatykk(child, target_parent, target_eid)
+                    _convert_peatykk(child, target_parent, target_eid, left_out)
                 else:
-                    _convert_jagu(child, target_parent, target_eid)
+                    _convert_jagu(child, target_parent, target_eid, left_out)
             elif ctag == "paragrahv":
                 target_parent = (
                     current_peatykk_akn
@@ -880,7 +930,7 @@ def riigi_teataja_to_akn(
                     if current_peatykk_akn is not None
                     else (current_osa_eid if current_osa_akn is not None else "")
                 )
-                _convert_paragrahv(child, target_parent, target_eid)
+                _convert_paragrahv(child, target_parent, target_eid, left_out)
             elif ctag == "punkt":
                 target_parent = (
                     current_peatykk_akn
@@ -900,7 +950,7 @@ def riigi_teataja_to_akn(
                 if knr and knr.strip():
                     pt_num = etree.SubElement(pt, _q("num"))
                     pt_num.text = _display_number(knr)
-                _fill_unit(pt, child, p_eid, [])
+                _fill_unit(pt, child, p_eid, [], left_out)
             elif ctag in {"sisuTekst", "HTMLKonteiner"}:
                 target_parent = (
                     current_peatykk_akn
@@ -917,7 +967,14 @@ def riigi_teataja_to_akn(
                 p_eid = f"{target_eid}__para_{st_count}" if target_eid else f"para_{st_count}"
                 para = etree.SubElement(target_parent, _q("paragraph"), eId=p_eid, wId=p_eid)
                 c_el = etree.SubElement(para, _q("content"))
-                _fill(c_el, [child], p_eid=f"{p_eid}__p", owner=para, owner_eid=p_eid)
+                _fill(
+                    c_el,
+                    [child],
+                    p_eid=f"{p_eid}__p",
+                    owner=para,
+                    owner_eid=p_eid,
+                    left_out=left_out,
+                )
 
     # Attachments
     lisad = annex_elements(root)

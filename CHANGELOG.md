@@ -174,11 +174,8 @@ Fixed:
   already do, and the conversion logs how many it left out.
 - The reader projection reads every `<p>` of an `intro` or `wrapUp`, not only
   the first; one that holds a table is read like content, in source order.
-- `document_to_rows`: an article's `intro` is its `__intro` row and its
-  `wrapUp` a `__wrapup` row after its children; a provision whose children
-  have rows puts its `wrapUp` in a `__wrapup` row after them, and the reader
-  renders it there. Provision text keeps table rows, cells and a cell's
-  paragraphs apart.
+- Provision text, intro and wrap-up included, keeps table rows, cells and a
+  cell's paragraphs apart.
 - `ensure_unique_eids`: a renamed duplicate never takes an eId the document
   already publishes, so a reference to an id such as `x_dup2` keeps naming the
   element it named.

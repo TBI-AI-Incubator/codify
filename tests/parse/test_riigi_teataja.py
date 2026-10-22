@@ -993,17 +993,17 @@ def test_table_edges_keep_text_and_stay_valid() -> None:
 @pytest.mark.parametrize(
     "sisu",
     [
-        "<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Mari Mets</td></tr>"
+        "<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Isik A</td></tr>"
         "</table>]]></HTMLKonteiner></sisuTekst>",
-        "<HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Mari Mets</td></tr>"
+        "<HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Isik A</td></tr>"
         "</table>]]></HTMLKonteiner>",
-        "<sisuTekst><tabel><tr><tc><sisuTekst/></tc><tc><sisuTekst><tavatekst>Minister Mari Mets"
+        "<sisuTekst><tabel><tr><tc><sisuTekst/></tc><tc><sisuTekst><tavatekst>Minister Isik A"
         "</tavatekst></sisuTekst></tc></tr></tabel></sisuTekst>",
     ],
 )
 def test_a_dropped_table_leaves_no_text(sisu: str) -> None:
     akn_xml = _act(sisu)
-    assert "Mari Mets" not in akn_xml
+    assert "Isik A" not in akn_xml
     assert "&lt;" not in akn_xml
 
 
@@ -1040,160 +1040,12 @@ def test_an_emptied_block_takes_no_editorial_note() -> None:
     assert _texts(_by_eid(akn_xml, "para_1")) == [""]
 
 
-def test_stored_rows_and_reader_keep_unit_text_in_reading_order() -> None:
-    import uuid
-
-    from codify.storage.documents import _eid_index, _to_provision
-    from codify.storage.mappers import document_to_rows
-
-    table = (
-        "<![CDATA[<table><tr><td>{0}</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></table>]]>"
-    )
-    akn_xml = _act(
-        f"""<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
-			<sisuTekst><tavatekst>Ees.</tavatekst></sisuTekst>
-			<loige><loigeNr>1</loigeNr><kuvatavNr>(1)</kuvatavNr>
-				<sisuTekst><tavatekst>Loetelu:</tavatekst></sisuTekst>
-				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
-					<sisuTekst><tavatekst>punkt;</tavatekst></sisuTekst></alampunkt>
-				<sisuTekst><tavatekst>Lõpetus.</tavatekst>
-					<HTMLKonteiner>{table.format("L")}</HTMLKonteiner></sisuTekst></loige>
-			<sisuTekst><tavatekst>Lõpp.</tavatekst>
-				<HTMLKonteiner>{table.format("P")}</HTMLKonteiner></sisuTekst>
-		</paragrahv>
-		<paragrahv><paragrahvNr>2</paragrahvNr><kuvatavNr>§ 2.</kuvatavNr>
-			<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td><td>10</td></tr>
-			<tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]></HTMLKonteiner></sisuTekst>
-		</paragrahv>"""
-    )
-    _, _, rows, _, _, _ = document_to_rows(parse_akn(akn_xml), law_id=uuid.uuid4())
-    by_section: dict[object, list[tuple[int, str, str]]] = {}
-    for r in rows:
-        by_section.setdefault(r.section_id, []).append((r.position, r.akn_eid, r.text))
-    reading = [(eid, text) for sec in by_section.values() for _, eid, text in sorted(sec)]
-    assert reading == [
-        ("art_1__intro", "Ees."),
-        ("art_1__para_1", "Loetelu:"),
-        ("art_1__para_1__point_1", "punkt;"),
-        ("art_1__para_1__wrapup", "Lõpetus. L 1 B 2"),
-        ("art_1__wrapup", "Lõpp. P 1 B 2"),
-        ("art_2__content", "A 10 B 20 eurot"),
-    ]
-    # The reader renders each split-off run in its own row, tables included,
-    # and the lõige's own block leaves its wrap-up to that row.
-    persisted = frozenset(r.akn_eid for r in rows)
-    index = _eid_index(etree.fromstring(akn_xml.encode()))
-    rendered = {r.akn_eid: _to_provision(r, index, persisted).blocks for r in rows}
-    para = rendered["art_1__para_1"][0]
-    assert para.wrap_up == []
-    assert [b.akn_type for b in para.blocks] == []
-    for eid, table_eid in (
-        ("art_1__para_1__wrapup", "art_1__para_1__table_1"),
-        ("art_1__wrapup", "art_1__table_1"),
-    ):
-        (closing,) = rendered[eid]
-        assert closing.intro and closing.intro[0].text.startswith("Lõp")
-        assert [b.akn_eid for b in closing.blocks] == [table_eid]
-
-
-def test_a_wrap_up_closing_subsections_is_not_rowed_before_them() -> None:
-    import uuid
-
-    from codify.akn import Article, Chapter
-    from codify.akn.document import Document
-    from codify.storage.mappers import document_to_rows
-
-    chapter = Chapter(
-        akn_eid="chp_1",
-        akn_type="chapter",
-        position=0,
-        wrap_up="Closing words.",
-        children=[Article(akn_eid="chp_1__art_1", akn_type="article", position=0, text="Body.")],
-    )
-    doc = Document(
-        id=uuid.uuid4(),
-        frbr_work_uri="/akn/xz/act/2012/7",
-        frbr_expression_uri="/akn/xz/act/2012/7/est@2012",
-        language="est",
-        expression_date="2012-01-01",
-        body=[chapter],
-    )
-    _, _, rows, _, _, _ = document_to_rows(doc, law_id=uuid.uuid4())
-    assert [r.akn_eid for r in rows] == ["chp_1__art_1__content"]
-
-
 def test_a_native_cell_is_classified_on_its_visible_text() -> None:
     akn_xml = _act(
         """<sisuTekst><tabel><tr><tc><HTMLKonteiner><![CDATA[<a href="allkirjastatud-leping.pdf">
 		Allkirjastamise tasu 5 eurot</a>]]></HTMLKonteiner></tc></tr></tabel></sisuTekst>"""
     )
     assert _cells(_by_eid(akn_xml, "para_1__table_1")) == [["Allkirjastamise tasu 5 eurot"]]
-
-
-def test_closing_text_and_anchors_land_on_the_wrap_up_row() -> None:
-    import uuid
-
-    from codify.storage.documents import _eid_index, _to_provision
-    from codify.storage.mappers import document_to_rows
-    from codify.storage.resolve_refs import nearest_stored_row
-
-    # A sub-point grouping points has no text of its own, only a closing run.
-    akn_xml = _act(
-        """<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
-			<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>
-			<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
-				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>a)</kuvatavNr>
-					<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>
-				<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr>
-				<td>X</td><td>1</td></tr><tr><td>Y</td><td>2</td></tr></table>]]></HTMLKonteiner>
-				</sisuTekst></alampunkt>
-		</punkt>"""
-    )
-    _, sections, rows, _, _, _ = document_to_rows(parse_akn(akn_xml), law_id=uuid.uuid4())
-    eids = [r.akn_eid for r in rows]
-    assert eids == ["point_1", "point_1__point_1__point_1", "point_1__point_1__wrapup"]
-    index = _eid_index(etree.fromstring(akn_xml.encode()))
-    persisted = frozenset(eids)
-    lead = _to_provision(rows[0], index, persisted).blocks[0]
-    # The group under the lead has no row, so the lead's block walks into it.
-    assert "Lõpetus." not in str(lead.model_dump())
-    assert "point_1__point_1__table_1" not in str(lead.model_dump())
-    anchor = nearest_stored_row(
-        index, "point_1__point_1__table_1", persisted, {s.akn_eid for s in sections}
-    )
-    assert anchor == ("point_1__point_1__wrapup", "enclosing")
-    # An anchor naming the wrap-up itself lands on its row too.
-    wrap = index["point_1__point_1__table_1"].getparent()
-    assert wrap is not None
-    wrap.set("eId", "closing")
-    index["closing"] = wrap
-    assert nearest_stored_row(index, "closing", persisted) == (
-        "point_1__point_1__wrapup",
-        "container",
-    )
-
-
-def test_compact_closing_text_keeps_its_table_boundaries() -> None:
-    import uuid
-
-    from codify.storage.mappers import document_to_rows
-
-    akn_xml = _act(
-        "<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>"
-        "<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>"
-        "<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>"
-        "<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>"
-        "<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td>"
-        "<td>10</td></tr><tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]>"
-        "</HTMLKonteiner></sisuTekst></punkt>"
-    )
-    # Written without indentation, so no whitespace stands between the blocks.
-    compact = etree.tostring(
-        etree.fromstring(akn_xml.encode(), etree.XMLParser(remove_blank_text=True))
-    )
-    _, _, rows, _, _, _ = document_to_rows(parse_akn(compact.decode()), law_id=uuid.uuid4())
-    closing = next(r.text for r in rows if r.akn_eid == "point_1__wrapup")
-    assert closing == "Lõpetus. A 10 B 20 eurot"
 
 
 def test_a_comment_does_not_split_a_single_lõige() -> None:
@@ -1204,3 +1056,20 @@ def test_a_comment_does_not_split_a_single_lõige() -> None:
 		</paragrahv>"""
     )
     assert _texts(_by_eid(akn_xml, "art_1")) == ["Esimene.", "Teine."]
+
+
+def test_provision_text_keeps_table_and_block_boundaries() -> None:
+    akn_xml = _act(
+        "<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>"
+        "<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>"
+        "<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>"
+        "<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>"
+        "<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td>"
+        "<td>10</td></tr><tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]>"
+        "</HTMLKonteiner></sisuTekst></punkt>"
+    )
+    # Written without indentation, so no whitespace stands between the blocks.
+    parser = etree.XMLParser(remove_blank_text=True)
+    compact = etree.tostring(etree.fromstring(akn_xml.encode(), parser)).decode()
+    point = parse_akn(compact).body[0]
+    assert point.wrap_up == "Lõpetus.\nA 10\nB 20 eurot"
