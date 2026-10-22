@@ -168,6 +168,9 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         adopted = str(summary.get("adoptionDate") or ref.extra.get("adopted") or "")
         year = _year(adopted) or ref.year
         titles = {lang: _lang_value(record.get("title"), lang) or "" for lang in LANGUAGES}
+        updates = (record.get("changeHistory") or {}).get("update") or []
+        # The latest Council act on the instrument dates the text in force.
+        revised = max([adopted, *(str(u.get("date") or "")[:10] for u in updates)])
         # The languages the ref asks for, the first primary, as the Cellar acquirer
         # has it; a ref naming none takes both, English first.
         wanted = ref.languages or list(LANGUAGES.values())
@@ -188,6 +191,7 @@ class OecdCompendiumAcquirer(BaseAcquirer):
                     "key": key,
                     "type": doctype,
                     "adopted": adopted,
+                    "revised": revised,
                     "title": titles[lang],
                     "lang": lang,
                 },
@@ -203,11 +207,13 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         if not any(b.role == "primary" for b in bodies):
             raise OecdInstrumentMissing(f"{key} has no HTML body text in {wanted[0]}")
         number = key.rsplit("/", 1)[-1]
+        work_uri = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
         return AcquiredDocument(
             ref=ref.model_copy(update={"doctype": doctype, "year": year, "number": number}),
             source_url=f"{self._base}/en/instruments/{path_key}",
             bodies=bodies,
-            frbr_work_uri=build_frbr_work_uri(self.JURISDICTION, doctype, year, number),
+            frbr_work_uri=work_uri,
+            expression_uri=f"{work_uri}/{wanted[0]}@{revised}" if revised else None,
             licence="oecd_terms",
             # The Compendium's own publish date, from the listing; the record's
             # `transmittedAt` is when this response was built.
@@ -217,6 +223,7 @@ class OecdCompendiumAcquirer(BaseAcquirer):
                 "type_id": type_id,
                 "status_id": int((record.get("status") or {}).get("id") or 0),
                 "adoption_date": adopted or None,
+                "revision_date": revised or None,
                 "in_force_date": summary.get("inForceDate"),
                 "title_fr": titles["fr"],
                 "themes": [t.get("id") for t in (record.get("themes") or {}).get("theme") or []],

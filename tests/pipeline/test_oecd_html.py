@@ -379,13 +379,12 @@ def test_rows_under_invites_and_instructs_leave_the_pool() -> None:
     xml, _, _ = _convert(_EIGHT_SECTIONS)
     flags = _row_flags(xml)
     excluded = sorted(eid for eid, (flag, _) in flags.items() if flag)
-    assert excluded == [
-        "sec_VIII__content", "sec_VII__content", "sec_VI__content", "sec_V__content",
-    ]  # fmt: skip
+    # VI invites the Adherents themselves, so it stays.
+    assert excluded == ["sec_VIII__content", "sec_VII__content", "sec_V__content"]
     assert {flags[eid][1] for eid in excluded} == {"marked"}
     kept = [eid for eid, (flag, _) in flags.items() if flag is False]
-    assert len(kept) == len(flags) - 4
-    assert "sec_IV__para_12" in kept
+    assert len(kept) == len(flags) - 3
+    assert {"sec_IV__para_12", "sec_VI__content"} <= set(kept)
 
 
 def test_paragraphs_under_instructs_leave_the_pool() -> None:
@@ -520,3 +519,68 @@ def test_the_french_text_marks_the_same_sections() -> None:
         "sec_III__para_1",
     }
     assert flags["att_1__para_2"] == (False, None)
+
+
+@pytest.mark.parametrize(
+    ("lead_in", "marked"),
+    [
+        ("INVITES Adherents to disseminate this Recommendation.", False),
+        ("INVITES the Secretary-General and Adherents to disseminate it.", False),
+        ("INVITES non-Adherents to adhere to this Recommendation.", True),
+        ("REQUESTS Members to report on its implementation.", False),
+        ("ENCOURAGES all harbour actors to promote it.", True),
+        ("REQUESTS the Secretary-General to report to Adherents.", True),
+        ("INVITE les Adhérents à diffuser la présente Recommandation.", False),
+        ("INVITE les non-Adhérents à y adhérer.", True),
+        ("CHARGE le Comité des ports de suivre sa mise en œuvre.", True),
+    ],
+)
+def test_the_addressee_decides_the_mark(lead_in: str, marked: bool) -> None:
+    for numbered in (f"II. {lead_in}", lead_in):
+        body = (
+            "<p>THE COUNCIL,</p><p>I. RECOMMENDS that Adherents light lanterns.</p>"
+            f"<p>{numbered}</p>"
+        )
+        _, _, root = _convert(body)
+        section = root.findall(".//a:body/a:section", NS)[1]
+        assert (section.get("refersTo") == "#nonAdherentDuty") is marked, numbered
+
+
+def test_items_name_their_own_addressee_when_the_lead_in_names_none() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light lanterns.</p>
+<p>II. INVITES:</p>
+<p>a) the Secretary-General to disseminate this Recommendation;</p>
+<p>b) Adherents to share their records.</p>
+"""
+    xml, _, root = _convert(body)
+    marked = {el.get("eId") for el in root.iter() if el.get("refersTo") == "#nonAdherentDuty"}
+    assert marked == {"sec_II__para_a"}
+    flags = _row_flags(xml)
+    assert flags["sec_II__para_a"] == (True, "marked")
+    assert flags["sec_II__para_b"] == (False, None)
+
+
+def test_a_revised_text_is_a_new_expression_of_the_same_work() -> None:
+    adopted, _, _ = _convert(_COUNCIL_ACT)
+    revised_xml, _, root = _convert(
+        _COUNCIL_ACT.replace("five years", "three years"), revised="2024-01-07"
+    )
+    first, second = parse_akn(adopted), parse_akn(revised_xml)
+    assert first.frbr_work_uri == second.frbr_work_uri
+    assert (first.frbr_expression_uri, second.frbr_expression_uri) == (
+        "/akn/oecd/act/recommendation/2020/9002/eng@2020-05-05",
+        "/akn/oecd/act/recommendation/2020/9002/eng@2024-01-07",
+    )
+    work_date = root.find(".//a:FRBRWork/a:FRBRdate", NS)
+    assert work_date is not None and work_date.get("date") == "2020-05-05"
+    assert [e.get("eId") for e in root.iter(f"{{{NS['a']}}}eventRef")] == [
+        "evt_adoption",
+        "evt_revision",
+    ]
+    validate_akn(revised_xml)
+    assert run_validator(revised_xml) == []
+    # A revision date before adoption is a data error, not an earlier expression.
+    early, _, _ = _convert(_COUNCIL_ACT, revised="2001-01-01")
+    assert parse_akn(early).frbr_expression_uri.endswith("@2020-05-05")

@@ -92,7 +92,7 @@ OPERATIVE_VERBS = frozenset(
         "SALUE", "PREND NOTE", "CONFIRME", "RÉAFFIRME", "SOULIGNE",
     }
 )  # fmt: skip
-# Verbs whose operative duty falls on a body other than the Adherents.
+# Verbs that may put a duty on a body other than the Adherents; the addressee decides.
 NON_ADHERENT_VERBS = frozenset(
     {
         "INVITES", "INSTRUCTS", "ENCOURAGES", "REQUESTS", "CALLS ON", "CALLS UPON",
@@ -100,6 +100,10 @@ NON_ADHERENT_VERBS = frozenset(
     }
 )  # fmt: skip
 NON_ADHERENT_DUTY = "#nonAdherentDuty"
+# The addressee runs to the infinitive (`to`, `à`) or the colon that opens a list.
+_ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|:")
+# Adherents or Members, in either language, but not non-Adherents.
+_ADHERENTS = re.compile(r"(?<![\w‐-])(?:Adherents?|Members?|Adhérents?|Membres?)\b")
 
 # Containers nest in this order; a code may skip a level but never inverts one.
 _CONTAINER_KIND = {"PART": "part", "TITLE": "title", "CHAPTER": "chapter"}
@@ -263,7 +267,6 @@ class _Builder:
         leaf = f"{_EID_PREFIX[kind]}_{node.key}"
         node.eid = f"{scope}__{leaf}" if scope else leaf
         if parent is not None:
-            node.non_adherent = parent.non_adherent
             parent.children.append(node)
         else:
             self.roots.append(node)
@@ -307,7 +310,6 @@ class _Builder:
             op = _operative(rest)
             verb, tail = op if op else (None, rest.strip())
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = not self.scope and verb in NON_ADHERENT_VERBS
             if tail:
                 node.text.append(tail)
             return
@@ -316,7 +318,6 @@ class _Builder:
             verb, rest = op
             numeral = _to_roman(sum(1 for r in self.roots if r.kind == "section") + 1)
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = not self.scope and verb in NON_ADHERENT_VERBS
             if rest:
                 node.text.append(rest)
             return
@@ -364,6 +365,40 @@ class _Builder:
             top.text.append(block)
         else:
             self._open_prose_paragraph(block)
+
+
+def _addressee(text: str) -> str | None:
+    """Who a verb section's lead-in addresses, or None when it names no one."""
+    lead = text.strip().lstrip("*").strip()
+    m = _ADDRESSEE_END.search(lead)
+    head = (lead[: m.start()] if m else lead).strip()
+    return head or None
+
+
+def _mark_subtree(node: _Node) -> None:
+    node.non_adherent = True
+    for child in node.children:
+        _mark_subtree(child)
+
+
+def _mark_non_adherent_duties(nodes: list[_Node]) -> None:
+    """Mark a verb section binding someone other than the Adherents. Its lead-in
+    names the addressee; a lead-in naming no one leaves each item to name its own,
+    and the section is marked only when every item is."""
+    for node in nodes:
+        if node.kind != "section" or node.heading not in NON_ADHERENT_VERBS:
+            _mark_non_adherent_duties(node.children)
+            continue
+        addressee = _addressee(node.text[0]) if node.text else None
+        if addressee is not None:
+            if not _ADHERENTS.search(addressee):
+                _mark_subtree(node)
+            continue
+        for child in node.children:
+            item = _addressee(child.text[0]) if child.text else None
+            if item is not None and not _ADHERENTS.search(item):
+                _mark_subtree(child)
+        node.non_adherent = bool(node.children) and all(c.non_adherent for c in node.children)
 
 
 def _annex_caption(block: str) -> bool:
@@ -418,6 +453,7 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             annex.title = block
             continue
         builder.feed(block)
+    _mark_non_adherent_duties(inst.body)
     if not inst.body:
         raise OecdHtmlError("no operative text: not an instrument body, or an empty page")
     return inst
@@ -457,7 +493,7 @@ def _emit(parent: etree._Element, node: _Node, counts: dict[str, int]) -> None:
 
 
 def _meta(
-    inst: _Instrument, *, frbr_work_uri: str, language: str, expression_date: str
+    inst: _Instrument, *, frbr_work_uri: str, language: str, work_date: str, expression_date: str
 ) -> etree._Element:
     doctype = inst.meta.get("type") or frbr_work_uri.strip("/").split("/")[3]
     meta = etree.Element(f"{{{AKN_NS}}}meta")
@@ -465,7 +501,7 @@ def _meta(
     work = _akn(ident, "FRBRWork")
     _akn(work, "FRBRthis", value=f"{frbr_work_uri}/main")
     _akn(work, "FRBRuri", value=frbr_work_uri)
-    _akn(work, "FRBRdate", date=expression_date, name="adoption")
+    _akn(work, "FRBRdate", date=work_date, name="adoption")
     _akn(work, "FRBRauthor", href="#oecdCouncil")
     _akn(work, "FRBRcountry", value="oecd")
     _akn(work, "FRBRsubtype", value=doctype)
@@ -474,7 +510,8 @@ def _meta(
     expr = _akn(ident, "FRBRExpression")
     _akn(expr, "FRBRthis", value=f"{frbr_work_uri}/{language}@{expression_date}/main")
     _akn(expr, "FRBRuri", value=f"{frbr_work_uri}/{language}@{expression_date}")
-    _akn(expr, "FRBRdate", date=expression_date, name="adoption")
+    expression_event = "adoption" if expression_date == work_date else "revision"
+    _akn(expr, "FRBRdate", date=expression_date, name=expression_event)
     _akn(expr, "FRBRauthor", href="#oecdCouncil")
     _akn(expr, "FRBRlanguage", language=language)
     manif = _akn(ident, "FRBRManifestation")
@@ -488,10 +525,19 @@ def _meta(
         lifecycle,
         "eventRef",
         eId="evt_adoption",
-        date=expression_date,
+        date=work_date,
         type="generation",
         source="#oecdCouncil",
     )
+    if expression_date != work_date:
+        _akn(
+            lifecycle,
+            "eventRef",
+            eId="evt_revision",
+            date=expression_date,
+            type="amendment",
+            source="#oecdCouncil",
+        )
     refs = _akn(meta, "references", source="#codify")
     _akn(
         refs,
@@ -552,7 +598,7 @@ def _attachment_meta(
         frbr = _akn(ident, block)
         _akn(frbr, "FRBRthis", value=this)
         _akn(frbr, "FRBRuri", value=uri)
-        _akn(frbr, "FRBRdate", date=expression_date, name="adoption")
+        _akn(frbr, "FRBRdate", date=expression_date, name="expression")
         _akn(frbr, "FRBRauthor", href=author)
         if block == "FRBRWork":
             _akn(frbr, "FRBRcountry", value="oecd")
@@ -604,21 +650,31 @@ def instrument_html_to_akn(
     language: str = "eng",
     provenance: dict[str, object] | None = None,
 ) -> str:
-    """Deterministic Compendium HTML → AKN `act`; the adoption date is the expression date."""
+    """Deterministic Compendium HTML → AKN `act`: the adoption date is the work's,
+    the latest revision's (`oecd.revised`) the expression's."""
     blocks, meta = _blocks(text)
     inst = _segment(blocks, meta)
     adopted = meta.get("adopted")
     if not adopted:
         raise OecdHtmlError("no oecd.adopted meta: the acquirer wraps the body with it")
+    # The latest Council act on the text dates the expression, so a revised text is
+    # a new expression of the same work rather than a clash with the adopted one.
+    revised = max(meta.get("revised") or adopted, adopted)
     root = etree.Element(f"{{{AKN_NS}}}akomaNtoso", nsmap={None: AKN_NS})
     doctype = meta.get("type") or frbr_work_uri.strip("/").split("/")[3]
     root_act = etree.SubElement(root, f"{{{AKN_NS}}}act", contains="originalVersion", name=doctype)
     root_act.append(
-        _meta(inst, frbr_work_uri=frbr_work_uri, language=language, expression_date=adopted)
+        _meta(
+            inst,
+            frbr_work_uri=frbr_work_uri,
+            language=language,
+            work_date=adopted,
+            expression_date=revised,
+        )
     )
     counts = build_body(inst, root_act)
     annexes = build_attachments(
-        inst, root_act, frbr_work_uri=frbr_work_uri, language=language, expression_date=adopted
+        inst, root_act, frbr_work_uri=frbr_work_uri, language=language, expression_date=revised
     )
     if provenance is not None:
         provenance["html_source"] = {

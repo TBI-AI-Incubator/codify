@@ -235,6 +235,31 @@ async def test_a_language_the_record_lacks_raises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_latest_council_act_dates_the_expression() -> None:
+    import copy
+
+    record = copy.deepcopy(_RECORD)
+    record["changeHistory"]["update"].append({"date": "2024-01-07", "type": {"id": 2}})
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/instruments/OECD-LEGAL-9002":
+            return httpx.Response(200, json=record)
+        return _handler(request)
+
+    adapter = SourceAdapter(kind="oecd_compendium", name="oecd-compendium", base_url=BASE)
+    acquirer = OecdCompendiumAcquirer(
+        adapter, client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    )
+    ref = DocumentRef(jurisdiction_code="oecd", doctype="recommendation", year=2020, number="9002")
+    doc = await acquirer.fetch(ref)
+    assert doc.expression_uri == "/akn/oecd/act/recommendation/2020/9002/eng@2024-01-07"
+    assert doc.upstream_metadata["revision_date"] == "2024-01-07"
+    assert '<meta name="oecd.revised" content="2024-01-07">' in doc.primary().content.decode()
+    plain = await _acquirer().fetch(ref)
+    assert plain.expression_uri == "/akn/oecd/act/recommendation/2020/9002/eng@2020-05-05"
+
+
+@pytest.mark.asyncio
 async def test_last_modified_is_the_listing_publish_date() -> None:
     listed = [r async for r in _acquirer().discover(DiscoveryQuery(limit=1))][0]
     doc = await _acquirer().fetch(listed)
