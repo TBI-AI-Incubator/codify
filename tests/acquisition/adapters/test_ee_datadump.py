@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -17,6 +18,7 @@ from codify.acquisition.adapters.ee.datadump import (
     build_ee_index,
 )
 from codify.jurisdictions import SourceAdapter
+from codify.pipeline.formats.riigi_teataja import riigi_teataja_to_akn
 
 _MEMBER = "123122022025.xml"
 _SYNTHETIC_EE_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -142,3 +144,140 @@ async def test_unknown_doc_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(EeDocNotInDump):
         await acquirer.fetch(bad_ref)
+
+
+# --- which members the index keeps --------------------------------------------------
+# Members in the publisher's shape with invented values; newer files add id attributes.
+
+_VERSION_CHANGE = """
+\t\t<versiooniMuutus>
+\t\t\t<dokumentEtapp>avaldamine</dokumentEtapp>
+\t\t\t<dokumentStaatus>esitatud avaldamiseks</dokumentStaatus>
+\t\t\t<metaandmedVersioon>{n}</metaandmedVersioon>
+\t\t\t<metaandmedVersioonKuupaev>2015-04-13</metaandmedVersioonKuupaev>
+\t\t\t<metaandmedVersioonPohjustaja>Näidis Toimetaja</metaandmedVersioonPohjustaja>
+\t\t</versiooniMuutus>"""
+
+
+def _member(
+    gid: str,
+    title: str = "Näidistoetuse andmise tingimused ja kord",
+    *,
+    issuer: str = "Haridus- ja teadusminister",
+    kind: str = "määrus",
+    text: str = "algtekst-terviktekst",
+    series: str = "RT I",
+    ids: bool = True,
+    changes: int = 0,
+    end: str = "",
+) -> bytes:
+    """One archive member. `ids` writes the newer layout, `changes` lengthens the
+    metadata ahead of the title, `end` closes the redaction's validity."""
+    attr = ' id="0c1e5b9a-8d1f-4a52-9c3e-2f6b7d8e9a01"' if ids else ""
+    lopp = f"<kehtivuseLopp>{end}</kehtivuseLopp>" if end else ""
+    history = "".join(_VERSION_CHANGE.format(n=n) for n in range(changes))
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt{attr} xmlns="Juurakt" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+\t<metaandmed>
+\t\t<valjaandja>{issuer}</valjaandja>
+\t\t<dokumentLiik>{kind}</dokumentLiik>
+\t\t<tekstiliik>{text}</tekstiliik>
+\t\t<dokumentEtapp>avaldamine</dokumentEtapp>
+\t\t<dokumentStaatus>avaldatud</dokumentStaatus>
+\t\t<vastuvoetud>
+\t\t\t<aktikuupaev>2026-09-28</aktikuupaev>
+\t\t\t<aktiNr>42</aktiNr>
+\t\t</vastuvoetud>
+\t\t<avaldamismarge><RTosa{attr}>{series}</RTosa>
+\t\t\t<avaldamineKuupaev{attr}>2026-10-01</avaldamineKuupaev><RTaasta>2026</RTaasta>
+\t\t\t<RTartikkel>1</RTartikkel><aktViide>{gid}</aktViide></avaldamismarge>
+\t\t<kehtivus><kehtivuseAlgus>2026-10-04+03:00</kehtivuseAlgus>{lopp}</kehtivus>
+\t\t<skeemiNimi>maarus_1_10.02.2010.xsd</skeemiNimi>
+\t\t<globaalID>{gid}</globaalID>
+\t\t<metaandmedVersioon>6</metaandmedVersioon>
+\t\t<metaandmedVersioonKuupaev>2026-09-30</metaandmedVersioonKuupaev>
+\t\t<metaandmedVersioonPohjustaja>Näidis Toimetaja</metaandmedVersioonPohjustaja>{history}
+\t</metaandmed>
+\t<aktinimi{attr}>
+\t\t<nimi{attr}>
+\t\t\t<pealkiri{attr}>{title}</pealkiri>
+\t\t</nimi>
+\t</aktinimi>
+\t<sisu{attr}><paragrahv id="para1"><paragrahvNr{attr}>1</paragrahvNr>
+\t\t<sisuTekst><tavatekst>Sätte tekst.</tavatekst></sisuTekst></paragrahv></sisu>
+</oigusakt>""".encode()
+
+
+def _indexed(tmp_path: Path, *members: bytes) -> dict[str, Any]:
+    archive = tmp_path / "archive.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for i, data in enumerate(members):
+            zf.writestr(f"{i:012d}.xml", data)
+    entries: dict[str, Any] = build_ee_index(archive)["entries"]
+    return entries
+
+
+@pytest.mark.parametrize("ids", [True, False], ids=["newer-layout", "older-layout"])
+@pytest.mark.parametrize("text", ["algtekst", "terviktekst", "algtekst-terviktekst"])
+@pytest.mark.parametrize(("kind", "issuer"), [("seadus", "Riigikogu"), ("määrus", "Siseminister")])
+def test_index_keeps_a_state_act_whatever_its_text_type(
+    tmp_path: Path, kind: str, issuer: str, text: str, ids: bool
+) -> None:
+    entries = _indexed(tmp_path, _member("101", kind=kind, issuer=issuer, text=text, ids=ids))
+    assert {k: (v["title"], v["issuer"]) for k, v in entries.items()} == {
+        "101": ("Näidistoetuse andmise tingimused ja kord", issuer)
+    }
+
+
+def test_index_files_an_older_layout_member_as_before(tmp_path: Path) -> None:
+    entry = _indexed(tmp_path, _member("103", ids=False))["103"]
+    assert {k: entry[k] for k in ("slug", "year", "date", "doctype", "expression_date")} == {
+        "slug": "naidistoetuse-andmise-tingimused-ja-kord",
+        "year": 2026,
+        "date": "2026-09-28",
+        "doctype": "maarrus",
+        "expression_date": "2026-10-04",
+    }
+
+
+def test_index_reads_a_title_that_long_metadata_pushes_past_3000_bytes(tmp_path: Path) -> None:
+    member = _member("102", ids=False, changes=12)
+    assert member.index(b"<pealkiri>") > 3000
+    assert list(_indexed(tmp_path, member)) == ["102"]
+
+
+@pytest.mark.parametrize(
+    ("issuer", "series"),
+    [
+        ("Näidise Linnavalitsus", "RT IV"),
+        ("Näidise Vallavolikogu", "RT IV"),
+        ("Näidise Linnavolikogu", "KO"),
+        ("Näidise Vallavalitsus", "RTL"),
+        ("Näidise Alevivolikogu", "KO"),
+        ("Näidise Linnavalitsuse Ehitusamet", "RT IV"),
+    ],
+)
+def test_index_leaves_out_every_act_a_municipal_body_issued(
+    tmp_path: Path, issuer: str, series: str
+) -> None:
+    municipal = _member("201", issuer=issuer, series=series)
+    state = _member("202", issuer="Vabariigi Valitsus")
+    assert list(_indexed(tmp_path, municipal, state)) == ["202"]
+
+
+def test_index_leaves_out_other_kinds_of_document(tmp_path: Path) -> None:
+    decision = _member("301", kind="otsus", issuer="Vabariigi Valitsus", series="RT III")
+    assert list(_indexed(tmp_path, decision, _member("302"))) == ["302"]
+
+
+def test_index_leaves_out_a_member_with_no_title(tmp_path: Path) -> None:
+    untitled = _member("401", title="")
+    assert list(_indexed(tmp_path, untitled, _member("402"))) == ["402"]
+
+
+def test_index_dates_an_entry_as_the_parser_dates_its_expression(tmp_path: Path) -> None:
+    member = _member("501")
+    entry = _indexed(tmp_path, member)["501"]
+    _, meta = riigi_teataja_to_akn(member)
+    assert meta["frbr_expression_uri"].endswith(f"@{entry['expression_date']}")
+    assert (entry["expression_date"], entry["year"]) == ("2026-10-04", 2026)
