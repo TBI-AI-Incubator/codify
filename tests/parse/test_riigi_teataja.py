@@ -1038,3 +1038,54 @@ def test_an_emptied_block_takes_no_editorial_note() -> None:
 		</sisuTekst>"""
     )
     assert _texts(_by_eid(akn_xml, "para_1")) == [""]
+
+
+def test_stored_rows_and_reader_keep_unit_text_in_reading_order() -> None:
+    import uuid
+
+    from codify.storage.documents import _eid_index, _to_provision
+    from codify.storage.mappers import document_to_rows
+
+    akn_xml = _act(
+        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+			<sisuTekst><tavatekst>Ees.</tavatekst></sisuTekst>
+			<loige><loigeNr>1</loigeNr><kuvatavNr>(1)</kuvatavNr>
+				<sisuTekst><tavatekst>Loetelu:</tavatekst></sisuTekst>
+				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+					<sisuTekst><tavatekst>punkt;</tavatekst></sisuTekst></alampunkt>
+				<sisuTekst><tavatekst>Lõpetus.</tavatekst></sisuTekst></loige>
+			<sisuTekst><tavatekst>Lõpp.</tavatekst></sisuTekst>
+		</paragrahv>
+		<paragrahv><paragrahvNr>2</paragrahvNr><kuvatavNr>§ 2.</kuvatavNr>
+			<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td><td>10</td></tr>
+			<tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]></HTMLKonteiner></sisuTekst>
+		</paragrahv>"""
+    )
+    _, _, rows, _, _, _ = document_to_rows(parse_akn(akn_xml), law_id=uuid.uuid4())
+    by_section: dict[object, list[tuple[int, str, str]]] = {}
+    for r in rows:
+        by_section.setdefault(r.section_id, []).append((r.position, r.akn_eid, r.text))
+    reading = [(eid, text) for sec in by_section.values() for _, eid, text in sorted(sec)]
+    assert reading == [
+        ("art_1__intro", "Ees."),
+        ("art_1__para_1", "Loetelu:"),
+        ("art_1__para_1__point_1", "punkt;"),
+        ("art_1__para_1__wrapup", "Lõpetus."),
+        ("art_1__wrapup", "Lõpp."),
+        ("art_2__content", "A 10 B 20 eurot"),
+    ]
+    # The reader renders the lõige's wrap-up in its own row, after the point.
+    persisted = frozenset(r.akn_eid for r in rows)
+    para = next(r for r in rows if r.akn_eid == "art_1__para_1")
+    index = _eid_index(etree.fromstring(akn_xml.encode()))
+    block = _to_provision(para, index, persisted).blocks[0]
+    assert block.wrap_up == []
+    assert block.intro and block.intro[0].text.strip() == "Loetelu:"
+
+
+def test_a_native_cell_is_classified_on_its_visible_text() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tabel><tr><tc><HTMLKonteiner><![CDATA[<a href="allkirjastatud-leping.pdf">
+		Allkirjastamise tasu 5 eurot</a>]]></HTMLKonteiner></tc></tr></tabel></sisuTekst>"""
+    )
+    assert _cells(_by_eid(akn_xml, "para_1__table_1")) == [["Allkirjastamise tasu 5 eurot"]]

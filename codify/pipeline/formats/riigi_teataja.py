@@ -374,7 +374,7 @@ def _write_native_table(tabel: etree._Element, w: _Blocks) -> None:
     rows = [[tc for tc in tr if _local(tc) == "tc"] for tr in tabel if _local(tr) == "tr"]
     rows = [r for r in rows if r]
     w.line_break()
-    if not rows or _leave_out([[_clean_text(tc) for tc in r] for r in rows]):
+    if not rows:
         return
     table = w.table([[("td", tc) for tc in r] for r in rows])
     for tr, src_row in zip(table, rows, strict=True):
@@ -384,6 +384,9 @@ def _write_native_table(tabel: etree._Element, w: _Blocks) -> None:
                 if _local(st) not in _NOT_TEXT:
                     _write_source(st, cell)
             cell.finish()
+    # Classified on the text as written, so markup inside a cell is not read.
+    if _leave_out([[" ".join("".join(td.itertext()).split()) for td in tr] for tr in table]):
+        w.container.remove(table)
     w.line_break()
 
 

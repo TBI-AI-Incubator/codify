@@ -326,8 +326,12 @@ def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineRef
 
     def visit(el: etree._Element) -> None:
         push(None if indentation(el.text) else el.text)
-        for child in el:
+        in_cell = _local(el) in ("td", "th")
+        for index, child in enumerate(el):
             tag = _local(child)
+            # A table's rows, cells and a cell's paragraphs stay apart in the text.
+            if index and (tag in ("tr", "td", "th") or (in_cell and tag == "p")):
+                push("\n" if tag == "tr" else " ")
             if is_lifted_note(child):
                 # Notes are not provision text or provision references.
                 pass

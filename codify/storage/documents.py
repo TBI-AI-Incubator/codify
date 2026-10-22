@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.akn._schema import safe_parser
 from codify.akn.vocabulary import TAG_TO_KIND, is_lifted_note, table_row_eid
+from codify.storage.mappers import WRAP_UP_SUFFIX
 from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
@@ -850,6 +851,9 @@ def _to_provision(
         # its eId with the persisted set still emit its own content.
         stop = stop_at_eids - {row.akn_eid} if stop_at_eids else stop_at_eids
         block = _walk_block(el, stop_at_eids=stop)
+        if f"{row.akn_eid}{WRAP_UP_SUFFIX}" in stop_at_eids:
+            # Its wrap-up closes rows rendered after this one, so it renders there.
+            block = block.model_copy(update={"wrap_up": []})
         if is_synthetic_content:
             # Section header already shows the container's num/heading
             # and owns the article's eId; drop both on the bridged block.
