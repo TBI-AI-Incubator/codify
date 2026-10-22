@@ -79,6 +79,29 @@ def _clean_number_str(raw: str | None, default: str = "1") -> str:
     return cleaned or default
 
 
+_TO_SUPERSCRIPT = str.maketrans({digit: sup for sup, digit in _SUPERSCRIPT_MAP.items()})
+
+
+def _sup_to_unicode(markup: str) -> str:
+    """Write ``<sup>N</sup>`` as superscript digits, keeping § 43⁹ apart from § 439."""
+    return re.sub(
+        r"<sup\b[^>]*>\s*(\d+)\s*</sup\s*>",
+        lambda m: m.group(1).translate(_TO_SUPERSCRIPT),
+        markup,
+        flags=re.I,
+    )
+
+
+def _display_number(raw: str) -> str:
+    """A ``kuvatavNr`` as plain text; the source writes its superscripts as HTML."""
+    return " ".join(re.sub(r"<[^>]+>", "", _sup_to_unicode(unescape(raw))).split())
+
+
+def _html_text(raw: str) -> str:
+    """An ``HTMLKonteiner`` as plain text."""
+    return " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescape(raw))).split())
+
+
 def _romanise(text: str) -> str:
     """Romanise Estonian text for FRBR URI slugs per ee/config.json."""
     trans = {
@@ -209,9 +232,7 @@ def _serialize_inline(src_node: etree._Element, parent_akn: etree._Element) -> N
             if child.tail:
                 _append_text(parent_akn, _clean_tail(child.tail))
         elif tag == "HTMLKonteiner":
-            raw_html = child.text or ""
-            unescaped = unescape(raw_html)
-            clean = " ".join(re.sub(r"<[^>]+>", " ", unescaped).split())
+            clean = _html_text(child.text or "")
             if clean:
                 _append_text(parent_akn, clean)
             if child.tail:
@@ -226,7 +247,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
     knr = p_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
         num = etree.SubElement(art, _q("num"))
-        num.text = knr.strip()
+        num.text = _display_number(knr)
 
     h = p_src.findtext("{*}paragrahvPealkiri")
     if h and h.strip():
@@ -245,8 +266,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
             if not p.text and len(p) == 0:
                 p.text = _clean_text(st)
         elif hk is not None:
-            raw_html = hk.text or ""
-            p.text = " ".join(re.sub(r"<[^>]+>", " ", unescape(raw_html)).split())
+            p.text = _html_text(hk.text or "")
         elif mm is not None:
             p.text = _clean_text(mm)
         else:
@@ -277,7 +297,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
         l_knr = loige_el.findtext("{*}kuvatavNr")
         if l_knr and l_knr.strip():
             num = etree.SubElement(para, _q("num"))
-            num.text = l_knr.strip()
+            num.text = _display_number(l_knr)
 
         alampunktid = loige_el.findall("{*}alampunkt")
         st = loige_el.find("{*}sisuTekst")
@@ -297,7 +317,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
                 ap_knr = ap.findtext("{*}kuvatavNr")
                 if ap_knr and ap_knr.strip():
                     pt_num = etree.SubElement(pt, _q("num"))
-                    pt_num.text = ap_knr.strip()
+                    pt_num.text = _display_number(ap_knr)
                 pt_c = etree.SubElement(pt, _q("content"))
                 pt_p = etree.SubElement(pt_c, _q("p"), eId=f"{ap_eid}__p_1")
                 ap_st = ap.find("{*}sisuTekst")
@@ -325,7 +345,7 @@ def _convert_jaotis(jt_src: etree._Element, parent_akn: etree._Element, parent_e
     knr = jt_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
         num = etree.SubElement(subsec, _q("num"))
-        num.text = knr.strip()
+        num.text = _display_number(knr)
 
     h = jt_src.findtext("{*}jaotisPealkiri") or jt_src.findtext("{*}alljaotisPealkiri")
     if h and h.strip():
@@ -349,7 +369,7 @@ def _convert_jagu(j_src: etree._Element, parent_akn: etree._Element, parent_eid:
     knr = j_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
         num = etree.SubElement(sec, _q("num"))
-        num.text = knr.strip()
+        num.text = _display_number(knr)
 
     h = j_src.findtext("{*}jaguPealkiri")
     if h and h.strip():
@@ -376,7 +396,7 @@ def _convert_peatykk(
     knr = p_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
         num = etree.SubElement(chp, _q("num"))
-        num.text = knr.strip()
+        num.text = _display_number(knr)
 
     h = p_src.findtext(f"{{*}}{prefix}Pealkiri")
     if h and h.strip():
@@ -404,7 +424,7 @@ def _convert_osa(o_src: etree._Element, parent_akn: etree._Element) -> tuple[etr
     knr = o_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
         num = etree.SubElement(part, _q("num"))
-        num.text = knr.strip()
+        num.text = _display_number(knr)
 
     h = o_src.findtext("{*}osaPealkiri")
     if h and h.strip():
@@ -668,7 +688,7 @@ def riigi_teataja_to_akn(
                 knr = child.findtext("{*}kuvatavNr")
                 if knr and knr.strip():
                     pt_num = etree.SubElement(pt, _q("num"))
-                    pt_num.text = knr.strip()
+                    pt_num.text = _display_number(knr)
                 pt_c = etree.SubElement(pt, _q("content"))
                 pt_p = etree.SubElement(pt_c, _q("p"), eId=f"{p_eid}__p_1")
                 st = child.find("{*}sisuTekst")
@@ -698,8 +718,7 @@ def riigi_teataja_to_akn(
                     if not p_el.text and len(p_el) == 0:
                         p_el.text = _clean_text(child)
                 else:
-                    raw_html = child.text or ""
-                    p_el.text = " ".join(re.sub(r"<[^>]+>", " ", unescape(raw_html)).split())
+                    p_el.text = _html_text(child.text or "")
 
     # Attachments
     lisad = root.findall(".//{*}lisaViide") + root.findall(".//{*}lisa")

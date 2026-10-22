@@ -239,7 +239,7 @@ def _check_number_set_continuity(
             arabic_nums: list[int] = []
             num_to_eid: dict[int, str] = {}
             for eid, num in scoped:
-                if num.isdigit():
+                if num.isdecimal():
                     arabic_nums.append(int(num))
                     num_to_eid.setdefault(int(num), eid)
                 else:
@@ -398,7 +398,7 @@ def _check_leading_gap(root: etree._Element) -> list[dict[str, Any]]:
             if num:
                 first = (el, num)
                 break
-        if first is None or not first[1].isdigit() or int(first[1]) <= 1:
+        if first is None or not first[1].isdecimal() or int(first[1]) <= 1:
             continue
         el, num = first
         eid = el.get("eId") or ""
@@ -1480,7 +1480,7 @@ def _check_undetected_amendment_shape(root: etree._Element) -> list[dict[str, An
         if num_el is None or not num_el.text:
             continue
         folded = normalise_digits(num_el.text).strip()
-        if not folded.isdigit():
+        if not folded.isdecimal():
             continue
         parent = art.getparent()
         if parent is None:
