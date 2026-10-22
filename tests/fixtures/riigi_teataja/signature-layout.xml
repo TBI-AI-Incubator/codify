@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Vabariigi Valitsus</valjaandja>
+		<dokumentLiik>korraldus</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>1999-05-06</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>1999-05-06</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidiskokkuleppe heakskiitmine</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<sisuTekst>
+			<HTMLKonteiner><![CDATA[<p>Vastavalt näidisseaduse paragrahvi 9 lõikele 2 kiita heaks <a href="./1234567">näidisriikide vaheline kokkulepe</a>.
+<table border="0" width="90%">
+  <tbody><tr>
+    <td width="73%"> </td>
+    <td width="27%"><strong>Peaminister Mart MAASIKAS</strong></td>
+  </tr>
+  <tr>
+    <td> </td>
+    <td><strong>Riigisekretär Liis LEPP</strong></td>
+  </tr>
+</tbody></table>
+</p><p/>]]></HTMLKonteiner>
+		</sisuTekst>
+	</sisu>
+</oigusakt>

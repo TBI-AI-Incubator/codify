@@ -563,8 +563,13 @@ def _walk_block(
         target.extend(run)
 
     def inline_of(parent: etree._Element) -> list[InlineNode]:
-        first_p = _direct_child(parent, "p")
-        return _walk_inline(first_p if first_p is not None else parent)
+        paras = [c for c in parent if _local_name(c) == "p"]
+        if not paras:
+            return _walk_inline(parent)
+        out: list[InlineNode] = []
+        for p in paras:
+            push(out, _walk_inline(p))
+        return out
 
     def flush_pending() -> None:
         nonlocal pending_intro, pending_children, pending_wrap_up, pending_active
@@ -610,7 +615,10 @@ def _walk_block(
                 continue
             follows_phrase = after_phrase and cname == "p"
             after_phrase = False
-            if cname == "intro":
+            if cname in ("intro", "wrapUp") and _direct_child(child, "table") is not None:
+                # Read like content, so its prose and tables keep their order.
+                absorb(child)
+            elif cname == "intro":
                 push(intro, inline_of(child))
             elif cname == "content":
                 absorb(child)

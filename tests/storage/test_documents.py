@@ -5,6 +5,7 @@ from __future__ import annotations
 from lxml import etree
 
 from codify.storage.documents import (
+    DocumentProvisionBlock,
     InlineText,
     _walk_block,
     _walk_text_block,
@@ -154,6 +155,52 @@ def test_walk_block_canonical_paragraph_with_intro_and_wrapup() -> None:
     assert _inline_text(block.intro) == "lead"
     assert [b.num for b in block.blocks] == ["(a)", "(b)"]
     assert _inline_text(block.wrap_up) == "tail"
+
+
+def _reading(block: DocumentProvisionBlock) -> list[str]:
+    """The provision as the reader lays it out: intro, blocks in order, wrap-up."""
+    out = [_inline_text(block.intro)] if block.intro else []
+    for b in block.blocks:
+        if b.table is not None:
+            out.append("table:" + b.table.akn_eid)
+        else:
+            out.extend(_reading(b))
+    return out + ([_inline_text(block.wrap_up)] if block.wrap_up else [])
+
+
+def test_walk_block_keeps_every_intro_and_wrapup_block() -> None:
+    """Every paragraph of an intro or wrap-up is read, and one holding a table
+    keeps its prose and table in source order, each once."""
+    ns = 'xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"'
+    el = _parse(
+        f"""
+        <paragraph {ns} eId="para_1">
+          <intro><p>lead</p><p>second line</p></intro>
+          <point eId="para_1__point_1"><content><p>one</p></content></point>
+          <wrapUp>
+            <p>tail</p>
+            <table eId="para_1__table_1"><tr><td><p>cell</p></td></tr></table>
+            <p>after</p>
+          </wrapUp>
+        </paragraph>
+        """.strip()
+    )
+    assert _reading(_walk_block(el)) == [
+        "lead\n\nsecond line",
+        "one",
+        "tail",
+        "table:para_1__table_1",
+        "after",
+    ]
+    only_table = _parse(
+        f"""
+        <paragraph {ns} eId="para_2">
+          <intro><table eId="para_2__table_1"><tr><td><p>cell</p></td></tr></table></intro>
+          <point eId="para_2__point_1"><content><p>one</p></content></point>
+        </paragraph>
+        """.strip()
+    )
+    assert _reading(_walk_block(only_table)) == ["table:para_2__table_1", "one"]
 
 
 def test_walk_block_blocklist_intro_and_wrapup() -> None:

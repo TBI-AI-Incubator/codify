@@ -161,6 +161,19 @@ New, additive:
 
 Fixed:
 
+- Riigi Teataja converter: a line break ends one `<p>` and the text after it
+  starts the next, which Bluebell reads as a line too. Every `sisuTekst` of a
+  unit is written, not only the first: text before a paragraph's lõiked is its
+  `intro`, text after them its `wrapUp`, text between two units follows the
+  first, and a top-level `punkt` keeps its points. Headings keep the text after inline markup, with superscript digits.
+  Unmapped inline markup keeps its text, and a space between two inline
+  elements stays. A native `tabel` or an HTML `table` becomes an AKN `table`
+  with row eIds, unless it only places text: lines of up to 100 characters
+  beside a column blank in every row, with no spanned cell, or every cell
+  reading `allkirjastatud` (signed). Those stay out of the body, as signatures
+  already do, and the conversion logs how many it left out.
+- The reader projection reads every `<p>` of an `intro` or `wrapUp`, not only
+  the first; one that holds a table is read like content, in source order.
 - `ensure_unique_eids`: a renamed duplicate never takes an eId the document
   already publishes, so a reference to an id such as `x_dup2` keeps naming the
   element it named.
