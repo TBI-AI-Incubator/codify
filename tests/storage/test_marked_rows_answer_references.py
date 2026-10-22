@@ -25,7 +25,8 @@ _AKN = f"""<akomaNtoso xmlns="{_NS}"><act><body>
 <section eId="sec_1"><paragraph eId="sec_1__para_1"><content><p>See below.</p></content>
 </paragraph></section>
 <section eId="sec_2" refersTo="#elsewhere"><paragraph eId="sec_2__para_2" refersTo="#elsewhere">
-<content><p>The Committee shall report.</p></content></paragraph></section>
+<content><p>The Committee shall <term eId="sec_2__para_2__term_1">report</term>.</p></content>
+</paragraph></section>
 <paragraph eId="para_9"><content><p>[TIFF not transcribed: annex.tif]</p></content></paragraph>
 </body></act></akomaNtoso>"""
 
@@ -136,7 +137,8 @@ async def test_a_marked_row_answers_a_reference_and_a_placeholder_does_not(
     assert await _provision_in_version(session, version, "sec_2__para_2") == duty
     assert await _provision_in_version(session, version, "para_9") is None
 
-    # The resolver's anchor pass lands on it as well.
+    # The resolver lands on it as well, by eId or, for a part with no row of its
+    # own, as the enclosing row; a placeholder's parts land nowhere.
     refs = {
         anchor: CrossReference(
             source_provision_id=rows["sec_1__para_1"][0],
@@ -144,13 +146,14 @@ async def test_a_marked_row_answers_a_reference_and_a_placeholder_does_not(
             ref_type="cross_reference",
             edge_class="freetext_reference",
         )
-        for anchor in ("sec_2__para_2", "para_9")
+        for anchor in ("sec_2__para_2", "sec_2__para_2__term_1", "para_9")
     }
     session.add_all(refs.values())
     await session.flush()
     await resolve_references_for_version(session, version)
     assert {a: r.target_provision_id for a, r in refs.items()} == {
         "sec_2__para_2": duty,
+        "sec_2__para_2__term_1": duty,
         "para_9": None,
     }
     assert placeholder not in {r.target_provision_id for r in refs.values()}
