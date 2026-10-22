@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import zipfile
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -281,3 +283,87 @@ def test_index_dates_an_entry_as_the_parser_dates_its_expression(tmp_path: Path)
     _, meta = riigi_teataja_to_akn(member)
     assert meta["frbr_expression_uri"].endswith(f"@{entry['expression_date']}")
     assert (entry["expression_date"], entry["year"]) == ("2026-10-04", 2026)
+
+
+# --- redactions kept only to mark a repeal ------------------------------------------
+
+_BODY = re.compile(rb"\t<sisu\b.*?</sisu>", re.S)
+
+
+def _repeal_stub(
+    gid: str, *, repealer: str | None = None, note: str | None = None, original: str = ""
+) -> bytes:
+    """A redaction whose text is gone: no body, or only a "Kehtetu" note naming the act
+    that repealed it. A repeal mark citing `repealer` follows the title."""
+    body = (
+        b"\t<sisu/>"
+        if note is None
+        else f"\t<sisu><sisuTekst><tavatekst>{note}</tavatekst></sisuTekst></sisu>".encode()
+    )
+    member = _BODY.sub(body, _member(gid, ids=False))
+    if original:
+        member = member.replace(
+            b"\t\t\t<aktiNr>42</aktiNr>",
+            f"\t\t\t<avaldamismarge><aktViide>{original}</aktViide></avaldamismarge>\n"
+            "\t\t\t<aktiNr>42</aktiNr>".encode(),
+        )
+    if repealer:
+        mark = (
+            "\t<muutmismarge><tavatekst>Kehtetu</tavatekst><avaldamismarge>"
+            f"<aktViide>{repealer}</aktViide></avaldamismarge></muutmismarge>\n"
+        )
+        member = member.replace(b"\t<sisu", mark.encode() + b"\t<sisu", 1)
+    return member
+
+
+def test_a_redaction_left_only_to_mark_a_repeal_is_kept_aside_with_its_repealer(
+    tmp_path: Path,
+) -> None:
+    payload = _indexed_payload(
+        tmp_path,
+        _repeal_stub("601", repealer="900001"),
+        _repeal_stub("602", note='Kehtetu - <a href="./900002">RTL 2004, 7, 94</a>'),
+        _repeal_stub("603", repealer="900003", original="900003"),
+        _member("604"),
+    )
+    assert list(payload["entries"]) == ["604"]
+    assert {k: v["repealed_by"] for k, v in payload["repealed"].items()} == {
+        "601": "900001",
+        "602": "900002",
+        # A temporary act's lapse note cites its own publication, so it names no repealer.
+        "603": None,
+    }
+    assert payload["repealed"]["601"]["expression_date"] == "2026-10-04"
+    assert payload["stats"]["repealed"] == 3
+
+
+def test_a_short_act_that_repeals_another_stays_an_entry(tmp_path: Path) -> None:
+    repealing = _BODY.sub(
+        "\t<sisu><sisuTekst><tavatekst>Kehtetuks tunnistada määrus nr 80.</tavatekst>"
+        "</sisuTekst></sisu>".encode(),
+        _member("605"),
+    )
+    assert list(_indexed(tmp_path, repealing)) == ["605"]
+
+
+def test_as_of_keeps_a_redaction_that_ended_since(tmp_path: Path) -> None:
+    ended = _member("606", end="2026-09-20")
+    archive = tmp_path / "archive.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("000000000606.xml", ended)
+    assert list(build_ee_index(archive, as_of=date(2026, 9, 11))["entries"]) == ["606"]
+    assert build_ee_index(archive, as_of=date(2026, 9, 21))["entries"] == {}
+
+
+def _indexed_payload(tmp_path: Path, *members: bytes) -> dict[str, Any]:
+    archive = tmp_path / "archive.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for i, data in enumerate(members):
+            zf.writestr(f"{i:012d}.xml", data)
+    return build_ee_index(archive)
+
+
+def test_text_after_the_title_is_not_read_as_metadata(tmp_path: Path) -> None:
+    # An abbreviation in the body is not the act's own, so it cannot make it the constitution.
+    member = _member("607").replace(b"</sisu>", b"<lyhend>PS</lyhend></sisu>")
+    assert _indexed(tmp_path, member)["607"]["doctype"] == "maarrus"

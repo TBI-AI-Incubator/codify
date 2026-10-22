@@ -32,7 +32,7 @@ from codify.acquisition.adapters.ee.remote import (
 )
 from codify.core.security import SSRFBlocked
 from codify.jurisdictions import SourceAdapter
-from tests.acquisition.adapters.test_ee_datadump import _member
+from tests.acquisition.adapters.test_ee_datadump import _member, _repeal_stub
 
 _URL = "https://archive.example/xml.zip"
 _STAMP = "Sun, 18 Oct 2026 11:48:02 GMT"
@@ -226,15 +226,15 @@ def test_a_member_that_does_not_inflate_is_named() -> None:
             f.member(loc)
 
 
-def test_a_head_is_one_bounded_read_cut_at_the_title() -> None:
+def test_a_prefix_is_one_bounded_read() -> None:
     # Incompressible padding, so the member is longer than the head.
     body = _member("601") + b"<!--" + random.Random(0).randbytes(200_000) + b"-->"
     server = _Server(_zip({"000000000601.xml": (body, (2026, 10, 2))}))
     with _remote(server) as f:
         loc = MemberLocation.of(f.directory()[0])
         server.ranges.clear()
-        head = f.member_head(loc, until=b"</aktinimi>", limit=4096)
-    assert body.startswith(head) and head.endswith(b"</aktinimi>")
+        head = f.member_prefix(loc, limit=4096)
+    assert body.startswith(head) and len(head) == 4096
     data_reads = [r for r in server.ranges if r[0] != loc.offset]
     assert loc.size > 4096 and len(data_reads) == 1
     assert data_reads[0][1] - data_reads[0][0] + 1 == 4096
@@ -259,7 +259,7 @@ def test_the_remote_index_reads_only_members_changed_since_and_keeps_the_state_o
     payload = index_remote_ee_archive(
         _URL, modified_since=date(2026, 10, 1), client=_client(server)
     )
-    assert payload["stats"] == {"files_scanned": 2, "indexed": 1, "skipped": 1}
+    assert payload["stats"] == {"files_scanned": 2, "indexed": 1, "repealed": 0, "skipped": 1}
     assert list(payload["entries"]) == ["101"]
     assert _member_reads(data, server) == {"000000000101.xml", "000000000102.xml"}
 
@@ -321,6 +321,27 @@ def test_a_member_dated_only_by_publication_is_dated_alike_on_both_paths(tmp_pat
         build_ee_index(archive)["entries"]["106"],
     ):  # type: ignore[index]
         assert (entry["expression_date"], entry["year"]) == ("2026-10-01", 2026)
+
+
+def test_the_remote_index_keeps_repeal_only_redactions_aside_as_the_local_walk_does(
+    tmp_path: Path,
+) -> None:
+    data = _zip(
+        {
+            **_members(),
+            "000000000501.xml": (_repeal_stub("501", repealer="777"), (2026, 10, 2)),
+        }
+    )
+    archive = tmp_path / "xml.zip"
+    archive.write_bytes(data)
+    remote_index = _index(data, date(2026, 10, 1))
+    local = build_ee_index(archive)
+    remote_repealed: dict[str, dict[str, object]] = remote_index["repealed"]  # type: ignore[assignment]
+    unlocated = {
+        k: {f: v for f, v in e.items() if f != "location"} for k, e in remote_repealed.items()
+    }
+    assert unlocated == local["repealed"]
+    assert list(local["repealed"]) == ["501"] and local["repealed"]["501"]["repealed_by"] == "777"
 
 
 def test_a_failure_behind_a_slow_member_stops_the_rest() -> None:

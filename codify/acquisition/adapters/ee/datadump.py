@@ -16,7 +16,7 @@ import httpx
 import structlog
 
 from codify.acquisition.adapters.ee.identity import classify, read_identity, romanise
-from codify.acquisition.adapters.ee.remote import MemberLocation, RemoteFile, leading
+from codify.acquisition.adapters.ee.remote import MemberLocation, RemoteFile
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
@@ -172,16 +172,51 @@ def _field(head: str, tag: str) -> str:
     return unescape(m.group(1)).strip() if m else ""
 
 
-def _read_head(f: IO[bytes]) -> str:
-    """A member's leading text through its title, cut as the remote read cuts it."""
-    return leading(f.read(_HEAD_LIMIT), _HEAD_END, _HEAD_LIMIT).decode("utf-8", errors="ignore")
+_BODY = re.compile(r"<sisu\b[^>]*/>|<sisu\b[^>]*>(.*?)</sisu>", re.S)
+_MARKUP = re.compile(r"<!\[CDATA\[|\]\]>|<[^>]+>")
+_REPEALING_ACT = re.compile(
+    r"<muutmismarge\b[^>]*>.*?<aktViide\b[^>]*>(\d+)</aktViide>|<sisu\b[^>]*>.*?href=\"\./(\d+)\"",
+    re.S,
+)
+_ORIGINAL_ACT = re.compile(r"<vastuvoetud\b[^>]*>.*?<aktViide\b[^>]*>(\d+)</aktViide>", re.S)
+
+
+def _original_act(prefix: str) -> str | None:
+    """The publisher id of the act's own first publication."""
+    m = _ORIGINAL_ACT.search(prefix)
+    return m.group(1) if m else None
+
+
+def _repealing_act(prefix: str, own_ids: set[str]) -> str | None:
+    """The publication the repeal note cites, unless it is the act's own: a temporary act
+    that lapses cites itself, which names no repealing act."""
+    m = _REPEALING_ACT.search(prefix)
+    cited = (m.group(1) or m.group(2)) if m else None
+    return cited if cited and cited not in own_ids else None
+
+
+def _is_repeal_stub(prefix: str) -> bool:
+    """A redaction kept only to mark the act repealed: no body, or a short "Kehtetu" note."""
+    m = _BODY.search(prefix)
+    if m is None:
+        return False
+    text = " ".join(unescape(_MARKUP.sub(" ", m.group(1) or "")).split())
+    return not text or (len(text) < 400 and re.match(r"kehtetu\b", text, re.I) is not None)
+
+
+def _prefix(f: IO[bytes]) -> bytes:
+    """A member's first bytes, as the remote read takes them."""
+    return f.read(_HEAD_LIMIT)
 
 
 def _index_entry(
-    member: str, head: str, *, today: date, principal_only: bool
-) -> tuple[str, dict[str, Any]] | None:
-    """A member's key and entry, or None for another kind of document, a municipal act,
-    a redaction no longer in force, or one with no title."""
+    member: str, data: bytes, *, today: date, principal_only: bool
+) -> tuple[str, dict[str, Any], bool] | None:
+    """A member's key, entry and whether it only marks a repeal, or None for another kind
+    of document, a municipal act, a redaction no longer in force, or one with no title."""
+    prefix = data.decode("utf-8", errors="ignore")
+    cut = data.find(_HEAD_END)
+    head = prefix if cut < 0 else data[: cut + len(_HEAD_END)].decode("utf-8", errors="ignore")
     liik = _field(head, "dokumentLiik").lower()
     if liik not in ("seadus", "määrus", "põhiseadus"):
         return None
@@ -222,7 +257,8 @@ def _index_entry(
     if principal_only and not (is_principal or is_code):
         return None
 
-    return doc_id, {
+    original = _original_act(prefix)
+    entry: dict[str, Any] = {
         "member": member,
         "title": title,
         "doctype": classify(liik, lyhend, title),
@@ -234,7 +270,13 @@ def _index_entry(
         "expression_date": (_field(head, "kehtivuseAlgus") or date_str)[:10],
         "principal": is_principal or is_code,
         "code": is_code,
+        "original": original,
     }
+    # Repealed acts keep a last redaction with no text; it has no end date.
+    if _is_repeal_stub(prefix):
+        own = {i for i in (doc_id, original) if i}
+        return doc_id, {**entry, "repealed_by": _repealing_act(prefix, own)}, True
+    return doc_id, entry, False
 
 
 def build_ee_index(
@@ -243,13 +285,16 @@ def build_ee_index(
     principal_only: bool = False,
     max_files: int | None = None,
     on_progress: Any = None,
+    as_of: date | None = None,
 ) -> dict[str, Any]:
-    """Walk an Estonian bulk XML zip archive and index the state statutes in force."""
+    """Walk an Estonian bulk XML zip archive and index the state statutes in force on
+    `as_of` (today). Repeal-only redactions go under ``repealed``, which no ingest reads."""
     from datetime import UTC, datetime
 
     archive_path = Path(archive)
-    today = date.today()
+    today = as_of or date.today()
     entries: dict[str, Any] = {}
+    repealed: dict[str, Any] = {}
     scanned = 0
     skipped = 0
 
@@ -262,13 +307,11 @@ def build_ee_index(
             scanned += 1
             try:
                 with zf.open(n) as f:
-                    found = _index_entry(
-                        n, _read_head(f), today=today, principal_only=principal_only
-                    )
-                if found is None:
+                    found = _index_entry(n, _prefix(f), today=today, principal_only=principal_only)
+                if found is None or found[2]:
                     skipped += 1
-                else:
-                    entries[found[0]] = found[1]
+                if found is not None:
+                    (repealed if found[2] else entries)[found[0]] = found[1]
             except Exception:
                 skipped += 1
 
@@ -287,9 +330,11 @@ def build_ee_index(
         "stats": {
             "files_scanned": scanned,
             "indexed": len(entries),
+            "repealed": len(repealed),
             "skipped": skipped,
         },
         "entries": entries,
+        "repealed": repealed,
     }
 
 
@@ -320,19 +365,16 @@ def index_remote_ee_archive(
                 f"more than the {max_members} one read takes"
             )
 
-        def entry(info: zipfile.ZipInfo) -> tuple[str, dict[str, Any]] | None:
+        def entry(info: zipfile.ZipInfo) -> tuple[str, dict[str, Any], bool] | None:
             loc = MemberLocation.of(info)
-            head = remote.member_head(loc, until=_HEAD_END, limit=_HEAD_LIMIT)
+            data = remote.member_prefix(loc, limit=_HEAD_LIMIT)
             try:
-                found = _index_entry(
-                    info.filename,
-                    head.decode("utf-8", errors="ignore"),
-                    today=today,
-                    principal_only=False,
-                )
+                found = _index_entry(info.filename, data, today=today, principal_only=False)
             except ValueError:
                 return None  # an unreadable date, skipped as the local walk skips it
-            return None if found is None else (found[0], {**found[1], "location": loc.to_extra()})
+            if found is None:
+                return None
+            return found[0], {**found[1], "location": loc.to_extra()}, found[2]
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(entry, i) for i in changed]
@@ -351,10 +393,12 @@ def index_remote_ee_archive(
         "modified_since": modified_since.isoformat(),
         "stats": {
             "files_scanned": len(changed),
-            "indexed": len(found),
-            "skipped": len(changed) - len(found),
+            "indexed": sum(1 for f in found if not f[2]),
+            "repealed": sum(1 for f in found if f[2]),
+            "skipped": len(changed) - sum(1 for f in found if not f[2]),
         },
-        "entries": dict(found),
+        "entries": {k: e for k, e, stub in found if not stub},
+        "repealed": {k: e for k, e, stub in found if stub},
     }
 
 

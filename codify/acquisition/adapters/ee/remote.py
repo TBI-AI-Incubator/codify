@@ -160,10 +160,10 @@ class RemoteFile:
             raise ArchiveChanged(f"{loc.name} does not match its recorded CRC")
         return raw
 
-    def member_head(self, loc: MemberLocation, *, until: bytes, limit: int) -> bytes:
-        """`leading(member, until, limit)` from one read of at most `limit` stored bytes."""
+    def member_prefix(self, loc: MemberLocation, *, limit: int) -> bytes:
+        """A member's first `limit` bytes, from one read of at most `limit` stored bytes."""
         data = self.read(self._data_start(loc), min(loc.size, limit))
-        return leading(self._inflate(loc, data, limit), until, limit)
+        return self._inflate(loc, data, limit)[:limit]
 
     def _data_start(self, loc: MemberLocation) -> int:
         """Where the member's data begins, after the local header it records."""
@@ -190,13 +190,6 @@ class RemoteFile:
             return zlib.decompressobj(-15).decompress(data, limit or 0)
         except zlib.error as exc:
             raise ArchiveChanged(f"{loc.name} does not inflate: {exc}") from exc
-
-
-def leading(data: bytes, until: bytes, limit: int) -> bytes:
-    """`data` through the first `until` in its first `limit` bytes, else those bytes."""
-    head = data[:limit]
-    cut = head.find(until)
-    return head if cut < 0 else head[: cut + len(until)]
 
 
 class _RangeIO(io.RawIOBase):
@@ -238,5 +231,4 @@ __all__ = [
     "RangeRefused",
     "RemoteFile",
     "http_client",
-    "leading",
 ]
