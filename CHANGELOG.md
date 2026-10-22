@@ -95,6 +95,8 @@ New, additive:
   uses one for a jurisdiction searched in its original language. The search
   then joins the flag instead of binding every id, which the planner estimated
   element by element: seconds of planning per query on a large corpus.
+- Migration `0025_atlas_build_kind` adds `atlas_build` to the run kinds; the
+  downgrade refuses while rows of that kind exist.
 - `structuring.recurring_furniture`: for a layout engine that files footnotes
   and page-top captions under header or footer. Furniture is then a bare page
   number or a short block another page repeats, a running head split across

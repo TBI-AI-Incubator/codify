@@ -1,4 +1,4 @@
-"""Migration 0024 is the head and touches `versions` without a long lock."""
+"""Migration 0024 follows source spans and touches `versions` without a long lock."""
 
 from __future__ import annotations
 
@@ -11,9 +11,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 _REVISION = "0024_current_versions"
 
 
-def test_current_versions_is_the_head_after_source_spans() -> None:
+def test_current_versions_follows_source_spans() -> None:
     scripts = ScriptDirectory.from_config(Config(str(_ROOT / "alembic.ini")))
-    assert scripts.get_heads() == [_REVISION]
     rev = scripts.get_revision(_REVISION)
     assert rev is not None and rev.down_revision == "0023_source_spans"
 
