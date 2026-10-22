@@ -346,13 +346,44 @@ def test_a_short_act_that_repeals_another_stays_an_entry(tmp_path: Path) -> None
     assert list(_indexed(tmp_path, repealing)) == ["605"]
 
 
-def test_as_of_keeps_a_redaction_that_ended_since(tmp_path: Path) -> None:
-    ended = _member("606", end="2026-09-20")
+@pytest.mark.parametrize(("day", "kept"), [((2026, 10, 20), True), ((2026, 10, 21), False)])
+def test_as_of_keeps_a_redaction_not_ended_that_day(
+    tmp_path: Path, day: tuple[int, int, int], kept: bool
+) -> None:
     archive = tmp_path / "archive.zip"
     with zipfile.ZipFile(archive, "w") as zf:
-        zf.writestr("000000000606.xml", ended)
-    assert list(build_ee_index(archive, as_of=date(2026, 9, 11))["entries"]) == ["606"]
-    assert build_ee_index(archive, as_of=date(2026, 9, 21))["entries"] == {}
+        zf.writestr("000000000606.xml", _member("606", end="2026-10-20"))
+    assert ("606" in build_ee_index(archive, as_of=date(*day))["entries"]) is kept
+
+
+def test_a_redaction_not_yet_in_force_is_kept(tmp_path: Path) -> None:
+    # Published before it starts: a weekly refresh takes it then or never, and an index
+    # for a past day holds it as an index built that day did.
+    archive = tmp_path / "archive.zip"
+    future = _member("608").replace(b"2026-10-04+03:00", b"2099-01-01")
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("000000000608.xml", future)
+    assert list(build_ee_index(archive)["entries"]) == ["608"]
+    assert list(build_ee_index(archive, as_of=date(2026, 9, 11))["entries"]) == ["608"]
+
+
+def test_a_repeal_mark_with_no_body_at_all_is_a_stub_but_a_cut_one_is_not(
+    tmp_path: Path,
+) -> None:
+    whole = _repeal_stub("609", repealer="900009").replace(b"\t<sisu/>", b"")
+    assert b"<sisu" not in whole
+    long_body = _member("610").replace(b"</sisu>", b"<!--" + b"x" * 70_000 + b"--></sisu>")
+    payload = _indexed_payload(tmp_path, whole, long_body)
+    assert list(payload["repealed"]) == ["609"] and list(payload["entries"]) == ["610"]
+
+
+def test_the_original_publication_is_read_from_the_adoption_block_alone(
+    tmp_path: Path,
+) -> None:
+    # No reference in the adoption block; the act's own and the repealer's come later.
+    stub = _repeal_stub("611", repealer="900011")
+    entry = _indexed_payload(tmp_path, stub)["repealed"]["611"]
+    assert (entry["original"], entry["repealed_by"]) == (None, "900011")
 
 
 def _indexed_payload(tmp_path: Path, *members: bytes) -> dict[str, Any]:

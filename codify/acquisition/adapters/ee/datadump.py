@@ -178,7 +178,10 @@ _REPEALING_ACT = re.compile(
     r"<muutmismarge\b[^>]*>.*?<aktViide\b[^>]*>(\d+)</aktViide>|<sisu\b[^>]*>.*?href=\"\./(\d+)\"",
     re.S,
 )
-_ORIGINAL_ACT = re.compile(r"<vastuvoetud\b[^>]*>.*?<aktViide\b[^>]*>(\d+)</aktViide>", re.S)
+# Within the adoption block only: past its end, a reference is a later publication's.
+_ORIGINAL_ACT = re.compile(
+    r"<vastuvoetud\b[^>]*>(?:(?!</vastuvoetud>).)*?<aktViide\b[^>]*>(\d+)</aktViide>", re.S
+)
 
 
 def _original_act(prefix: str) -> str | None:
@@ -199,7 +202,8 @@ def _is_repeal_stub(prefix: str) -> bool:
     """A redaction kept only to mark the act repealed: no body, or a short "Kehtetu" note."""
     m = _BODY.search(prefix)
     if m is None:
-        return False
+        # No body in a member read whole; a body past the read limit is not absent.
+        return "</oigusakt>" in prefix
     text = " ".join(unescape(_MARKUP.sub(" ", m.group(1) or "")).split())
     return not text or (len(text) < 400 and re.match(r"kehtetu\b", text, re.I) is not None)
 
@@ -287,8 +291,9 @@ def build_ee_index(
     on_progress: Any = None,
     as_of: date | None = None,
 ) -> dict[str, Any]:
-    """Walk an Estonian bulk XML zip archive and index the state statutes in force on
-    `as_of` (today). Repeal-only redactions go under ``repealed``, which no ingest reads."""
+    """Walk an Estonian bulk XML zip archive and index the state statutes not ended by
+    `as_of` (today), so a text published ahead of its start is kept. Repeal-only
+    redactions go under ``repealed``, which no ingest reads."""
     from datetime import UTC, datetime
 
     archive_path = Path(archive)
