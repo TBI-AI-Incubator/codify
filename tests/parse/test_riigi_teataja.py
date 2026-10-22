@@ -1046,15 +1046,20 @@ def test_stored_rows_and_reader_keep_unit_text_in_reading_order() -> None:
     from codify.storage.documents import _eid_index, _to_provision
     from codify.storage.mappers import document_to_rows
 
+    table = (
+        "<![CDATA[<table><tr><td>{0}</td><td>1</td></tr><tr><td>B</td><td>2</td></tr></table>]]>"
+    )
     akn_xml = _act(
-        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+        f"""<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
 			<sisuTekst><tavatekst>Ees.</tavatekst></sisuTekst>
 			<loige><loigeNr>1</loigeNr><kuvatavNr>(1)</kuvatavNr>
 				<sisuTekst><tavatekst>Loetelu:</tavatekst></sisuTekst>
 				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
 					<sisuTekst><tavatekst>punkt;</tavatekst></sisuTekst></alampunkt>
-				<sisuTekst><tavatekst>Lõpetus.</tavatekst></sisuTekst></loige>
-			<sisuTekst><tavatekst>Lõpp.</tavatekst></sisuTekst>
+				<sisuTekst><tavatekst>Lõpetus.</tavatekst>
+					<HTMLKonteiner>{table.format("L")}</HTMLKonteiner></sisuTekst></loige>
+			<sisuTekst><tavatekst>Lõpp.</tavatekst>
+				<HTMLKonteiner>{table.format("P")}</HTMLKonteiner></sisuTekst>
 		</paragrahv>
 		<paragrahv><paragrahvNr>2</paragrahvNr><kuvatavNr>§ 2.</kuvatavNr>
 			<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td><td>10</td></tr>
@@ -1070,17 +1075,51 @@ def test_stored_rows_and_reader_keep_unit_text_in_reading_order() -> None:
         ("art_1__intro", "Ees."),
         ("art_1__para_1", "Loetelu:"),
         ("art_1__para_1__point_1", "punkt;"),
-        ("art_1__para_1__wrapup", "Lõpetus."),
-        ("art_1__wrapup", "Lõpp."),
+        ("art_1__para_1__wrapup", "Lõpetus. L 1 B 2"),
+        ("art_1__wrapup", "Lõpp. P 1 B 2"),
         ("art_2__content", "A 10 B 20 eurot"),
     ]
-    # The reader renders the lõige's wrap-up in its own row, after the point.
+    # The reader renders each split-off run in its own row, tables included,
+    # and the lõige's own block leaves its wrap-up to that row.
     persisted = frozenset(r.akn_eid for r in rows)
-    para = next(r for r in rows if r.akn_eid == "art_1__para_1")
     index = _eid_index(etree.fromstring(akn_xml.encode()))
-    block = _to_provision(para, index, persisted).blocks[0]
-    assert block.wrap_up == []
-    assert block.intro and block.intro[0].text.strip() == "Loetelu:"
+    rendered = {r.akn_eid: _to_provision(r, index, persisted).blocks for r in rows}
+    para = rendered["art_1__para_1"][0]
+    assert para.wrap_up == []
+    assert [b.akn_type for b in para.blocks] == []
+    for eid, table_eid in (
+        ("art_1__para_1__wrapup", "art_1__para_1__table_1"),
+        ("art_1__wrapup", "art_1__table_1"),
+    ):
+        (closing,) = rendered[eid]
+        assert closing.intro and closing.intro[0].text.startswith("Lõp")
+        assert [b.akn_eid for b in closing.blocks] == [table_eid]
+
+
+def test_a_wrap_up_closing_subsections_is_not_rowed_before_them() -> None:
+    import uuid
+
+    from codify.akn import Article, Chapter
+    from codify.akn.document import Document
+    from codify.storage.mappers import document_to_rows
+
+    chapter = Chapter(
+        akn_eid="chp_1",
+        akn_type="chapter",
+        position=0,
+        wrap_up="Closing words.",
+        children=[Article(akn_eid="chp_1__art_1", akn_type="article", position=0, text="Body.")],
+    )
+    doc = Document(
+        id=uuid.uuid4(),
+        frbr_work_uri="/akn/xz/act/2012/7",
+        frbr_expression_uri="/akn/xz/act/2012/7/est@2012",
+        language="est",
+        expression_date="2012-01-01",
+        body=[chapter],
+    )
+    _, _, rows, _, _, _ = document_to_rows(doc, law_id=uuid.uuid4())
+    assert [r.akn_eid for r in rows] == ["chp_1__art_1__content"]
 
 
 def test_a_native_cell_is_classified_on_its_visible_text() -> None:

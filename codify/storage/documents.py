@@ -525,8 +525,10 @@ def _walk_block(
     stop_at_eids: frozenset[str] = frozenset(),
     nested_tags: frozenset[str] = _NESTED_BLOCK_TAGS,
     keep_unknown: bool = False,
+    skip_wrap_up: bool = False,
 ) -> DocumentProvisionBlock:
-    """Build a nested provision block.
+    """Build a nested provision block; ``skip_wrap_up`` leaves out a wrap-up
+    persisted as its own row.
 
     Each `<p>...<blockList>?` pair under `<content>` becomes a "group". A
     new `<p>` after items closes the current group and opens the next.
@@ -616,6 +618,8 @@ def _walk_block(
                 continue
             follows_phrase = after_phrase and cname == "p"
             after_phrase = False
+            if cname == "wrapUp" and skip_wrap_up:
+                continue
             if cname in ("intro", "wrapUp") and _direct_child(child, "table") is not None:
                 # Read like content, so its prose and tables keep their order.
                 absorb(child)
@@ -831,6 +835,14 @@ def _eid_index(root: etree._Element) -> dict[str, etree._Element]:
 _SYNTHETIC_CONTENT_SUFFIX = "__content"
 
 
+def _wrapper_of(eid: str, xml_index: dict[str, etree._Element]) -> etree._Element | None:
+    """The ``<intro>`` or ``<wrapUp>`` a split-off ``__intro``/``__wrapup`` row names."""
+    for suffix, tag in (("__intro", "intro"), (WRAP_UP_SUFFIX, "wrapUp")):
+        if eid.endswith(suffix) and (owner := xml_index.get(eid[: -len(suffix)])) is not None:
+            return _direct_child(owner, tag)
+    return None
+
+
 def _to_provision(
     row: Provision,
     xml_index: dict[str, etree._Element],
@@ -838,6 +850,19 @@ def _to_provision(
 ) -> DocumentProvision:
     el = xml_index.get(row.akn_eid)
     is_synthetic_content = False
+    wrapper = None if el is not None else _wrapper_of(row.akn_eid, xml_index)
+    if wrapper is not None:
+        # A lead-in or wrap-up row the mapper split off: read its own subtree.
+        block = _walk_block(wrapper).model_copy(update={"akn_eid": ""})
+        return DocumentProvision(
+            id=row.id,
+            akn_eid=row.akn_eid,
+            akn_type=row.akn_type,
+            text=row.text,
+            position=row.position,
+            normative=row.normative,
+            blocks=[block],
+        )
     if el is None and row.akn_eid.endswith(_SYNTHETIC_CONTENT_SUFFIX):
         # Mapper-synthesised `<eid>__content` row: walk the parent so
         # blockList items lift into nested blocks.
@@ -850,10 +875,9 @@ def _to_provision(
         # Never stop at self: excluding own eId lets a leaf that shares
         # its eId with the persisted set still emit its own content.
         stop = stop_at_eids - {row.akn_eid} if stop_at_eids else stop_at_eids
-        block = _walk_block(el, stop_at_eids=stop)
-        if f"{row.akn_eid}{WRAP_UP_SUFFIX}" in stop_at_eids:
-            # Its wrap-up closes rows rendered after this one, so it renders there.
-            block = block.model_copy(update={"wrap_up": []})
+        # A wrap-up with its own row closes rows rendered after this one.
+        moved = f"{row.akn_eid}{WRAP_UP_SUFFIX}" in stop_at_eids
+        block = _walk_block(el, stop_at_eids=stop, skip_wrap_up=moved)
         if is_synthetic_content:
             # Section header already shows the container's num/heading
             # and owns the article's eId; drop both on the bridged block.

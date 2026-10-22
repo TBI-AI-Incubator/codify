@@ -244,7 +244,11 @@ def document_to_rows(
                 )
             for child in element.children:
                 _walk(child, parent_section_id=section_row.id, normative=normative)
-            if element.wrap_up.strip():
+            # The reader puts a section's rows before its subsections, so a wrap-up
+            # closing subsections would read first; only one closing provisions is rowed.
+            if element.wrap_up.strip() and not any(
+                c.kind in ROW_SECTION_KINDS for c in element.children
+            ):
                 _append_wrap_up(element, section_row.id, normative)
         elif element.kind in LEAF_KINDS:
             # A grouping point carries its lead-in in `intro` (and any tail in
