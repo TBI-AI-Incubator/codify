@@ -327,7 +327,7 @@ def create_server(
         count = sum(
             1
             for p in iter_assessable(docs[0])
-            if not is_structural(p) and not is_excluded(p, docs[0], marked)
+            if not is_structural(p, marked) and not is_excluded(p, docs[0], marked)
         )
         if count > compare_cap:
             raise ToolError(

@@ -176,7 +176,7 @@ async def compare(
         provs = [
             p
             for p in iter_assessable(doc)
-            if not is_structural(p) and not is_excluded(p, doc, doc_marked)
+            if not is_structural(p, doc_marked) and not is_excluded(p, doc, doc_marked)
         ]
         group_provisions.append(provs)
         domestic_provisions.extend(provs)
@@ -319,7 +319,7 @@ async def _assess_provision(
     marked: frozenset[uuid.UUID] = frozenset(),
 ) -> ProvisionAlignment:
     # Classify structural headings without an LLM call and keep their own label.
-    if is_structural(directive_provision):
+    if is_structural(directive_provision, marked):
         return ProvisionAlignment(
             directive_eid=directive_provision.akn_eid,
             directive_heading=directive_provision.heading,

@@ -100,9 +100,10 @@ def provision_text(
     return "\n".join(parts).strip()
 
 
-def is_structural(el: BodyElement) -> bool:
-    """Heading-only container, such as ``Section I``; not a target."""
-    return not provision_text(el)
+def is_structural(el: BodyElement, marked: frozenset[UUID] = frozenset()) -> bool:
+    """Heading-only container, such as ``Section I``, or one whose only content is
+    marked out of the pool; not a target."""
+    return not provision_text(el, marked=marked)
 
 
 _ART_RE = re.compile(r"art_([0-9]+[a-z]?)")

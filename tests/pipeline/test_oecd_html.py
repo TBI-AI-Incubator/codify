@@ -533,6 +533,10 @@ def test_the_french_text_marks_the_same_sections() -> None:
         ("INVITE les Adhérents à diffuser la présente Recommandation.", False),
         ("INVITE les non-Adhérents à y adhérer.", True),
         ("CHARGE le Comité des ports de suivre sa mise en œuvre.", True),
+        ("CHARGE le Comité de faire rapport aux Adhérents.", True),
+        ("CHARGE le Comité d’informer les Adhérents.", True),
+        ("CHARGE le Comité de la gouvernance publique de suivre les Adhérents.", True),
+        ("INVITE les représentants de chaque Adhérent à diffuser le texte.", False),
     ],
 )
 def test_the_addressee_decides_the_mark(lead_in: str, marked: bool) -> None:

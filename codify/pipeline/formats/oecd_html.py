@@ -100,8 +100,9 @@ NON_ADHERENT_VERBS = frozenset(
     }
 )  # fmt: skip
 NON_ADHERENT_DUTY = "#nonAdherentDuty"
-# The addressee runs to the infinitive (`to`, `à`) or the colon that opens a list.
-_ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|:")
+# The addressee runs to the infinitive (`to`, `à`, or `de`/`d’` before a verb in
+# -er, -ir, -re or -oir, so `Comité de la gouvernance` stays whole) or a list's colon.
+_ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|\s(?:de\s+|d[’']\s*)(?=\w+(?:er|ir|re)\b)|:")
 # Adherents or Members, in either language, but not non-Adherents.
 _ADHERENTS = re.compile(r"(?<![\w‐-])(?:Adherents?|Members?|Adhérents?|Membres?)\b")
 
