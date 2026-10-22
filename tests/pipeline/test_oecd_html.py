@@ -434,6 +434,7 @@ _WITH_ANNEX = """
 <p>2. The keeper should bear the cost of the lantern oil.</p>
 <p>Annex II</p>
 <p>3. Records should be kept for five years.</p>
+<p>I. INVITES harbours to share their records.</p>
 """
 
 
@@ -457,10 +458,13 @@ def test_an_annex_closes_the_last_section_and_stays_in_the_pool() -> None:
     assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_II__content"}
     assert flags["att_1__para_2"] == (False, None)
     assert flags["att_2__para_3"] == (False, None)
+    # A verb inside an annex binds no one by its verb.
+    assert flags["att_2__sec_I__content"] == (False, None)
     doc = parse_akn(xml)
     annex_units = [p for att in doc.attachments for p in att.children]
     assert [(p.akn_eid, is_excluded(p, doc)) for p in annex_units] == [
         ("att_1__para_1", False), ("att_1__para_2", False), ("att_2__para_3", False),
+        ("att_2__sec_I", False),
     ]  # fmt: skip
 
 
