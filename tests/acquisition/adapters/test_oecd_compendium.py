@@ -235,11 +235,15 @@ async def test_a_language_the_record_lacks_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_the_latest_council_act_dates_the_expression() -> None:
+async def test_the_latest_amendment_dates_the_expression() -> None:
     import copy
 
     record = copy.deepcopy(_RECORD)
-    record["changeHistory"]["update"].append({"date": "2024-01-07", "type": {"id": 2}})
+    # A follow-up report (type 9) leaves the text as it was; an amendment (2) does not.
+    record["changeHistory"]["update"] += [
+        {"date": "2024-01-07", "type": {"id": 2}},
+        {"date": "2025-06-01", "type": {"id": 9}},
+    ]
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/instruments/OECD-LEGAL-9002":

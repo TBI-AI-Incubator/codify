@@ -675,7 +675,7 @@ def instrument_html_to_akn(
     adopted = meta.get("adopted")
     if not adopted:
         raise OecdHtmlError("no oecd.adopted meta: the acquirer wraps the body with it")
-    # The latest Council act on the text dates the expression, so a revised text is
+    # The latest amendment of the text dates the expression, so a revised text is
     # a new expression of the same work rather than a clash with the adopted one.
     revised = max(meta.get("revised") or adopted, adopted)
     root = etree.Element(f"{{{AKN_NS}}}akomaNtoso", nsmap={None: AKN_NS})
