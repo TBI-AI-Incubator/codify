@@ -552,6 +552,8 @@ def _run_index_datadump(args: argparse.Namespace) -> int:
 
 def _run_index_ee_archive(args: argparse.Namespace) -> int:
     """Build index of active statutes from Estonian Riigi Teataja bulk XML zip."""
+    from datetime import date
+
     from codify.acquisition.adapters.ee.datadump import build_ee_index
     from codify.acquisition.index import index_path
 
@@ -568,6 +570,7 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
         principal_only=args.principal_only,
         max_files=args.max_files,
         on_progress=None if args.quiet else progress,
+        as_of=date.fromisoformat(args.as_of) if args.as_of else None,
     )
     out = Path(args.out or index_path("ee"))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -950,6 +953,9 @@ def main(argv: list[str] | None = None) -> int:
         "--principal-only", action="store_true", help="only index principal acts and codes"
     )
     ee_idx.add_argument("--max-files", type=int, default=None, help="stop after N members")
+    ee_idx.add_argument(
+        "--as-of", default=None, help="keep redactions in force on this ISO date (default: today)"
+    )
     ee_idx.add_argument("--quiet", action="store_true", help="suppress progress")
     ee_idx.set_defaults(func=_run_index_ee_archive)
 

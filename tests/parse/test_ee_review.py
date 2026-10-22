@@ -12,8 +12,10 @@ from codify.acquisition import get_acquirer
 from codify.acquisition.adapters.ee.datadump import EeDatadumpAcquirer, build_ee_index
 from codify.pipeline.formats.riigi_teataja import riigi_teataja_to_akn
 
+_BODY = "<paragrahv><paragrahvNr>1</paragrahvNr><sisuTekst>Text</sisuTekst></paragrahv>"
 
-def source(end: str = "", title: str = "Synthetic Act", body: str = "") -> str:
+
+def source(end: str = "", title: str = "Synthetic Act", body: str = _BODY) -> str:
     return f"""<oigusakt><metaandmed><dokumentLiik>seadus</dokumentLiik>
     <valjaandja>Riigikogu</valjaandja><globaalID>123</globaalID>
     <vastuvoetud><aktikuupaev>2022-04-13</aktikuupaev></vastuvoetud>
