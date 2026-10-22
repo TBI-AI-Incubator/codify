@@ -83,15 +83,23 @@ _TO_SUPERSCRIPT = str.maketrans({digit: sup for sup, digit in _SUPERSCRIPT_MAP.i
 
 
 def _sup_to_unicode(markup: str) -> str:
-    """Write ``<sup>N</sup>`` as superscript digits, so dropping the tags keeps § 43⁹ apart from § 439."""
+    """Write ``<sup>N</sup>`` as superscript digits, keeping § 43⁹ apart from § 439."""
     return re.sub(
-        r"<sup>\s*(\d+)\s*</sup>", lambda m: m.group(1).translate(_TO_SUPERSCRIPT), markup, flags=re.I
+        r"<sup>\s*(\d+)\s*</sup>",
+        lambda m: m.group(1).translate(_TO_SUPERSCRIPT),
+        markup,
+        flags=re.I,
     )
 
 
 def _display_number(raw: str) -> str:
     """A ``kuvatavNr`` as plain text; the source writes its superscripts as HTML."""
     return " ".join(re.sub(r"<[^>]+>", "", _sup_to_unicode(unescape(raw))).split())
+
+
+def _html_text(raw: str) -> str:
+    """An ``HTMLKonteiner`` as plain text."""
+    return " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescape(raw))).split())
 
 
 def _romanise(text: str) -> str:
@@ -224,9 +232,7 @@ def _serialize_inline(src_node: etree._Element, parent_akn: etree._Element) -> N
             if child.tail:
                 _append_text(parent_akn, _clean_tail(child.tail))
         elif tag == "HTMLKonteiner":
-            raw_html = child.text or ""
-            unescaped = unescape(raw_html)
-            clean = " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescaped)).split())
+            clean = _html_text(child.text or "")
             if clean:
                 _append_text(parent_akn, clean)
             if child.tail:
@@ -260,8 +266,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
             if not p.text and len(p) == 0:
                 p.text = _clean_text(st)
         elif hk is not None:
-            raw_html = hk.text or ""
-            p.text = " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescape(raw_html))).split())
+            p.text = _html_text(hk.text or "")
         elif mm is not None:
             p.text = _clean_text(mm)
         else:
@@ -713,8 +718,7 @@ def riigi_teataja_to_akn(
                     if not p_el.text and len(p_el) == 0:
                         p_el.text = _clean_text(child)
                 else:
-                    raw_html = child.text or ""
-                    p_el.text = " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescape(raw_html))).split())
+                    p_el.text = _html_text(child.text or "")
 
     # Attachments
     lisad = root.findall(".//{*}lisaViide") + root.findall(".//{*}lisa")

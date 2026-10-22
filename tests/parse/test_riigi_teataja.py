@@ -390,7 +390,8 @@ def test_direct_sisu_tekst_and_html_konteiner() -> None:
 		<sisuTekst>
 			<tavatekst>Määruses tehakse järgmised muudatused:</tavatekst>
 		</sisuTekst>
-		<HTMLKonteiner>&lt;p&gt;Punkt 1 muudetakse. § 43&lt;sup&gt;8&lt;/sup&gt; jäetakse välja.&lt;/p&gt;</HTMLKonteiner>
+		<HTMLKonteiner>&lt;p&gt;Punkt 1 muudetakse.
+		§ 43&lt;sup&gt;8&lt;/sup&gt; jäetakse välja.&lt;/p&gt;</HTMLKonteiner>
 	</sisu>
 </oigusakt>"""
     akn_xml, meta = riigi_teataja_to_akn(amend_xml)
@@ -427,7 +428,9 @@ def test_display_numbers_keep_their_superscripts() -> None:
 					<alampunkt id="p14b1">
 						<alampunktNr ylaIndeks="1">14</alampunktNr>
 						<kuvatavNr><![CDATA[14<sup>1</sup>) ]]></kuvatavNr>
-						<sisuTekst><tavatekst>aadressiandmete süsteem.</tavatekst></sisuTekst>
+						<sisuTekst>
+							<HTMLKonteiner>§ 43&lt;sup&gt;8&lt;/sup&gt;</HTMLKonteiner>
+						</sisuTekst>
 					</alampunkt>
 				</loige>
 			</paragrahv>
@@ -438,6 +441,7 @@ def test_display_numbers_keep_their_superscripts() -> None:
     validate_akn(akn_xml)
     nums = [el.text for el in etree.fromstring(akn_xml.encode()).iter(f"{{{AKN_NS}}}num")]
     assert nums == ["5¹. peatükk", "§ 43⁹.", "(1¹)", "14¹)"]
+    assert "§ 43⁸</p>" in akn_xml
 
 
 def test_mixed_osa_and_flat_paragrahvs_nesting() -> None:
