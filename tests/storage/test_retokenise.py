@@ -308,3 +308,51 @@ async def test_a_provision_that_merely_mentions_a_placeholder_keeps_its_tokens(
         assert tokens != ""
     finally:
         await _cleanup(session, vid)
+
+
+async def test_a_reflag_keeps_units_under_an_excluded_heading_out_of_the_pool(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The mapper scopes the flag by the headings above a unit; the backfill reads
+    only rows, so it has to find the same headings through the section rows or a
+    reflag would put those units back in the pool."""
+    excluded = frozenset({"INVITES"})
+    monkeypatch.setattr("codify.storage.mappers.pool_excluded_headings_for", lambda _: excluded)
+    monkeypatch.setattr(
+        "codify.storage.search_tokens.pool_excluded_headings_for", lambda _: excluded
+    )
+    suffix = uuid.uuid4().hex[:8]
+    bb = (
+        "BODY\n"
+        "  SECTION 1 - RECOMMENDS\n"
+        "    ARTICLE 1\n"
+        "      Adherents shall keep a register of keepers.\n"
+        "  SECTION 2 - INVITES\n"
+        "    ARTICLE 2\n"
+        "      The Secretariat to disseminate this instrument.\n"
+        "    ARTICLE 3\n"
+        "      PARA 1.\n"
+        "        Non-Adherents to take account of it.\n"
+    )
+    akn = parse_to_akn(bb, country="xz", doctype="act", number=suffix, date="2020-01-01")
+    vid = await save_document(
+        session, parse_akn(akn), jurisdiction_code="xz", law_title=f"Scope {suffix}", akn_xml=akn
+    )
+    await session.commit()
+    select_flags = text(
+        "SELECT akn_eid, excluded_from_pool, exclusion_reason FROM provisions WHERE version_id=:v"
+    )
+    try:
+        written = {eid: (flag, reason) for eid, flag, reason in
+                   (await session.execute(select_flags, {"v": vid})).all()}  # fmt: skip
+        assert {eid for eid, (flag, _) in written.items() if flag} == {
+            "sec_2__art_2__content",
+            "sec_2__art_3__para_1",
+        }
+        assert await retokenise_version_provisions(session, vid, reflag=True) == len(written)
+        await session.commit()
+        reflagged = {eid: (flag, reason) for eid, flag, reason in
+                     (await session.execute(select_flags, {"v": vid})).all()}  # fmt: skip
+        assert reflagged == written
+    finally:
+        await _cleanup(session, vid)

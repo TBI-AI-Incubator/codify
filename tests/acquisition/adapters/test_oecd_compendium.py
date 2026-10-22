@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 import codify.acquisition.adapters  # noqa: F401  registers adapters
-from codify.acquisition import DiscoveryQuery, DocumentRef, registered_kinds
+from codify.acquisition import DiscoveryQuery, DocumentRef, get_acquirer, registered_kinds
 from codify.acquisition.adapters.oecd.compendium import (
     OecdCompendiumAcquirer,
     OecdInstrumentMissing,
@@ -122,6 +122,13 @@ def _acquirer() -> OecdCompendiumAcquirer:
 
 def test_kind_is_registered() -> None:
     assert "oecd_compendium" in registered_kinds()
+
+
+def test_the_packaged_config_resolves_the_acquirer() -> None:
+    """The public path: the `oecd` config names this adapter, so no caller builds one by hand."""
+    acquirer = get_acquirer("oecd")
+    assert type(acquirer).__name__ == "OecdCompendiumAcquirer"
+    assert acquirer.jurisdiction_code == "oecd"
 
 
 def test_instrument_key_pads_the_serial() -> None:

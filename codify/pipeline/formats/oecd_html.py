@@ -17,10 +17,10 @@ recur, and one segmenter reads them all by classifying each block:
   Adherents should:` sections.
 
 Regular enough to segment deterministically, so an instrument takes the
-validator and embedding without the LLM lane. Sections headed by a verb
-whose duty falls on someone other than the Adherents (`INVITES`,
-`INSTRUCTS`) carry `refersTo="#nonAdherentDuty"`, as do their paragraphs, so
-a lens can leave them out of an alignment pool.
+validator and embedding without the LLM lane. Sections headed by a verb the
+jurisdiction lists in `pool_excluded_headings` (`INVITES`, `INSTRUCTS`: a duty
+on someone other than the Adherents) carry `refersTo="#nonAdherentDuty"`, as do
+their paragraphs; the row split reads the same list to keep them out of the pool.
 
 The acquirer (`codify.acquisition.adapters.oecd.compendium`) wraps the body
 in a head whose `<meta name="oecd.*">` tags name the instrument; this module
@@ -39,6 +39,7 @@ import structlog
 from lxml import etree, html
 
 from codify.akn import Document, parse_akn, validate_akn
+from codify.jurisdictions import pool_excluded_headings_for
 from codify.pipeline.events import (
     Complete,
     Failed,
@@ -84,12 +85,18 @@ OPERATIVE_VERBS = frozenset(
         "ADOPTS", "APPROVES", "WELCOMES", "NOTES", "CONFIRMS", "REAFFIRMS",
     }
 )  # fmt: skip
-# Verbs whose operative duty falls on a body other than the Adherents.
-NON_ADHERENT_VERBS = frozenset({"INVITES", "INSTRUCTS", "ENCOURAGES", "REQUESTS", "CALLS ON"})
 
-_RANK = {"part": 0, "article": 1, "section": 1, "paragraph": 2, "point": 3, "indent": 4}
+# Containers nest in this order; a code may skip a level but never inverts one.
+_CONTAINER_KIND = {"PART": "part", "TITLE": "title", "CHAPTER": "chapter"}
+_RANK = {
+    "part": 0, "title": 1, "chapter": 2, "article": 3, "section": 3,
+    "paragraph": 4, "point": 5, "indent": 6,
+}  # fmt: skip
+_HEADED = frozenset({"part", "title", "chapter", "article"})
 _EID_PREFIX = {
     "part": "part",
+    "title": "title",
+    "chapter": "chp",
     "article": "art",
     "section": "sec",
     "paragraph": "para",
@@ -125,8 +132,21 @@ class _Instrument:
     body: list[_Node] = field(default_factory=list)
 
 
-def is_oecd_instrument_html(text: str) -> bool:
-    return 'name="oecd.key"' in text[:2000]
+_SNIFF_BYTES = 4096
+
+
+def is_oecd_instrument_html(source: Path | str) -> bool:
+    """Whether the source opens with the head the acquirer wraps a body in: HTML
+    text, or a local file of which only a bounded prefix is read."""
+    if isinstance(source, str) and source.lstrip().startswith("<"):
+        prefix = source[:_SNIFF_BYTES]
+    else:
+        try:
+            with Path(source).open("rb") as stream:
+                prefix = stream.read(_SNIFF_BYTES).decode("utf-8", errors="replace")
+        except (OSError, ValueError):
+            return False
+    return 'name="oecd.key"' in prefix
 
 
 def _blocks(text: str) -> tuple[list[str], dict[str, str]]:
@@ -195,7 +215,8 @@ class _Builder:
     """A stack of open nodes: each block opens a node at some rank or continues
     the deepest open one."""
 
-    def __init__(self) -> None:
+    def __init__(self, non_adherent_verbs: frozenset[str] = frozenset()) -> None:
+        self.non_adherent_verbs = non_adherent_verbs
         self.roots: list[_Node] = []
         self.stack: list[_Node] = []
         self.pending_heading: str | None = None
@@ -222,7 +243,7 @@ class _Builder:
         else:
             self.roots.append(node)
         self.stack.append(node)
-        if self.pending_heading and kind in ("part", "article", "section", "paragraph"):
+        if self.pending_heading and kind in (*_HEADED, "section", "paragraph"):
             if node.heading is None:
                 node.heading = self.pending_heading
             elif kind != "paragraph":
@@ -239,7 +260,8 @@ class _Builder:
         m = _CONTAINER.match(block)
         if m:
             word, key, rest = m.groups()
-            self._open("part", f"{word.title()} {key}", key.lower(), heading=rest.strip() or None)
+            kind = _CONTAINER_KIND[word]
+            self._open(kind, f"{word.title()} {key}", key.lower(), heading=rest.strip() or None)
             return
         m = _ARTICLE.match(block)
         if m:
@@ -254,7 +276,7 @@ class _Builder:
             op = _operative(rest)
             verb, tail = op if op else (None, rest.strip())
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = verb in NON_ADHERENT_VERBS
+            node.non_adherent = verb in self.non_adherent_verbs
             if tail:
                 node.text.append(tail)
             return
@@ -263,7 +285,7 @@ class _Builder:
             verb, rest = op
             numeral = _to_roman(sum(1 for r in self.roots if r.kind == "section") + 1)
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = verb in NON_ADHERENT_VERBS
+            node.non_adherent = verb in self.non_adherent_verbs
             if rest:
                 node.text.append(rest)
             return
@@ -291,10 +313,10 @@ class _Builder:
             self._open_prose_paragraph(block)
             return
         top = self.stack[-1] if self.stack else None
-        # A part's or article's heading is the short line right after its number.
+        # A container's or article's heading is the short line right after its number.
         if (
             top is not None
-            and top.kind in ("part", "article")
+            and top.kind in _HEADED
             and not top.text
             and not top.children
             and top.heading is None
@@ -313,7 +335,9 @@ class _Builder:
             self._open_prose_paragraph(block)
 
 
-def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
+def _segment(
+    blocks: list[str], meta: dict[str, str], non_adherent_verbs: frozenset[str] = frozenset()
+) -> _Instrument:
     if not blocks:
         raise OecdHtmlError("no text blocks in the HTML")
     inst = _Instrument(meta=meta)
@@ -342,7 +366,7 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
         elif block != "PREAMBLE":
             inst.recitals.append([block])
         i += 1
-    builder = _Builder()
+    builder = _Builder(non_adherent_verbs)
     for block in blocks[i:]:
         builder.feed(block)
     inst.body = builder.roots
@@ -474,7 +498,7 @@ def instrument_html_to_akn(
 ) -> str:
     """Deterministic Compendium HTML → AKN `act`; the adoption date is the expression date."""
     blocks, meta = _blocks(text)
-    inst = _segment(blocks, meta)
+    inst = _segment(blocks, meta, pool_excluded_headings_for(frbr_work_uri))
     adopted = meta.get("adopted")
     if not adopted:
         raise OecdHtmlError("no oecd.adopted meta: the acquirer wraps the body with it")
@@ -540,7 +564,6 @@ async def ingest(
 
 
 __all__ = [
-    "NON_ADHERENT_VERBS",
     "OPERATIVE_VERBS",
     "OecdHtmlError",
     "ingest",

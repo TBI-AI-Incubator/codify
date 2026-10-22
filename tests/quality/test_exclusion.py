@@ -57,3 +57,40 @@ def test_placeholder_helper_honours_extra_markers() -> None:
     assert is_placeholder_only("[TIFF not transcribed: a.tif]")
     assert not is_placeholder_only("Elucidation omitted.")
     assert is_placeholder_only("Elucidation omitted.", markers=MARKER)
+
+
+def test_a_unit_under_an_excluded_heading_leaves_the_pool() -> None:
+    duty = "The Secretariat shall publish the register."
+    assert exclusion_reason(duty, under_excluded_heading=True) == "heading"
+    assert exclusion_reason(duty) is None
+    # A placeholder keeps its own reason; an empty unit is still judged elsewhere.
+    assert exclusion_reason("[TIFF not transcribed: a.tif]", under_excluded_heading=True) == (
+        "placeholder"
+    )
+    assert exclusion_reason("", under_excluded_heading=True) is None
+
+
+def test_heading_scope_covers_the_container_and_everything_under_it() -> None:
+    from codify.akn import Article, Paragraph, Point, Section
+    from codify.quality.sentinels import SCOPING_KINDS, heading_scoped
+    from codify.storage.mappers import ROW_SECTION_KINDS
+
+    point = Point(akn_eid="sec_2__para_2__point_a", akn_type="point", position=0, text="x")
+    para = Paragraph(akn_eid="sec_2__para_2", akn_type="paragraph", position=0, children=[point])
+    invites = Section(
+        akn_eid="sec_2", akn_type="section", position=1, heading=" Invites ", children=[para]
+    )
+    kept = Section(
+        akn_eid="sec_1",
+        akn_type="section",
+        position=0,
+        heading="RECOMMENDS",
+        children=[Article(akn_eid="sec_1__art_1", akn_type="article", position=0, text="y")],
+    )
+    # A leaf's heading never scopes: only the kinds stored as section rows do.
+    headed_leaf = Paragraph(akn_eid="para_9", akn_type="paragraph", position=2, heading="INVITES")
+    scoped = heading_scoped([kept, invites, headed_leaf], frozenset({"INVITES"}))
+    assert scoped == {invites.id, para.id, point.id}
+    assert heading_scoped([kept, invites], frozenset()) == frozenset()
+    # The backfill scopes by section rows, so the two kind sets must agree.
+    assert SCOPING_KINDS == ROW_SECTION_KINDS

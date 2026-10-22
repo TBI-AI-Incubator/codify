@@ -1363,6 +1363,25 @@
       "public_reference": true
     },
     {
+      "code": "oecd",
+      "name": "Organisation for Economic Co-operation and Development",
+      "type": "supranational",
+      "tradition": [
+        "sui_generis"
+      ],
+      "languages": [
+        "eng",
+        "fra"
+      ],
+      "calendar": "gregorian",
+      "tier": 2,
+      "status": "draft",
+      "effective_tier": 2,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
       "code": "om",
       "name": "Oman",
       "type": "national",

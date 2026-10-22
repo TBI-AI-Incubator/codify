@@ -1,0 +1,202 @@
+{
+  "code": "oecd",
+  "name": "Organisation for Economic Co-operation and Development",
+  "name_local": "Organisation de coopération et de développement économiques",
+  "name_en": "Organisation for Economic Co-operation and Development",
+  "type": "supranational",
+  "tradition": [
+    "sui_generis"
+  ],
+  "calendar": "gregorian",
+  "languages": [
+    "eng",
+    "fra"
+  ],
+  "akn_profile": "AKN 3.0",
+  "document_classes": {
+    "recommendation": {
+      "label": "Recommendation",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "paragraph",
+      "direct_effect": false,
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "higher",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "basic",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "roman_lower_parenthesized"
+        },
+        {
+          "local_term": "Indent",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT"
+        }
+      ]
+    },
+    "decision": {
+      "extends": "recommendation",
+      "label": "Decision",
+      "direct_effect": true
+    },
+    "declaration": {
+      "extends": "recommendation",
+      "label": "Declaration"
+    },
+    "arrangement": {
+      "extends": "recommendation",
+      "label": "Arrangement, Understanding or Other"
+    },
+    "agreement": {
+      "label": "International Agreement",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "basic_unit": "article",
+      "direct_effect": false,
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "numbering": "roman_upper"
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "numbering": "alpha_lower_parenthesized"
+        }
+      ]
+    }
+  },
+  "default_document_class": "recommendation",
+  "frbr": {
+    "country_code": "oecd",
+    "uri_patterns": {
+      "recommendation": "/akn/oecd/act/recommendation/{year}/{number}",
+      "decision": "/akn/oecd/act/decision/{year}/{number}",
+      "declaration": "/akn/oecd/act/declaration/{year}/{number}",
+      "arrangement": "/akn/oecd/act/arrangement/{year}/{number}",
+      "agreement": "/akn/oecd/act/agreement/{year}/{number}"
+    },
+    "date_calendar": "gregorian"
+  },
+  "pool_excluded_headings": [
+    "INVITES",
+    "INSTRUCTS",
+    "ENCOURAGES",
+    "REQUESTS",
+    "CALLS ON"
+  ],
+  "core_tlcs": [
+    {
+      "eId": "oecdCouncil",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/oecd/council",
+      "showAs": "OECD Council"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "source_adapters": [
+    {
+      "kind": "oecd_compendium",
+      "name": "oecd-compendium",
+      "base_url": "https://legalinstruments.oecd.org",
+      "rate_limit_per_minute": 60,
+      "licence": "oecd_terms"
+    }
+  ],
+  "display": {
+    "heading_type": "centered",
+    "heading_case": "upper_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 13,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 2,
+    "note": "Council acts, codes, a convention and a declaration from the Compendium, segmented deterministically and validated against the AKN schema. Operative sections are numbered I., II. and headed by their verb; paragraphs are numbered across them. The URI number is the serial of the OECD/LEGAL number and the year is the year of adoption.",
+    "ambiguities": [
+      "Annexes and tables inside a code fall out as flat units with repeated numbers.",
+      "A declaration's paragraphs sit directly under the body, which the validator reports as an unexpected parent."
+    ]
+  },
+  "tier": 2,
+  "status": "draft",
+  "public_reference": true
+}

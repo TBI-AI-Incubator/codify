@@ -31,8 +31,8 @@ from codify.akn.analysis import (
 )
 from codify.akn.elements import BodyElement, ElementBase
 from codify.akn.references import InlineReference
-from codify.jurisdictions import placeholder_markers_for
-from codify.quality.sentinels import exclusion_reason
+from codify.jurisdictions import placeholder_markers_for, pool_excluded_headings_for
+from codify.quality.sentinels import exclusion_reason, heading_scoped
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.models import (
     AmendmentEffect as AmendmentEffectRow,
@@ -108,8 +108,10 @@ def _attachment_is_normative(doc: Document, heading: str | None) -> bool:
     )
 
 
-def _exclusion(text: str, akn_eid: str, markers: tuple[str, ...]) -> dict[str, object]:
-    reason = exclusion_reason(text, akn_eid, markers)
+def _exclusion(
+    text: str, akn_eid: str, markers: tuple[str, ...], scoped: bool = False
+) -> dict[str, object]:
+    reason = exclusion_reason(text, akn_eid, markers, under_excluded_heading=scoped)
     return {"excluded_from_pool": reason is not None, "exclusion_reason": reason}
 
 
@@ -142,6 +144,10 @@ def document_to_rows(
     sections: list[SectionRow] = []
     provisions: list[ProvisionRow] = []
     markers = placeholder_markers_for(doc.frbr_work_uri)
+    # Attachments too: the backfill reads section rows, which hold both.
+    scoped = heading_scoped(
+        [*doc.body, *doc.attachments], pool_excluded_headings_for(doc.frbr_work_uri)
+    )
     cross_refs: list[CrossReferenceRow] = []
     dropped_anchors: list[str] = []
 
@@ -190,7 +196,9 @@ def document_to_rows(
                         text=_normalise(element.text),
                         position=_next_pos(section_row.id),
                         normative=normative,
-                        **_exclusion(element.text, f"{element.akn_eid}", markers),
+                        **_exclusion(
+                            element.text, f"{element.akn_eid}", markers, element.id in scoped
+                        ),
                     )
                 )
             elif element.text.strip():
@@ -207,7 +215,9 @@ def document_to_rows(
                         text=_normalise(element.text),
                         position=_next_pos(section_row.id),
                         normative=normative,
-                        **_exclusion(element.text, f"{element.akn_eid}", markers),
+                        **_exclusion(
+                            element.text, f"{element.akn_eid}", markers, element.id in scoped
+                        ),
                     )
                 )
             for child in element.children:
@@ -232,7 +242,7 @@ def document_to_rows(
                     text=_normalise(own_text),
                     position=_next_pos(parent_section_id),
                     normative=normative,
-                    **_exclusion(own_text, element.akn_eid, markers),
+                    **_exclusion(own_text, element.akn_eid, markers, element.id in scoped),
                 )
                 provisions.append(provision_row)
                 for ref in element.references:

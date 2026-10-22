@@ -32,14 +32,23 @@ def _own_text(el: BodyElement) -> str:
 def is_excluded(el: BodyElement, doc: Document) -> bool:
     """The stored exclusion rule on a unit's own text, as the mapper judges a
     row: a marker child never taints its parent, and a table-shaped child never
-    excludes a substantive one. Empty units stay with the structural rule."""
-    return unit_excluded(el, markers_for(doc))
+    excludes a substantive one. Empty units stay with the structural rule. A unit
+    under a heading the jurisdiction keeps out of the pool is excluded as its row is."""
+    from codify.jurisdictions import pool_excluded_headings_for
+    from codify.quality.sentinels import heading_scoped
+
+    excluded = pool_excluded_headings_for(doc.frbr_work_uri)
+    scoped = el.id in heading_scoped(doc.body, excluded) if excluded else False
+    return unit_excluded(el, markers_for(doc), scoped=scoped)
 
 
-def unit_excluded(el: BodyElement, markers: tuple[str, ...]) -> bool:
+def unit_excluded(el: BodyElement, markers: tuple[str, ...], *, scoped: bool = False) -> bool:
     from codify.quality.sentinels import exclusion_reason
 
-    return exclusion_reason(_own_text(el), el.akn_eid or "", markers) is not None
+    return (
+        exclusion_reason(_own_text(el), el.akn_eid or "", markers, under_excluded_heading=scoped)
+        is not None
+    )
 
 
 def iter_assessable(doc: Document) -> Iterator[BodyElement]:

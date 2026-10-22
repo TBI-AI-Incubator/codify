@@ -18,10 +18,10 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from codify.jurisdictions import placeholder_markers_for
-from codify.quality.sentinels import exclusion_reason, is_placeholder_only
+from codify.jurisdictions import placeholder_markers_for, pool_excluded_headings_for
+from codify.quality.sentinels import exclusion_reason, is_excluded_heading, is_placeholder_only
 from codify.search import TOKENISER_VERSION, tokenise_to_text
-from codify.storage.models import Law, Provision, Version
+from codify.storage.models import Law, Provision, Section, Version
 
 logger = structlog.get_logger()
 
@@ -45,26 +45,32 @@ async def retokenise_version_provisions(
         return 0
     language, work_uri = head
     markers = placeholder_markers_for(work_uri)
+    excluded_headings = pool_excluded_headings_for(work_uri)
 
-    # The flag rides the same pass: both are derived from the text alone, and
-    # an in-place update is what keeps embeddings and references intact.
+    # The flag rides the same pass: both are derived from the text and the
+    # section headings above it, and an in-place update keeps embeddings intact.
     stale = Provision.search_pipeline_version.is_distinct_from(
         TOKENISER_VERSION
     ) | Provision.excluded_from_pool.is_(None)
     rows = (
         await session.execute(
-            select(Provision.id, Provision.text, Provision.akn_eid).where(
+            select(Provision.id, Provision.text, Provision.akn_eid, Provision.section_id).where(
                 Provision.version_id == version_id, true() if reflag else stale
             )
         )
     ).all()
     if not rows:
         return 0
+    scoped = (
+        await _heading_scoped_sections(session, version_id, excluded_headings)
+        if excluded_headings
+        else frozenset()
+    )
 
     # `tokenise_to_text` returns nothing for a placeholder, so both lexical arms
     # lose it: the BM25 index reads this column and the tsvector is generated from
     # it. Counted here only to report what the pass dropped.
-    placeholders = sum(1 for _pid, txt, _eid in rows if is_placeholder_only(txt, markers))
+    placeholders = sum(1 for _pid, txt, _eid, _sid in rows if is_placeholder_only(txt, markers))
     if placeholders:
         logger.info(
             "retokenise_skipped_placeholders",
@@ -97,11 +103,47 @@ async def retokenise_version_provisions(
                 "excluded": reason is not None,
                 "reason": reason,
             }
-            for provision_id, provision_text, akn_eid in rows
-            for reason in (exclusion_reason(provision_text, akn_eid, markers),)
+            for provision_id, provision_text, akn_eid, section_id in rows
+            for reason in (
+                exclusion_reason(
+                    provision_text,
+                    akn_eid,
+                    markers,
+                    under_excluded_heading=section_id in scoped,
+                ),
+            )
         ],
     )
     return len(rows)
+
+
+async def _heading_scoped_sections(
+    session: AsyncSession, version_id: uuid.UUID, excluded: frozenset[str]
+) -> frozenset[uuid.UUID]:
+    """Sections at or under one whose title is excluded: the row form of
+    `heading_scoped`, which the mapper applies to the document."""
+    sections = {
+        sid: (parent, title)
+        for sid, parent, title in (
+            await session.execute(
+                select(Section.id, Section.parent_section_id, Section.title).where(
+                    Section.version_id == version_id
+                )
+            )
+        ).all()
+    }
+
+    def scoped(sid: uuid.UUID | None) -> bool:
+        seen: set[uuid.UUID] = set()
+        while sid is not None and sid in sections and sid not in seen:
+            seen.add(sid)
+            parent, title = sections[sid]
+            if is_excluded_heading(title, excluded):
+                return True
+            sid = parent
+        return False
+
+    return frozenset(sid for sid in sections if scoped(sid))
 
 
 async def count_stale_search_tokens(
