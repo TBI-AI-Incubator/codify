@@ -12,6 +12,7 @@ from typing import Any, ClassVar
 
 import structlog
 
+from codify.acquisition.adapters.ee.identity import classify, read_identity, romanise
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
@@ -19,34 +20,8 @@ from codify.acquisition.base import (
     DocumentRef,
 )
 from codify.acquisition.index import index_path as acquisition_index_path
-from codify.frbr import build_frbr_work_uri
+from codify.akn._schema import parse_xml
 from codify.jurisdictions import SourceAdapter
-
-
-def _romanise(text: str) -> str:
-    """Romanise Estonian text for FRBR URI slugs per ee/config.json."""
-    import re
-
-    trans = {
-        "ä": "a",
-        "ö": "o",
-        "ü": "u",
-        "õ": "o",
-        "š": "s",
-        "ž": "z",
-        "Ä": "a",
-        "Ö": "o",
-        "Ü": "u",
-        "Õ": "o",
-        "Š": "s",
-        "Ž": "z",
-    }
-    s = text.lower()
-    for k, v in trans.items():
-        s = s.replace(k, v)
-    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    return s or "seadus"
-
 
 logger = structlog.get_logger()
 
@@ -151,20 +126,8 @@ class EeDatadumpAcquirer(BaseAcquirer):
             ) from exc
 
         source_url = f"https://www.riigiteataja.ee/akt/{doc_id}.xml"
-        slug = ref.extra.get("slug")
-        if not slug and isinstance(entry, dict):
-            slug = entry.get("slug")
-        if not slug:
-            title = entry.get("title") if isinstance(entry, dict) else ref.extra.get("title") or ""
-            slug = _romanise(title) if title else str(ref.number)
-
-        doctype = ref.doctype
-        if doctype == "constitution" or (
-            isinstance(entry, dict) and entry.get("doctype") == "constitution"
-        ):
-            frbr_work_uri = "/akn/ee/act/1992/pohiseadus"
-        else:
-            frbr_work_uri = build_frbr_work_uri("ee", doctype, ref.year, slug)
+        # From the member, not the index or ref: an index built earlier can carry a stale slug.
+        frbr_work_uri = read_identity(parse_xml(raw_xml, huge_tree=True)).work_uri
 
         return AcquiredDocument(
             ref=ref,
@@ -231,7 +194,7 @@ def build_ee_index(
 
                     m_lyhend = re.search(r"<lyhend>(.*?)</lyhend>", head)
                     lyhend = unescape(m_lyhend.group(1)).strip() if m_lyhend else ""
-                    slug = _romanise(lyhend or title)
+                    slug = romanise(title)
 
                     m_id = re.search(r"<globaalID>(.*?)</globaalID>", head)
                     doc_id = unescape(m_id.group(1)).strip() if m_id else n.replace(".xml", "")
@@ -254,13 +217,7 @@ def build_ee_index(
                         skipped += 1
                         continue
 
-                    is_const = "põhiseadus" in title.lower() or lyhend.lower() == "ps"
-                    if is_const:
-                        doctype = "constitution"
-                    elif liik == "seadus":
-                        doctype = "act"
-                    else:
-                        doctype = "maarrus"
+                    doctype = classify(liik, lyhend, title)
 
                     entries[doc_id] = {
                         "member": n,

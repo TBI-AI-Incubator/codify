@@ -16,11 +16,11 @@ from typing import Any, cast
 import structlog
 from lxml import etree
 
+from codify.acquisition.adapters.ee.identity import read_identity
 from codify.akn._schema import AKN_NS, parse_xml, validate_akn
 from codify.akn.document import Document
 from codify.akn.eids import ensure_unique_eids
 from codify.akn.io import parse_akn
-from codify.frbr import build_frbr_work_uri
 from codify.pipeline.events import (
     Complete,
     Failed,
@@ -100,29 +100,6 @@ def _display_number(raw: str) -> str:
 def _html_text(raw: str) -> str:
     """An ``HTMLKonteiner`` as plain text."""
     return " ".join(re.sub(r"<[^>]+>", " ", _sup_to_unicode(unescape(raw))).split())
-
-
-def _romanise(text: str) -> str:
-    """Romanise Estonian text for FRBR URI slugs per ee/config.json."""
-    trans = {
-        "ä": "a",
-        "ö": "o",
-        "ü": "u",
-        "õ": "o",
-        "š": "s",
-        "ž": "z",
-        "Ä": "a",
-        "Ö": "o",
-        "Ü": "u",
-        "Õ": "o",
-        "Š": "s",
-        "Ž": "z",
-    }
-    s = text.lower()
-    for k, v in trans.items():
-        s = s.replace(k, v)
-    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    return s or "seadus"
 
 
 def _rewrite_viide_uri(raw_uri: str) -> str:
@@ -456,62 +433,21 @@ def riigi_teataja_to_akn(
     root = parse_xml(source_xml, huge_tree=True)
     meta = root.find("{*}metaandmed")
 
-    title = root.findtext(".//{*}pealkiri") or root.findtext(".//{*}aktinimi") or "Seadus"
-    title = " ".join(title.split())
+    identity = read_identity(root)
+    title, doctype = identity.title, identity.doctype
+    enactment_date, publication_date = identity.enacted, identity.published
+    primary_date = enactment_date or publication_date
+    year = identity.year
 
-    d_type_raw = (meta.findtext("{*}dokumentLiik") if meta is not None else "") or "seadus"
-    d_type_raw = d_type_raw.lower().strip()
-
-    short_title = (meta.findtext("{*}lyhend") if meta is not None else "") or title
-    slug = _romanise(short_title)
-
-    is_constitution = (
-        d_type_raw == "põhiseadus"
-        or "põhiseadus" in title.lower()
-        or (meta is not None and (meta.findtext("{*}lyhend") or "").strip().lower() == "ps")
-    )
-    if is_constitution:
-        doctype = "constitution"
-    elif d_type_raw == "määrus":
-        doctype = "maarrus"
-    elif d_type_raw in {"otsus", "korraldus"}:
-        doctype = "act"
-    else:
-        doctype = "act"
-
-    enactment_date = ""
-    publication_date = ""
     number = ""
-
     if meta is not None:
         m_vastu = meta.find("{*}vastuvoetud")
         if m_vastu is not None:
-            raw_enact = m_vastu.findtext("{*}aktikuupaev")
-            if raw_enact:
-                enactment_date = raw_enact.split("+")[0].strip()
             number = (m_vastu.findtext("{*}aktiNr") or "").strip()
-
-        raw_pub = meta.findtext(".//{*}avaldamineKuupaev")
-        if raw_pub:
-            publication_date = raw_pub.split("+")[0].strip()
-
         if not number:
             number = (meta.findtext(".//{*}RTartikkel") or "").strip()
 
-    primary_date = enactment_date or publication_date
-    if not primary_date:
-        raise ValueError(
-            f"Riigi Teataja XML document {title!r} lacks both enactment and publication dates"
-        )
-
-    year = primary_date.split("-")[0]
-
-    if frbr_work_uri:
-        work_uri = frbr_work_uri
-    elif doctype == "constitution":
-        work_uri = "/akn/ee/act/1992/pohiseadus"
-    else:
-        work_uri = build_frbr_work_uri("ee", doctype, year, slug)
+    work_uri = frbr_work_uri or identity.work_uri
 
     exp_date = (
         meta.findtext(".//{*}kehtivuseAlgus") if meta is not None else primary_date
