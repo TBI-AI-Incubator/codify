@@ -706,6 +706,13 @@ def element_index(root: etree._Element) -> dict[str, etree._Element]:
     return out
 
 
+def _closing_row(el: etree._Element, provisions: Container[str]) -> str | None:
+    """The row the mapper split a ``wrapUp`` into, which its closing text lands on."""
+    owner = el.getparent() if etree.QName(el).localname == "wrapUp" else None
+    closing = f"{owner.get('eId')}__wrapup" if owner is not None else ""
+    return closing if closing in provisions else None
+
+
 def nearest_stored_row(
     index: dict[str, etree._Element],
     eid: str,
@@ -739,6 +746,8 @@ def nearest_stored_row(
     if any(c in placeholders for c in (name, f"{name}__intro", f"{name}__content")):
         return None
     ancestors = [a for a in el.iterancestors() if isinstance(a.tag, str)]
+    if closing := _closing_row(el, provisions):
+        return closing, "container"
     if not any(etree.QName(a).localname in _QUOTING for a in ancestors):
         # Its own lead-in or text first, then its first stored part.
         if own := row(el):
@@ -747,10 +756,7 @@ def nearest_stored_row(
             if isinstance(d.tag, str) and (hit := row(d)):
                 return hit, "container"
     for a in ancestors:
-        # Closing text the mapper rowed apart lands on that row, not its owner's.
-        owner = a.getparent() if etree.QName(a).localname == "wrapUp" else None
-        closing = f"{owner.get('eId')}__wrapup" if owner is not None else ""
-        if closing in provisions:
+        if closing := _closing_row(a, provisions):
             return closing, "enclosing"
         if hit := row(a):
             return hit, "enclosing"

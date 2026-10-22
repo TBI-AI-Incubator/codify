@@ -1162,3 +1162,12 @@ def test_closing_text_and_anchors_land_on_the_wrap_up_row() -> None:
         index, "point_1__point_1__table_1", persisted, {s.akn_eid for s in sections}
     )
     assert anchor == ("point_1__point_1__wrapup", "enclosing")
+    # An anchor naming the wrap-up itself lands on its row too.
+    wrap = index["point_1__point_1__table_1"].getparent()
+    assert wrap is not None
+    wrap.set("eId", "closing")
+    index["closing"] = wrap
+    assert nearest_stored_row(index, "closing", persisted) == (
+        "point_1__point_1__wrapup",
+        "container",
+    )
