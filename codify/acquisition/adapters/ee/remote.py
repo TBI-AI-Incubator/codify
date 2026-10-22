@@ -144,7 +144,8 @@ class RemoteFile:
 
     def directory(self) -> list[zipfile.ZipInfo]:
         """The archive's members, from its central directory alone."""
-        head = self._client.head(self.url)
+        # The length of the bytes the ranges will read, not of an encoded representation.
+        head = self._client.head(self.url, headers={"accept-encoding": "identity"})
         head.raise_for_status()
         self.size = int(head.headers["content-length"])
         self._validator = head.headers.get("last-modified")

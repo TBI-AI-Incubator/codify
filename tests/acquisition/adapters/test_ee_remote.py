@@ -125,6 +125,19 @@ def test_reads_after_the_directory_name_its_date_so_a_replaced_file_is_never_mix
     assert server.ranges and {r[2] for r in server.ranges} == {_STAMP}
 
 
+def test_the_directory_reads_the_unencoded_length() -> None:
+    members = _members()
+    server = _Server(_zip(members))
+
+    def encoding_aware(request: httpx.Request) -> httpx.Response:
+        if request.method == "HEAD" and request.headers.get("accept-encoding") != "identity":
+            return httpx.Response(200, headers={"content-length": "123"})
+        return server(request)
+
+    with RemoteFile(_URL, client=_client(encoding_aware), backoff=0) as f:
+        assert [i.filename for i in f.directory()] == list(members)
+
+
 def test_a_whole_file_answer_is_closed_unread_and_the_range_asked_again() -> None:
     data = _zip(_members())
     server = _Server(data, ignore=2)
