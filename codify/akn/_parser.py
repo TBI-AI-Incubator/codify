@@ -37,7 +37,6 @@ from codify.akn.vocabulary import (
     PRESENTATION_CONTAINER_NAMES,
     TAG_TO_KIND,
     is_lifted_note,
-    provision_text,
 )
 
 # Map AKN tags to model kinds; preserve the original tag for emission.
@@ -302,7 +301,7 @@ def _extract_plain(el: etree._Element) -> str:
     `intro` and `wrap_up` feed `provisions.text` the same way `text` does, so a
     note folded in here reaches search, the lens and the comparator identically.
     """
-    return provision_text(el)
+    return _extract_text_and_refs(el)[0]
 
 
 def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineReference]]:

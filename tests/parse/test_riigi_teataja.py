@@ -1171,3 +1171,36 @@ def test_closing_text_and_anchors_land_on_the_wrap_up_row() -> None:
         "point_1__point_1__wrapup",
         "container",
     )
+
+
+def test_compact_closing_text_keeps_its_table_boundaries() -> None:
+    import uuid
+
+    from codify.storage.mappers import document_to_rows
+
+    akn_xml = _act(
+        "<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>"
+        "<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>"
+        "<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>"
+        "<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>"
+        "<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td>"
+        "<td>10</td></tr><tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]>"
+        "</HTMLKonteiner></sisuTekst></punkt>"
+    )
+    # Written without indentation, so no whitespace stands between the blocks.
+    compact = etree.tostring(
+        etree.fromstring(akn_xml.encode(), etree.XMLParser(remove_blank_text=True))
+    )
+    _, _, rows, _, _, _ = document_to_rows(parse_akn(compact.decode()), law_id=uuid.uuid4())
+    closing = next(r.text for r in rows if r.akn_eid == "point_1__wrapup")
+    assert closing == "Lõpetus. A 10 B 20 eurot"
+
+
+def test_a_comment_does_not_split_a_single_lõige() -> None:
+    akn_xml = _act(
+        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+			<loige><!-- märkus --><sisuTekst><tavatekst>Esimene.</tavatekst></sisuTekst>
+			<!-- teine --><sisuTekst><tavatekst>Teine.</tavatekst></sisuTekst></loige>
+		</paragrahv>"""
+    )
+    assert _texts(_by_eid(akn_xml, "art_1")) == ["Esimene.", "Teine."]

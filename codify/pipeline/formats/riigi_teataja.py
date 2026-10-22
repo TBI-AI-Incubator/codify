@@ -482,11 +482,11 @@ def _fill(
 _TEXT_TAGS = frozenset({"sisuTekst", "HTMLKonteiner"})
 
 
-def _split_text(src: etree._Element, unit_tag: str) -> list[list[etree._Element]]:
+def _split_text(src: etree._Element, unit_tag: str | None) -> list[list[etree._Element]]:
     """Text elements in runs: before the first ``unit_tag`` child, then after each."""
     runs: list[list[etree._Element]] = [[]]
     for child in src:
-        if _local(child) == unit_tag:
+        if unit_tag and _local(child) == unit_tag:
             runs.append([])
         elif _local(child) in _TEXT_TAGS:
             runs[-1].append(child)
@@ -550,7 +550,7 @@ def _convert_paragrahv(p_src: etree._Element, parent_akn: etree._Element, parent
     single_has_points = single_unnumbered and bool(loiked[0].findall("{*}alampunkt"))
 
     if single_unnumbered and not single_has_points:
-        own = _split_text(loiked[0], "")[0]
+        own = _split_text(loiked[0], None)[0]
         c = etree.SubElement(art, _q("content"))
         _fill(c, before + own + runs[-1], p_eid=f"{p_eid}__p", owner=art, owner_eid=p_eid)
         return
