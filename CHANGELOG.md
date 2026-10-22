@@ -112,6 +112,11 @@ New, additive:
 - `attachments[].always_opens`: a caption that titles no table in the body, so
   numbering that continues past it does not read it as a table caption, and the
   keyword reading of its line is dropped.
+- `codify.pipeline.formats.riigi_teataja_annexes`: `annex_files` reads the file
+  each Riigi Teataja annex embeds, base64, beside its link, keyed by the eId of
+  the attachment the converter writes for it. `fill_annex_text` writes a
+  transcript into those attachments, one `transcribedSource` `hcontainer` per
+  page after the link; an attachment already holding one is left alone.
 
 Fixed:
 
@@ -131,6 +136,9 @@ Fixed:
   block printed on a head's row is not part of the row.
 - `basic_unit_numbers` folds digits through `normalise_digits`, so an article
   numbered in Devanagari, Bengali or Thai digits is in the unit set.
+- Riigi Teataja: an annex links its file under the text's own `globaalID`. The
+  first `aktViide` names the act's original publication, which does not hold a
+  consolidated text's later annex files, and older texts write it as a URL.
 
 ## 0.6.0 (2026-10-02)
 
