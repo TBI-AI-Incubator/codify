@@ -90,11 +90,12 @@ def _relevance_candidates(
     """The laws a relevance listing ranks, each with its BM25 score.
 
     Two arms, unioned and materialised before anything orders them. The title arm
-    keeps the BM25 index ordering and its early stop over `window` rows, which
-    the score secondary key would cost (8,705 rows read instead of 626, 38ms to
-    218ms). The citation arm stands apart because an ordered BM25 scan yields
-    only titles sharing a token with the query: ORed into one predicate, a law
-    found by its number and year alone was lost whenever the planner chose it.
+    takes `window` rows in the listing's own total order, so a tie at the cut is
+    the same tie on every page; an incremental sort over the BM25 index order
+    reads on only through the tied group, not the whole match. The citation arm
+    stands apart because an ordered BM25 scan yields only titles sharing a token
+    with the query: ORed into one predicate, a law found by its number and year
+    alone was lost whenever the planner chose it.
     """
 
     def arm(predicate: Any) -> Select[Any]:
@@ -104,7 +105,9 @@ def _relevance_candidates(
             .where(predicate, *filters)
         )
 
-    titled = arm(_title_words(tsquery)).order_by(_bm25(tokens)).limit(window)
+    titled = (
+        arm(_title_words(tsquery)).order_by(_bm25(tokens), Law.frbr_work_uri, Law.id).limit(window)
+    )
     arms = titled if citation is None else union(titled, arm(_cites(citation)))
     return arms.cte("candidates").prefix_with("MATERIALIZED")
 

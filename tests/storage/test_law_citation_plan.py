@@ -42,8 +42,10 @@ async def session() -> AsyncIterator[AsyncSession]:
     await engine.dispose()
 
 
-async def _seed(session: AsyncSession, doctype: str, title: str, number: str, year: int) -> None:
-    suffix = uuid.uuid4().hex[:8]
+async def _seed(
+    session: AsyncSession, doctype: str, title: str, number: str, year: int, suffix: str = ""
+) -> None:
+    suffix = suffix or uuid.uuid4().hex[:8]
     work = f"/akn/xz/act/{year}/{suffix}"
     doc = Document(
         frbr_work_uri=work,
@@ -114,3 +116,23 @@ async def test_paging_a_relevance_listing_keeps_its_order(session: AsyncSession)
     pages = [(await list_laws(session, q=f"harbour {number} lights", limit=1, offset=i))[0]
              for i in range(len(whole))]  # fmt: skip
     assert [p[0].title for p in pages] == [r.title for r in whole]
+
+
+async def test_tied_scores_page_once_each_in_order(session: AsyncSession) -> None:
+    number, _ = _citation()
+    # Identical titles score alike; inserted against their work-URI order, so the
+    # index's order among the ties is not the listing's.
+    stems = [f"{c}{uuid.uuid4().hex[:6]}" for c in "fedcba"]
+    for stem in stems:
+        await _seed(session, "act", f"Harbour {number} Law", "3", 2001, suffix=stem)
+    await session.flush()
+    await _force_the_bm25_scan(session)
+    query = f"harbour {number}"
+    whole, _ = await list_laws(session, q=query)
+    assert [r.frbr_work_uri for r in whole] == sorted(r.frbr_work_uri for r in whole)
+    paged = [
+        (await list_laws(session, q=query, limit=1, offset=i))[0][0].frbr_work_uri
+        for i in range(len(stems))
+    ]
+    assert paged == [r.frbr_work_uri for r in whole]
+    assert len(set(paged)) == len(stems)
