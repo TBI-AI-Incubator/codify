@@ -1225,6 +1225,8 @@ export interface components {
             opening_material_terminators?: string[];
             /** Placeholders */
             placeholders?: components["schemas"]["PlaceholderMarker"][];
+            /** Pool Excluded Headings */
+            pool_excluded_headings?: string[];
             /**
              * Public Reference
              * @default false
@@ -1599,7 +1601,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml" | "json_portal";
+            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml" | "json_portal" | "oecd_compendium";
             /** Licence */
             licence?: string | null;
             /** Name */
