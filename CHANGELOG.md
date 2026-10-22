@@ -131,7 +131,8 @@ New, additive:
   `fetch` returns the bodies in the languages the ref names (English and French
   when it names none), the first as primary, each wrapped in a head whose
   `oecd.*` meta tags name the instrument and date its latest revision, the last
-  Council act in the record's change history. `last_modified` is the listing's
+  amendment in the record's change history (follow-up reports and entry into
+  force are not revisions). `last_modified` is the listing's
   publish date. The record's committee, themes, related instruments, adherents
   and monitoring reports travel as `upstream_metadata`. A packaged `oecd` config
   names the adapter, so `get_acquirer("oecd")` resolves it.

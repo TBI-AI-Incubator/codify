@@ -49,6 +49,9 @@ TYPE_TO_DOCTYPE: dict[int, str] = {
 }
 DOCTYPE_TO_TYPE: dict[str, int] = {v: k for k, v in TYPE_TO_DOCTYPE.items()}
 STATUS_IN_FORCE = 1
+# Change-history type that rewrites the text ("Amended on"). The others record
+# adoption, follow-up reports, entry into force or abrogation, and leave it as is.
+UPDATE_AMENDED = 2
 LANGUAGES: dict[str, str] = {"en": "eng", "fr": "fra"}
 
 
@@ -169,8 +172,13 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         year = _year(adopted) or ref.year
         titles = {lang: _lang_value(record.get("title"), lang) or "" for lang in LANGUAGES}
         updates = (record.get("changeHistory") or {}).get("update") or []
-        # The latest Council act on the instrument dates the text in force.
-        revised = max([adopted, *(str(u.get("date") or "")[:10] for u in updates)])
+        # The latest amendment dates the text in force; without one it is the adopted text.
+        amended = [
+            str(u.get("date") or "")[:10]
+            for u in updates
+            if int((u.get("type") or {}).get("id") or 0) == UPDATE_AMENDED
+        ]
+        revised = max([adopted, *amended])
         # The languages the ref asks for, the first primary, as the Cellar acquirer
         # has it; a ref naming none takes both, English first.
         wanted = ref.languages or list(LANGUAGES.values())
