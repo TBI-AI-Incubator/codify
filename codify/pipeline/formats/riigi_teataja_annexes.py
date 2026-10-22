@@ -9,7 +9,6 @@ for those same attachments, and `fill_annex_text` writes a transcript into each.
 from __future__ import annotations
 
 import base64
-import binascii
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -67,7 +66,7 @@ def _decoded(fail: etree._Element) -> bytes | None:
     payload = "".join("".join(fail.itertext()).split())
     try:
         return base64.b64decode(payload, validate=True) or None
-    except binascii.Error:
+    except ValueError:  # binascii.Error, and non-ASCII text
         return None
 
 

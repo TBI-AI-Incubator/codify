@@ -60,7 +60,9 @@ _SOURCE = _act(
     + _annex("KUM_m7_lisa3.gif", _GIF, "Joonis")
     + _annex("KUM_m7_lisa4.pdf", None, "Tühi")
     + _annex("KUM_m7_lisa5.pdf", None, "Katki").replace("</fail>", "QUJ</fail>")
-    + _annex("KUM_m7_lisa6.pdf", None, "Võõras").replace("</fail>", "QU-JD</fail>"),
+    + _annex("KUM_m7_lisa6.pdf", None, "Võõras").replace("</fail>", "QU-JD</fail>")
+    + _annex("KUM_m7_lisa7.pdf", None, "Täpitähed").replace("</fail>", "QUJé</fail>")
+    + _annex("KUM_m7_lisa8.pdf", _PDF, "Viimane"),
 )
 
 
@@ -72,7 +74,7 @@ def _attachment_eids(akn: str) -> list[str]:
 def test_annex_files_name_the_transformers_attachments_and_carry_their_bytes() -> None:
     akn, _ = riigi_teataja_to_akn(_SOURCE)
     files = annex_files(_SOURCE)
-    assert [f.eid for f in files] == _attachment_eids(akn) == [f"att_{i}" for i in range(1, 7)]
+    assert [f.eid for f in files] == _attachment_eids(akn) == [f"att_{i}" for i in range(1, 9)]
     assert [(f.name, f.data) for f in files] == [
         ("KUM_m7_lisa1.pdf", _PDF),
         (None, None),
@@ -80,6 +82,8 @@ def test_annex_files_name_the_transformers_attachments_and_carry_their_bytes() -
         ("KUM_m7_lisa4.pdf", None),
         ("KUM_m7_lisa5.pdf", None),  # bad padding
         ("KUM_m7_lisa6.pdf", None),  # a character outside the alphabet
+        ("KUM_m7_lisa7.pdf", None),  # a non-ASCII character
+        ("KUM_m7_lisa8.pdf", _PDF),  # read past the damaged ones
     ]
 
 

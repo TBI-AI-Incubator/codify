@@ -168,6 +168,7 @@ codify.pipeline.formats.eu_annex_splice:find_image_markers
 codify.pipeline.formats.eu_annex_splice:splice_transcriptions
 codify.pipeline.formats.eu_directive:configure_cpu_pool
 codify.pipeline.formats.eu_directive:on_the_cpu_pool
+codify.pipeline.formats.riigi_teataja_annexes:AnnexFile
 codify.pipeline.formats.riigi_teataja_annexes:annex_files
 codify.pipeline.formats.riigi_teataja_annexes:fill_annex_text
 codify.pipeline.formats:looks_like_eu
