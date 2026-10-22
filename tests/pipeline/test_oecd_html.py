@@ -607,3 +607,22 @@ def test_an_annex_never_takes_its_first_unit_as_a_caption(annex: str, first_unit
     assert attachment is not None
     assert attachment.find("a:subheading", NS) is None
     assert _eids(attachment, "article", "paragraph")[0] == first_unit
+
+
+def test_a_verb_line_inside_an_article_continues_the_article() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>DECIDES:</p>
+<p>Article 1</p>
+<p>General undertakings</p>
+<p>a. Members shall light lanterns at dusk.</p>
+<p>NOTES that this undertaking covers every harbour.</p>
+<p>Article 2</p>
+<p>a. Members shall keep registers.</p>
+"""
+    _, _, root = _convert(body, type="decision")
+    assert root.findall(".//a:body/a:section", NS) == []
+    assert _eids(root, "article") == ["art_1", "art_2"]
+    para = root.find(".//a:paragraph[@eId='art_1__para_a']", NS)
+    assert para is not None
+    assert "NOTES that this undertaking covers every harbour." in "".join(para.itertext())

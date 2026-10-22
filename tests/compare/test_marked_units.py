@@ -146,4 +146,8 @@ async def test_a_unit_holding_only_marked_text_is_structural(
     )
     embedded, prompts, _, _ = await _run(monkeypatch, domestic=other)
     assert embedded[2:] == ["Adherents should keep registers, and:\npublish them annually"]
+    # The candidate's marked point stays out of its prompt text as well.
+    candidates = [p.split("CANDIDATE DOMESTIC PROVISIONS")[1] for p in prompts]
+    assert candidates and all("publish them annually" in c for c in candidates)
+    assert [c for c in candidates if _DUTY in c] == []
     assert [p for p in prompts if "eId: sec_I__para_2" in p.split("CANDIDATE")[-1]] == []
