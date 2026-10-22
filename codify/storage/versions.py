@@ -342,17 +342,13 @@ _COUNT_EMBEDDED_SQL = text(
 async def count_embedded_versions(
     session: AsyncSession,
     version_ids: VersionScope,
-    model_id: str,
-    fallback_model_id: str | None = None,
 ) -> int:
     """How many of these versions have finished embedding, each counted once.
     An array parameter, because a corpus-wide IN list exceeds the bind limit.
 
-    The model ids are unused: retrieval reads the active and superseded models,
-    so while no third exists the stamp implies a readable vector. Revisit on a
-    third model, or a model switch without re-embedding.
+    The stamp names no model, so a version embedded only under a model the
+    reader no longer queries still counts. A model switch must re-embed.
     """
-    del model_id, fallback_model_id
     if not isinstance(version_ids, CurrentScope):
         if not version_ids:
             return 0

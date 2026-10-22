@@ -218,7 +218,6 @@ async def test_a_promoted_jurisdiction_is_served_from_its_own_partition(
         "query_tokens": "provision says",
         "query_match": "provision | says",
         "model_id": "test-model",
-        "fallback_model_id": None,
         "akn_type": None,
         "include_non_normative": False,
     }
@@ -456,7 +455,6 @@ async def test_a_global_search_merges_every_partition_by_distance(session: Async
                     "jurisdiction_ids": [first.id, second.id],
                     "k": 3,
                     "model_id": "test-model",
-                    "fallback_model_id": None,
                     "akn_type": None,
                     "include_non_normative": False,
                 },

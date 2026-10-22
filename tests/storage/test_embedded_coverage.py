@@ -69,14 +69,14 @@ async def test_counts_stamped_versions_in_scope_once_each(session: AsyncSession)
             {"ids": scope},
         )
     ).scalar_one()
-    counted = await count_embedded_versions(session, scope, "test-model", None)
+    counted = await count_embedded_versions(session, scope)
     assert (counted, stamped) == (2, 2)
-    assert await count_embedded_versions(session, [unembedded_a], "test-model") == 0
+    assert await count_embedded_versions(session, [unembedded_a]) == 0
 
 
 async def test_empty_scope_does_not_query() -> None:
     session = AsyncMock()
-    assert await count_embedded_versions(session, [], "new", "old") == 0
+    assert await count_embedded_versions(session, []) == 0
     session.execute.assert_not_awaited()
 
 
@@ -84,5 +84,5 @@ async def test_count_binds_the_scope_as_one_array() -> None:
     session = AsyncMock()
     session.execute.return_value = Mock(scalar_one=Mock(return_value=2))
     ids = [uuid.uuid4(), uuid.uuid4()]
-    assert await count_embedded_versions(session, ids, "new", "old") == 2
+    assert await count_embedded_versions(session, ids) == 2
     assert session.execute.await_args.args[1] == {"version_ids": ids}

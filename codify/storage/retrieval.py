@@ -60,8 +60,7 @@ RRF_K = 60
 # the ordered index scan. A window over the join instead sorts every embedding
 # in scope exactly, which measured 60 s cold on 67k provisions. The window
 # orders by `distance + 0`: the relaxed scan is approximately ordered and the
-# planner would otherwise take its order for the window's. The anti-join
-# excludes fallback vectors wherever a preferred vector exists.
+# planner would otherwise take its order for the window's.
 _HYBRID_TEMPLATE = """
     WITH fts AS (
       SELECT p.id, ROW_NUMBER() OVER (
@@ -99,18 +98,7 @@ _DENSE_TEMPLATE = """e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :q
         FROM provision_embeddings e
         JOIN provisions p ON p.id = e.provision_id {vec_join}
         WHERE {vec_partitions} {vec_scope}
-          AND (
-            e.model_id = :model_id
-            OR (
-              e.model_id = CAST(:fallback_model_id AS text)
-              AND NOT EXISTS (
-                SELECT 1 FROM provision_embeddings preferred
-                WHERE preferred.provision_id = e.provision_id
-                  AND preferred.jurisdiction_id = e.jurisdiction_id
-                  AND preferred.model_id = :model_id
-              )
-            )
-          )
+          AND e.model_id = :model_id
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
           AND p.excluded_from_pool IS NOT TRUE
@@ -215,7 +203,6 @@ async def _dense_only(
     model_id: str,
     akn_type: str | None = None,
     include_non_normative: bool = False,
-    fallback_model_id: str | None = None,
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """Dense arm alone, for a query the tokeniser finds nothing lexical in."""
     sql, params = _dense_only_sql(scope, jurisdiction_ids is not None)
@@ -223,7 +210,6 @@ async def _dense_only(
         "query_vec": query_vec,
         "k": k,
         "model_id": model_id,
-        "fallback_model_id": fallback_model_id,
         "akn_type": akn_type,
         "include_non_normative": include_non_normative,
     }
@@ -245,14 +231,11 @@ async def hybrid_search(
     model_id: str,
     akn_type: str | None = None,
     include_non_normative: bool = False,
-    fallback_model_id: str | None = None,
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """RRF-fused dense + BM25.
 
     `version_ids` is an id list or a `CurrentScope`; pass the latter for a
     jurisdiction-wide search, which otherwise spends seconds planning.
-    `fallback_model_id` is read per provision where the preferred construction
-    has not been written yet, so a re-embed in progress never empties the arm.
 
     Returns (provision_id, akn_eid, text, rrf_score).
     Normative only unless `include_non_normative`: an elucidation cannot be a
@@ -282,7 +265,6 @@ async def hybrid_search(
             model_id,
             akn_type,
             include_non_normative,
-            fallback_model_id,
         )
     sql, params = _hybrid_sql(scope, jurisdiction_ids is not None)
     params |= {
@@ -295,7 +277,6 @@ async def hybrid_search(
         "pool": candidate_pool,
         "rrf_k": rrf_k,
         "model_id": model_id,
-        "fallback_model_id": fallback_model_id,
         "akn_type": akn_type,
         "include_non_normative": include_non_normative,
     }

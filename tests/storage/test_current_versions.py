@@ -195,8 +195,8 @@ async def test_current_scope_searches_and_counts_what_the_id_list_does(
     hits = await search(ids)
     assert hits and await search(scope) == hits
     assert await count_in_scope(session, scope) == len(ids)
-    assert await count_embedded_versions(session, scope, "m") == await count_embedded_versions(
-        session, ids, "m"
+    assert await count_embedded_versions(session, scope) == await count_embedded_versions(
+        session, ids
     )
     # A year range admits the undated law unless asked not to.
     assert await count_in_scope(
