@@ -22,7 +22,7 @@ from codify.pipeline.formats.eu_annex_splice import TRANSCRIBED_NAME, transcript
 ANNEX_URL = "https://www.riigiteataja.ee/aktilisa/{}/{}"
 
 # Characters XML 1.0 refuses; a text layer can carry them.
-_XML_ILLEGAL = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff￾￿]")
+_XML_ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 
 
 @dataclass(frozen=True)
