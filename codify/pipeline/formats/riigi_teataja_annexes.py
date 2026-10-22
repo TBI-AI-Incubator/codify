@@ -1,27 +1,19 @@
-"""Riigi Teataja annexes published as files.
-
-The publisher's XML links most annexes (`lisa`) as files and carries each file's
-bytes, base64, inside the link's `fail` element. The transformer writes one
-attachment per annex holding its heading and link; `annex_files` reads the bytes
-for those same attachments, and `fill_annex_text` writes a transcript into each.
-"""
+"""Riigi Teataja annexes published as files: the bytes the XML embeds beside each
+link, read under the converter's attachment eIds, and their transcripts written in."""
 
 from __future__ import annotations
 
 import base64
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, parse_xml
+from codify.pipeline.enrich.ocr import _strip_control_chars
 from codify.pipeline.formats.eu_annex_splice import TRANSCRIBED_NAME, transcript_to_content
 
 ANNEX_URL = "https://www.riigiteataja.ee/aktilisa/{}/{}"
-
-# Characters XML 1.0 refuses; a text layer can carry them.
-_XML_ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
 
 
 @dataclass(frozen=True)
@@ -41,20 +33,10 @@ def annex_elements(root: etree._Element) -> list[etree._Element]:
 
 
 def annex_act_id(root: etree._Element) -> str | None:
-    """The id the publisher files this text's annexes under.
-
-    The text's own `globaalID`: a consolidated text's first `aktViide` names the
-    act's original publication, which does not hold a later text's annex files.
-    Older texts write `aktViide` as a URL, so its trailing digits are the fallback.
-    """
-    meta = root.find("{*}metaandmed")
-    if meta is None:
-        return None
-    own = (meta.findtext("{*}globaalID") or "").strip()
-    if own:
-        return own
-    viide = re.search(r"(\d+)\s*$", meta.findtext(".//{*}aktViide") or "")
-    return viide.group(1) if viide else None
+    """The text's own `globaalID`, which files its annexes; the first `aktViide` names
+    the original publication, which lacks a consolidated text's later annexes."""
+    own = (root.findtext("{*}metaandmed/{*}globaalID") or "").strip()
+    return own or None
 
 
 def annex_url(act_id: str, file_name: str) -> str:
@@ -90,11 +72,8 @@ def annex_files(source_xml: str | bytes) -> list[AnnexFile]:
 
 
 def fill_annex_text(akn_xml: str, pages: Mapping[str, Sequence[str]]) -> tuple[str, int]:
-    """The document with each named attachment's transcript after its link.
-
-    One `hcontainer` per page, numbered by page; a blank page is skipped. An
-    attachment already holding a transcript is left alone. Returns the document
-    and how many attachments were filled."""
+    """Each named attachment's pages after its link, one `hcontainer` per non-blank page;
+    one already transcribed is left alone. Returns the document and the count filled."""
     root = parse_xml(akn_xml, huge_tree=True)
     filled = 0
     for main in root.iterfind(f".//{{{AKN_NS}}}attachment/{{{AKN_NS}}}doc/{{{AKN_NS}}}mainBody"):
@@ -105,7 +84,7 @@ def fill_annex_text(akn_xml: str, pages: Mapping[str, Sequence[str]]) -> tuple[s
             continue
         added = False
         for number, text in enumerate(pages[eid], start=1):
-            text = _XML_ILLEGAL.sub("", text)
+            text = _strip_control_chars(text)
             if not text.strip():
                 continue
             page_eid = f"{eid}__hcontainer_{number}"

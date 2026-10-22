@@ -138,7 +138,8 @@ Fixed:
   numbered in Devanagari, Bengali or Thai digits is in the unit set.
 - Riigi Teataja: an annex links its file under the text's own `globaalID`. The
   first `aktViide` names the act's original publication, which does not hold a
-  consolidated text's later annex files, and older texts write it as a URL.
+  consolidated text's later annex files, and older texts write it as a URL. A
+  text without a `globaalID` keeps the annex title unlinked.
 
 ## 0.6.0 (2026-10-02)
 

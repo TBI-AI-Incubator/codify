@@ -93,18 +93,6 @@ def test_annex_link_names_the_texts_own_id_not_the_first_publication() -> None:
     assert "108032021002" not in akn
 
 
-def test_annex_link_takes_the_digits_of_a_url_form_act_reference() -> None:
-    old = _act(
-        meta_ids=(
-            "<avaldamismarge><avaldamineKuupaev>2009-04-28</avaldamineKuupaev>"
-            "<aktViide>http://www.riigiteataja.ee/akt/13175900</aktViide></avaldamismarge>"
-        ),
-        annexes=_annex("13175903.gif", _GIF, ""),
-    )
-    akn, _ = riigi_teataja_to_akn(old)
-    assert 'href="https://www.riigiteataja.ee/aktilisa/13175900/13175903.gif"' in akn
-
-
 def test_fill_writes_one_container_per_page_after_the_link() -> None:
     akn, _ = riigi_teataja_to_akn(_SOURCE)
     pages = {
