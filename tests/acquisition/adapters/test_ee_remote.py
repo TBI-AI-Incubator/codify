@@ -294,6 +294,22 @@ def test_a_member_with_an_unreadable_end_date_is_skipped_as_the_local_walk_skips
     assert "105" not in build_ee_index(archive)["entries"]
 
 
+def test_a_member_dated_only_by_publication_is_dated_alike_on_both_paths(tmp_path: Path) -> None:
+    published = (
+        _member("106")
+        .replace(b"\t\t\t<aktikuupaev>2026-09-28</aktikuupaev>\n", b"")
+        .replace(b"<kehtivuseAlgus>2026-10-04+03:00</kehtivuseAlgus>", b"")
+    )
+    data = _zip({"000000000106.xml": (published, (2026, 10, 3))})
+    archive = tmp_path / "xml.zip"
+    archive.write_bytes(data)
+    for entry in (
+        _index(data, date(2026, 10, 1))["entries"]["106"],
+        build_ee_index(archive)["entries"]["106"],
+    ):  # type: ignore[index]
+        assert (entry["expression_date"], entry["year"]) == ("2026-10-01", 2026)
+
+
 def test_a_failure_behind_a_slow_member_stops_the_rest() -> None:
     members = {f"{n:012d}.xml": (_member(str(n)), (2026, 10, 2)) for n in range(1, 21)}
     data = bytearray(_zip(members))

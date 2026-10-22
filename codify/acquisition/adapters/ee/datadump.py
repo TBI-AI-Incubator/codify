@@ -207,7 +207,7 @@ def _index_entry(
 
     doc_id = _field(head, "globaalID") or member.replace(".xml", "")
 
-    m_date = re.search(r"<(?:aktikuupaev|avaldamineKuupaev)>(\d{4}-\d{2}-\d{2})", head)
+    m_date = re.search(r"<(?:aktikuupaev|avaldamineKuupaev)\b[^>]*>(\d{4}-\d{2}-\d{2})", head)
     date_str = m_date.group(1) if m_date else ""
     year = date_str.split("-")[0] if date_str else "2022"
 
