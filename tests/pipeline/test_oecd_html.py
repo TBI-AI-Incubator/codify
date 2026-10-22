@@ -402,3 +402,20 @@ def test_the_comparator_excludes_what_the_rows_exclude() -> None:
     doc = parse_akn(xml)
     excluded = sorted(el.akn_eid for el in iter_assessable(doc) if is_excluded(el, doc))
     assert excluded == ["sec_IV", "sec_V", "sec_V__para_4"]
+
+
+def test_an_empty_excluded_section_does_not_pool_its_bullets() -> None:
+    body = _LETTERED_ACT + (
+        "<p>III. INVITES</p><p>- the Secretary-General to disseminate this Recommendation;</p>"
+        "<p>- non-Adherents to adhere to this Recommendation.</p>"
+    )
+    xml, _, _ = _convert(body)
+    flags = _row_flags(xml)
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {
+        "sec_III__indent_1",
+        "sec_III__indent_2",
+    }
+    doc = parse_akn(xml)
+    pooled = [el.akn_eid for el in iter_assessable(doc) if not is_excluded(el, doc)]
+    assert "sec_III" not in pooled
+    assert "sec_II__para_a" in pooled

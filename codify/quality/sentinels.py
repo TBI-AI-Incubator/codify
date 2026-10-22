@@ -78,8 +78,8 @@ def exclusion_reason(
 
 
 def is_excluded_heading(heading: str | None, excluded: frozenset[str]) -> bool:
-    """Whether a container heading is one of `excluded`, which is upper-cased."""
-    return bool(heading) and (heading or "").strip().upper() in excluded
+    """Whether a container heading, stripped, is one of `excluded` as written."""
+    return bool(heading) and (heading or "").strip() in excluded
 
 
 def heading_scoped(body: Iterable[BodyElement], excluded: frozenset[str]) -> frozenset[UUID]:

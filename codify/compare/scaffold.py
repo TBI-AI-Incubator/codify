@@ -38,17 +38,16 @@ def is_excluded(el: BodyElement, doc: Document) -> bool:
     from codify.quality.sentinels import heading_scoped
 
     excluded = pool_excluded_headings_for(doc.frbr_work_uri)
-    scoped = el.id in heading_scoped(doc.body, excluded) if excluded else False
-    return unit_excluded(el, markers_for(doc), scoped=scoped)
+    # Whole, own text or not: an empty unit would otherwise fold its children in.
+    if excluded and el.id in heading_scoped(doc.body, excluded):
+        return True
+    return unit_excluded(el, markers_for(doc))
 
 
-def unit_excluded(el: BodyElement, markers: tuple[str, ...], *, scoped: bool = False) -> bool:
+def unit_excluded(el: BodyElement, markers: tuple[str, ...]) -> bool:
     from codify.quality.sentinels import exclusion_reason
 
-    return (
-        exclusion_reason(_own_text(el), el.akn_eid or "", markers, under_excluded_heading=scoped)
-        is not None
-    )
+    return exclusion_reason(_own_text(el), el.akn_eid or "", markers) is not None
 
 
 def iter_assessable(doc: Document) -> Iterator[BodyElement]:

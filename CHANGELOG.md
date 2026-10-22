@@ -140,7 +140,7 @@ New, additive:
   HTML source carrying the acquirer's head to it. Annexes and tables inside a
   code fall out as flat units with repeated numbers.
 - `pool_excluded_headings` in a jurisdiction config: units at or under a title,
-  chapter, section or article whose heading it lists are stored with
+  chapter, section or article whose heading, as printed, it lists are stored with
   `excluded_from_pool` and reason `heading`, by the mapper, by
   `retokenise_version_provisions` (which reads the section rows) and by the
   comparator's `is_excluded`. The `oecd` config lists the verbs whose duty falls

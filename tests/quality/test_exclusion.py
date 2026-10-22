@@ -78,7 +78,7 @@ def test_heading_scope_covers_the_container_and_everything_under_it() -> None:
     point = Point(akn_eid="sec_2__para_2__point_a", akn_type="point", position=0, text="x")
     para = Paragraph(akn_eid="sec_2__para_2", akn_type="paragraph", position=0, children=[point])
     invites = Section(
-        akn_eid="sec_2", akn_type="section", position=1, heading=" Invites ", children=[para]
+        akn_eid="sec_2", akn_type="section", position=1, heading=" INVITES ", children=[para]
     )
     kept = Section(
         akn_eid="sec_1",
@@ -87,9 +87,11 @@ def test_heading_scope_covers_the_container_and_everything_under_it() -> None:
         heading="RECOMMENDS",
         children=[Article(akn_eid="sec_1__art_1", akn_type="article", position=0, text="y")],
     )
-    # A leaf's heading never scopes: only the kinds stored as section rows do.
+    # A leaf's heading never scopes: only the kinds stored as section rows do. The
+    # match is as printed, so an article titled in sentence case is not a verb heading.
     headed_leaf = Paragraph(akn_eid="para_9", akn_type="paragraph", position=2, heading="INVITES")
-    scoped = heading_scoped([kept, invites, headed_leaf], frozenset({"INVITES"}))
+    titled = Article(akn_eid="art_9", akn_type="article", position=3, heading="Invites", text="z")
+    scoped = heading_scoped([kept, invites, headed_leaf, titled], frozenset({"INVITES"}))
     assert scoped == {invites.id, para.id, point.id}
     assert heading_scoped([kept, invites], frozenset()) == frozenset()
     # The backfill scopes by section rows, so the two kind sets must agree.
