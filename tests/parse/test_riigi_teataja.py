@@ -1116,3 +1116,10 @@ def test_a_zero_rowspan_reaches_the_last_row() -> None:
     table = _by_eid(akn_xml, "para_1__table_1")
     assert table[0][0].get("rowspan") == "2"
     assert _cells(table) == [["Määr", ""], ["10", ""]]
+
+
+@pytest.mark.parametrize("digit", ["&#57;", "&#x39;"])
+def test_an_entity_superscript_stays_superscript(digit: str) -> None:
+    akn_xml = _html_act(f"<p>§ 43<sup>{digit}</sup> kehtib.</p>")
+    paragraph = parse_akn(akn_xml).body[0]
+    assert paragraph.text == "§ 43⁹ kehtib."

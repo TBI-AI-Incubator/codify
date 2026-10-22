@@ -415,6 +415,9 @@ def _walk_html(el: etree._Element, w: _Blocks) -> None:
             w.line_break()
         elif tag == "table" and not w.in_cell:
             _write_html_table(child, w)
+        elif tag == "sup" and len(child) == 0 and re.fullmatch(r"\s*[0-9]+\s*", child.text or ""):
+            # Digits written as entities escape the pre-parse pass; § 43⁹ is not § 439.
+            w.text((child.text or "").strip().translate(_TO_SUPERSCRIPT))
         elif tag in _HTML_INLINE:
             w.push(_HTML_INLINE[tag])
             _walk_html(child, w)
