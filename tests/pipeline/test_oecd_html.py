@@ -509,6 +509,11 @@ def test_the_french_text_marks_the_same_sections() -> None:
 <p>2. Les ports allument les lanternes au crépuscule.</p>
 """
     xml, _, root = _convert(body, lang="fr")
+    # The wrapper names the language, so the French expression is not the English one.
+    assert [e.get("language") for e in root.iterfind(".//a:FRBRlanguage", NS)] == ["fra", "fra"]
+    assert parse_akn(xml).frbr_expression_uri == (
+        "/akn/oecd/act/recommendation/2020/9002/fra@2020-05-05"
+    )
     sections = root.findall(".//a:body/a:section", NS)
     assert [s.findtext("a:heading", namespaces=NS) for s in sections] == [
         "RECOMMANDE", "INVITE", "CHARGE",

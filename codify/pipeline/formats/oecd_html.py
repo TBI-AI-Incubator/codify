@@ -100,6 +100,8 @@ NON_ADHERENT_VERBS = frozenset(
     }
 )  # fmt: skip
 NON_ADHERENT_DUTY = "#nonAdherentDuty"
+# The acquirer's two-letter `oecd.lang` → the ISO 639-3 code an expression carries.
+_WRAPPER_LANGUAGES = {"en": "eng", "fr": "fra"}
 # The addressee runs to the infinitive (`to`, `à`, or `de`/`d’` before a verb in
 # -er, -ir, -re or -oir, so `Comité de la gouvernance` stays whole) or a list's colon.
 _ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|\s(?:de\s+|d[’']\s*)(?=\w+(?:er|ir|re)\b)|:")
@@ -665,8 +667,10 @@ def instrument_html_to_akn(
     provenance: dict[str, object] | None = None,
 ) -> str:
     """Deterministic Compendium HTML → AKN `act`: the adoption date is the work's,
-    the latest revision's (`oecd.revised`) the expression's."""
+    the latest revision's (`oecd.revised`) the expression's. The wrapper's
+    `oecd.lang` names the body's language; `language` stands in where it is absent."""
     blocks, meta = _blocks(text)
+    language = _WRAPPER_LANGUAGES.get(meta.get("lang", ""), language)
     inst = _segment(blocks, meta)
     adopted = meta.get("adopted")
     if not adopted:
