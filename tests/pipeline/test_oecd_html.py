@@ -588,3 +588,22 @@ def test_a_revised_text_is_a_new_expression_of_the_same_work() -> None:
     # A revision date before adoption is a data error, not an earlier expression.
     early, _, _ = _convert(_COUNCIL_ACT, revised="2001-01-01")
     assert parse_akn(early).frbr_expression_uri.endswith("@2020-05-05")
+
+
+@pytest.mark.parametrize(
+    ("annex", "first_unit"),
+    [
+        ("<p>Article 1</p><p>a. Members shall keep registers.</p>", "att_1__art_1"),
+        ("<p>1. Adherents should:</p><p>a) keep registers;</p><p>b) publish them.</p>",
+         "att_1__para_1"),
+        ("<p>1. Members shall keep registers</p>", "att_1__para_1"),
+    ],
+)  # fmt: skip
+def test_an_annex_never_takes_its_first_unit_as_a_caption(annex: str, first_unit: str) -> None:
+    body = "<p>THE COUNCIL,</p><p>I. RECOMMENDS that Adherents apply the Annex.</p><p>Annex</p>"
+    xml, _, root = _convert(body + annex)
+    validate_akn(xml)
+    attachment = root.find(".//a:attachments/a:attachment", NS)
+    assert attachment is not None
+    assert attachment.find("a:subheading", NS) is None
+    assert _eids(attachment, "article", "paragraph")[0] == first_unit

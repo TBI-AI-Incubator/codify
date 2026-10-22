@@ -225,6 +225,13 @@ def _is_heading(block: str) -> bool:
     return len(block.split()) <= _HEADING_WORDS and not block.rstrip().endswith((".", ";", ","))
 
 
+def _is_unit(block: str) -> bool:
+    """Whether the block opens a unit of its own: a container, article, section,
+    numbered or lettered paragraph, point or indent, never a caption."""
+    units = (_NUM_PARA, _LETTER_PARA, _POINT, _INDENT)
+    return _starts_body(block) or any(p.match(block) for p in units)
+
+
 def _starts_body(block: str) -> bool:
     return bool(_CONTAINER.match(block) or _ARTICLE.match(block) or _SECTION.match(block)) or (
         _operative(block) is not None
@@ -450,7 +457,13 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             builder = _Builder(scope=annex.eid)
             annex.body = builder.roots
             continue
-        if annex is not None and annex.title is None and not builder.roots and _is_heading(block):
+        if (
+            annex is not None
+            and annex.title is None
+            and not builder.roots
+            and _is_heading(block)
+            and not _is_unit(block)
+        ):
             annex.title = block
             continue
         builder.feed(block)
