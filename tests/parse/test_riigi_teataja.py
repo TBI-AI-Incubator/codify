@@ -36,6 +36,7 @@ _SAMPLE_EST_XML = """<?xml version="1.0" encoding="UTF-8"?>
 			<kehtivuseAlgus>2023-02-01</kehtivuseAlgus>
 			<kehtivuseLopp>2025-12-31</kehtivuseLopp>
 		</kehtivus>
+		<globaalID>105052022001</globaalID>
 	</metaandmed>
 	<aktinimi>
 		<nimi>

@@ -29,6 +29,11 @@ from codify.pipeline.events import (
     Parsed,
     ValidationIssued,
 )
+from codify.pipeline.formats.riigi_teataja_annexes import (
+    annex_act_id,
+    annex_elements,
+    annex_url,
+)
 
 logger = structlog.get_logger()
 
@@ -657,10 +662,10 @@ def riigi_teataja_to_akn(
                     p_el.text = _html_text(child.text or "")
 
     # Attachments
-    lisad = root.findall(".//{*}lisaViide") + root.findall(".//{*}lisa")
+    lisad = annex_elements(root)
     if lisad:
         attachments = etree.SubElement(act, _q("attachments"))
-        akt_viide = meta.findtext(".//{*}aktViide") if meta is not None else None
+        akt_id = annex_act_id(root)
         for l_idx, lisa in enumerate(lisad, start=1):
             att_eid = f"att_{l_idx}"
             att = etree.SubElement(attachments, _q("attachment"), eId=att_eid)
@@ -709,9 +714,8 @@ def riigi_teataja_to_akn(
 
             fail_el = lisa.find(".//{*}fail")
             fail_nimi = fail_el.get("failNimi") if fail_el is not None else None
-            if fail_nimi and akt_viide:
-                ref_link = f"https://www.riigiteataja.ee/aktilisa/{akt_viide}/{fail_nimi}"
-                ref = etree.SubElement(lisa_p, _q("ref"), href=ref_link)
+            if fail_nimi and akt_id:
+                ref = etree.SubElement(lisa_p, _q("ref"), href=annex_url(akt_id, fail_nimi))
                 ref.text = f"{lisa_title} ({fail_nimi})"
             else:
                 lisa_p.text = lisa_title
