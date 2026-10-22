@@ -390,7 +390,12 @@ def test_rows_under_invites_and_instructs_leave_the_pool() -> None:
 def test_paragraphs_under_instructs_leave_the_pool() -> None:
     xml, _, _ = _convert(_COUNCIL_ACT)
     flags = _row_flags(xml)
-    assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_IV__content", "sec_V__para_4"}
+    # The INSTRUCTS lead-in has a row of its own, excluded with its section.
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {
+        "sec_IV__content",
+        "sec_V__intro",
+        "sec_V__para_4",
+    }
     assert flags["sec_V__para_4"] == (True, "marked")
     assert flags["sec_III__para_3"] == (False, None)
     assert flags["sec_II__para_1__point_i"] == (False, None)
@@ -491,7 +496,12 @@ def test_a_translated_heading_keeps_the_unit_out_of_the_pool() -> None:
     translated = translated.replace("<heading>INVITES</heading>", "<heading>เชิญ</heading>")
     assert translated != xml
     flags = _row_flags(translated)
-    assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_IV__content", "sec_V__para_4"}
+    # The INSTRUCTS lead-in has a row of its own, excluded with its section.
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {
+        "sec_IV__content",
+        "sec_V__intro",
+        "sec_V__para_4",
+    }
     doc = parse_akn(translated)
     assert [el.akn_eid for el in iter_assessable(doc) if is_excluded(el, doc)] == [
         "sec_IV", "sec_V", "sec_V__para_4",
@@ -521,6 +531,7 @@ def test_the_french_text_marks_the_same_sections() -> None:
     flags = _row_flags(xml)
     assert {eid for eid, (flag, _) in flags.items() if flag} == {
         "sec_II__content",
+        "sec_III__intro",
         "sec_III__para_1",
     }
     assert flags["att_1__para_2"] == (False, None)
