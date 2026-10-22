@@ -79,8 +79,10 @@ async def test_ee_datadump_fetch_succeeds(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ee_datadump_fetch_derives_slug_from_index(tmp_path: Path) -> None:
-    # When ref has no extra.slug, fetch must derive from index title, not use raw ID
+async def test_ee_datadump_fetch_takes_the_uri_from_the_member_not_a_stale_index(
+    tmp_path: Path,
+) -> None:
+    # An index built before the full-title rule names an abbreviation slug and another title.
     archive = tmp_path / "xml.2026.zip"
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr(_MEMBER, _SYNTHETIC_EE_XML)
@@ -107,7 +109,7 @@ async def test_ee_datadump_fetch_derives_slug_from_index(tmp_path: Path) -> None
         number="123122022025",
     )
     doc = await acquirer.fetch(id_only_ref)
-    assert doc.frbr_work_uri == "/akn/ee/act/2022/ars"
+    assert doc.frbr_work_uri == "/akn/ee/act/2022/synthetic-act"
 
 
 def test_build_ee_index(tmp_path: Path) -> None:

@@ -84,7 +84,7 @@ def test_constitution_chapter_identity() -> None:
         f"<paragrahv><paragrahvNr>{n}</paragrahvNr></paragrahv></jagu>"
         for n in (1, 2)
     )
-    akn, _ = riigi_teataja_to_akn(source(title="Synthetic põhiseadus", body=body))
+    akn, _ = riigi_teataja_to_akn(source(title="Eesti Vabariigi põhiseadus", body=body))
     root = etree.fromstring(akn.encode())
     chapters = root.findall(".//{*}chapter")
     assert [c.get("eId") for c in chapters] == ["chp_1", "chp_2"]

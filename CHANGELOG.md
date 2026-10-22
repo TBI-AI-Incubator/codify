@@ -26,6 +26,14 @@ Breaks, in that the structurer's output changes for documents it already read:
    schedule paragraph printed above its caption keeps its anchor. A line
    of a keyword and a number inside a schedule, or beside its caption, is the
    citation of the provision that introduces it, not a section.
+2. Every Riigi Teataja act whose source carries an abbreviation (`lyhend`) gets a
+   new work URI. The URI now slugs the full title on every path: the transformer,
+   `build_ee_index` and `EeDatadumpAcquirer.fetch`, which share
+   `codify.acquisition.adapters.ee.identity`. `fetch` reads the URI from the
+   member, not from the index or the ref. Only the constitution, known by document
+   type `põhiseadus`, abbreviation `PS` or its exact title, takes
+   `/akn/ee/act/1992/pohiseadus`. A title that merely contains `põhiseadus` no
+   longer does.
 
 New, additive:
 

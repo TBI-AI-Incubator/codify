@@ -178,8 +178,9 @@ def test_riigi_teataja_to_akn_validates_and_parses() -> None:
     validate_akn(akn_xml)
 
     doc = parse_akn(akn_xml)
-    assert doc.frbr_work_uri == "/akn/ee/act/2022/ars"
-    assert doc.frbr_expression_uri == "/akn/ee/act/2022/ars/est@2023-02-01"
+    # Keyed by the full title, not the source's abbreviation ÄRS.
+    assert doc.frbr_work_uri == "/akn/ee/act/2022/ariregistri-seadus"
+    assert doc.frbr_expression_uri == "/akn/ee/act/2022/ariregistri-seadus/est@2023-02-01"
     assert doc.language == "est"
 
     assert meta["title"] == "Äriregistri seadus"
@@ -247,7 +248,7 @@ async def test_pipeline_ingest_riigi_teataja(tmp_path: Path) -> None:
     assert "complete" in kinds
 
     complete_ev = next(ev for ev in events if isinstance(ev, Complete))
-    assert complete_ev.document.frbr_work_uri == "/akn/ee/act/2022/ars"
+    assert complete_ev.document.frbr_work_uri == "/akn/ee/act/2022/ariregistri-seadus"
     assert len(complete_ev.document.body) > 0
 
 
