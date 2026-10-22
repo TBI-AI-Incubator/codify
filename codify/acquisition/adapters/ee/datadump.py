@@ -187,7 +187,12 @@ def build_ee_index(
                         continue
 
                     m_title = re.search(r"<pealkiri>(.*?)</pealkiri>", head)
-                    title = unescape(m_title.group(1)).strip() if m_title else ""
+                    # Parsed, as fetch and the transformer read it: CDATA and entities decode.
+                    title = (
+                        " ".join((parse_xml(m_title.group(0)).text or "").split())
+                        if m_title
+                        else ""
+                    )
                     if not title:
                         skipped += 1
                         continue

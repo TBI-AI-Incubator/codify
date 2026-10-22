@@ -106,6 +106,23 @@ async def test_transformer_and_adapter_give_one_work_uri_for_one_source_file(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "title",
+    ["<![CDATA[Näidisseadus]]>", "N&#228;idisseadus", "  Näidisseadus  "],
+)
+async def test_every_path_reads_the_title_as_xml(tmp_path: Path, title: str) -> None:
+    transformed, fetched, entry = await _paths(tmp_path, _source(title=title))
+    indexed = build_frbr_work_uri("ee", entry["doctype"], entry["year"], entry["slug"])
+    expected = "/akn/ee/act/2005/naidisseadus"
+    assert (transformed, fetched, indexed, entry["title"]) == (
+        expected,
+        expected,
+        expected,
+        "Näidisseadus",
+    )
+
+
+@pytest.mark.asyncio
 async def test_a_title_naming_the_constitution_is_another_act(tmp_path: Path) -> None:
     raw = _source(
         title=_NAMES_THE_CONSTITUTION,
