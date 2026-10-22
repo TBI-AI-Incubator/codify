@@ -12,6 +12,7 @@
     "eng",
     "fra"
   ],
+  "authoritative_language": "eng",
   "akn_profile": "AKN 3.0",
   "document_classes": {
     "recommendation": {
@@ -148,12 +149,8 @@
     },
     "date_calendar": "gregorian"
   },
-  "pool_excluded_headings": [
-    "INVITES",
-    "INSTRUCTS",
-    "ENCOURAGES",
-    "REQUESTS",
-    "CALLS ON"
+  "pool_excluded_refers_to": [
+    "#nonAdherentDuty"
   ],
   "core_tlcs": [
     {

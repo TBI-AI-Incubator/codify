@@ -15,13 +15,14 @@ from functools import lru_cache
 
 import structlog
 from lxml import etree
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy import text as text_clause
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from codify.frbr import UNKNOWN_YEAR, parse_source_ref
 from codify.jurisdictions import try_load_config
+from codify.quality.sentinels import LAW_REASONS
 from codify.storage.models import CrossReference, Law, Provision, Section, Version
 
 logger = structlog.get_logger()
@@ -556,6 +557,14 @@ async def _law_latest_version(
     return cache.by_uri[work_uri]
 
 
+def _answers_a_reference() -> ColumnElement[bool]:
+    """In the pool, or out of it but still law: a marked duty is citable."""
+    return or_(
+        Provision.excluded_from_pool.is_not(True),
+        Provision.exclusion_reason.in_(sorted(LAW_REASONS)),
+    )
+
+
 async def _provision_in_version(
     session: AsyncSession, version_id: uuid.UUID, eid: str
 ) -> uuid.UUID | None:
@@ -569,7 +578,7 @@ async def _provision_in_version(
                 # apparatus is printed under the eId of the unit it explains,
                 # a citation of that unit resolved to the sentence saying it
                 # needs no explanation.
-                .where(Provision.excluded_from_pool.is_not(True))
+                .where(_answers_a_reference())
             )
         )
         .scalars()
@@ -585,7 +594,7 @@ async def _provision_in_version(
             await session.execute(
                 select(Provision.id)
                 .where(Provision.version_id == version_id)
-                .where(Provision.excluded_from_pool.is_not(True))
+                .where(_answers_a_reference())
                 .where(
                     Provision.akn_eid.like(f"{escaped}\\_\\_%", escape="\\")
                     | Provision.akn_eid.like(f"%\\_\\_{escaped}", escape="\\")
@@ -767,9 +776,15 @@ async def _anchors(
         return None
     provisions = (
         await session.execute(
-            select(Provision.akn_eid, Provision.id, Provision.excluded_from_pool).where(
-                Provision.version_id == version_id
-            )
+            select(
+                Provision.akn_eid,
+                Provision.id,
+                Provision.excluded_from_pool.is_(True)
+                & (
+                    Provision.exclusion_reason.is_(None)
+                    | Provision.exclusion_reason.not_in(sorted(LAW_REASONS))
+                ),
+            ).where(Provision.version_id == version_id)
         )
     ).all()
     sections = (

@@ -33,13 +33,14 @@ def is_excluded(el: BodyElement, doc: Document) -> bool:
     """The stored exclusion rule on a unit's own text, as the mapper judges a
     row: a marker child never taints its parent, and a table-shaped child never
     excludes a substantive one. Empty units stay with the structural rule. A unit
-    under a heading the jurisdiction keeps out of the pool is excluded as its row is."""
-    from codify.jurisdictions import pool_excluded_headings_for
-    from codify.quality.sentinels import heading_scoped
+    marked with a `refersTo` the jurisdiction keeps out of the pool is excluded as its
+    row is."""
+    from codify.jurisdictions import pool_excluded_refers_to_for
+    from codify.quality.sentinels import marked_scope
 
-    excluded = pool_excluded_headings_for(doc.frbr_work_uri)
+    excluded = pool_excluded_refers_to_for(doc.frbr_work_uri)
     # Whole, own text or not: an empty unit would otherwise fold its children in.
-    if excluded and el.id in heading_scoped(doc.body, excluded):
+    if excluded and el.id in marked_scope([*doc.body, *doc.attachments], excluded):
         return True
     return unit_excluded(el, markers_for(doc))
 

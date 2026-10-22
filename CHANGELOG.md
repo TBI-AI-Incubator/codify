@@ -127,26 +127,30 @@ New, additive:
   page after the link; an attachment already holding one is left alone.
 - `SourceAdapterKind` gains `oecd_compendium` (Tier 2), with
   `OecdCompendiumAcquirer` over the Compendium of OECD Legal Instruments' JSON
-  API: `discover` lists the instruments in force with their publish date,
-  `fetch` returns the English body as primary and the French as a translation,
-  each wrapped in a head whose `oecd.*` meta tags name the instrument, and the
-  record's committee, themes, related instruments, adherents and monitoring
-  reports as `upstream_metadata`. A packaged `oecd` config names the adapter, so
-  `get_acquirer("oecd")` resolves it.
+  API: `discover` lists the instruments in force with their publish date, and
+  `fetch` returns the bodies in the languages the ref names (English and French
+  when it names none), the first as primary, each wrapped in a head whose
+  `oecd.*` meta tags name the instrument. `last_modified` is the listing's
+  publish date. The record's committee, themes, related instruments, adherents
+  and monitoring reports travel as `upstream_metadata`. A packaged `oecd` config
+  names the adapter, so `get_acquirer("oecd")` resolves it.
 - `codify.pipeline.formats.oecd_html` segments that body into AKN without a
-  model: preamble citations and recitals, the enacting line, Roman verb sections
-  with paragraphs numbered across them, parts, titles, chapters and articles in
-  codes and conventions, and `WE ...` declarations. `dispatch` routes a local
-  HTML source carrying the acquirer's head to it. Annexes and tables inside a
-  code fall out as flat units with repeated numbers.
-- `pool_excluded_headings` in a jurisdiction config: units at or under a title,
-  chapter, section or article whose heading, as printed, it lists are stored with
-  `excluded_from_pool` and reason `heading`, by the mapper, by
-  `retokenise_version_provisions` (which reads the section rows) and by the
-  comparator's `is_excluded`. The `oecd` config lists the verbs whose duty falls
-  on someone other than the Adherents (`INVITES`, `INSTRUCTS`, `ENCOURAGES`,
-  `REQUESTS`, `CALLS ON`); the structurer marks the same sections
-  `refersTo="#nonAdherentDuty"`.
+  model: preamble citations and recitals, the enacting line, English or French
+  verb sections with paragraphs numbered across them, parts, titles, chapters and
+  articles in codes and conventions, and `WE ...` declarations. Sections whose
+  verb puts a duty on someone other than the Adherents, and their contents,
+  carry `refersTo="#nonAdherentDuty"`. An `Annex` line closes the operative text;
+  each annex becomes an attachment. `dispatch` routes a local HTML source
+  carrying the acquirer's head to it.
+- Body elements carry `refers_to`, read from and written back to `refersTo`.
+- `pool_excluded_refers_to` in a jurisdiction config: units at or under an
+  element whose `refersTo` names a listed value are stored with
+  `excluded_from_pool` and reason `marked`, by the mapper, by
+  `retokenise_version_provisions` (which reads the stored AKN) and by the
+  comparator's `is_excluded`. The marker survives translation, which rewrites
+  headings. A `marked` row is still law: `LAW_REASONS` lets the reference
+  resolver and the in-document link pass land on it, as they never land on a
+  placeholder. The `oecd` config lists `#nonAdherentDuty`.
 
 Fixed:
 

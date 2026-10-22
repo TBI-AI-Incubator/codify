@@ -10,6 +10,7 @@ import pytest
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DiscoveryQuery, DocumentRef, get_acquirer, registered_kinds
 from codify.acquisition.adapters.oecd.compendium import (
+    TYPE_TO_DOCTYPE,
     OecdCompendiumAcquirer,
     OecdInstrumentMissing,
     instrument_key,
@@ -38,6 +39,15 @@ _LIST = [
         "title": "Decision of the Council on Harbour Lights",
         "status": {"id": "1", "name": "In force"},
         "type": {"id": "1", "name": "Decision"},
+    },
+    {
+        "id": "903",
+        "key": "OECD/LEGAL/9004",
+        "adoptionDate": "2001-03-03",
+        "lastPublishDate": "2024-01-01T00:00:00+01:00",
+        "title": "Understanding on Harbour Signals",
+        "status": {"id": "1", "name": "In force"},
+        "type": {"id": "5678", "name": "Others"},
     },
 ]
 
@@ -142,10 +152,18 @@ async def test_discover_lists_instruments_in_force_with_their_publish_date() -> 
     assert [(r.doctype, r.year, r.number) for r in refs] == [
         ("recommendation", 2020, "9002"),
         ("decision", 1961, "9003"),
+        ("arrangement", 2001, "9004"),
     ]
     assert refs[0].languages == ["eng", "fra"]
     assert refs[0].extra["last_published"] == "2025-02-20T11:44:25+01:00"
     assert refs[0].extra["key"] == "OECD/LEGAL/9002"
+
+
+@pytest.mark.asyncio
+async def test_the_residual_type_is_an_arrangement_by_its_own_id() -> None:
+    assert TYPE_TO_DOCTYPE[5678] == "arrangement"
+    refs = [r async for r in _acquirer().discover(DiscoveryQuery(doctype="arrangement"))]
+    assert [(r.doctype, r.number) for r in refs] == [("arrangement", "9004")]
 
 
 @pytest.mark.asyncio
@@ -185,6 +203,45 @@ async def test_fetch_wraps_both_language_bodies_and_carries_the_record() -> None
     assert meta["title_fr"].startswith("Recommandation")
     # The metadata round-trips as JSON, which is how the ingest run stores it.
     json.dumps(meta)
+
+
+@pytest.mark.asyncio
+async def test_the_first_requested_language_is_primary() -> None:
+    ref = DocumentRef(
+        jurisdiction_code="oecd",
+        doctype="recommendation",
+        year=2020,
+        number="9002",
+        languages=["fra", "eng"],
+    )
+    doc = await _acquirer().fetch(ref)
+    assert [(b.role, b.language) for b in doc.bodies] == [
+        ("translation", "eng"),
+        ("primary", "fra"),
+    ]
+    assert _BODY_FR in doc.primary().content.decode()
+    french_only = await _acquirer().fetch(ref.model_copy(update={"languages": ["fra"]}))
+    assert [(b.role, b.language) for b in french_only.bodies] == [("primary", "fra")]
+
+
+@pytest.mark.asyncio
+async def test_a_language_the_record_lacks_raises() -> None:
+    ref = DocumentRef(
+        jurisdiction_code="oecd", doctype="recommendation", year=2020, number="9002",
+        languages=["deu"],
+    )  # fmt: skip
+    with pytest.raises(OecdInstrumentMissing, match="deu"):
+        await _acquirer().fetch(ref)
+
+
+@pytest.mark.asyncio
+async def test_last_modified_is_the_listing_publish_date() -> None:
+    listed = [r async for r in _acquirer().discover(DiscoveryQuery(limit=1))][0]
+    doc = await _acquirer().fetch(listed)
+    assert doc.last_modified == "2025-02-20T11:44:25+01:00"
+    assert _RECORD["transmittedAt"] != doc.last_modified
+    bare = DocumentRef(jurisdiction_code="oecd", doctype="recommendation", year=2020, number="9002")
+    assert (await _acquirer().fetch(bare)).last_modified is None
 
 
 @pytest.mark.asyncio

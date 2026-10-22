@@ -19,6 +19,7 @@ from codify.akn._parser import carried_ids
 from codify.akn._schema import parse_xml
 from codify.akn.io import parse_akn
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
+from codify.quality.sentinels import LAW_REASONS
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.lexicon import record_terms_from_rows
@@ -455,7 +456,11 @@ async def _persist_derived_rows(
         await record_terms_from_rows(session, provisions)
     if cross_refs:
         # Resolve eligible local leaves while retaining the citation for reassessment.
-        provision_by_eid = {p.akn_eid: p for p in provisions if p.excluded_from_pool is not True}
+        provision_by_eid = {
+            p.akn_eid: p
+            for p in provisions
+            if p.excluded_from_pool is not True or p.exclusion_reason in LAW_REASONS
+        }
         for ref in cross_refs:
             if ref.target_uri and ref.target_uri.startswith("#"):
                 eid = ref.target_uri[1:]

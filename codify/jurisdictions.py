@@ -1127,9 +1127,9 @@ class JurisdictionConfig(BaseModel):
     attachments: list[AttachmentCaption] = Field(default_factory=list)
     # Whole-string markers for missing or struck content, beyond the platform default.
     placeholders: list[PlaceholderMarker] = Field(default_factory=list)
-    # Container headings, matched whole and as printed, whose units bind someone other
-    # than the instrument's subjects; those units stay readable but leave the pool.
-    pool_excluded_headings: list[str] = Field(default_factory=list)
+    # `refersTo` values marking a duty on someone other than the instrument's
+    # subjects: units at or under a marked element stay readable but leave the pool.
+    pool_excluded_refers_to: list[str] = Field(default_factory=list)
     # Where one source holds several instruments, how their openings are read.
     segmentation: SegmentationConfig | None = None
     amendments: AmendmentConfig | None = None
@@ -1625,16 +1625,16 @@ def placeholder_markers_for(work_uri: str | None) -> tuple[str, ...]:
     return tuple(pattern for pattern, _ in placeholder_statuses_for(work_uri))
 
 
-def pool_excluded_headings_for(work_uri: str | None) -> frozenset[str]:
-    """The jurisdiction's `pool_excluded_headings`, stripped, keyed by the work URI's
-    country like the placeholder markers so every pass reads the same list."""
+def pool_excluded_refers_to_for(work_uri: str | None) -> frozenset[str]:
+    """The jurisdiction's `pool_excluded_refers_to`, keyed by the work URI's country
+    like the placeholder markers so every pass reads the same list."""
     from codify.akn.frbr import country_of
 
     country = country_of(work_uri) if work_uri else None
     config = try_load_config(country) if country else None
     if config is None:
         return frozenset()
-    return frozenset(h.strip() for h in config.pool_excluded_headings if h.strip())
+    return frozenset(v.strip() for v in config.pool_excluded_refers_to if v.strip())
 
 
 def resolve_frbr_country(jurisdiction_code: str) -> FrbrCountry:

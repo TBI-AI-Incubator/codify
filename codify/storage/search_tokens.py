@@ -13,13 +13,16 @@ from __future__ import annotations
 import uuid
 
 import structlog
+from lxml import etree
 from sqlalchemy import bindparam, select, text, true, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from codify.jurisdictions import placeholder_markers_for, pool_excluded_headings_for
-from codify.quality.sentinels import exclusion_reason, is_excluded_heading, is_placeholder_only
+from codify.akn import parse_xml
+from codify.akn.vocabulary import PROVISION_ELEMENTS
+from codify.jurisdictions import placeholder_markers_for, pool_excluded_refers_to_for
+from codify.quality.sentinels import exclusion_reason, is_placeholder_only, refers_to_excluded
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.models import Law, Provision, Section, Version
 
@@ -45,10 +48,10 @@ async def retokenise_version_provisions(
         return 0
     language, work_uri = head
     markers = placeholder_markers_for(work_uri)
-    excluded_headings = pool_excluded_headings_for(work_uri)
+    excluded_refs = pool_excluded_refers_to_for(work_uri)
 
     # The flag rides the same pass: both are derived from the text and the
-    # section headings above it, and an in-place update keeps embeddings intact.
+    # stored markup, and an in-place update keeps embeddings and references intact.
     stale = Provision.search_pipeline_version.is_distinct_from(
         TOKENISER_VERSION
     ) | Provision.excluded_from_pool.is_(None)
@@ -61,10 +64,8 @@ async def retokenise_version_provisions(
     ).all()
     if not rows:
         return 0
-    scoped = (
-        await _heading_scoped_sections(session, version_id, excluded_headings)
-        if excluded_headings
-        else frozenset()
+    marked, section_eids = (
+        await _marked(session, version_id, excluded_refs) if excluded_refs else (frozenset(), {})
     )
 
     # `tokenise_to_text` returns nothing for a placeholder, so both lexical arms
@@ -109,7 +110,8 @@ async def retokenise_version_provisions(
                     provision_text,
                     akn_eid,
                     markers,
-                    under_excluded_heading=section_id in scoped,
+                    # A container's own text row is named for it plus a suffix.
+                    marked=akn_eid in marked or section_eids.get(section_id) in marked,
                 ),
             )
         ],
@@ -117,33 +119,38 @@ async def retokenise_version_provisions(
     return len(rows)
 
 
-async def _heading_scoped_sections(
+async def _marked(
     session: AsyncSession, version_id: uuid.UUID, excluded: frozenset[str]
-) -> frozenset[uuid.UUID]:
-    """Sections at or under one whose title is excluded: the row form of
-    `heading_scoped`, which the mapper applies to the document."""
-    sections = {
-        sid: (parent, title)
-        for sid, parent, title in (
-            await session.execute(
-                select(Section.id, Section.parent_section_id, Section.title).where(
-                    Section.version_id == version_id
-                )
-            )
-        ).all()
-    }
+) -> tuple[frozenset[str], dict[uuid.UUID, str]]:
+    """The eIds the stored AKN marks out of the pool, and each section row's eId:
+    the row form of `marked_scope`, which the mapper applies to the document."""
+    from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 
-    def scoped(sid: uuid.UUID | None) -> bool:
-        seen: set[uuid.UUID] = set()
-        while sid is not None and sid in sections and sid not in seen:
-            seen.add(sid)
-            parent, title = sections[sid]
-            if is_excluded_heading(title, excluded):
-                return True
-            sid = parent
-        return False
+    akn_xml = (
+        await session.execute(select(Version.akn_xml).where(Version.id == version_id))
+    ).scalar_one_or_none()
+    marked: frozenset[str] = (
+        await on_the_cpu_pool(_marked_eids, akn_xml, excluded) if akn_xml else frozenset()
+    )
+    sections = (
+        await session.execute(
+            select(Section.id, Section.akn_eid).where(Section.version_id == version_id)
+        )
+    ).all()
+    return marked, {sid: eid for sid, eid in sections}
 
-    return frozenset(sid for sid in sections if scoped(sid))
+
+def _marked_eids(akn_xml: str, excluded: frozenset[str]) -> frozenset[str]:
+    """eIds at or under a provision element whose `refersTo` names an excluded value;
+    only those elements, as the parser reads `refersTo` from no others."""
+    found: set[str] = set()
+    for el in parse_xml(akn_xml).iter():
+        if not isinstance(el.tag, str) or etree.QName(el).localname not in PROVISION_ELEMENTS:
+            continue
+        if refers_to_excluded(el.get("refersTo"), excluded):
+            found.update(e.get("eId") or "" for e in el.iter() if isinstance(e.tag, str))
+    found.discard("")
+    return frozenset(found)
 
 
 async def count_stale_search_tokens(

@@ -38,13 +38,14 @@ from codify.jurisdictions import SourceAdapter
 logger = structlog.get_logger()
 
 # Compendium type id → document class in data/jurisdictions/oecd/config.json.
-# 5 is the residual "Arrangement, Understanding and Others" category.
+# 3 is "Substantive Outcome Document", declarations among them; 5678 is the
+# residual "Others" (arrangements and understandings).
 TYPE_TO_DOCTYPE: dict[int, str] = {
     1: "decision",
     2: "recommendation",
     3: "declaration",
     4: "agreement",
-    5: "arrangement",
+    5678: "arrangement",
 }
 DOCTYPE_TO_TYPE: dict[str, int] = {v: k for k, v in TYPE_TO_DOCTYPE.items()}
 STATUS_IN_FORCE = 1
@@ -167,12 +168,17 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         adopted = str(summary.get("adoptionDate") or ref.extra.get("adopted") or "")
         year = _year(adopted) or ref.year
         titles = {lang: _lang_value(record.get("title"), lang) or "" for lang in LANGUAGES}
+        # The languages the ref asks for, the first primary, as the Cellar acquirer
+        # has it; a ref naming none takes both, English first.
+        wanted = ref.languages or list(LANGUAGES.values())
         refs = (record.get("bodyText") or {}).get("ref") or []
         bodies: list[Body] = []
         for entry in refs:
             lang = str(entry.get("lang") or "")
             uri = entry.get("uri")
-            if lang not in LANGUAGES or not uri or entry.get("format") != "html":
+            if lang not in LANGUAGES or LANGUAGES[lang] not in wanted:
+                continue
+            if not uri or entry.get("format") != "html":
                 continue
             resp = await self._client.get(f"{self._base}{uri}")
             resp.raise_for_status()
@@ -190,12 +196,12 @@ class OecdCompendiumAcquirer(BaseAcquirer):
                 Body(
                     content=page,
                     media_type="text/html",
-                    role="primary" if lang == "en" else "translation",
+                    role="primary" if LANGUAGES[lang] == wanted[0] else "translation",
                     language=LANGUAGES[lang],
                 )
             )
-        if not bodies:
-            raise OecdInstrumentMissing(f"{key} has no HTML body text")
+        if not any(b.role == "primary" for b in bodies):
+            raise OecdInstrumentMissing(f"{key} has no HTML body text in {wanted[0]}")
         number = key.rsplit("/", 1)[-1]
         return AcquiredDocument(
             ref=ref.model_copy(update={"doctype": doctype, "year": year, "number": number}),
@@ -203,7 +209,9 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             bodies=bodies,
             frbr_work_uri=build_frbr_work_uri(self.JURISDICTION, doctype, year, number),
             licence="oecd_terms",
-            last_modified=str(record.get("transmittedAt") or "") or None,
+            # The Compendium's own publish date, from the listing; the record's
+            # `transmittedAt` is when this response was built.
+            last_modified=str(ref.extra.get("last_published") or "") or None,
             upstream_metadata={
                 "key": key,
                 "type_id": type_id,

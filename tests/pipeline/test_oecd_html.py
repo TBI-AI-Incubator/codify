@@ -382,7 +382,7 @@ def test_rows_under_invites_and_instructs_leave_the_pool() -> None:
     assert excluded == [
         "sec_VIII__content", "sec_VII__content", "sec_VI__content", "sec_V__content",
     ]  # fmt: skip
-    assert {flags[eid][1] for eid in excluded} == {"heading"}
+    assert {flags[eid][1] for eid in excluded} == {"marked"}
     kept = [eid for eid, (flag, _) in flags.items() if flag is False]
     assert len(kept) == len(flags) - 4
     assert "sec_IV__para_12" in kept
@@ -392,7 +392,7 @@ def test_paragraphs_under_instructs_leave_the_pool() -> None:
     xml, _, _ = _convert(_COUNCIL_ACT)
     flags = _row_flags(xml)
     assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_IV__content", "sec_V__para_4"}
-    assert flags["sec_V__para_4"] == (True, "heading")
+    assert flags["sec_V__para_4"] == (True, "marked")
     assert flags["sec_III__para_3"] == (False, None)
     assert flags["sec_II__para_1__point_i"] == (False, None)
 
@@ -419,3 +419,100 @@ def test_an_empty_excluded_section_does_not_pool_its_bullets() -> None:
     pooled = [el.akn_eid for el in iter_assessable(doc) if not is_excluded(el, doc)]
     assert "sec_III" not in pooled
     assert "sec_II__para_a" in pooled
+
+
+# A closing INSTRUCTS section, then an annex whose guidance binds the Adherents.
+_WITH_ANNEX = """
+<p>THE COUNCIL,</p>
+<p>On the proposal of the Harbour Committee:</p>
+<p>I. RECOMMENDS that Adherents apply the Guiding Principles in the Annex.</p>
+<p>II. INSTRUCTS the Harbour Committee to review this Recommendation.</p>
+<p>Annex</p>
+<p>GUIDING PRINCIPLES ON HARBOUR LIGHTING</p>
+<p>1. Every harbour should light its entrance from dusk to dawn.</p>
+<p>a) Cost Allocation</p>
+<p>2. The keeper should bear the cost of the lantern oil.</p>
+<p>Annex II</p>
+<p>3. Records should be kept for five years.</p>
+"""
+
+
+def test_an_annex_closes_the_last_section_and_stays_in_the_pool() -> None:
+    xml, provenance, root = _convert(_WITH_ANNEX)
+    validate_akn(xml)
+    html_source = provenance["html_source"]
+    assert isinstance(html_source, dict)
+    assert html_source["annexes"] == 2
+    attachments = root.findall(".//a:attachments/a:attachment", NS)
+    assert [(a.get("eId"), a.findtext("a:heading", namespaces=NS)) for a in attachments] == [
+        ("att_1", "Annex"),
+        ("att_2", "Annex II"),
+    ]
+    assert attachments[0].findtext("a:subheading", namespaces=NS) == (
+        "GUIDING PRINCIPLES ON HARBOUR LIGHTING"
+    )
+    assert _eids(root.find(".//a:body", NS), "paragraph") == []
+    assert _eids(attachments[0], "paragraph") == ["att_1__para_1", "att_1__para_2"]
+    flags = _row_flags(xml)
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_II__content"}
+    assert flags["att_1__para_2"] == (False, None)
+    assert flags["att_2__para_3"] == (False, None)
+    doc = parse_akn(xml)
+    annex_units = [p for att in doc.attachments for p in att.children]
+    assert [(p.akn_eid, is_excluded(p, doc)) for p in annex_units] == [
+        ("att_1__para_1", False), ("att_1__para_2", False), ("att_2__para_3", False),
+    ]  # fmt: skip
+
+
+def test_an_unnumbered_verb_after_a_verb_section_opens_a_sibling() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>On the proposal of the Harbour Committee:</p>
+<p>RECOMMENDS that Adherents light every lantern.</p>
+<p>INSTRUCTS the Harbour Committee to report within five years.</p>
+"""
+    xml, _, root = _convert(body)
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [(s.get("eId"), s.findtext("a:heading", namespaces=NS)) for s in sections] == [
+        ("sec_I", "RECOMMENDS"),
+        ("sec_II", "INSTRUCTS"),
+    ]
+    flags = _row_flags(xml)
+    assert flags == {"sec_I__content": (False, None), "sec_II__content": (True, "marked")}
+
+
+def test_a_translated_heading_keeps_the_unit_out_of_the_pool() -> None:
+    xml, _, _ = _convert(_COUNCIL_ACT)
+    # Translation rewrites the heading text and keeps the markup.
+    translated = xml.replace("<heading>INSTRUCTS</heading>", "<heading>CHARGE</heading>")
+    translated = translated.replace("<heading>INVITES</heading>", "<heading>เชิญ</heading>")
+    assert translated != xml
+    flags = _row_flags(translated)
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_IV__content", "sec_V__para_4"}
+    doc = parse_akn(translated)
+    assert [el.akn_eid for el in iter_assessable(doc) if is_excluded(el, doc)] == [
+        "sec_IV", "sec_V", "sec_V__para_4",
+    ]  # fmt: skip
+
+
+def test_the_french_text_marks_the_same_sections() -> None:
+    body = """
+<p>LE CONSEIL,</p>
+<p>I. RECOMMANDE que les Adhérents allument chaque lanterne.</p>
+<p>II. INVITE le Secrétaire général à diffuser la présente Recommandation.</p>
+<p>III. CHARGE le Comité des ports :</p>
+<p>1. de suivre la mise en œuvre de la présente Recommandation.</p>
+<p>Annexe</p>
+<p>2. Les ports allument les lanternes au crépuscule.</p>
+"""
+    xml, _, root = _convert(body, lang="fr")
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [s.findtext("a:heading", namespaces=NS) for s in sections] == [
+        "RECOMMANDE", "INVITE", "CHARGE",
+    ]  # fmt: skip
+    flags = _row_flags(xml)
+    assert {eid for eid, (flag, _) in flags.items() if flag} == {
+        "sec_II__content",
+        "sec_III__para_1",
+    }
+    assert flags["att_1__para_2"] == (False, None)

@@ -72,6 +72,8 @@ def _emit_element(element: ElementBase) -> etree._Element:
     el = etree.Element(_q(tag))
     if element.akn_eid:
         el.set("eId", element.akn_eid)
+    if element.refers_to:
+        el.set("refersTo", element.refers_to)
     if element.number:
         etree.SubElement(el, _q("num")).text = element.number
     if element.heading:

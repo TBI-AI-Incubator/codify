@@ -17,10 +17,12 @@ recur, and one segmenter reads them all by classifying each block:
   Adherents should:` sections.
 
 Regular enough to segment deterministically, so an instrument takes the
-validator and embedding without the LLM lane. Sections headed by a verb the
-jurisdiction lists in `pool_excluded_headings` (`INVITES`, `INSTRUCTS`: a duty
-on someone other than the Adherents) carry `refersTo="#nonAdherentDuty"`, as do
-their paragraphs; the row split reads the same list to keep them out of the pool.
+validator and embedding without the LLM lane. Sections headed by a verb
+whose duty falls on someone other than the Adherents (`INVITES`,
+`INSTRUCTS`) carry `refersTo="#nonAdherentDuty"`, as do their paragraphs, in
+either official language; a jurisdiction listing that value in
+`pool_excluded_refers_to` keeps them out of the pool. An `Annex` line ends the
+operative text: each annex becomes an attachment of its own.
 
 The acquirer (`codify.acquisition.adapters.oecd.compendium`) wraps the body
 in a head whose `<meta name="oecd.*">` tags name the instrument; this module
@@ -39,7 +41,6 @@ import structlog
 from lxml import etree, html
 
 from codify.akn import Document, parse_akn, validate_akn
-from codify.jurisdictions import pool_excluded_headings_for
 from codify.pipeline.events import (
     Complete,
     Failed,
@@ -59,7 +60,8 @@ _ARTICLE = re.compile(
     r"^Article\s+(\d{1,3}[A-Za-z]?(?:\s?(?:bis|ter|quater))?)\s*(?:[-:–—]\s*(.+))?$"
 )
 _SECTION = re.compile(rf"^({_ROMAN})\.\s+(.*)$", re.DOTALL)
-_CAPS_RUN = re.compile(r"^([A-Z]{3,}(?:\s+[A-Z]{2,})*)\b")
+_CAPS_RUN = re.compile(r"^([A-ZÀ-ÖØ-Þ]{3,}(?:\s+[A-ZÀ-ÖØ-Þ]{2,})*)\b")
+_ANNEX = re.compile(rf"^(?:ANNEXE?|Annexe?)(?:\s+({_ROMAN}|\d+|[A-Z])\b)?\.?\s*(.*)$", re.DOTALL)
 _NUM_PARA = re.compile(r"^(\d{1,3})\.\s+(.*)$", re.DOTALL)
 _LETTER_PARA = re.compile(r"^([a-z])\.\s+(.*)$", re.DOTALL)
 _POINT = re.compile(r"^([ivxl]{1,6}|[a-z])\)\s+(.*)$", re.DOTALL)
@@ -76,15 +78,28 @@ _OPENER = re.compile(r"^(THE COUNCIL|THE PARTIES|ADHERENTS|THE GOVERNMENTS|WE, T
 _ALL_CAPS = re.compile(r"^[A-Z0-9][A-Z0-9 ,.;:'’()\-–—/&]+$")
 _HEADING_WORDS = 14
 
-# Verbs that open an operative section. A preamble verb (RECOGNISING, NOTING)
-# is a participle and never in this set, so a recital never opens the body.
+# Verbs that open an operative section, English then French. A preamble verb
+# (RECOGNISING, NOTANT) is a participle and never in this set, so a recital
+# never opens the body.
 OPERATIVE_VERBS = frozenset(
     {
         "AGREES", "RECOMMENDS", "DECIDES", "DECLARES", "INVITES", "INSTRUCTS",
-        "ENCOURAGES", "REQUESTS", "CALLS ON", "URGES", "COMMITS", "RESOLVES",
+        "ENCOURAGES", "REQUESTS", "CALLS ON", "CALLS UPON", "URGES", "COMMITS", "RESOLVES",
         "ADOPTS", "APPROVES", "WELCOMES", "NOTES", "CONFIRMS", "REAFFIRMS",
+        "UNDERLINES",
+        "CONVIENT", "RECOMMANDE", "DÉCIDE", "DÉCLARE", "INVITE", "CHARGE",
+        "ENCOURAGE", "DEMANDE", "APPELLE", "EXHORTE", "ADOPTE", "APPROUVE",
+        "SALUE", "PREND NOTE", "CONFIRME", "RÉAFFIRME", "SOULIGNE",
     }
 )  # fmt: skip
+# Verbs whose operative duty falls on a body other than the Adherents.
+NON_ADHERENT_VERBS = frozenset(
+    {
+        "INVITES", "INSTRUCTS", "ENCOURAGES", "REQUESTS", "CALLS ON", "CALLS UPON",
+        "INVITE", "CHARGE", "ENCOURAGE", "DEMANDE", "APPELLE",
+    }
+)  # fmt: skip
+NON_ADHERENT_DUTY = "#nonAdherentDuty"
 
 # Containers nest in this order; a code may skip a level but never inverts one.
 _CONTAINER_KIND = {"PART": "part", "TITLE": "title", "CHAPTER": "chapter"}
@@ -123,6 +138,14 @@ class _Node:
 
 
 @dataclass
+class _Annex:
+    eid: str
+    caption: str
+    title: str | None = None
+    body: list[_Node] = field(default_factory=list)
+
+
+@dataclass
 class _Instrument:
     meta: dict[str, str]
     opener: str | None = None
@@ -130,6 +153,7 @@ class _Instrument:
     recitals: list[list[str]] = field(default_factory=list)
     formula: str | None = None
     body: list[_Node] = field(default_factory=list)
+    annexes: list[_Annex] = field(default_factory=list)
 
 
 _SNIFF_BYTES = 4096
@@ -215,8 +239,9 @@ class _Builder:
     """A stack of open nodes: each block opens a node at some rank or continues
     the deepest open one."""
 
-    def __init__(self, non_adherent_verbs: frozenset[str] = frozenset()) -> None:
-        self.non_adherent_verbs = non_adherent_verbs
+    def __init__(self, scope: str = "") -> None:
+        # An annex's nodes carry its eId as their prefix and bind no one by verb.
+        self.scope = scope
         self.roots: list[_Node] = []
         self.stack: list[_Node] = []
         self.pending_heading: str | None = None
@@ -230,7 +255,7 @@ class _Builder:
     def _open(self, kind: str, num: str, key: str, heading: str | None = None) -> _Node:
         self._close_to(_RANK[kind])
         parent = self.stack[-1] if self.stack else None
-        scope = parent.eid if parent else ""
+        scope = parent.eid if parent else self.scope
         n = self.seen.get((scope, f"{kind}:{key}"), 0) + 1
         self.seen[(scope, f"{kind}:{key}")] = n
         # A repeated number keeps a unique eId, as a repeated article does.
@@ -250,6 +275,12 @@ class _Builder:
                 node.subheading = self.pending_heading
             self.pending_heading = None
         return node
+
+    def _verb_may_open_section(self) -> bool:
+        """No section or article is open, or the open one is itself a verb
+        section, whose next verb starts a sibling rather than continuing it."""
+        open_ = [n for n in self.stack if n.kind in ("section", "article")]
+        return not open_ or (open_[-1].kind == "section" and open_[-1].heading in OPERATIVE_VERBS)
 
     def _open_prose_paragraph(self, block: str) -> None:
         self._close_to(_RANK["paragraph"])
@@ -276,16 +307,16 @@ class _Builder:
             op = _operative(rest)
             verb, tail = op if op else (None, rest.strip())
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = verb in self.non_adherent_verbs
+            node.non_adherent = not self.scope and verb in NON_ADHERENT_VERBS
             if tail:
                 node.text.append(tail)
             return
         op = _operative(block)
-        if op and not any(n.kind in ("section", "article") for n in self.stack):
+        if op and self._verb_may_open_section():
             verb, rest = op
             numeral = _to_roman(sum(1 for r in self.roots if r.kind == "section") + 1)
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
-            node.non_adherent = verb in self.non_adherent_verbs
+            node.non_adherent = not self.scope and verb in NON_ADHERENT_VERBS
             if rest:
                 node.text.append(rest)
             return
@@ -335,9 +366,15 @@ class _Builder:
             self._open_prose_paragraph(block)
 
 
-def _segment(
-    blocks: list[str], meta: dict[str, str], non_adherent_verbs: frozenset[str] = frozenset()
-) -> _Instrument:
+def _annex_caption(block: str) -> bool:
+    """`Annex`, `ANNEXE II` or a short `Annex to the Recommendation` line."""
+    m = _ANNEX.match(block)
+    if m is None:
+        return False
+    return not m.group(2) or _is_heading(block)
+
+
+def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
     if not blocks:
         raise OecdHtmlError("no text blocks in the HTML")
     inst = _Instrument(meta=meta)
@@ -366,10 +403,21 @@ def _segment(
         elif block != "PREAMBLE":
             inst.recitals.append([block])
         i += 1
-    builder = _Builder(non_adherent_verbs)
-    for block in blocks[i:]:
-        builder.feed(block)
+    builder = _Builder()
     inst.body = builder.roots
+    annex: _Annex | None = None
+    for block in blocks[i:]:
+        # An annex ends whatever section was open, so its text inherits no verb.
+        if _annex_caption(block):
+            annex = _Annex(eid=f"att_{len(inst.annexes) + 1}", caption=block)
+            inst.annexes.append(annex)
+            builder = _Builder(scope=annex.eid)
+            annex.body = builder.roots
+            continue
+        if annex is not None and annex.title is None and not builder.roots and _is_heading(block):
+            annex.title = block
+            continue
+        builder.feed(block)
     if not inst.body:
         raise OecdHtmlError("no operative text: not an instrument body, or an empty page")
     return inst
@@ -386,7 +434,7 @@ def _akn(parent: etree._Element, tag: str, **attrs: str) -> etree._Element:
 def _emit(parent: etree._Element, node: _Node, counts: dict[str, int]) -> None:
     el = _akn(parent, node.kind, eId=node.eid)
     if node.non_adherent:
-        el.set("refersTo", "#nonAdherentDuty")
+        el.set("refersTo", NON_ADHERENT_DUTY)
         if node.kind == "paragraph":
             counts["non_adherent_paragraphs"] += 1
     counts[node.kind + "s"] = counts.get(node.kind + "s", 0) + 1
@@ -489,6 +537,66 @@ def build_body(inst: _Instrument, root_act: etree._Element) -> dict[str, int]:
     return counts
 
 
+def _attachment_meta(
+    *, frbr_work_uri: str, language: str, expression_date: str, eid: str
+) -> etree._Element:
+    """The identification an annex's `<doc>` must carry, naming it as a component."""
+    meta = etree.Element(f"{{{AKN_NS}}}meta")
+    ident = _akn(meta, "identification", source="#codify")
+    expression = f"{frbr_work_uri}/{language}@{expression_date}"
+    for block, this, uri, author in (
+        ("FRBRWork", f"{frbr_work_uri}/!{eid}", frbr_work_uri, "#oecdCouncil"),
+        ("FRBRExpression", f"{expression}/!{eid}", expression, "#oecdCouncil"),
+        ("FRBRManifestation", f"{expression}/!{eid}.xml", f"{expression}.xml", "#codify"),
+    ):
+        frbr = _akn(ident, block)
+        _akn(frbr, "FRBRthis", value=this)
+        _akn(frbr, "FRBRuri", value=uri)
+        _akn(frbr, "FRBRdate", date=expression_date, name="adoption")
+        _akn(frbr, "FRBRauthor", href=author)
+        if block == "FRBRWork":
+            _akn(frbr, "FRBRcountry", value="oecd")
+        elif block == "FRBRExpression":
+            _akn(frbr, "FRBRlanguage", language=language)
+        else:
+            _akn(frbr, "FRBRformat", value="xml")
+    return meta
+
+
+def build_attachments(
+    inst: _Instrument,
+    root_act: etree._Element,
+    *,
+    frbr_work_uri: str,
+    language: str,
+    expression_date: str,
+) -> int:
+    """Each annex as an `<attachment>` holding a `<doc name="annex">`; the count emitted."""
+    annexes = [a for a in inst.annexes if a.body]
+    if not annexes:
+        return 0
+    attachments = _akn(root_act, "attachments")
+    counts: dict[str, int] = {"non_adherent_paragraphs": 0}
+    for annex in annexes:
+        attachment = _akn(attachments, "attachment", eId=annex.eid)
+        _akn(attachment, "heading").text = annex.caption
+        if annex.title:
+            _akn(attachment, "subheading").text = annex.title
+        doc = _akn(attachment, "doc", name="annex")
+        doc.append(
+            _attachment_meta(
+                frbr_work_uri=frbr_work_uri,
+                language=language,
+                expression_date=expression_date,
+                eid=annex.eid,
+            )
+        )
+        main = _akn(doc, "mainBody")
+        for node in annex.body:
+            _emit(main, node, counts)
+    return len(annexes)
+
+
 def instrument_html_to_akn(
     text: str,
     *,
@@ -498,7 +606,7 @@ def instrument_html_to_akn(
 ) -> str:
     """Deterministic Compendium HTML → AKN `act`; the adoption date is the expression date."""
     blocks, meta = _blocks(text)
-    inst = _segment(blocks, meta, pool_excluded_headings_for(frbr_work_uri))
+    inst = _segment(blocks, meta)
     adopted = meta.get("adopted")
     if not adopted:
         raise OecdHtmlError("no oecd.adopted meta: the acquirer wraps the body with it")
@@ -509,9 +617,13 @@ def instrument_html_to_akn(
         _meta(inst, frbr_work_uri=frbr_work_uri, language=language, expression_date=adopted)
     )
     counts = build_body(inst, root_act)
+    annexes = build_attachments(
+        inst, root_act, frbr_work_uri=frbr_work_uri, language=language, expression_date=adopted
+    )
     if provenance is not None:
         provenance["html_source"] = {
             **counts,
+            "annexes": annexes,
             "citations": len(inst.citations),
             "recitals": len(inst.recitals),
             "verbs": [n.heading for n in inst.body if n.kind == "section" and n.heading],
@@ -564,6 +676,8 @@ async def ingest(
 
 
 __all__ = [
+    "NON_ADHERENT_DUTY",
+    "NON_ADHERENT_VERBS",
     "OPERATIVE_VERBS",
     "OecdHtmlError",
     "ingest",

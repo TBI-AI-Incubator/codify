@@ -2537,11 +2537,11 @@
             "title": "Placeholders",
             "type": "array"
           },
-          "pool_excluded_headings": {
+          "pool_excluded_refers_to": {
             "items": {
               "type": "string"
             },
-            "title": "Pool Excluded Headings",
+            "title": "Pool Excluded Refers To",
             "type": "array"
           },
           "public_reference": {

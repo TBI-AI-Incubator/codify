@@ -1225,8 +1225,8 @@ export interface components {
             opening_material_terminators?: string[];
             /** Placeholders */
             placeholders?: components["schemas"]["PlaceholderMarker"][];
-            /** Pool Excluded Headings */
-            pool_excluded_headings?: string[];
+            /** Pool Excluded Refers To */
+            pool_excluded_refers_to?: string[];
             /**
              * Public Reference
              * @default false
