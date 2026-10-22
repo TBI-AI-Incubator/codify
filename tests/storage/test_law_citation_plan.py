@@ -119,16 +119,18 @@ async def test_paging_a_relevance_listing_keeps_its_order(session: AsyncSession)
 
 
 async def test_tied_scores_page_once_each_in_order(session: AsyncSession) -> None:
-    number, _ = _citation()
+    # A word no other title carries, so the whole result is the seeded rows.
+    word = "q" + "".join(chr(ord("a") + int(c, 16) % 26) for c in uuid.uuid4().hex[:10])
     # Identical titles score alike; inserted against their work-URI order, so the
     # index's order among the ties is not the listing's.
     stems = [f"{c}{uuid.uuid4().hex[:6]}" for c in "fedcba"]
     for stem in stems:
-        await _seed(session, "act", f"Harbour {number} Law", "3", 2001, suffix=stem)
+        await _seed(session, "act", f"{word.title()} Law", "3", 2001, suffix=stem)
     await session.flush()
     await _force_the_bm25_scan(session)
-    query = f"harbour {number}"
+    query = word
     whole, _ = await list_laws(session, q=query)
+    assert len(whole) == len(stems)
     assert [r.frbr_work_uri for r in whole] == sorted(r.frbr_work_uri for r in whole)
     paged = [
         (await list_laws(session, q=query, limit=1, offset=i))[0][0].frbr_work_uri

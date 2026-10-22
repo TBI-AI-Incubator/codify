@@ -98,17 +98,30 @@ def _relevance_candidates(
     alone was lost whenever the planner chose it.
     """
 
-    def arm(predicate: Any) -> Select[Any]:
+    def ids(predicate: Any) -> Select[Any]:
         return (
-            select(Law.id.label("id"), _bm25(tokens).label("score"))
+            select(Law.id.label("id"))
             .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
             .where(predicate, *filters)
         )
 
-    titled = (
-        arm(_title_words(tsquery)).order_by(_bm25(tokens), Law.frbr_work_uri, Law.id).limit(window)
+    def scored(rows: Any) -> Select[Any]:
+        # Scored once per surviving row, not for every row the sort reads through.
+        return select(Law.id.label("id"), _bm25(tokens).label("score")).join(
+            rows, rows.c.id == Law.id
+        )
+
+    titled = scored(
+        ids(_title_words(tsquery))
+        .order_by(_bm25(tokens), Law.frbr_work_uri, Law.id)
+        .limit(window)
+        .subquery("titled")
     )
-    arms = titled if citation is None else union(titled, arm(_cites(citation)))
+    arms = (
+        titled
+        if citation is None
+        else union(titled, scored(ids(_cites(citation)).subquery("cited")))
+    )
     return arms.cte("candidates").prefix_with("MATERIALIZED")
 
 
