@@ -137,7 +137,19 @@ async def test_an_act_amending_the_constitution_is_another_act(tmp_path: Path) -
 async def test_the_constitution_is_known_by_its_identity(
     tmp_path: Path, title: str, kind: str, abbreviation: str
 ) -> None:
-    raw = _source(title=title, kind=kind, abbreviation=abbreviation, adopted="1992-06-28")
+    # Its URI is fixed: a redaction adopted in another year still lands on 1992.
+    raw = _source(title=title, kind=kind, abbreviation=abbreviation, adopted="2015-03-27")
     transformed, fetched, entry = await _paths(tmp_path, raw)
     expected = "/akn/ee/act/1992/pohiseadus"
     assert (transformed, fetched, entry["doctype"]) == (expected, expected, "constitution")
+
+
+@pytest.mark.asyncio
+async def test_a_member_stating_no_date_fails_at_the_fetch(tmp_path: Path) -> None:
+    raw = (
+        _source(title="Näidisseadus")
+        .replace(b"<vastuvoetud><aktikuupaev>2005-04-20</aktikuupaev></vastuvoetud>", b"")
+        .replace(b"<avaldamineKuupaev>2024-01-05+02:00</avaldamineKuupaev>", b"")
+    )
+    with pytest.raises(ValueError, match="lacks both enactment and publication dates"):
+        await _paths(tmp_path, raw)
