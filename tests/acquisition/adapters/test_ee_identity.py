@@ -11,6 +11,7 @@ from lxml import etree
 
 from codify.acquisition import DocumentRef
 from codify.acquisition.adapters.ee.datadump import EeDatadumpAcquirer, build_ee_index
+from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.formats.riigi_teataja import riigi_teataja_to_akn
 
@@ -52,8 +53,8 @@ def _source(
 </oigusakt>""".encode()
 
 
-async def _paths(tmp_path: Path, raw: bytes) -> tuple[str, str, dict]:
-    """The transformer's work URI and the archive adapter's, for one member."""
+def _acquirer(tmp_path: Path, raw: bytes) -> tuple[EeDatadumpAcquirer, DocumentRef, dict]:
+    """The archive adapter over an index of one member, and the ref a caller builds."""
     archive = tmp_path / "laws.zip"
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("member.xml", raw)
@@ -72,6 +73,12 @@ async def _paths(tmp_path: Path, raw: bytes) -> tuple[str, str, dict]:
         number=doc_id,
         extra={"member": entry["member"], "title": entry["title"]},
     )
+    return acquirer, ref, entry
+
+
+async def _paths(tmp_path: Path, raw: bytes) -> tuple[str, str, dict]:
+    """The transformer's work URI and the archive adapter's, for one member."""
+    acquirer, ref, entry = _acquirer(tmp_path, raw)
     fetched = (await acquirer.fetch(ref)).frbr_work_uri
     transformed = riigi_teataja_to_akn(raw)[1]["frbr_work_uri"]
     return transformed, fetched, entry
@@ -93,7 +100,9 @@ async def test_transformer_and_adapter_give_one_work_uri_for_one_source_file(
     raw = _source(title="Tsiviilkohtumenetluse seadustik", kind=kind, abbreviation=abbreviation)
     transformed, fetched, entry = await _paths(tmp_path, raw)
     assert (transformed, fetched) == (expected, expected)
-    assert expected.endswith(f"/{entry['slug']}")
+    # What a consumer keying on the index entry builds: its class, year and slug.
+    indexed = build_frbr_work_uri("ee", entry["doctype"], entry["year"], entry["slug"])
+    assert (indexed, entry["year"]) == (expected, 2005)
 
 
 @pytest.mark.asyncio
@@ -151,5 +160,8 @@ async def test_a_member_stating_no_date_fails_at_the_fetch(tmp_path: Path) -> No
         .replace(b"<vastuvoetud><aktikuupaev>2005-04-20</aktikuupaev></vastuvoetud>", b"")
         .replace(b"<avaldamineKuupaev>2024-01-05+02:00</avaldamineKuupaev>", b"")
     )
+    acquirer, ref, _ = _acquirer(tmp_path, raw)
     with pytest.raises(ValueError, match="lacks both enactment and publication dates"):
-        await _paths(tmp_path, raw)
+        await acquirer.fetch(ref)
+    with pytest.raises(ValueError, match="lacks both enactment and publication dates"):
+        riigi_teataja_to_akn(raw)

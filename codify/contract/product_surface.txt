@@ -1,5 +1,8 @@
 codify.acquisition.adapters
 codify.acquisition.adapters.akn_native:AknNativeAcquirer
+codify.acquisition.adapters.ee.identity:is_constitution
+codify.acquisition.adapters.ee.identity:romanise
+codify.acquisition.adapters.ee.identity:work_uri
 codify.acquisition.adapters.eu.datadump:EuDatadumpAcquirer
 codify.acquisition.adapters.legislation_gov_uk:paths_for_work
 codify.acquisition.base:DiscoveryQuery
