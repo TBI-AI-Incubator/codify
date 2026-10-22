@@ -1073,3 +1073,46 @@ def test_provision_text_keeps_table_and_block_boundaries() -> None:
     compact = etree.tostring(etree.fromstring(akn_xml.encode(), parser)).decode()
     point = parse_akn(compact).body[0]
     assert point.wrap_up == "Lõpetus.\nA 10\nB 20 eurot"
+
+
+def test_comments_are_not_text() -> None:
+    akn_xml = _act(
+        """<peatykk><peatykkNr>1</peatykkNr><kuvatavNr>1. peatükk</kuvatavNr>
+		<peatykkPealkiri>Pealkiri<!-- märkus --> lõpp</peatykkPealkiri></peatykk>
+		<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tabel><tr><tc><!-- toimetaja -->
+				<sisuTekst><tavatekst>A</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>10</tavatekst></sisuTekst></tc></tr>
+			<tr><tc><sisuTekst><tavatekst>B</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>20</tavatekst></sisuTekst></tc></tr></tabel></sisuTekst>
+		</punkt>"""
+    )
+    assert _texts(etree.fromstring(akn_xml.encode()), "heading") == ["Pealkiri lõpp"]
+    assert _cells(_by_eid(akn_xml, "chp_1__point_1__table_1")) == [["A", "10"], ["B", "20"]]
+    assert "märkus" not in akn_xml and "toimetaja" not in akn_xml
+
+
+def test_a_commented_intro_parses_with_its_tail() -> None:
+    akn_xml = _act(
+        """<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tavatekst>Juht</tavatekst></sisuTekst>
+			<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+				<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt></punkt>"""
+    )
+    root = etree.fromstring(akn_xml.encode())
+    intro_p = root.find(f".//{_A}intro/{_A}p")
+    assert intro_p is not None
+    intro_p.append(etree.Comment(" märkus "))
+    intro_p[-1].tail = " järg:"
+    point = parse_akn(etree.tostring(root, encoding="unicode")).body[0]
+    assert point.intro == "Juht järg:"
+
+
+def test_a_zero_rowspan_reaches_the_last_row() -> None:
+    akn_xml = _html_act(
+        "<table><tbody><tr><td rowspan='0'>Määr</td><td></td></tr>"
+        "<tr><td>10</td><td></td></tr></tbody></table>"
+    )
+    table = _by_eid(akn_xml, "para_1__table_1")
+    assert table[0][0].get("rowspan") == "2"
+    assert _cells(table) == [["Määr", ""], ["10", ""]]

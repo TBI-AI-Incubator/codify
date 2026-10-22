@@ -117,6 +117,8 @@ def _clean_text(el: etree._Element | None) -> str:
     parts: list[str] = []
 
     def walk(node: etree._Element) -> None:
+        if not isinstance(node.tag, str):
+            return  # a comment's body is not text; its tail is read by the caller
         text = node.text or ""
         if _local(node) == "sup" and text.strip().isdigit():
             text = text.strip().translate(_TO_SUPERSCRIPT)
@@ -379,7 +381,7 @@ def _write_native_table(tabel: etree._Element, w: _Blocks) -> None:
         for td, tc in zip(tr, src_row, strict=True):
             cell = _Blocks(td, None, w.owner, w.owner_eid, w.left_out, in_cell=True)
             for st in tc:
-                if _local(st) not in _NOT_TEXT:
+                if isinstance(st.tag, str) and _local(st) not in _NOT_TEXT:
                     _write_source(st, cell)
             cell.finish()
     # Classified on the text as written, so markup inside a cell is not read.
@@ -439,6 +441,11 @@ def _write_html_table(src: etree._Element, w: _Blocks) -> None:
         _walk_html(src, w)
         w.line_break()
         return
+    for index, r in enumerate(rows):
+        for c in r:
+            if (c.get("rowspan") or "").strip() == "0":
+                # Zero spans the rest of the rows.
+                c.set("rowspan", str(len(rows) - index))
     texts = [[" ".join(c.text_content().split()) for c in r] for r in rows]
     spanned = any(_span(c, k) for r in rows for c in r for k in ("colspan", "rowspan"))
     if _leave_out(texts, w.left_out, spanned):

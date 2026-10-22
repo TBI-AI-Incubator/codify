@@ -327,6 +327,10 @@ def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineRef
         push(None if indentation(el.text) else el.text)
         in_cell = _local(el) in ("td", "th")
         for index, child in enumerate(el):
+            if not isinstance(child.tag, str):
+                # A comment is not text; the words after it are.
+                push(None if indentation(child.tail) else child.tail)
+                continue
             tag = _local(child)
             # A table's rows, cells and a cell's paragraphs stay apart in the text.
             if index and (tag in ("tr", "td", "th") or (in_cell and tag == "p")):
