@@ -744,7 +744,10 @@ def _walk_block(
                     # section-level DocumentProvision, so leaving it here
                     # would double-render.
                     continue
-                blocks.append(_walk_block(child, stop_at_eids, nested_tags, keep_unknown))
+                moved = f"{child_eid}{WRAP_UP_SUFFIX}" in stop_at_eids
+                blocks.append(
+                    _walk_block(child, stop_at_eids, nested_tags, keep_unknown, skip_wrap_up=moved)
+                )
                 # A boundary like a table: prose after a nested provision must
                 # not fold into the intro, which renders before every block.
                 multi_group = True

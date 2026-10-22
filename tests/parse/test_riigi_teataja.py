@@ -1128,3 +1128,37 @@ def test_a_native_cell_is_classified_on_its_visible_text() -> None:
 		Allkirjastamise tasu 5 eurot</a>]]></HTMLKonteiner></tc></tr></tabel></sisuTekst>"""
     )
     assert _cells(_by_eid(akn_xml, "para_1__table_1")) == [["Allkirjastamise tasu 5 eurot"]]
+
+
+def test_closing_text_and_anchors_land_on_the_wrap_up_row() -> None:
+    import uuid
+
+    from codify.storage.documents import _eid_index, _to_provision
+    from codify.storage.mappers import document_to_rows
+    from codify.storage.resolve_refs import nearest_stored_row
+
+    # A sub-point grouping points has no text of its own, only a closing run.
+    akn_xml = _act(
+        """<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>
+			<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>a)</kuvatavNr>
+					<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>
+				<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr>
+				<td>X</td><td>1</td></tr><tr><td>Y</td><td>2</td></tr></table>]]></HTMLKonteiner>
+				</sisuTekst></alampunkt>
+		</punkt>"""
+    )
+    _, sections, rows, _, _, _ = document_to_rows(parse_akn(akn_xml), law_id=uuid.uuid4())
+    eids = [r.akn_eid for r in rows]
+    assert eids == ["point_1", "point_1__point_1__point_1", "point_1__point_1__wrapup"]
+    index = _eid_index(etree.fromstring(akn_xml.encode()))
+    persisted = frozenset(eids)
+    lead = _to_provision(rows[0], index, persisted).blocks[0]
+    # The group under the lead has no row, so the lead's block walks into it.
+    assert "Lõpetus." not in str(lead.model_dump())
+    assert "point_1__point_1__table_1" not in str(lead.model_dump())
+    anchor = nearest_stored_row(
+        index, "point_1__point_1__table_1", persisted, {s.akn_eid for s in sections}
+    )
+    assert anchor == ("point_1__point_1__wrapup", "enclosing")

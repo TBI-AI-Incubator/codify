@@ -747,6 +747,11 @@ def nearest_stored_row(
             if isinstance(d.tag, str) and (hit := row(d)):
                 return hit, "container"
     for a in ancestors:
+        # Closing text the mapper rowed apart lands on that row, not its owner's.
+        owner = a.getparent() if etree.QName(a).localname == "wrapUp" else None
+        closing = f"{owner.get('eId')}__wrapup" if owner is not None else ""
+        if closing in provisions:
+            return closing, "enclosing"
         if hit := row(a):
             return hit, "enclosing"
     return None
