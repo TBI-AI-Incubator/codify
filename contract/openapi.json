@@ -2537,6 +2537,13 @@
             "title": "Placeholders",
             "type": "array"
           },
+          "pool_excluded_refers_to": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pool Excluded Refers To",
+            "type": "array"
+          },
           "public_reference": {
             "default": false,
             "title": "Public Reference",
@@ -3545,7 +3552,8 @@
               "sparql",
               "bulk_xml_archive",
               "gazette_xml",
-              "json_portal"
+              "json_portal",
+              "oecd_compendium"
             ],
             "title": "Kind",
             "type": "string"

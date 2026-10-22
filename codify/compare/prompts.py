@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import secrets
+from uuid import UUID
 
 from codify.akn.elements import BodyElement
 from codify.compare.aligner import Candidate
@@ -185,6 +186,7 @@ def build_user_prompt(
     domestic_frbr_uri: str,
     directive_markers: tuple[str, ...] | None = None,
     domestic_markers: tuple[str, ...] | None = None,
+    marked: frozenset[UUID] = frozenset(),
 ) -> str:
     """The model reads the same folded text the embedding did: excluded
     descendants are left out on both sides by the same markers."""
@@ -204,7 +206,7 @@ def build_user_prompt(
     if directive.heading:
         parts.append(f"Heading: {directive.heading}")
     parts.append("")
-    parts.append(_fenced(provision_text(directive, directive_markers), nonce))
+    parts.append(_fenced(provision_text(directive, directive_markers, marked), nonce))
     parts.append("")
 
     multi_law = len({c.frbr for c in candidates if c.frbr}) > 1
@@ -228,7 +230,7 @@ def build_user_prompt(
             parts.append(f"Heading: {p.heading}")
         parts.append(f"Similarity: {cand.score:.3f}")
         parts.append("")
-        parts.append(_fenced(provision_text(p, domestic_markers), nonce))
+        parts.append(_fenced(provision_text(p, domestic_markers, marked), nonce))
 
     return "\n".join(parts)
 

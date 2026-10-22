@@ -25,6 +25,7 @@ from codify.compare.scaffold import (
     is_excluded,
     is_structural,
     iter_assessable,
+    marked_ids,
     markers_for,
     provision_text,
     summarise,
@@ -68,17 +69,20 @@ async def _embed_group(
     session_factory: async_sessionmaker[AsyncSession] | None,
     version_id: uuid.UUID | None,
     markers: tuple[str, ...] | None = None,
+    marked: frozenset[uuid.UUID] = frozenset(),
 ) -> list[list[float]]:
     """Embed one provision group, via the version_unit_embeddings cache when a
     session_factory + version id are supplied; otherwise compute fresh."""
     if session_factory is None or version_id is None:
         return await embed_provisions(
-            provisions, embedding_client=embedding_client, markers=markers
+            provisions, embedding_client=embedding_client, markers=markers, marked=marked
         )
 
     from codify.storage.embeddings import embed_provisions_cached
 
-    items = [(p.akn_eid or "", p.heading or "", provision_text(p, markers)) for p in provisions]
+    items = [
+        (p.akn_eid or "", p.heading or "", provision_text(p, markers, marked)) for p in provisions
+    ]
     async with session_factory() as s:
         vecs = await embed_provisions_cached(s, version_id, items, client=embedding_client)
         await s.commit()
@@ -98,10 +102,11 @@ async def warm_comparator_cache(
         return 0
     doc = parse_akn(ver.akn_xml.encode("utf-8"))
     markers = markers_for(doc)
+    marked = marked_ids(doc)
     items = [
-        (el.akn_eid or "", el.heading or "", provision_text(el, markers))
+        (el.akn_eid or "", el.heading or "", provision_text(el, markers, marked))
         for el in iter_assessable(doc)
-        if not is_excluded(el, doc)
+        if not is_excluded(el, doc, marked)
     ]
     if not items:
         return 0
@@ -149,7 +154,11 @@ async def compare(
         lambda _eid, _frbr: confidence_threshold
     )
 
-    directive_provisions = [p for p in iter_assessable(directive) if not is_excluded(p, directive)]
+    # One walk per document; the ids are unique, so one set serves every group.
+    directive_marked = marked_ids(directive)
+    directive_provisions = [
+        p for p in iter_assessable(directive) if not is_excluded(p, directive, directive_marked)
+    ]
     directive_headings = effective_headings(directive)
 
     domestic_groups: list[tuple[Document, uuid.UUID | None]] = [
@@ -160,9 +169,14 @@ async def compare(
     domestic_provisions: list[BodyElement] = []
     domestic_frbrs: list[str] = []
     group_provisions: list[list[BodyElement]] = []
+    group_marked: list[frozenset[uuid.UUID]] = []
     for doc, _vid in domestic_groups:
+        doc_marked = marked_ids(doc)
+        group_marked.append(doc_marked)
         provs = [
-            p for p in iter_assessable(doc) if not is_structural(p) and not is_excluded(p, doc)
+            p
+            for p in iter_assessable(doc)
+            if not is_structural(p, doc_marked) and not is_excluded(p, doc, doc_marked)
         ]
         group_provisions.append(provs)
         domestic_provisions.extend(provs)
@@ -205,10 +219,13 @@ async def compare(
             session_factory=session_factory,
             version_id=directive_version_id,
             markers=markers_for(directive),
+            marked=directive_marked,
         )
         # Cache embeddings by version, preserving candidate order for alignment.
         domestic_vecs: list[list[float]] = []
-        for provs, (group_doc, vid) in zip(group_provisions, domestic_groups, strict=True):
+        for provs, (group_doc, vid), doc_marked in zip(
+            group_provisions, domestic_groups, group_marked, strict=True
+        ):
             domestic_vecs.extend(
                 await _embed_group(
                     provs,
@@ -216,8 +233,10 @@ async def compare(
                     session_factory=session_factory,
                     version_id=vid,
                     markers=markers_for(group_doc),
+                    marked=doc_marked,
                 )
             )
+        prompt_marked = directive_marked.union(*group_marked)
 
         # Stamp streamed alignments with the compare trace for consistent tracing.
         trace_id = langfuse.get_current_trace_id()
@@ -234,6 +253,7 @@ async def compare(
                 domestic_frbr_uri=domestic.frbr_expression_uri,
                 directive_markers=markers_for(directive),
                 domestic_markers=markers_for(domestic),
+                marked=prompt_marked,
                 directive_frbr_uri=directive.frbr_expression_uri,
                 llm=llm,
                 k_candidates=k_candidates,
@@ -296,9 +316,10 @@ async def _assess_provision(
     response_language: str | None = None,
     directive_markers: tuple[str, ...] | None = None,
     domestic_markers: tuple[str, ...] | None = None,
+    marked: frozenset[uuid.UUID] = frozenset(),
 ) -> ProvisionAlignment:
     # Classify structural headings without an LLM call and keep their own label.
-    if is_structural(directive_provision):
+    if is_structural(directive_provision, marked):
         return ProvisionAlignment(
             directive_eid=directive_provision.akn_eid,
             directive_heading=directive_provision.heading,
@@ -331,6 +352,7 @@ async def _assess_provision(
             domestic_frbr_uri=domestic_frbr_uri,
             directive_markers=directive_markers,
             domestic_markers=domestic_markers,
+            marked=marked,
         )
 
         verdict = await chat_json_validated(

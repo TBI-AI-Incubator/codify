@@ -57,3 +57,42 @@ def test_placeholder_helper_honours_extra_markers() -> None:
     assert is_placeholder_only("[TIFF not transcribed: a.tif]")
     assert not is_placeholder_only("Elucidation omitted.")
     assert is_placeholder_only("Elucidation omitted.", markers=MARKER)
+
+
+def test_a_marked_unit_leaves_the_pool() -> None:
+    duty = "The Secretariat shall publish the register."
+    assert exclusion_reason(duty, marked=True) == "marked"
+    assert exclusion_reason(duty) is None
+    # A placeholder keeps its own reason; an empty unit is still judged elsewhere.
+    assert exclusion_reason("[TIFF not transcribed: a.tif]", marked=True) == "placeholder"
+    assert exclusion_reason("", marked=True) is None
+
+
+def test_a_marker_scopes_the_element_and_everything_under_it() -> None:
+    from codify.akn import Article, Paragraph, Point, Section
+    from codify.quality.sentinels import marked_scope
+
+    point = Point(akn_eid="sec_2__para_2__point_a", akn_type="point", position=0, text="x")
+    para = Paragraph(akn_eid="sec_2__para_2", akn_type="paragraph", position=0, children=[point])
+    # `refersTo` is a list; the heading plays no part.
+    duty = Section(
+        akn_eid="sec_2",
+        akn_type="section",
+        position=1,
+        heading="RECOMMENDS",
+        refers_to="#other #duty",
+        children=[para],
+    )
+    kept = Section(
+        akn_eid="sec_1",
+        akn_type="section",
+        position=0,
+        heading="INVITES",
+        refers_to="#other",
+        children=[Article(akn_eid="sec_1__art_1", akn_type="article", position=0, text="y")],
+    )
+    leaf = Paragraph(akn_eid="para_9", akn_type="paragraph", position=2, refers_to="#duty")
+    assert marked_scope([kept, duty, leaf], frozenset({"#duty"})) == {
+        duty.id, para.id, point.id, leaf.id,
+    }  # fmt: skip
+    assert marked_scope([kept, duty], frozenset()) == frozenset()

@@ -282,6 +282,7 @@ def _parse_element(el: etree._Element, position: int) -> ElementBase | None:
         position=position,
         number=num_el.text if num_el is not None and num_el.text else None,
         heading=heading_el.text if heading_el is not None and heading_el.text else None,
+        refers_to=el.get("refersTo") or None,
         text=text,
         intro=intro,
         wrap_up=wrap_up,

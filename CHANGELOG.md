@@ -125,6 +125,38 @@ New, additive:
   the attachment the converter writes for it. `fill_annex_text` writes a
   transcript into those attachments, one `transcribedSource` `hcontainer` per
   page after the link; an attachment already holding one is left alone.
+- `SourceAdapterKind` gains `oecd_compendium` (Tier 2), with
+  `OecdCompendiumAcquirer` over the Compendium of OECD Legal Instruments' JSON
+  API: `discover` lists the instruments in force with their publish date, and
+  `fetch` returns the bodies in the languages the ref names (English and French
+  when it names none), the first as primary, each wrapped in a head whose
+  `oecd.*` meta tags name the instrument and date its latest revision, the last
+  Council act in the record's change history. `last_modified` is the listing's
+  publish date. The record's committee, themes, related instruments, adherents
+  and monitoring reports travel as `upstream_metadata`. A packaged `oecd` config
+  names the adapter, so `get_acquirer("oecd")` resolves it.
+- `codify.pipeline.formats.oecd_html` segments that body into AKN without a
+  model: preamble citations and recitals, the enacting line, English or French
+  verb sections with paragraphs numbered across them, parts, titles, chapters and
+  articles in codes and conventions, and `WE ...` declarations. The work is
+  dated by adoption and the expression by the latest revision, so a revised text
+  is a new expression. A verb section (`INVITES`, `INSTRUCTS` and the like)
+  whose addressee is not the Adherents, or each such item of a section naming
+  none, carries `refersTo="#nonAdherentDuty"` with its contents. An `Annex` line closes the operative text;
+  each annex becomes an attachment. `dispatch` routes a local HTML source
+  carrying the acquirer's head to it.
+- Body elements carry `refers_to`, read from and written back to `refersTo`.
+- `pool_excluded_refers_to` in a jurisdiction config: units at or under an
+  element whose `refersTo` names a listed value are stored with
+  `excluded_from_pool` and reason `marked`, by the mapper, by
+  `retokenise_version_provisions` (which reads the stored AKN) and by the
+  comparator's `is_excluded`. `marked_ids` takes a document's marked units once;
+  `is_excluded` and `provision_text` accept it, so a marked part of an unmarked
+  unit stays out of the text the comparator embeds and prompts with. The marker
+  survives translation, which rewrites
+  headings. A `marked` row is still law: `LAW_REASONS` lets the reference
+  resolver and the in-document link pass land on it, as they never land on a
+  placeholder. The `oecd` config lists `#nonAdherentDuty`.
 
 Fixed:
 

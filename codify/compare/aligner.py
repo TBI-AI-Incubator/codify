@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from codify.akn.elements import BodyElement
 from codify.compare.scaffold import provision_text
@@ -22,10 +23,11 @@ async def embed_provisions(
     embedding_client: EmbeddingClient,
     title: str = "",
     markers: tuple[str, ...] | None = None,
+    marked: frozenset[UUID] = frozenset(),
 ) -> list[list[float]]:
     if not provisions:
         return []
-    items = [(title or (p.heading or ""), provision_text(p, markers)) for p in provisions]
+    items = [(title or (p.heading or ""), provision_text(p, markers, marked)) for p in provisions]
     return await embedding_client.embed_documents(items)
 
 

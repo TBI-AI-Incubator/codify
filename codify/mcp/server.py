@@ -312,7 +312,7 @@ def create_server(
     ) -> dict[str, Any]:
         from codify.akn.io import parse_akn
         from codify.compare.comparator import compare
-        from codify.compare.scaffold import is_excluded, is_structural, iter_assessable
+        from codify.compare.scaffold import is_excluded, is_structural, iter_assessable, marked_ids
         from codify.storage import get_version
 
         docs = []
@@ -323,10 +323,11 @@ def create_server(
                     raise ToolError(f"no version {ref}")
                 docs.append(parse_akn(row.akn_xml))
         # The comparator's own set: a structural heading is graded without a model call.
+        marked = marked_ids(docs[0])
         count = sum(
             1
             for p in iter_assessable(docs[0])
-            if not is_structural(p) and not is_excluded(p, docs[0])
+            if not is_structural(p, marked) and not is_excluded(p, docs[0], marked)
         )
         if count > compare_cap:
             raise ToolError(
