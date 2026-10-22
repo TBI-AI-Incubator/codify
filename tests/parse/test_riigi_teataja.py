@@ -413,10 +413,19 @@ def test_display_numbers_keep_their_superscripts() -> None:
 	</metaandmed>
 	<aktinimi><nimi><pealkiri>Näidisseadus</pealkiri></nimi></aktinimi>
 	<sisu>
+	<osa id="o1b1">
+		<osaNr ylaIndeks="1">1</osaNr>
+		<kuvatavNr><![CDATA[1<sup>1</sup>. osa]]></kuvatavNr>
 		<peatykk id="ch5b1">
 			<peatykkNr ylaIndeks="1">5</peatykkNr>
 			<kuvatavNr><![CDATA[5<sup>1</sup>. peatükk]]></kuvatavNr>
 			<peatykkPealkiri>Andmekogud</peatykkPealkiri>
+			<jagu id="j2b1">
+			<jaguNr ylaIndeks="1">2</jaguNr>
+			<kuvatavNr><![CDATA[2<sup>1</sup>. jagu]]></kuvatavNr>
+			<jaotis id="jt1b1">
+			<jaotisNr ylaIndeks="1">1</jaotisNr>
+			<kuvatavNr><![CDATA[1<sup class="x">1</sup >. jaotis]]></kuvatavNr>
 			<paragrahv id="para43b9">
 				<paragrahvNr ylaIndeks="9">43</paragrahvNr>
 				<kuvatavNr><![CDATA[§ 43<sup>9</sup>. ]]></kuvatavNr>
@@ -434,14 +443,61 @@ def test_display_numbers_keep_their_superscripts() -> None:
 					</alampunkt>
 				</loige>
 			</paragrahv>
+			<paragrahv id="para43b10">
+				<paragrahvNr ylaIndeks="10">43</paragrahvNr>
+				<kuvatavNr><![CDATA[§ 43<sup>10</sup>.]]></kuvatavNr>
+				<HTMLKonteiner>§ 43&lt;sup&gt;7&lt;/sup&gt;</HTMLKonteiner>
+			</paragrahv>
+			</jaotis>
+			</jagu>
 		</peatykk>
+	</osa>
 	</sisu>
 </oigusakt>"""
     akn_xml, _ = riigi_teataja_to_akn(xml)
     validate_akn(akn_xml)
     nums = [el.text for el in etree.fromstring(akn_xml.encode()).iter(f"{{{AKN_NS}}}num")]
-    assert nums == ["5¹. peatükk", "§ 43⁹.", "(1¹)", "14¹)"]
+    assert nums == [
+        "1¹. osa",
+        "5¹. peatükk",
+        "2¹. jagu",
+        "1¹. jaotis",
+        "§ 43⁹.",
+        "(1¹)",
+        "14¹)",
+        "§ 43¹⁰.",
+    ]
     assert "§ 43⁸</p>" in akn_xml
+    assert "§ 43⁷</p>" in akn_xml
+
+
+@pytest.mark.asyncio
+async def test_superscripted_points_pass_the_validator(tmp_path: Path) -> None:
+    # "2¹" passes str.isdigit() but not int(); the validator must skip it, not crash.
+    src = tmp_path / "punktid.xml"
+    src.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt id="m1" xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Vabariigi Valitsus</valjaandja>
+		<dokumentLiik>määrus</dokumentLiik>
+		<vastuvoetud><aktikuupaev>2010-01-01</aktikuupaev></vastuvoetud>
+	</metaandmed>
+	<aktinimi><nimi><pealkiri>Näidismäärus</pealkiri></nimi></aktinimi>
+	<sisu>
+		<punkt id="p1"><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tavatekst>Üks.</tavatekst></sisuTekst></punkt>
+		<punkt id="p2"><punktNr>2</punktNr><kuvatavNr>2.</kuvatavNr>
+			<sisuTekst><tavatekst>Kaks.</tavatekst></sisuTekst></punkt>
+		<punkt id="p2b1"><punktNr ylaIndeks="1">2</punktNr>
+			<kuvatavNr><![CDATA[2<sup>1</sup>.]]></kuvatavNr>
+			<sisuTekst><tavatekst>Kaks-üks.</tavatekst></sisuTekst></punkt>
+	</sisu>
+</oigusakt>""",
+        encoding="utf-8",
+    )
+    events = [ev async for ev in ingest_document(src, "ee")]
+    assert [ev.kind for ev in events if ev.kind in {"failed", "complete"}] == ["complete"]
 
 
 def test_mixed_osa_and_flat_paragrahvs_nesting() -> None:

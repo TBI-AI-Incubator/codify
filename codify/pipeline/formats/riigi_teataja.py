@@ -85,7 +85,7 @@ _TO_SUPERSCRIPT = str.maketrans({digit: sup for sup, digit in _SUPERSCRIPT_MAP.i
 def _sup_to_unicode(markup: str) -> str:
     """Write ``<sup>N</sup>`` as superscript digits, keeping § 43⁹ apart from § 439."""
     return re.sub(
-        r"<sup>\s*(\d+)\s*</sup>",
+        r"<sup\b[^>]*>\s*(\d+)\s*</sup\s*>",
         lambda m: m.group(1).translate(_TO_SUPERSCRIPT),
         markup,
         flags=re.I,
