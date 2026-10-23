@@ -286,3 +286,28 @@ def test_wrap_body_escapes_the_meta() -> None:
     ).decode()
     assert 'content="A &quot;quoted&quot; &lt;title&gt;"' in page
     assert "<title>A &quot;quoted&quot; &lt;title&gt;</title>" in page
+
+
+@pytest.mark.asyncio
+async def test_details_read_a_record_without_its_body() -> None:
+    import copy
+
+    record = copy.deepcopy(_RECORD)
+    record["status"] = {"id": 2}  # abrogated, and no HTML text to ingest
+    record["bodyText"] = {"ref": []}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/instruments/OECD-LEGAL-9002":
+            return httpx.Response(200, json=record)
+        return httpx.Response(500)
+
+    adapter = SourceAdapter(kind="oecd_compendium", name="oecd-compendium", base_url=BASE)
+    acquirer = OecdCompendiumAcquirer(
+        adapter, client=httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    )
+    meta = await acquirer.details("9002")
+    assert meta["status_id"] == 2
+    assert meta["title_en"] == "Recommendation of the Council on Lantern Registers"
+    assert meta["committees"] == [863]
+    with pytest.raises(OecdInstrumentMissing):
+        await _acquirer().details("9999")
