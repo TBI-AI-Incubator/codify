@@ -153,32 +153,36 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             if query.limit and emitted >= query.limit:
                 return
 
-    async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
-        key = instrument_key(ref.number)
-        path_key = key.replace("/", "-")
+    async def _record(self, key: str) -> dict[str, Any]:
         try:
-            record = await self._json(f"/api/instruments/{path_key}")
+            record = await self._json(f"/api/instruments/{key.replace('/', '-')}")
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
                 raise OecdInstrumentMissing(key) from exc
             raise
         if not isinstance(record, dict) or record.get("key") != key:
             raise OecdInstrumentMissing(key)
+        return record
 
+    async def details(self, number: str) -> dict[str, Any]:
+        """An instrument's record as `fetch` carries it, plus its English title, for any
+        status and whether or not it has a body text."""
+        key = instrument_key(number)
+        record = await self._record(key)
+        title_en = _lang_value(record.get("title"), "en") or key
+        return {**_metadata(record, key, ""), "title_en": title_en}
+
+    async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
+        key = instrument_key(ref.number)
+        path_key = key.replace("/", "-")
+        record = await self._record(key)
         type_id = int((record.get("type") or {}).get("id") or 0)
         doctype = TYPE_TO_DOCTYPE.get(type_id, ref.doctype)
-        summary = record.get("statusSummary") or {}
-        adopted = str(summary.get("adoptionDate") or ref.extra.get("adopted") or "")
+        meta = _metadata(record, key, str(ref.extra.get("adopted") or ""))
+        adopted = meta["adoption_date"] or ""
+        revised = meta["revision_date"] or ""
         year = _year(adopted) or ref.year
         titles = {lang: _lang_value(record.get("title"), lang) or "" for lang in LANGUAGES}
-        updates = (record.get("changeHistory") or {}).get("update") or []
-        # The latest amendment dates the text in force; without one it is the adopted text.
-        amended = [
-            str(u.get("date") or "")[:10]
-            for u in updates
-            if int((u.get("type") or {}).get("id") or 0) == UPDATE_AMENDED
-        ]
-        revised = max([adopted, *amended])
         # The languages the ref asks for, the first primary, as the Cellar acquirer
         # has it; a ref naming none takes both, English first.
         wanted = ref.languages or list(LANGUAGES.values())
@@ -226,49 +230,59 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             # The Compendium's own publish date, from the listing; the record's
             # `transmittedAt` is when this response was built.
             last_modified=str(ref.extra.get("last_published") or "") or None,
-            upstream_metadata={
-                "key": key,
-                "type_id": type_id,
-                "status_id": int((record.get("status") or {}).get("id") or 0),
-                "adoption_date": adopted or None,
-                "revision_date": revised or None,
-                "in_force_date": summary.get("inForceDate"),
-                "title_fr": titles["fr"],
-                "themes": [t.get("id") for t in (record.get("themes") or {}).get("theme") or []],
-                "committees": [
-                    c.get("id")
-                    for c in (record.get("committees") or {}).get("parentCommittee") or []
-                ],
-                "related": [
-                    r.get("key") for r in (record.get("relations") or {}).get("relatedTo") or []
-                ],
-                # adherenceTypeId 1 is a Member; 2 a non-Member adherent, dated. A
-                # candidate adhering before accession is a signal for screening.
-                "adherence": [
-                    {
-                        "country_id": c.get("id"),
-                        "adherence_type_id": c.get("adherenceTypeId"),
-                        "date": c.get("date"),
-                    }
-                    for c in (summary.get("adherents") or {}).get("countryRef") or []
-                ],
-                "change_history": [
-                    {
-                        "date": u.get("date"),
-                        "type_id": (u.get("type") or {}).get("id"),
-                        "olis": [o.get("uri") for o in u.get("OLISRef") or []],
-                    }
-                    for u in (record.get("changeHistory") or {}).get("update") or []
-                ],
-                "monitoring": [
-                    {
-                        "year": e.get("year"),
-                        "olis": [o.get("uri") for o in e.get("OLISRef") or []],
-                    }
-                    for e in (record.get("monitoring") or {}).get("entry") or []
-                ],
-            },
+            upstream_metadata=meta,
         )
+
+
+
+def _metadata(record: dict[str, Any], key: str, listed_adopted: str) -> dict[str, Any]:
+    """The record's details, JSON-safe, as the ingest stores them."""
+    summary = record.get("statusSummary") or {}
+    adopted = str(summary.get("adoptionDate") or listed_adopted or "")
+    updates = (record.get("changeHistory") or {}).get("update") or []
+    # The latest amendment dates the text in force; without one it is the adopted text.
+    amended = [
+        str(u.get("date") or "")[:10]
+        for u in updates
+        if int((u.get("type") or {}).get("id") or 0) == UPDATE_AMENDED
+    ]
+    revised = max([adopted, *amended])
+    return {
+        "key": key,
+        "type_id": int((record.get("type") or {}).get("id") or 0),
+        "status_id": int((record.get("status") or {}).get("id") or 0),
+        "adoption_date": adopted or None,
+        "revision_date": revised or None,
+        "in_force_date": summary.get("inForceDate"),
+        "title_fr": _lang_value(record.get("title"), "fr") or "",
+        "themes": [t.get("id") for t in (record.get("themes") or {}).get("theme") or []],
+        "committees": [
+            c.get("id") for c in (record.get("committees") or {}).get("parentCommittee") or []
+        ],
+        "related": [r.get("key") for r in (record.get("relations") or {}).get("relatedTo") or []],
+        # adherenceTypeId 1 is a Member; 2 a non-Member adherent, dated. A
+        # candidate adhering before accession is a signal for screening.
+        "adherence": [
+            {
+                "country_id": c.get("id"),
+                "adherence_type_id": c.get("adherenceTypeId"),
+                "date": c.get("date"),
+            }
+            for c in (summary.get("adherents") or {}).get("countryRef") or []
+        ],
+        "change_history": [
+            {
+                "date": u.get("date"),
+                "type_id": (u.get("type") or {}).get("id"),
+                "olis": [o.get("uri") for o in u.get("OLISRef") or []],
+            }
+            for u in updates
+        ],
+        "monitoring": [
+            {"year": e.get("year"), "olis": [o.get("uri") for o in e.get("OLISRef") or []]}
+            for e in (record.get("monitoring") or {}).get("entry") or []
+        ],
+    }
 
 
 __all__ = [

@@ -136,6 +136,9 @@ New, additive:
   publish date. The record's committee, themes, related instruments, adherents
   and monitoring reports travel as `upstream_metadata`. A packaged `oecd` config
   names the adapter, so `get_acquirer("oecd")` resolves it.
+- `OecdCompendiumAcquirer.details` reads one instrument's record the way `fetch`
+  carries it, plus its English title, for an instrument of any status and with
+  or without a body text.
 - `codify.pipeline.formats.oecd_html` segments that body into AKN without a
   model: preamble citations and recitals, the enacting line, English or French
   verb sections with paragraphs numbered across them, parts, titles, chapters and
