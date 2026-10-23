@@ -108,7 +108,8 @@ OPERATIVE_VERBS = frozenset(
         "RECOMMANDENT", "RECOMMANDONS", "ADOPTENT", "ADOPTONS", "APPROUVENT",
         "INVITENT", "INVITONS", "CHARGENT", "CHARGEONS", "DEMANDENT", "DEMANDONS",
         "APPELLENT", "APPELONS", "ENCOURAGENT", "ENCOURAGEONS", "RÉAFFIRMENT",
-        "RÉAFFIRMONS", "SALUENT", "ACKNOWLEDGE", "UNDERLINE", "EXPECT",
+        "RÉAFFIRMONS", "SALUENT", "ACKNOWLEDGE", "UNDERLINE", "EXPECT", "EXHORTENT",
+        "EXHORTONS",
         # Ministerial conclusions report in the past tense.
         "WELCOMED", "RECOGNISED", "NOTED", "SUPPORTED", "ACKNOWLEDGED", "AGREED",
         "DECIDED", "DECLARED", "ENDORSED", "ADOPTED", "REAFFIRMED", "CONFIRMED",
@@ -125,6 +126,7 @@ NON_ADHERENT_VERBS = frozenset(
         "INVITENT", "INVITONS", "CHARGENT", "CHARGEONS", "DEMANDENT", "DEMANDONS",
         "APPELLENT", "APPELONS", "ENCOURAGENT", "ENCOURAGEONS",
         "INVITED", "REQUESTED", "CALLED ON", "CALLED UPON", "INSTRUCTED", "ENCOURAGED",
+        "URGES", "URGE", "URGED", "EXHORTE", "EXHORTENT", "EXHORTONS",
     }
 )  # fmt: skip
 NON_ADHERENT_DUTY = "#nonAdherentDuty"
@@ -262,8 +264,10 @@ def _operative(block: str) -> tuple[str, str] | None:
 
 
 def _is_heading(block: str) -> bool:
-    """A short line with no sentence end: a heading for what follows."""
-    return len(block.split()) <= _HEADING_WORDS and not block.rstrip().endswith((".", ";", ","))
+    """A short line with no sentence end: a heading for what follows. A line
+    ending in a colon is a lead-in to a list, not a heading."""
+    ends = (".", ";", ",", ":")
+    return len(block.split()) <= _HEADING_WORDS and not block.rstrip().endswith(ends)
 
 
 def _is_unit(block: str) -> bool:
@@ -521,7 +525,7 @@ class _Builder:
             section is not None
             and _lead_in(section)
             and block[:1].isupper()
-            and (not _is_heading(block) or block.rstrip().endswith(":"))
+            and not _is_heading(block)
             and (top is section or (item is not None and not item.num))
         ):
             self._open_prose_paragraph(block)
@@ -701,7 +705,8 @@ def _annex_caption(block: str) -> bool:
     m = _ANNEX.match(block)
     if m is None:
         return False
-    return not m.group(2) or _is_heading(block)
+    # `Annex I to Annex A:` is a caption whose colon opens the annex.
+    return not m.group(2) or _is_heading(block.rstrip().rstrip(":"))
 
 
 def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:

@@ -984,11 +984,12 @@ def test_the_declarants_own_commitments_stay_unmarked() -> None:
 <p>3. INVITE Non-OECD Members to adhere to this Declaration.</p>
 <p>4. INVITE the Secretary-General to report.</p>
 <p>5. INVITE contributions from harbour users.</p>
+<p>6. URGE the Harbour Committee to report.</p>
 """
     xml, _, root = _convert(body, type="declaration")
     _clean(xml)
     # `Non-OECD Members` are not the Adherents, whatever the regex for Members finds.
-    assert _marked(root) == {"sec_I__para_3", "sec_I__para_4"}
+    assert _marked(root) == {"sec_I__para_3", "sec_I__para_4", "sec_I__para_6"}
 
 
 def test_appendices_and_labels_keep_their_text() -> None:
@@ -1055,3 +1056,39 @@ def test_the_lead_ins_subject_decides_whose_items_they_are(
     xml, _, root = _convert(body, type="declaration")
     _clean(xml)
     assert (("sec_I__para_1" in _marked(root)), ("sec_I__para_2" in _marked(root))) == marked
+
+
+def test_a_colon_line_is_a_lead_in_not_a_heading() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>1. Light every harbour.</p>
+<p>To that effect, the ports should:</p>
+<p>a) keep registers;</p>
+<p>b) train keepers.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _eids(root, "point") == ["sec_I__para_1__point_a", "sec_I__para_1__point_b"]
+    assert root.findall(".//a:heading", NS)[-1].text == "RECOMMENDS"
+
+
+def test_the_preamble_label_opens_the_preamble() -> None:
+    body = "<p>PREAMBLE</p><p>THE COUNCIL,</p><p>RECOGNISING that harbours matter;</p>" + (
+        "<p>I. RECOMMENDS that Adherents light harbours.</p>"
+    )
+    xml, _, root = _convert(body)
+    _clean(xml)
+    lines = [p.text for p in root.findall(".//a:preamble/a:p", NS)]
+    assert lines == ["PREAMBLE", "THE COUNCIL,"]
+    recitals = [" ".join(r.itertext()).strip() for r in root.iterfind(".//a:recital", NS)]
+    assert recitals == ["RECOGNISING that harbours matter;"]
+
+
+def test_an_annex_caption_may_end_in_a_colon() -> None:
+    body = "<p>THE COUNCIL,</p><p>I. DECIDES that ports are lit.</p>" + (
+        "<p>Annex I to the Code:</p><p>1. Every harbour has a keeper.</p>"
+    )
+    xml, _, root = _convert(body, type="decision")
+    _clean(xml)
+    assert root.findtext(".//a:attachment/a:heading", namespaces=NS) == "Annex I to the Code:"
