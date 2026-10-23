@@ -55,7 +55,9 @@ logger = structlog.get_logger()
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
 _ROMAN = r"[IVXLC]+"
-_CONTAINER = re.compile(rf"^(PART|CHAPTER|TITLE)\s+({_ROMAN}|\d+)\b\.?\s*(.*)$", re.DOTALL)
+_CONTAINER = re.compile(
+    rf"^(PART|CHAPTER|TITLE|PARTIE|CHAPITRE|TITRE)\s+({_ROMAN}|\d+)\b\.?\s*(.*)$", re.DOTALL
+)
 _ARTICLE = re.compile(
     r"^Article\s+(\d{1,3}[A-Za-z]?(?:\s?(?:bis|ter|quater))?|[IVXLC]+)\s*(?:[-:–—]\s*(.+))?$"
 )
@@ -155,7 +157,14 @@ _ACTOR = re.compile(
 _ADHERENTS = re.compile(r"(?<![\w‐-])(?:Adherents?|Members?|Adhérents?|Membres?)\b")
 
 # Containers nest in this order; a code may skip a level but never inverts one.
-_CONTAINER_KIND = {"PART": "part", "TITLE": "title", "CHAPTER": "chapter"}
+_CONTAINER_KIND = {
+    "PART": "part",
+    "TITLE": "title",
+    "CHAPTER": "chapter",
+    "PARTIE": "part",
+    "TITRE": "title",
+    "CHAPITRE": "chapter",
+}
 _RANK = {
     "part": 0, "title": 1, "chapter": 2, "article": 3, "section": 3,
     "paragraph": 4, "point": 5, "indent": 6,

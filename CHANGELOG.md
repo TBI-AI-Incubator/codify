@@ -176,6 +176,9 @@ Fixed:
   or an annex sit in unnumbered sections that open at each heading line. Where
   the text has articles, a group with no heading is an `hcontainer`. A paragraph
   the source does not number gets no `<num>`.
+- `oecd_html` reads `PARTIE`, `CHAPITRE` and `TITRE` as it reads `PART`,
+  `CHAPTER` and `TITLE`. A French part's lead-in no longer falls into the
+  section before it and takes that section's `#nonAdherentDuty` mark.
 - No source word is dropped:
   - consecutive heading lines all reach the unit they head;
   - a heading between list items ends the list;
