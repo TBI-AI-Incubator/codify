@@ -257,7 +257,7 @@ def _is_heading(block: str) -> bool:
 def _is_unit(block: str) -> bool:
     """Whether the block opens a unit of its own: a container, article, section,
     numbered or lettered paragraph, point or indent, never a caption."""
-    units = (_NUM_PARA, _LETTER_PARA, _POINT, _INDENT)
+    units = (_NUM_PARA, _NUM_PAREN, _LETTER_PARA, _POINT, _INDENT)
     return _starts_body(block) or any(p.match(block) for p in units)
 
 
@@ -337,13 +337,20 @@ class _Builder:
     def _nested_number(self, number: int) -> bool:
         """Whether `number.` continues a numbered list inside the open paragraph:
         `1.` under a numbered paragraph ending in a colon, or the next number of
-        such a list already open."""
+        such a list already open. The outer sequence resumes at the lead-in's
+        next number once the list's last item has closed with a full stop."""
         inner = next(
             (n for n in reversed(self.stack) if n.kind == "point" and n.num[:-1].isdigit()), None
         )
-        if inner is not None:
-            return number == int(inner.num[:-1]) + 1
         outer = next((n for n in reversed(self.stack) if n.kind == "paragraph"), None)
+        if inner is not None:
+            resumes = (
+                outer is not None and outer.num[:-1].isdigit() and number == int(outer.num[:-1]) + 1
+            )
+            closed = bool(inner.text) and inner.text[-1].rstrip().endswith(".")
+            if resumes and (closed or number != int(inner.num[:-1]) + 1):
+                return False
+            return number == int(inner.num[:-1]) + 1
         return (
             number == 1
             and outer is not None
@@ -464,7 +471,17 @@ class _Builder:
         if _is_heading(block) and (top is None or top.text or _ALL_CAPS.match(block)):
             self.pending_heading = block
             return
-        if top is not None:
+        # After an unnumbered paragraph, a heading waiting for its text, or a new
+        # sentence after a finished one, opens the next paragraph.
+        prose = top is not None and top.kind == "paragraph" and not top.num
+        finished = (
+            prose
+            and top is not None
+            and bool(top.text)
+            and top.text[-1].rstrip().endswith((".", "!", "?"))
+        )
+        new_sentence = finished and block[:1].isupper()
+        if top is not None and not (prose and (self.pending_heading or new_sentence)):
             top.text.append(block)
         else:
             self._open_prose_paragraph(block)
@@ -511,33 +528,37 @@ def _decide(node: _Node, lead: str) -> None:
     node.non_adherent = bool(node.children) and all(c.non_adherent for c in node.children)
 
 
-def _mark_non_adherent_duties(nodes: list[_Node], speaking: bool = False) -> None:
+def _mark_non_adherent_duties(
+    nodes: list[_Node], speaking: bool = False, adherents: bool = False
+) -> None:
     """Mark the duties on someone other than the Adherents: a verb section, a
     paragraph opening on such a verb (`WE CALL ON …`, `5. CALL on …`), or an item
     under a section in the declarants' own voice (`DECLARE that we:` … `Call on
-    the OECD to:`)."""
+    the OECD to:`). Under a lead-in addressed to the Adherents (`RECOMMENDS that
+    Adherents should:`), an item's verb is the Adherents' own act and stays."""
     for node in nodes:
         text = node.text[0] if node.text else ""
         if node.kind == "section" and node.heading in NON_ADHERENT_VERBS:
             _decide(node, text)
             continue
-        if node.kind == "paragraph" and (
-            _WE_PARA.match(text)
-            or _CAPS_RUN.match(text) is not None
-            or (speaking and text[:1].isupper())
+        if (
+            node.kind == "paragraph"
+            and not adherents
+            and (
+                _WE_PARA.match(text)
+                or _CAPS_RUN.match(text) is not None
+                or (speaking and text[:1].isupper())
+            )
         ):
             lead = _lead_verb(text)
             if lead is not None:
                 _decide(node, lead[1])
                 continue
-        # Items speak for the declarants only under `… that we:`; under
-        # `RECOMMENDS that Adherents … which:` an item is the Adherents' own duty.
-        voiced = (
-            node.kind == "section"
-            and node.heading in OPERATIVE_VERBS
-            and _DECLARANTS.search(text) is not None
-        )
-        _mark_non_adherent_duties(node.children, voiced)
+        verb_section = node.kind == "section" and node.heading in OPERATIVE_VERBS
+        # Items speak for the declarants only under `… that we:`.
+        voiced = verb_section and _DECLARANTS.search(text) is not None
+        addressed = adherents or (verb_section and _ADHERENTS.search(text) is not None)
+        _mark_non_adherent_duties(node.children, voiced, addressed)
 
 
 def _rescope(node: _Node, scope: str, group: str) -> None:
@@ -584,6 +605,7 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
     if not blocks:
         raise OecdHtmlError("no text blocks in the HTML")
     inst = _Instrument(meta=meta)
+    kept: set[int] = set()  # the blocks the preamble holds as opener or citation
     i = 0
     # Preamble runs to the enacting line, or to the first structural token when
     # the instrument has none (a declaration's first `WE ...` paragraph).
@@ -602,22 +624,25 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             and _OPENER.match(block)
         ):
             inst.opener = block
+            kept.add(i)
         elif _CITATION.match(block):
             inst.citations.append(block)
+            kept.add(i)
         elif _INDENT.match(block) and inst.recitals:
             inst.recitals[-1].append(block)  # a bulleted list under `CONSIDERING that:`
         elif block != "PREAMBLE":
             inst.recitals.append([block])
         i += 1
+    body_blocks = blocks[i:]
     if i == len(blocks):
         # No operative token anywhere: a text of numbered or plain paragraphs. The
-        # body is all of it after the opener and citations, not a long preamble.
-        i = sum(1 for b in blocks if b == inst.opener or b in inst.citations)
+        # body is all of it but the opener and citations, not a long preamble.
+        body_blocks = [b for k, b in enumerate(blocks) if k not in kept]
         inst.recitals = []
     builder = _Builder()
     inst.body = builder.roots
     annex: _Annex | None = None
-    for block in blocks[i:]:
+    for block in body_blocks:
         # An annex ends whatever section was open, so its text inherits no verb.
         if _annex_caption(block):
             annex = _Annex(eid=f"att_{len(inst.annexes) + 1}", caption=block)

@@ -616,6 +616,7 @@ def test_a_revised_text_is_a_new_expression_of_the_same_work() -> None:
         ("<p>1. Adherents should:</p><p>a) keep registers;</p><p>b) publish them.</p>",
          "att_1__sec_1__para_1"),
         ("<p>1. Members shall keep registers</p>", "att_1__sec_1__para_1"),
+        ("<p>1) Members shall keep registers</p>", "att_1__sec_1__para_1"),
     ],
 )  # fmt: skip
 def test_an_annex_never_takes_its_first_unit_as_a_caption(annex: str, first_unit: str) -> None:
@@ -844,3 +845,66 @@ def test_items_under_a_colon_lead_in_each_name_their_addressee() -> None:
     ]  # fmt: skip
     assert _eids(root, "point") == ["sec_I__para_2__point_a", "sec_I__para_2__point_b"]
     assert _marked(root) == {"sec_II__para_3"}
+
+
+def test_a_numbered_sublist_closes_when_the_outer_sequence_resumes() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>1. Ports light lanterns at dusk.</p>
+<p>2. Ports should:</p>
+<p>1. Keep a register;</p>
+<p>2. Train new keepers.</p>
+<p>3. Ports will meet annually.</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_1__para_1", "sec_1__para_2", "sec_1__para_3"]
+    assert _eids(root, "point") == ["sec_1__para_2__point_1", "sec_1__para_2__point_2"]
+
+
+def test_items_under_an_adherents_lead_in_stay_the_adherents_duty() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents should:</p>
+<p>1. ENCOURAGE local authorities to light every harbour;</p>
+<p>2. INVITE shipping lines to report outages.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_I__para_1", "sec_I__para_2"]
+    assert _marked(root) == set()
+
+
+def test_a_verbless_text_keeps_each_heading() -> None:
+    body = """
+<p>Purpose</p>
+<p>The ports light their lanterns at dusk;</p>
+<p>Implementation</p>
+<p>The ports meet every year to review the lighting.</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [(s.findtext("a:heading", namespaces=NS), len(s.findall("a:paragraph", NS)))
+            for s in sections] == [("Purpose", 1), ("Implementation", 1)]  # fmt: skip
+
+
+def test_a_verbless_body_keeps_what_lies_between_the_preamble_lines() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>Lanterns help ships find the harbour.</p>
+<p>HAVING REGARD to the Lantern Convention;</p>
+<p>Keepers light them every evening.</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    assert [c.findtext("a:p", namespaces=NS) for c in root.iterfind(".//a:citation", NS)] == [
+        "HAVING REGARD to the Lantern Convention;"
+    ]
+    paragraphs = [
+        " ".join(p.itertext()).strip() for p in root.iterfind(".//a:body//a:paragraph", NS)
+    ]
+    assert paragraphs == [
+        "Lanterns help ships find the harbour.",
+        "Keepers light them every evening.",
+    ]
