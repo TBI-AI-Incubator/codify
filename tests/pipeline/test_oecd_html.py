@@ -652,6 +652,33 @@ def _marked(root: etree._Element) -> set[str]:
     return {el.get("eId") or "" for el in root.iter() if el.get("refersTo") == "#nonAdherentDuty"}
 
 
+@pytest.mark.parametrize(
+    ("label", "prefix"),
+    [
+        ("PART", "part"),
+        ("PARTIE", "part"),
+        ("CHAPTER", "chp"),
+        ("CHAPITRE", "chp"),
+        ("TITLE", "title"),
+        ("TITRE", "title"),
+    ],
+)
+def test_a_container_label_closes_the_section_before_it(label: str, prefix: str) -> None:
+    body = f"""
+<p>LE CONSEIL,</p>
+<p>{label} I</p>
+<p>I. DÉCIDE que les pays Membres éclairent les ports.</p>
+<p>II. CHARGE le Comité des ports de faire rapport.</p>
+<p>{label} II</p>
+<p>Pour mettre en œuvre la Décision exposée ci-dessus :</p>
+<p>I. RECOMMANDE que les pays Membres tiennent des registres.</p>
+"""
+    xml, _, root = _convert(body, lang="fr")
+    validate_akn(xml)
+    # Under the second label, its lead-in is no part of the Committee's duty.
+    assert _marked(root) == {f"{prefix}_i__sec_II"}
+
+
 def _clean(xml: str) -> None:
     validate_akn(xml)
     assert run_validator(xml) == []
