@@ -105,6 +105,10 @@ New, additive:
   element by element: seconds of planning per query on a large corpus.
 - Migration `0025_atlas_build_kind` adds `atlas_build` to the run kinds; the
   downgrade refuses while rows of that kind exist.
+- Migration `0026_provisions_created_at_idx` indexes `provisions` on
+  `(version_id, created_at)` and drops `provisions_version_id_idx`, which the
+  new key's prefix makes redundant. `max(created_at)` for one version is then
+  a single index descent instead of a read of every provision.
 - `structuring.recurring_furniture`: for a layout engine that files footnotes
   and page-top captions under header or footer. Furniture is then a bare page
   number or a short block another page repeats, a running head split across
