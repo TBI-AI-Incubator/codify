@@ -1028,3 +1028,30 @@ def test_loose_paragraphs_in_an_article_text_group_without_a_title() -> None:
     group = root.find(".//a:attachment//a:hcontainer", NS)
     assert group is not None
     assert (group.get("eId"), group.get("name")) == ("att_1__hcontainer_1", "group")
+
+
+@pytest.mark.parametrize(
+    ("lead_in", "marked"),
+    [
+        # `Adherents` is the verb's object here; the items are the declarants' acts.
+        ("DECLARE that we support Adherents through the following actions:", (True, True)),
+        ("RECOMMENDS that Adherents should:", (False, False)),
+        ("RECOMMENDS that, in lighting harbours, Adherents should:", (False, False)),
+        ("DECLARE that, in this spirit, we will:", (True, True)),
+        # A `we` later in the clause does not make the items the declarants' own:
+        # only the capitalised verb is read, as it is under any other subject.
+        ("AGREE that the Secretariat, as we requested, should:", (True, False)),
+    ],
+)
+def test_the_lead_ins_subject_decides_whose_items_they_are(
+    lead_in: str, marked: tuple[bool, bool]
+) -> None:
+    body = f"""
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>I. {lead_in}</p>
+<p>1. CALL on the OECD to map every lantern.</p>
+<p>2. Call on the OECD to count every keeper.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert (("sec_I__para_1" in _marked(root)), ("sec_I__para_2" in _marked(root))) == marked

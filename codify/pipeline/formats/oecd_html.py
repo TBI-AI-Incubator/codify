@@ -134,7 +134,7 @@ _WRAPPER_LANGUAGES = {"en": "eng", "fr": "fra"}
 # -er, -ir, -re or -oir, so `Comité de la gouvernance` stays whole) or a list's colon.
 _ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|\s(?:de\s+|d[’']\s*)(?=\w+(?:er|ir|re)\b)|:")
 # The declarants as the subject of a section's items.
-_DECLARANTS = re.compile(r"\b(?:we|they|nous|ils)\b", re.IGNORECASE)
+_DECLARANTS = re.compile(r"(?:we|they|nous|ils)\b", re.IGNORECASE)
 # Non-Members or non-Adherents named alongside the Adherents make it their duty.
 _NON_ADHERENTS = re.compile(
     r"\bnon[-‐\s]+(?:OECD[-‐\s]+)?(?:Adherents?|Members?|Adhérents?|Membres?)\b", re.IGNORECASE
@@ -577,6 +577,23 @@ def _lead_verb(text: str) -> tuple[str, str] | None:
     return None
 
 
+# Where a lead-in's subject ends: its verb or modal, or the colon opening a list.
+_SUBJECT_END = re.compile(
+    r"\s(?:should|shall|will|must|may|are|is|have|has|to|develop|establish|take|adopt"
+    r"|support|devraient|doivent|sont|ont|à)\b|[:;]",
+    re.IGNORECASE,
+)
+
+
+def _lead_subject(text: str) -> str:
+    """The subject of a verb section's `that …` clause: `Adherents` in `that
+    Adherents should:`, `we` in `that we support Adherents through:`. A clause
+    set off by commas after `that` is skipped."""
+    lead = re.sub(r"^(?:that|que|qu[’'])\s*(?:,[^,]*,\s*)?", "", text.strip(), flags=re.IGNORECASE)
+    m = _SUBJECT_END.search(lead)
+    return (lead[: m.start()] if m else lead).strip()
+
+
 def _decide(node: _Node, lead: str) -> None:
     """Mark `node` when its lead-in addresses someone other than the Adherents; a
     lead-in naming no one leaves each item to name its own, and the node is
@@ -622,9 +639,11 @@ def _mark_non_adherent_duties(
                 _decide(node, lead[1])
                 continue
         verb_section = node.kind == "section" and node.heading in OPERATIVE_VERBS
-        # Items speak for the declarants only under `… that we:`.
-        voiced = verb_section and _DECLARANTS.search(text) is not None
-        addressed = adherents or (verb_section and _ADHERENTS.search(text) is not None)
+        # The lead-in's subject decides whose acts its items are: `… that we:`
+        # speaks for the declarants, `… that Adherents should:` for the Adherents.
+        subject = _lead_subject(text) if verb_section else ""
+        voiced = _DECLARANTS.match(subject) is not None
+        addressed = adherents or (bool(subject) and not voiced and _binds_adherents(subject))
         _mark_non_adherent_duties(node.children, voiced, addressed)
 
 
