@@ -21,6 +21,9 @@ _TOKEN_PRICES: dict[str, tuple[float, float]] = {
     # Azure Global Standard, short context: meters "5.6 sol ShortCo Inp Std Gl"
     # and "5.6 sol ShortCo Opt Std Gl" in the Azure retail prices API.
     "gpt-5.6-sol": (0.000004, 0.00002),
+    # No Azure retail meter yet; OpenAI's Standard short-context rate
+    # (https://developers.openai.com/api/docs/pricing). Swap for the meter once published.
+    "gpt-6.1-sol": (0.000002, 0.00001),
 }
 
 # USD per page on the meter this subscription bills: "OCR 4 DZ Pages", SE
