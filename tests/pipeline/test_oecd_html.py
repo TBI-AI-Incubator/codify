@@ -908,3 +908,123 @@ def test_a_verbless_body_keeps_what_lies_between_the_preamble_lines() -> None:
         "Lanterns help ships find the harbour.",
         "Keepers light them every evening.",
     ]
+
+
+def _body_words(xml: str) -> list[str]:
+    root = etree.fromstring(xml.encode())
+    for el in list(root.iter(f"{{{NS['a']}}}meta")) + list(root.iter(f"{{{NS['a']}}}preface")):
+        el.getparent().remove(el)  # type: ignore[union-attr]
+    return sorted(" ".join(root.itertext()).replace("/", " ").split())
+
+
+def _source_words(body: str) -> list[str]:
+    return sorted(" ".join(etree.fromstring(f"<b>{body}</b>").itertext()).replace("“", "").split())
+
+
+def test_a_heading_between_list_items_ends_the_list_and_survives() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>2. Publish data as follows:</p>
+<p>Chapter Two Keepers</p>
+<p>1. Train keepers.</p>
+<p>a) The Committee shall:</p>
+<p>Duty to Return</p>
+<p>i) return the lanterns.</p>
+<p>II. AGREES that:</p>
+<p>Definitions</p>
+<p>- Lantern refers to a fixed light.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _body_words(xml) == _source_words(body)
+    headed = {el.get("eId"): el.findtext("a:heading", namespaces=NS)
+              for el in root.iter() if el.find("a:heading", NS) is not None}  # fmt: skip
+    assert headed["sec_I__para_1"] == "Chapter Two Keepers"
+    assert headed["sec_I__para_i"] == "Duty to Return"
+    # A bullet takes the heading above it too.
+    assert headed["sec_II__indent_1"] == "Definitions"
+
+
+def test_consecutive_heading_lines_all_survive() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>PART ONE</p>
+<p>GENERAL PRINCIPLES</p>
+<p>1. Light every harbour.</p>
+<p>Closing remarks</p>
+"""
+    xml, _, _ = _convert(body)
+    _clean(xml)
+    assert _body_words(xml) == _source_words(body)
+
+
+def test_a_lead_ins_next_sibling_is_not_its_point() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>a) The Committee shall:</p>
+<p>i) keep a register;</p>
+<p>ii) publish it.</p>
+<p>b) The Secretariat shall assist.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_I__para_a", "sec_I__para_b"]
+    assert _eids(root, "point") == ["sec_I__para_a__point_i", "sec_I__para_a__point_ii"]
+
+
+def test_the_declarants_own_commitments_stay_unmarked() -> None:
+    body = """
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>DECLARE that we:</p>
+<p>1. ENCOURAGE green investment in harbour lighting.</p>
+<p>2. ENCOURAGE efforts to develop proposals for keepers.</p>
+<p>3. INVITE Non-OECD Members to adhere to this Declaration.</p>
+<p>4. INVITE the Secretary-General to report.</p>
+<p>5. INVITE contributions from harbour users.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    # `Non-OECD Members` are not the Adherents, whatever the regex for Members finds.
+    assert _marked(root) == {"sec_I__para_3", "sec_I__para_4"}
+
+
+def test_appendices_and_labels_keep_their_text() -> None:
+    body = """
+<p>PREAMBLE</p>
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light harbours.</p>
+<p>ANNEX</p>
+<p>ANNEX TO THE RECOMMENDATION ON HARBOURS</p>
+<p>1. Every harbour has a keeper.</p>
+<p>APPENDIX I. CONTENTS LINE</p>
+<p>APPENDIX II</p>
+<p>2. Keepers keep registers.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _body_words(xml) == _source_words(body)
+    attachments = root.findall(".//a:attachment", NS)
+    assert [(a.findtext("a:heading", namespaces=NS), a.findtext("a:subheading", namespaces=NS))
+            for a in attachments] == [
+        ("ANNEX", "ANNEX TO THE RECOMMENDATION ON HARBOURS"), ("APPENDIX II", None),
+    ]  # fmt: skip
+
+
+def test_loose_paragraphs_in_an_article_text_group_without_a_title() -> None:
+    body = """
+<p>The Parties to this Agreement,</p>
+<p>HAVE AGREED as follows:</p>
+<p>Article 1</p>
+<p>Objective</p>
+<p>a. The Parties shall light harbours.</p>
+<p>ANNEX</p>
+<p>Harbours are lit at dusk.</p>
+"""
+    xml, _, root = _convert(body, type="agreement")
+    _clean(xml)
+    group = root.find(".//a:attachment//a:hcontainer", NS)
+    assert group is not None
+    assert (group.get("eId"), group.get("name")) == ("att_1__hcontainer_1", "group")

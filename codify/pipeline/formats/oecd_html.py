@@ -61,7 +61,10 @@ _ARTICLE = re.compile(
 )
 _SECTION = re.compile(rf"^({_ROMAN})\.\s+(.*)$", re.DOTALL)
 _CAPS_RUN = re.compile(r"^([A-ZÀ-ÖØ-Þ]{3,}(?:\s+[A-ZÀ-ÖØ-Þ]{2,})*)\b")
-_ANNEX = re.compile(rf"^(?:ANNEXE?|Annexe?)(?:\s+({_ROMAN}|\d+|[A-Z])\b)?\.?\s*(.*)$", re.DOTALL)
+_ANNEX = re.compile(
+    rf"^(?:ANNEXE?|Annexe?|APPENDI(?:X|CE)|Appendi(?:x|ce))(?:\s+({_ROMAN}|\d+|[A-Z])\b)?\.?\s*(.*)$",
+    re.DOTALL,
+)
 _NUM_PARA = re.compile(r"^(\d{1,3})\.\s+(.*)$", re.DOTALL)
 _NUM_PAREN = re.compile(r"^(\d{1,3})\)\s+(.*)$", re.DOTALL)
 _LETTER_PARA = re.compile(r"^([a-z])\.\s+(.*)$", re.DOTALL)
@@ -132,6 +135,12 @@ _WRAPPER_LANGUAGES = {"en": "eng", "fr": "fra"}
 _ADDRESSEE_END = re.compile(r"\s(?:to|à)\s|\s(?:de\s+|d[’']\s*)(?=\w+(?:er|ir|re)\b)|:")
 # The declarants as the subject of a section's items.
 _DECLARANTS = re.compile(r"\b(?:we|they|nous|ils)\b", re.IGNORECASE)
+# Non-Members or non-Adherents named alongside the Adherents make it their duty.
+_NON_ADHERENTS = re.compile(
+    r"\bnon[-‐\s]+(?:OECD[-‐\s]+)?(?:Adherents?|Members?|Adhérents?|Membres?)\b", re.IGNORECASE
+)
+# Encouraging an activity names no addressee, so an item opening on it is never marked.
+_ENCOURAGING = frozenset({"ENCOURAGES", "ENCOURAGE", "ENCOURAGENT", "ENCOURAGEONS", "ENCOURAGED"})
 # Adherents or Members, in either language, but not non-Adherents.
 _ADHERENTS = re.compile(r"(?<![\w‐-])(?:Adherents?|Members?|Adhérents?|Membres?)\b")
 
@@ -151,6 +160,7 @@ _EID_PREFIX = {
     "paragraph": "para",
     "point": "point",
     "indent": "indent",
+    "hcontainer": "hcontainer",
 }
 
 
@@ -169,6 +179,7 @@ class _Node:
     text: list[str] = field(default_factory=list)
     children: list[_Node] = field(default_factory=list)
     non_adherent: bool = False
+    name: str | None = None  # an `hcontainer`'s name
 
 
 @dataclass
@@ -182,6 +193,7 @@ class _Annex:
 @dataclass
 class _Instrument:
     meta: dict[str, str]
+    label: str | None = None  # a `PREAMBLE` line naming the part it opens
     opener: str | None = None
     citations: list[str] = field(default_factory=list)
     recitals: list[list[str]] = field(default_factory=list)
@@ -261,6 +273,26 @@ def _is_unit(block: str) -> bool:
     return _starts_body(block) or any(p.match(block) for p in units)
 
 
+def _roman_value(numeral: str) -> int:
+    values = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
+    total = 0
+    for here, after in zip(numeral, [*numeral[1:], ""], strict=True):
+        value = values[here]
+        total += -value if after and values[after] > value else value
+    return total
+
+
+def _follows(previous: str, current: str) -> bool:
+    """Whether `current` is the item after `previous` in one list: `a` then `b`,
+    or `iv` then `v`."""
+    if len(previous) == 1 and len(current) == 1 and ord(current) == ord(previous) + 1:
+        return True
+    roman = re.compile(r"[ivxlc]+")
+    if roman.fullmatch(previous) and roman.fullmatch(current):
+        return _roman_value(current) == _roman_value(previous) + 1
+    return False
+
+
 def _numbered(node: _Node) -> bool:
     """A paragraph numbered `1.`, under which `a.` items are its points."""
     return node.kind == "paragraph" and node.num[:-1].isdigit() and node.num.endswith(".")
@@ -303,7 +335,8 @@ class _Builder:
         self.scope = scope
         self.roots: list[_Node] = []
         self.stack: list[_Node] = []
-        self.pending_heading: str | None = None
+        # Heading lines waiting for the unit they head; consecutive ones all wait.
+        self.pending_headings: list[str] = []
         self.seen: dict[tuple[str, str], int] = {}
         self.prose_count = 0
 
@@ -326,19 +359,25 @@ class _Builder:
         else:
             self.roots.append(node)
         self.stack.append(node)
-        if self.pending_heading and kind in (*_HEADED, "section", "paragraph"):
+        if self.pending_headings:
+            lines = self.pending_headings
             if node.heading is None:
-                node.heading = self.pending_heading
-            elif kind != "paragraph":
-                node.subheading = self.pending_heading
-            self.pending_heading = None
+                node.heading, lines = lines[0], lines[1:]
+            if lines:
+                node.subheading = " / ".join(
+                    [*([node.subheading] if node.subheading else []), *lines]
+                )
+            self.pending_headings = []
         return node
 
     def _nested_number(self, number: int) -> bool:
         """Whether `number.` continues a numbered list inside the open paragraph:
         `1.` under a numbered paragraph ending in a colon, or the next number of
         such a list already open. The outer sequence resumes at the lead-in's
-        next number once the list's last item has closed with a full stop."""
+        next number once the list's last item has closed with a full stop, and a
+        heading between items ends the list."""
+        if self.pending_headings:
+            return False
         inner = next(
             (n for n in reversed(self.stack) if n.kind == "point" and n.num[:-1].isdigit()), None
         )
@@ -358,6 +397,18 @@ class _Builder:
             and int(outer.num[:-1]) > 1
             and _lead_in(outer)
         )
+
+    def feed_prose(self, block: str) -> None:
+        """Keep `block` as a paragraph of its own, whatever it looks like."""
+        self.flush()
+        self._open_prose_paragraph(block)
+
+    def flush(self) -> None:
+        """A heading left with nothing after it is kept as a paragraph of its own."""
+        if self.pending_headings:
+            block = " / ".join(self.pending_headings)
+            self.pending_headings = []
+            self._open_prose_paragraph(block)
 
     def _verb_may_open_section(self) -> bool:
         """No section or article is open, or the open one is itself a verb
@@ -414,7 +465,8 @@ class _Builder:
         if m:
             # `a.` under an open `1.` is a point of it; straight under an article it
             # is the article's own paragraph.
-            kind = "point" if any(_numbered(n) for n in self.stack) else "paragraph"
+            numbered = any(_numbered(n) for n in self.stack)
+            kind = "point" if numbered and not self.pending_headings else "paragraph"
             self._open(kind, f"{m.group(1)}.", m.group(1)).text.append(m.group(2))
             return
         m = _NUM_PAREN.match(block)
@@ -425,10 +477,18 @@ class _Builder:
         if m:
             # `a)` under an open `1.` or `a.` paragraph is a point; straight under
             # a section or article it is a paragraph, and the next `b)` its sibling.
+            # A lead-in ending in a colon takes the list that follows, but not its
+            # own next sibling (`a) … shall:` / `i)` / `ii)` / `b)`), and a heading
+            # between items ends the list.
+            item = next((n for n in reversed(self.stack) if n.kind == "paragraph"), None)
+            sibling = (
+                item is not None and item.num.endswith(")") and _follows(item.num[:-1], m.group(1))
+            )
             under_dotted = any(
                 n.kind == "paragraph" and (n.num.endswith(".") or _lead_in(n)) for n in self.stack
             )
-            kind = "point" if under_dotted else "paragraph"
+            listed = under_dotted and not sibling and not self.pending_headings
+            kind = "point" if listed else "paragraph"
             self._open(kind, f"{m.group(1)})", m.group(1)).text.append(m.group(2))
             return
         m = _INDENT.match(block)
@@ -469,10 +529,11 @@ class _Builder:
         # A short unpunctuated line is a heading for what follows; a prose
         # continuation ends in punctuation or runs longer.
         if _is_heading(block) and (top is None or top.text or _ALL_CAPS.match(block)):
-            self.pending_heading = block
+            self.pending_headings.append(block)
             return
-        # After an unnumbered paragraph, a heading waiting for its text, or a new
-        # sentence after a finished one, opens the next paragraph.
+        # A heading waiting for its text, or a new sentence after a finished
+        # unnumbered paragraph, opens the next paragraph rather than vanishing
+        # into the one before it.
         prose = top is not None and top.kind == "paragraph" and not top.num
         finished = (
             prose
@@ -481,7 +542,7 @@ class _Builder:
             and top.text[-1].rstrip().endswith((".", "!", "?"))
         )
         new_sentence = finished and block[:1].isupper()
-        if top is not None and not (prose and (self.pending_heading or new_sentence)):
+        if top is not None and not self.pending_headings and not (prose and new_sentence):
             top.text.append(block)
         else:
             self._open_prose_paragraph(block)
@@ -493,6 +554,10 @@ def _addressee(text: str) -> str | None:
     m = _ADDRESSEE_END.search(lead)
     head = (lead[: m.start()] if m else lead).strip()
     return head or None
+
+
+def _binds_adherents(addressee: str) -> bool:
+    return bool(_ADHERENTS.search(addressee)) and not _NON_ADHERENTS.search(addressee)
 
 
 def _mark_subtree(node: _Node) -> None:
@@ -518,12 +583,12 @@ def _decide(node: _Node, lead: str) -> None:
     marked only when every item is."""
     addressee = _addressee(lead)
     if addressee is not None:
-        if not _ADHERENTS.search(addressee):
+        if not _binds_adherents(addressee):
             _mark_subtree(node)
         return
     for child in node.children:
         item = _addressee(child.text[0]) if child.text else None
-        if item is not None and not _ADHERENTS.search(item):
+        if item is not None and not _binds_adherents(item):
             _mark_subtree(child)
     node.non_adherent = bool(node.children) and all(c.non_adherent for c in node.children)
 
@@ -551,7 +616,9 @@ def _mark_non_adherent_duties(
             )
         ):
             lead = _lead_verb(text)
-            if lead is not None:
+            # An item names its addressee before an infinitive or a colon
+            # (`Call on the OECD to:`); `ENCOURAGE green investment` names none.
+            if lead is not None and lead[0] not in _ENCOURAGING and _ADDRESSEE_END.search(lead[1]):
                 _decide(node, lead[1])
                 continue
         verb_section = node.kind == "section" and node.heading in OPERATIVE_VERBS
@@ -569,10 +636,14 @@ def _rescope(node: _Node, scope: str, group: str) -> None:
         _rescope(child, scope, group)
 
 
-def _group_loose_paragraphs(nodes: list[_Node], scope: str = "") -> list[_Node]:
+def _group_loose_paragraphs(
+    nodes: list[_Node], scope: str = "", untitled: str = "section"
+) -> list[_Node]:
     """Gather paragraphs lying straight under the body, a declaration's shape,
     into unnumbered sections that open at each heading line, so every paragraph
-    sits in a container as the body's hierarchy expects."""
+    sits in a container as the body's hierarchy expects. A group with no heading
+    is an `untitled` container: an `hcontainer` where the text has articles,
+    whose sections are expected to carry a title."""
     if not any(n.kind == "paragraph" for n in nodes):
         return nodes
     out: list[_Node] = []
@@ -583,14 +654,27 @@ def _group_loose_paragraphs(nodes: list[_Node], scope: str = "") -> list[_Node]:
             group = None
             continue
         if group is None or node.heading:
-            key = str(sum(1 for n in out if n.kind == "section" and not n.num) + 1)
-            eid = f"{scope}__sec_{key}" if scope else f"sec_{key}"
-            group = _Node("section", "", key, eid=eid, heading=node.heading)
+            kind = "section" if node.heading else untitled
+            key = str(sum(1 for n in out if n.kind == kind and not n.num) + 1)
+            leaf = f"{_EID_PREFIX[kind]}_{key}"
+            eid = f"{scope}__{leaf}" if scope else leaf
+            group = _Node(kind, "", key, eid=eid, heading=node.heading)
+            group.name = "group" if kind == "hcontainer" else None
             node.heading = None
             out.append(group)
         _rescope(node, scope, group.eid)
         group.children.append(node)
     return out
+
+
+def _has_articles(nodes: list[_Node]) -> bool:
+    return any(n.kind == "article" or _has_articles(n.children) for n in nodes)
+
+
+def _bare_caption(caption: str) -> bool:
+    """`ANNEX` alone, with no number or title of its own."""
+    m = _ANNEX.match(caption)
+    return m is not None and m.group(1) is None and not m.group(2)
 
 
 def _annex_caption(block: str) -> bool:
@@ -630,7 +714,10 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             kept.add(i)
         elif _INDENT.match(block) and inst.recitals:
             inst.recitals[-1].append(block)  # a bulleted list under `CONSIDERING that:`
-        elif block != "PREAMBLE":
+        elif block == "PREAMBLE" and inst.label is None:
+            inst.label = block
+            kept.add(i)
+        else:
             inst.recitals.append([block])
         i += 1
     body_blocks = blocks[i:]
@@ -642,9 +729,29 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
     builder = _Builder()
     inst.body = builder.roots
     annex: _Annex | None = None
+    previous = builder
+
+    def fold_empty() -> None:
+        # A caption with nothing under it (a contents line) is text, not an annex.
+        if annex is not None and not annex.body:
+            inst.annexes.remove(annex)
+            previous.feed_prose(" / ".join(filter(None, [annex.caption, annex.title])))
+
     for block in body_blocks:
         # An annex ends whatever section was open, so its text inherits no verb.
         if _annex_caption(block):
+            builder.flush()
+            if (
+                annex is not None
+                and _bare_caption(annex.caption)
+                and not builder.roots
+                and annex.title is None
+            ):
+                annex.title = block  # `ANNEX` then `ANNEX TO THE RECOMMENDATION …`
+                continue
+            fold_empty()
+            if annex is None or annex.body:
+                previous = builder
             annex = _Annex(eid=f"att_{len(inst.annexes) + 1}", caption=block)
             inst.annexes.append(annex)
             builder = _Builder(scope=annex.eid)
@@ -660,10 +767,17 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             annex.title = block
             continue
         builder.feed(block)
+    builder.flush()
+    fold_empty()
     _mark_non_adherent_duties(inst.body)
-    inst.body = _group_loose_paragraphs(inst.body)
+    untitled = (
+        "hcontainer"
+        if _has_articles([*inst.body, *(n for a in inst.annexes for n in a.body)])
+        else "section"
+    )
+    inst.body = _group_loose_paragraphs(inst.body, untitled=untitled)
     for annex in inst.annexes:
-        annex.body = _group_loose_paragraphs(annex.body, annex.eid)
+        annex.body = _group_loose_paragraphs(annex.body, annex.eid, untitled)
     if not inst.body:
         raise OecdHtmlError("no operative text: not an instrument body, or an empty page")
     return inst
@@ -679,6 +793,8 @@ def _akn(parent: etree._Element, tag: str, **attrs: str) -> etree._Element:
 
 def _emit(parent: etree._Element, node: _Node, counts: dict[str, int]) -> None:
     el = _akn(parent, node.kind, eId=node.eid)
+    if node.name:
+        el.set("name", node.name)
     if node.non_adherent:
         el.set("refersTo", NON_ADHERENT_DUTY)
         if node.kind == "paragraph":
@@ -771,8 +887,10 @@ def _meta(
 def build_body(inst: _Instrument, root_act: etree._Element) -> dict[str, int]:
     preface = _akn(root_act, "preface")
     _akn(_akn(preface, "longTitle"), "p").text = inst.meta.get("title") or inst.opener or ""
-    if inst.opener or inst.citations or inst.recitals or inst.formula:
+    if inst.label or inst.opener or inst.citations or inst.recitals or inst.formula:
         preamble = _akn(root_act, "preamble")
+        if inst.label:
+            _akn(preamble, "p").text = inst.label
         if inst.opener:
             _akn(preamble, "p").text = inst.opener
         if inst.citations:

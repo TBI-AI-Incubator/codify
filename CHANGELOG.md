@@ -173,8 +173,16 @@ Fixed:
   - an excerpt that opens with a quotation mark
 
   A text with no operative verb is all body. Paragraphs straight under the body
-  or an annex sit in unnumbered sections that open at each heading line, and a
-  paragraph the source does not number gets no `<num>`. The addressee rule also
+  or an annex sit in unnumbered sections that open at each heading line. Where
+  the text has articles, a group with no heading is an `hcontainer`. A paragraph
+  the source does not number gets no `<num>`.
+- No source word is dropped:
+  - consecutive heading lines all reach the unit they head;
+  - a heading between list items ends the list;
+  - a heading left at the end is kept as a paragraph;
+  - a caption with no annex under it (a contents line) is kept as text;
+  - `APPENDIX` opens an attachment as `ANNEX` does;
+  - a `PREAMBLE` label stays in the preamble. The addressee rule also
   marks `WE CALL ON…` paragraphs, `5. CALL on…` paragraphs and items under a
   section in the declarants' own voice.
 
