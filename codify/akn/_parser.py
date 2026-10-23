@@ -37,7 +37,6 @@ from codify.akn.vocabulary import (
     PRESENTATION_CONTAINER_NAMES,
     TAG_TO_KIND,
     is_lifted_note,
-    provision_text,
 )
 
 # Map AKN tags to model kinds; preserve the original tag for emission.
@@ -302,7 +301,7 @@ def _extract_plain(el: etree._Element) -> str:
     `intro` and `wrap_up` feed `provisions.text` the same way `text` does, so a
     note folded in here reaches search, the lens and the comparator identically.
     """
-    return provision_text(el)
+    return _extract_text_and_refs(el)[0]
 
 
 def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineReference]]:
@@ -326,8 +325,16 @@ def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineRef
 
     def visit(el: etree._Element) -> None:
         push(None if indentation(el.text) else el.text)
-        for child in el:
+        in_cell = _local(el) in ("td", "th")
+        for index, child in enumerate(el):
+            if not isinstance(child.tag, str):
+                # A comment is not text; the words after it are.
+                push(None if indentation(child.tail) else child.tail)
+                continue
             tag = _local(child)
+            # A table's rows, cells and a cell's paragraphs stay apart in the text.
+            if index and (tag in ("tr", "td", "th") or (in_cell and tag == "p")):
+                push("\n" if tag == "tr" else " ")
             if is_lifted_note(child):
                 # Notes are not provision text or provision references.
                 pass

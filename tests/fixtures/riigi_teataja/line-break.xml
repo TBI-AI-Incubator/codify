@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Riigikogu</valjaandja>
+		<dokumentLiik>seadus</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>2001-02-03</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>2001-02-03</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidiskaristusseadustik</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<paragrahv>
+			<paragrahvNr>227</paragrahvNr>
+			<kuvatavNr><![CDATA[§ 227. ]]></kuvatavNr>
+			<paragrahvPealkiri>Näidiskaubaga kauplemine</paragrahvPealkiri>
+			<loige>
+				<loigeNr>1</loigeNr>
+				<kuvatavNr><![CDATA[(1)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Näidiskaubaga kauplemise eest –<reavahetus/>karistatakse rahatrahviga kuni 100 ühikut.</tavatekst>
+				</sisuTekst>
+			</loige>
+			<loige>
+				<loigeNr>3</loigeNr>
+				<kuvatavNr><![CDATA[(3)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Kohus võtab ära teo objektiks olnud näidiseseme.</tavatekst>
+				</sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>

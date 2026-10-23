@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Näidisvalla Valitsus</valjaandja>
+		<dokumentLiik>määrus</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>2011-04-05</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>2011-04-05</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidisteenuse hinna kehtestamine</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<paragrahv>
+			<paragrahvNr>2</paragrahvNr>
+			<kuvatavNr><![CDATA[§ 2. ]]></kuvatavNr>
+			<paragrahvPealkiri>Teenuse hind</paragrahvPealkiri>
+			<loige>
+				<loigeNr>1</loigeNr>
+				<kuvatavNr><![CDATA[(1)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Kehtestada näidisteenuse hind alljärgnevalt:</tavatekst>
+				</sisuTekst>
+				<sisuTekst>
+					<HTMLKonteiner><![CDATA[<table class="data">
+  <tbody><tr>
+    <td>1) põhitasu kuus</td>
+    <td>1.00 eurot;</td>
+  </tr>
+  <tr>
+    <td>2) tasu vee eest (1 m<sup>3</sup> kohta) </td>
+    <td>0.10
+eurot;</td>
+  </tr>
+  <tr>
+    <td>3) tasu heitvee eest (1 m<sup>3</sup> kohta
+ilma maksuta)</td>
+    <td>0.20 eurot.</td>
+  </tr>
+</tbody></table>]]></HTMLKonteiner>
+					<tavatekst>
+						<i>(Näidismäärus 01.01.2011; jõust. 01.02.2011)</i>
+					</tavatekst>
+				</sisuTekst>
+			</loige>
+			<loige>
+				<loigeNr>2</loigeNr>
+				<kuvatavNr><![CDATA[(2)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Kehtestada hulgihind alljärgnevalt:</tavatekst>
+				</sisuTekst>
+				<sisuTekst>
+					<HTMLKonteiner><![CDATA[<table class="data">
+  <tbody><tr>
+    <td>1) tasu vee eest</td>
+    <td>0.05 eurot;</td>
+  </tr>
+  <tr>
+    <td>2) tasu heitvee eest</td>
+    <td>0.06 eurot.</td>
+  </tr>
+</tbody></table>]]></HTMLKonteiner>
+				</sisuTekst>
+			</loige>
+			<loige>
+				<loigeNr>3</loigeNr>
+				<kuvatavNr><![CDATA[(3)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Kinnitada hinnakoefitsiendid:</tavatekst>
+				</sisuTekst>
+				<sisuTekst>
+					<HTMLKonteiner><![CDATA[<table class="data">
+  <tbody><tr>
+    <td>Grupp</td>
+    <td>Aine
+X<sub>7</sub> sisaldus (mg/l)</td>
+    <td>Koefitsient</td>
+  </tr>
+  <tr><td>I</td><td>0-99 </td><td>1,0</td></tr>
+  <tr><td>II</td><td>100-199</td><td>1,1</td></tr>
+  <tr><td>III</td><td>200-299</td><td>1,2</td></tr>
+  <tr><td>IV</td><td>300-399</td><td>1,3</td></tr>
+  <tr><td>V</td><td>400-499</td><td>1,4</td></tr>
+  <tr><td>VI</td><td>500-599 </td><td>1,5</td></tr>
+  <tr><td>VII</td><td>600-699</td><td>2,0 </td></tr>
+  <tr><td>VIII</td><td> 700
+ja üle </td><td>3,0</td></tr>
+</tbody></table>]]></HTMLKonteiner>
+				</sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>

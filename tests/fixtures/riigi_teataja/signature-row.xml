@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Näidisministeerium</valjaandja>
+		<dokumentLiik>leping</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>2026-01-02</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>2026-01-02</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidislepingu muudatus</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<sisuTekst>
+			<HTMLKonteiner><![CDATA[<p>Tellija ja täitja lepivad kokku järgnevas:</p>
+<p>1. Täitja korraldab lisareise.</p>
+<p>2. Lisareise ei korraldata, kui:<br/>
+2.1. laev on remondis;<br/>
+2.2. täitja teeb ettevalmistusi asendusreisiks.</p>
+<table width="756">
+  <tbody>
+    <tr>
+      <td><p>Tellija: </p>
+      <p>(allkirjastatud digitaalselt)</p>
+      <p>Isik A</p>
+      <p>Näidisminister </p></td>
+      <td><p> Täitja: </p>
+      <p>(allkirjastatud digitaalselt) </p>
+      <p>Isik B </p>
+      <p>Näidis OÜ juhatuse esimees </p></td>
+      <td><p> Täitja:</p>
+      <p>(allkirjastatud digitaalselt)</p>
+      <p>Isik C</p>
+      <p>Näidis OÜ juhatuse liige</p></td>
+    </tr>
+  </tbody>
+</table>]]></HTMLKonteiner>
+		</sisuTekst>
+	</sisu>
+</oigusakt>

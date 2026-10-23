@@ -6,9 +6,11 @@ import os
 from pathlib import Path
 
 import pytest
+import structlog
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, validate_akn
+from codify.akn.bluebell import akn_xml_to_bluebell, bluebell_to_akn
 from codify.akn.io import parse_akn
 from codify.pipeline import ingest_document
 from codify.pipeline.events import Complete, MetadataExtracted
@@ -609,3 +611,515 @@ def test_real_estonian_acts_from_zip() -> None:
             doc = parse_akn(akn_xml)
             assert doc.frbr_work_uri.startswith("/akn/ee/act/")
             assert len(doc.body) > 0
+
+
+# --- line breaks, every text element, tables ----------------------------------
+
+_FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "riigi_teataja"
+_A = f"{{{AKN_NS}}}"
+
+
+def _fixture(name: str) -> str:
+    akn_xml, _ = riigi_teataja_to_akn((_FIXTURES / name).read_bytes())
+    validate_akn(akn_xml)
+    return akn_xml
+
+
+def _by_eid(akn_xml: str, eid: str) -> etree._Element:
+    root = etree.fromstring(akn_xml.encode())
+    found = [el for el in root.iter() if el.get("eId") == eid]
+    assert len(found) == 1, (eid, len(found))
+    return found[0]
+
+
+def _texts(el: etree._Element, tag: str = "p") -> list[str]:
+    return [" ".join("".join(p.itertext()).split()) for p in el.iter(_A + tag)]
+
+
+def _cells(table: etree._Element) -> list[list[str]]:
+    return [
+        [" | ".join(_texts(cell)) for cell in tr if etree.QName(cell).localname in {"td", "th"}]
+        for tr in table.iter(_A + "tr")
+    ]
+
+
+def _act(sisu: str, *, doctype: str = "määrus") -> str:
+    akn_xml, _ = riigi_teataja_to_akn(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Vabariigi Valitsus</valjaandja>
+		<dokumentLiik>{doctype}</dokumentLiik>
+		<vastuvoetud><aktikuupaev>2020-01-01</aktikuupaev></vastuvoetud>
+	</metaandmed>
+	<aktinimi><nimi><pealkiri>Näidismäärus</pealkiri></nimi></aktinimi>
+	<sisu>{sisu}</sisu>
+</oigusakt>"""
+    )
+    validate_akn(akn_xml)
+    return akn_xml
+
+
+def _html_act(markup: str) -> str:
+    return _act(f"<sisuTekst><HTMLKonteiner><![CDATA[{markup}]]></HTMLKonteiner></sisuTekst>")
+
+
+def test_a_line_break_keeps_the_text_after_it() -> None:
+    akn_xml = _fixture("line-break.xml")
+    para = _by_eid(akn_xml, "art_227__para_1")
+    assert _texts(para) == [
+        "Näidiskaubaga kauplemise eest –",
+        "karistatakse rahatrahviga kuni 100 ühikut.",
+    ]
+    assert [p.get("eId") for p in para.iter(_A + "p")] == [
+        "art_227__para_1__p_1",
+        "art_227__para_1__p_2",
+    ]
+    provision = next(p for p in parse_akn(akn_xml).body[0].children if p.akn_eid.endswith("_1"))
+    assert provision.text == (
+        "Näidiskaubaga kauplemise eest –\nkaristatakse rahatrahviga kuni 100 ühikut."
+    )
+    # The break is a line in Bluebell too, so the source pane round-trips it.
+    bluebell = akn_xml_to_bluebell(akn_xml)
+    assert "kauplemise eest –\n" in bluebell
+    reparsed, _, errors = bluebell_to_akn(bluebell, country="ee", language="est")
+    assert errors == []
+    assert "karistatakse rahatrahviga" in reparsed
+
+
+def test_a_content_table_becomes_an_akn_table() -> None:
+    akn_xml = _fixture("fee-table.xml")
+    para = _by_eid(akn_xml, "art_2__para_1")
+    content = para.find(_A + "content")
+    assert content is not None
+    assert [etree.QName(c).localname for c in content] == ["p", "table", "p"]
+    table = _by_eid(akn_xml, "art_2__para_1__table_1")
+    assert [tr.get("eId") for tr in table] == [f"art_2__para_1__table_1__tr_{i}" for i in (1, 2, 3)]
+    assert _cells(table) == [
+        ["1) põhitasu kuus", "1.00 eurot;"],
+        ["2) tasu vee eest (1 m³ kohta)", "0.10 eurot;"],
+        ["3) tasu heitvee eest (1 m³ kohta ilma maksuta)", "0.20 eurot."],
+    ]
+    # The note after the table is its own block, italic only, with no indent text.
+    note = _by_eid(akn_xml, "art_2__para_1__p_2")
+    assert note.text is None
+    assert [etree.QName(c).localname for c in note] == ["i"]
+    # A subscript inside a cell stays inline.
+    grouped = _cells(_by_eid(akn_xml, "art_2__para_3__table_1"))
+    assert grouped[0][1] == "Aine X7 sisaldus (mg/l)"
+    assert _by_eid(akn_xml, "art_2__para_3__table_1").find(f".//{_A}sub") is not None
+    assert len(grouped) == 9
+    reparsed, _, errors = bluebell_to_akn(akn_xml_to_bluebell(akn_xml), country="ee")
+    assert errors == []
+    assert reparsed.count("<table") == 3
+
+
+def test_a_native_table_keeps_its_rows_and_cell_breaks() -> None:
+    akn_xml = _fixture("native-table.xml")
+    para = _by_eid(akn_xml, "art_3__para_2")
+    assert _texts(para.find(_A + "content"))[0] == ("Palgagruppide vahemikud on järgmised:")
+    rows = _cells(_by_eid(akn_xml, "art_3__para_2__table_1"))
+    assert rows[0] == [
+        "Grupp",
+        "Vahemik eurodes, | alammäär",
+        "Vahemik eurodes, ülemmäär",
+        "Ametikohad",
+    ]
+    assert rows[1][0] == "I"
+    assert len(rows) == 3
+
+
+@pytest.mark.parametrize(
+    ("name", "left_out", "dropped", "kept"),
+    [
+        # Signature lines placed beside a blank column.
+        (
+            "signature-layout.xml",
+            {"placed": 1},
+            ["Peaminister", "Riigisekretär"],
+            ["kiita heaks näidisriikide vaheline kokkulepe"],
+        ),
+        # One row of blocks, each signed.
+        (
+            "signature-row.xml",
+            {"signed": 1},
+            ["allkirjastatud", "juhatuse esimees"],
+            ["2.2. täitja teeb ettevalmistusi asendusreisiks."],
+        ),
+        # An annex's approval stamp, before the annex's own table.
+        (
+            "approval-stamp.xml",
+            {"placed": 1},
+            ["KINNITATUD", "määrusega nr 9"],
+            ["VASTAVUSTABEL", "Määrus jõustub 2010. aasta 1. augustil."],
+        ),
+    ],
+)
+def test_layout_and_signature_tables_stay_out(
+    name: str, left_out: dict[str, int], dropped: list[str], kept: list[str]
+) -> None:
+    from structlog.testing import capture_logs
+
+    with capture_logs() as captured:
+        akn_xml = _fixture(name)
+    structlog.reset_defaults()
+    body = etree.fromstring(akn_xml.encode()).find(f".//{_A}body")
+    assert body is not None
+    text = " ".join(_texts(body))
+    assert [w for w in dropped if w in text] == []
+    assert [w for w in kept if w not in text] == []
+    logged = [r for r in captured if r.get("event") == "riigi_teataja_tables_left_out"]
+    assert [{k: r[k] for k in ("placed", "signed") if k in r} for r in logged] == [left_out]
+
+
+def test_a_spanned_table_beside_a_stamp_is_kept() -> None:
+    akn_xml = _fixture("approval-stamp.xml")
+    table = _by_eid(akn_xml, "art_8__table_1")
+    head = table[0]
+    assert [(c.get("colspan"), " | ".join(_texts(c))) for c in head] == [
+        (None, "Aastad"),
+        ("2", "Klassid | näidiskoolis"),
+        ("3", "Klassid | tavakoolis"),
+    ]
+    assert _cells(table)[1][:4] == ["1", "1st", "Algkool", "1. klass"]
+    assert table[1][2].get("rowspan") == "5"
+
+
+@pytest.mark.parametrize(
+    ("rows", "cells"),
+    [
+        # One row without a signature is data.
+        ("<tr><td>Riigilõiv</td><td>10 eurot</td></tr>", [["Riigilõiv", "10 eurot"]]),
+        # Signing named in a fee is not a signature.
+        (
+            "<tr><td>Hind</td><td>Allkirjastamise tasu 5 eurot</td></tr>",
+            [["Hind", "Allkirjastamise tasu 5 eurot"]],
+        ),
+        ("<tr><td>Allkirjastamise tasu 5 eurot</td></tr>", [["Allkirjastamise tasu 5 eurot"]]),
+        # One signed cell beside data is not a signature row.
+        (
+            "<tr><td>Leping (allkirjastatud digitaalselt)</td><td>10 eurot</td></tr>",
+            [["Leping (allkirjastatud digitaalselt)", "10 eurot"]],
+        ),
+        # A spanned label beside its value is data, though a row looks short.
+        (
+            "<tr><td rowspan='2'>Määr</td><td></td></tr><tr><td>10</td></tr>",
+            [["Määr", ""], ["10"]],
+        ),
+        (
+            "<tr><td colspan='2'>Tasu</td><td></td></tr>"
+            "<tr><td>Riigilõiv</td><td></td><td></td></tr>",
+            [["Tasu", ""], ["Riigilõiv", "", ""]],
+        ),
+        # A long line beside a blank cell is body text, not a stamp.
+        (
+            f"<tr><td></td><td>{'Seaduse tekst. ' * 8}</td></tr>",
+            [["", ("Seaduse tekst. " * 8).strip()]],
+        ),
+        # Signing named in a data table.
+        (
+            "<tr><td>Dokument</td><td>Allkirjastamise kuupäev</td></tr>"
+            "<tr><td>Leping</td><td>01.01.2020</td></tr>",
+            [["Dokument", "Allkirjastamise kuupäev"], ["Leping", "01.01.2020"]],
+        ),
+        # One column, so no blank column beside it.
+        ("<tr><td>Esimees</td></tr><tr><td>Liige</td></tr>", [["Esimees"], ["Liige"]]),
+        # A blank column beside rows that each fill two cells.
+        (
+            "<tr><td>E</td><td></td><td>10:00</td></tr><tr><td>T</td><td></td><td>11:00</td></tr>",
+            [["E", "", "10:00"], ["T", "", "11:00"]],
+        ),
+    ],
+)
+def test_data_tables_near_the_layout_rules_are_kept(rows: str, cells: list[list[str]]) -> None:
+    akn_xml = _html_act(f"<p>Sissejuhatus.</p><table>{rows}</table>")
+    assert _cells(_by_eid(akn_xml, "para_1__table_1")) == cells
+    assert "Sissejuhatus." in akn_xml
+
+
+def test_headings_keep_inline_text() -> None:
+    akn_xml = _act(
+        """<peatykk><peatykkNr>1</peatykkNr><kuvatavNr>1. peatükk</kuvatavNr>
+		<peatykkPealkiri><b>ÜLDSÄTTED</b></peatykkPealkiri>
+		<paragrahv><paragrahvNr>2</paragrahvNr><kuvatavNr>§ 2.</kuvatavNr>
+			<paragrahvPealkiri>Osa 5<sup>1</sup>. ptk<reavahetus/>rakendamine</paragrahvPealkiri>
+			<sisuTekst><tavatekst>Tekst.</tavatekst></sisuTekst>
+		</paragrahv></peatykk>"""
+    )
+    assert _texts(etree.fromstring(akn_xml.encode()), "heading") == [
+        "ÜLDSÄTTED",
+        "Osa 5¹. ptk rakendamine",
+    ]
+
+
+def test_every_text_element_of_a_unit_is_written() -> None:
+    akn_xml = _act(
+        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+			<sisuTekst><tavatekst>Määrusega muudetakse:</tavatekst></sisuTekst>
+			<loige><loigeNr>1</loigeNr><kuvatavNr>(1)</kuvatavNr>
+				<sisuTekst><tavatekst>Esimene osa.</tavatekst></sisuTekst>
+				<sisuTekst><tavatekst>Teine osa.</tavatekst></sisuTekst>
+			</loige>
+			<loige><loigeNr>2</loigeNr><kuvatavNr>(2)</kuvatavNr>
+				<sisuTekst><tavatekst>Loetelu:</tavatekst></sisuTekst>
+				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+					<sisuTekst><tavatekst>punkt;</tavatekst></sisuTekst></alampunkt>
+				<sisuTekst><tavatekst>Lõpetus.</tavatekst></sisuTekst>
+			</loige>
+			<sisuTekst><tavatekst>Paragrahvi lõpp.</tavatekst></sisuTekst>
+		</paragrahv>
+		<paragrahv><paragrahvNr>3</paragrahvNr><kuvatavNr>§ 3.</kuvatavNr>
+			<muutmismarge><tavatekst>Kehtetu -</tavatekst></muutmismarge></paragrahv>
+		<paragrahv><paragrahvNr>4</paragrahvNr><kuvatavNr>§ 4.</kuvatavNr>
+			<sisuTekst><tavatekst>Ees.</tavatekst></sisuTekst>
+			<loige><sisuTekst><tavatekst>Lõige.</tavatekst></sisuTekst></loige></paragrahv>
+		<punkt><punktNr>2</punktNr><kuvatavNr>2.</kuvatavNr>
+			<sisuTekst><tavatekst>Punkti sissejuhatus:</tavatekst></sisuTekst>
+			<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+				<sisuTekst><tavatekst>alampunkt.</tavatekst></sisuTekst></alampunkt>
+		</punkt>"""
+    )
+    assert _texts(_by_eid(akn_xml, "art_1").find(_A + "intro")) == ["Määrusega muudetakse:"]
+    assert _texts(_by_eid(akn_xml, "art_1__para_1")) == ["Esimene osa.", "Teine osa."]
+    assert _texts(_by_eid(akn_xml, "art_1__para_2").find(_A + "wrapUp")) == ["Lõpetus."]
+    assert _texts(_by_eid(akn_xml, "art_1").find(_A + "wrapUp")) == ["Paragrahvi lõpp."]
+    assert _texts(_by_eid(akn_xml, "point_2__point_1")) == ["alampunkt."]
+    assert _texts(_by_eid(akn_xml, "art_3")) == ["Kehtetu -"]
+    assert _texts(_by_eid(akn_xml, "art_4")) == ["Ees.", "Lõige."]
+
+
+def test_text_between_units_keeps_its_place() -> None:
+    akn_xml = _act(
+        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+			<loige><loigeNr>1</loigeNr><kuvatavNr>(1)</kuvatavNr>
+				<sisuTekst><tavatekst>Esimene.</tavatekst></sisuTekst></loige>
+			<sisuTekst><tavatekst>Lõigete vahel.</tavatekst></sisuTekst>
+			<loige><loigeNr>2</loigeNr><kuvatavNr>(2)</kuvatavNr>
+				<sisuTekst><tavatekst>Loetelu:</tavatekst></sisuTekst>
+				<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+					<sisuTekst><tavatekst>üks;</tavatekst></sisuTekst></alampunkt>
+				<sisuTekst><tavatekst>Punktide vahel.</tavatekst></sisuTekst>
+				<alampunkt><alampunktNr>2</alampunktNr><kuvatavNr>2)</kuvatavNr>
+					<sisuTekst><tavatekst>kaks.</tavatekst></sisuTekst></alampunkt>
+			</loige>
+			<sisuTekst><tavatekst>Pärast punkte.</tavatekst></sisuTekst>
+			<loige><loigeNr>3</loigeNr><kuvatavNr>(3)</kuvatavNr>
+				<sisuTekst><tavatekst>Kolmas.</tavatekst></sisuTekst></loige>
+		</paragrahv>"""
+    )
+    assert _texts(_by_eid(akn_xml, "art_1")) == [
+        "Esimene.",
+        "Lõigete vahel.",
+        "Loetelu:",
+        "üks;",
+        "Punktide vahel.",
+        "kaks.",
+        "Pärast punkte.",
+        "Kolmas.",
+    ]
+    assert _texts(_by_eid(akn_xml, "art_1__para_2").find(_A + "wrapUp")) == ["Pärast punkte."]
+    assert _texts(_by_eid(akn_xml, "art_1__para_1")) == ["Esimene.", "Lõigete vahel."]
+    assert _texts(_by_eid(akn_xml, "art_1__para_2__point_1")) == ["üks;", "Punktide vahel."]
+
+
+def test_inline_text_keeps_every_tail() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tavatekst><b>Paks<reavahetus/>jätk</b> ja
+			<i>kald</i> <u>joon</u>.<tundmatu>Peidus</tundmatu> lõpp<i><reavahetus/> </i>
+			</tavatekst>
+			<muutmismarge><tavatekst>[RT I, 01.01.2020, 1]</tavatekst></muutmismarge>
+			<veaparandus><veaparandusTekst>Parandatud trükiviga</veaparandusTekst></veaparandus>
+			<fail failNimi="lisa.pdf">QUJDRA==</fail>
+		</sisuTekst>"""
+    )
+    para = _by_eid(akn_xml, "para_1")
+    assert _texts(para) == ["Paks", "jätk ja kald joon.Peidus lõpp"]
+    # A break inside bold reopens the bold in the next block.
+    second = _by_eid(akn_xml, "para_1__p_2")
+    assert [etree.QName(c).localname for c in second] == ["b", "i", "u"]
+    assert "RT I, 01.01.2020" not in akn_xml
+    assert "trükiviga" not in akn_xml
+    assert "QUJDRA" not in akn_xml
+
+
+def test_html_markup_maps_to_blocks_and_cells() -> None:
+    akn_xml = _html_act(
+        "<p>Esimene<br/>teine</p><!-- märkus --><div>kolmas</div>"
+        "<table><tr><th colspan='2'>Pealkiri</th></tr>"
+        "<tr><td colspan='1'>a<table><tr><td>sisemine</td></tr></table></td>"
+        "<td rowspan='x' colspan='²'>b</td>"
+        "</tr><tr></tr>"
+        "<caption>Tabeli pealdis</caption></table>"
+        "<style>p {{ color: red }}</style><script>alert(1)</script>"
+    )
+    assert _texts(_by_eid(akn_xml, "para_1").find(_A + "content"))[:3] == [
+        "Esimene",
+        "teine",
+        "kolmas",
+    ]
+    table = _by_eid(akn_xml, "para_1__table_1")
+    head = table[0][0]
+    assert etree.QName(head).localname == "th"
+    assert head.get("colspan") == "2"
+    assert table[1][1].get("rowspan") is None
+    assert table[1][1].get("colspan") is None
+    assert table[1][0].get("colspan") is None
+    # The inner table is the cell's text, not rows of the outer one or a table of its own.
+    assert _cells(table) == [["Pealkiri"], ["a | sisemine", "b"]]
+    assert akn_xml.count("<table") == 1
+    assert "märkus" not in akn_xml
+    assert "Tabeli pealdis" in _texts(_by_eid(akn_xml, "para_1").find(_A + "content"))
+    assert "color" not in akn_xml
+    assert "alert" not in akn_xml
+
+
+def test_table_edges_keep_text_and_stay_valid() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tabel><tr/><tr>
+			<tc><sisuTekst><tavatekst>Välimine</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>Lahter</tavatekst>
+				<tabel><tr><tc><sisuTekst><tavatekst>Sisemine</tavatekst></sisuTekst></tc>
+				<tc><sisuTekst><tavatekst>Teine</tavatekst></sisuTekst></tc></tr></tabel>
+			</sisuTekst></tc></tr></tabel></sisuTekst>"""
+    )
+    table = _by_eid(akn_xml, "para_1__table_1")
+    assert _cells(table) == [["Välimine", "Lahter | Sisemine | Teine"]]
+    assert akn_xml.count("<table") == 1
+    rowless = _html_act("<table><caption>Pealdis</caption></table>")
+    assert "<table" not in rowless
+    assert "Pealdis" in rowless
+
+
+@pytest.mark.parametrize(
+    "sisu",
+    [
+        "<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Isik A</td></tr>"
+        "</table>]]></HTMLKonteiner></sisuTekst>",
+        "<HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister Isik A</td></tr>"
+        "</table>]]></HTMLKonteiner>",
+        "<sisuTekst><tabel><tr><tc><sisuTekst/></tc><tc><sisuTekst><tavatekst>Minister Isik A"
+        "</tavatekst></sisuTekst></tc></tr></tabel></sisuTekst>",
+    ],
+)
+def test_a_dropped_table_leaves_no_text(sisu: str) -> None:
+    akn_xml = _act(sisu)
+    assert "Isik A" not in akn_xml
+    assert "&lt;" not in akn_xml
+
+
+def test_a_short_native_row_is_not_a_blank_column() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tabel>
+			<tr><tc><sisuTekst><tavatekst>Määr</tavatekst></sisuTekst></tc><tc><sisuTekst/></tc></tr>
+			<tr><tc><sisuTekst><tavatekst>10</tavatekst></sisuTekst></tc></tr>
+		</tabel></sisuTekst>"""
+    )
+    assert _cells(_by_eid(akn_xml, "para_1__table_1")) == [["Määr", ""], ["10"]]
+
+
+def test_a_native_cell_reads_its_html() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tabel><tr>
+			<tc><sisuTekst><tavatekst>Nimetus</tavatekst></sisuTekst></tc>
+			<tc><HTMLKonteiner><![CDATA[<p>10 <b>eurot</b></p>]]></HTMLKonteiner></tc>
+		</tr><tr>
+			<tc><sisuTekst><tavatekst>Teine</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>20 eurot</tavatekst></sisuTekst></tc>
+		</tr></tabel></sisuTekst>"""
+    )
+    assert _cells(_by_eid(akn_xml, "para_1__table_1"))[0] == ["Nimetus", "10 eurot"]
+    assert "&lt;" not in akn_xml
+
+
+def test_an_emptied_block_takes_no_editorial_note() -> None:
+    akn_xml = _act(
+        """<sisuTekst><HTMLKonteiner><![CDATA[<table><tr><td></td><td>Minister</td></tr>
+		</table>]]></HTMLKonteiner><muutmismarge><tavatekst>[RT I, 1]</tavatekst></muutmismarge>
+		</sisuTekst>"""
+    )
+    assert _texts(_by_eid(akn_xml, "para_1")) == [""]
+
+
+def test_a_native_cell_is_classified_on_its_visible_text() -> None:
+    akn_xml = _act(
+        """<sisuTekst><tabel><tr><tc><HTMLKonteiner><![CDATA[<a href="allkirjastatud-leping.pdf">
+		Allkirjastamise tasu 5 eurot</a>]]></HTMLKonteiner></tc></tr></tabel></sisuTekst>"""
+    )
+    assert _cells(_by_eid(akn_xml, "para_1__table_1")) == [["Allkirjastamise tasu 5 eurot"]]
+
+
+def test_a_comment_does_not_split_a_single_lõige() -> None:
+    akn_xml = _act(
+        """<paragrahv><paragrahvNr>1</paragrahvNr><kuvatavNr>§ 1.</kuvatavNr>
+			<loige><!-- märkus --><sisuTekst><tavatekst>Esimene.</tavatekst></sisuTekst>
+			<!-- teine --><sisuTekst><tavatekst>Teine.</tavatekst></sisuTekst></loige>
+		</paragrahv>"""
+    )
+    assert _texts(_by_eid(akn_xml, "art_1")) == ["Esimene.", "Teine."]
+
+
+def test_provision_text_keeps_table_and_block_boundaries() -> None:
+    akn_xml = _act(
+        "<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>"
+        "<sisuTekst><tavatekst>Juht:</tavatekst></sisuTekst>"
+        "<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>"
+        "<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt>"
+        "<sisuTekst><tavatekst>Lõpetus.</tavatekst><HTMLKonteiner><![CDATA[<table><tr><td>A</td>"
+        "<td>10</td></tr><tr><td>B</td><td><p>20</p><p>eurot</p></td></tr></table>]]>"
+        "</HTMLKonteiner></sisuTekst></punkt>"
+    )
+    # Written without indentation, so no whitespace stands between the blocks.
+    parser = etree.XMLParser(remove_blank_text=True)
+    compact = etree.tostring(etree.fromstring(akn_xml.encode(), parser)).decode()
+    point = parse_akn(compact).body[0]
+    assert point.wrap_up == "Lõpetus.\nA 10\nB 20 eurot"
+
+
+def test_comments_are_not_text() -> None:
+    akn_xml = _act(
+        """<peatykk><peatykkNr>1</peatykkNr><kuvatavNr>1. peatükk</kuvatavNr>
+		<peatykkPealkiri>Pealkiri<!-- märkus --> lõpp</peatykkPealkiri></peatykk>
+		<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tabel><tr><tc><!-- toimetaja -->
+				<sisuTekst><tavatekst>A</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>10</tavatekst></sisuTekst></tc></tr>
+			<tr><tc><sisuTekst><tavatekst>B</tavatekst></sisuTekst></tc>
+			<tc><sisuTekst><tavatekst>20</tavatekst></sisuTekst></tc></tr></tabel></sisuTekst>
+		</punkt>"""
+    )
+    assert _texts(etree.fromstring(akn_xml.encode()), "heading") == ["Pealkiri lõpp"]
+    assert _cells(_by_eid(akn_xml, "chp_1__point_1__table_1")) == [["A", "10"], ["B", "20"]]
+    assert "märkus" not in akn_xml and "toimetaja" not in akn_xml
+
+
+def test_a_commented_intro_parses_with_its_tail() -> None:
+    akn_xml = _act(
+        """<punkt><punktNr>1</punktNr><kuvatavNr>1.</kuvatavNr>
+			<sisuTekst><tavatekst>Juht</tavatekst></sisuTekst>
+			<alampunkt><alampunktNr>1</alampunktNr><kuvatavNr>1)</kuvatavNr>
+				<sisuTekst><tavatekst>Sisu.</tavatekst></sisuTekst></alampunkt></punkt>"""
+    )
+    root = etree.fromstring(akn_xml.encode())
+    intro_p = root.find(f".//{_A}intro/{_A}p")
+    assert intro_p is not None
+    intro_p.append(etree.Comment(" märkus "))
+    intro_p[-1].tail = " järg:"
+    point = parse_akn(etree.tostring(root, encoding="unicode")).body[0]
+    assert point.intro == "Juht järg:"
+
+
+def test_a_zero_rowspan_reaches_the_last_row() -> None:
+    akn_xml = _html_act(
+        "<table><tbody><tr><td rowspan='0'>Määr</td><td></td></tr>"
+        "<tr><td>10</td><td></td></tr></tbody></table>"
+    )
+    table = _by_eid(akn_xml, "para_1__table_1")
+    assert table[0][0].get("rowspan") == "2"
+    assert _cells(table) == [["Määr", ""], ["10", ""]]
+
+
+@pytest.mark.parametrize("digit", ["&#57;", "&#x39;"])
+def test_an_entity_superscript_stays_superscript(digit: str) -> None:
+    akn_xml = _html_act(f"<p>§ 43<sup>{digit}</sup> kehtib.</p>")
+    paragraph = parse_akn(akn_xml).body[0]
+    assert paragraph.text == "§ 43⁹ kehtib."
