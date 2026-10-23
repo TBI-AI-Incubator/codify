@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
 import pytest
 from lxml import etree
@@ -262,10 +263,21 @@ def test_declaration_paragraphs_carry_bullets_as_indents() -> None:
     assert root.findtext(".//a:preamble/a:p", namespaces=NS) == (
         "WE, THE MINISTERS AND REPRESENTATIVES OF the lantern ports,"
     )
-    paras = root.findall(".//a:body/a:paragraph", NS)
-    assert [p.get("eId") for p in paras] == ["para_1", "para_2"]
-    assert paras[1].findtext("a:heading", namespaces=NS) == "Lighting the future"
-    assert _eids(root, "indent") == ["para_2__indent_1", "para_2__indent_2"]
+    # Loose paragraphs gather into unnumbered sections, one per heading line.
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [(s.get("eId"), s.findtext("a:heading", namespaces=NS)) for s in sections] == [
+        ("sec_1", None),
+        ("sec_2", "Lighting the future"),
+    ]
+    assert [s.find("a:num", NS) for s in sections] == [None, None]
+    assert _eids(root, "paragraph") == ["sec_1__para_1", "sec_2__para_2"]
+    # The source numbers none of them, so no number is invented.
+    assert root.findall(".//a:paragraph/a:num", NS) == []
+    assert _eids(root, "indent") == ["sec_2__para_2__indent_1", "sec_2__para_2__indent_2"]
+    # `WE CALL on the OECD … to:` puts the duty on the OECD.
+    marked = {el.get("eId") for el in root.iter() if el.get("refersTo") == "#nonAdherentDuty"}
+    assert marked == {"sec_2__para_2", "sec_2__para_2__indent_1", "sec_2__para_2__indent_2"}
+    assert run_validator(xml) == []
 
 
 def test_repeated_paragraph_number_keeps_a_unique_eid() -> None:
@@ -452,19 +464,21 @@ def test_an_annex_closes_the_last_section_and_stays_in_the_pool() -> None:
         "GUIDING PRINCIPLES ON HARBOUR LIGHTING"
     )
     assert _eids(root.find(".//a:body", NS), "paragraph") == []
-    assert _eids(attachments[0], "paragraph") == ["att_1__para_1", "att_1__para_2"]
+    assert _eids(attachments[0], "paragraph") == ["att_1__sec_1__para_1", "att_1__sec_1__para_2"]
     flags = _row_flags(xml)
     assert {eid for eid, (flag, _) in flags.items() if flag} == {"sec_II__content"}
-    assert flags["att_1__para_2"] == (False, None)
-    assert flags["att_2__para_3"] == (False, None)
+    assert flags["att_1__sec_1__para_2"] == (False, None)
+    assert flags["att_2__sec_1__para_3"] == (False, None)
     # A verb inside an annex binds no one by its verb.
     assert flags["att_2__sec_I__content"] == (False, None)
     doc = parse_akn(xml)
-    annex_units = [p for att in doc.attachments for p in att.children]
-    assert [(p.akn_eid, is_excluded(p, doc)) for p in annex_units] == [
-        ("att_1__para_1", False), ("att_1__para_2", False), ("att_2__para_3", False),
-        ("att_2__sec_I", False),
-    ]  # fmt: skip
+
+    def units(elements: list[Any]) -> list[Any]:
+        return [u for el in elements for u in (el, *units(el.children))]
+
+    annex_units = {u.akn_eid: is_excluded(u, doc) for u in units(doc.attachments)}
+    expected = ["att_1__sec_1__para_1", "att_1__sec_1__para_2", "att_2__sec_1__para_3"]
+    assert [annex_units[eid] for eid in [*expected, "att_2__sec_I"]] == [False] * 4
 
 
 def test_an_unnumbered_verb_after_a_verb_section_opens_a_sibling() -> None:
@@ -523,7 +537,7 @@ def test_the_french_text_marks_the_same_sections() -> None:
         "sec_II__content",
         "sec_III__para_1",
     }
-    assert flags["att_1__para_2"] == (False, None)
+    assert flags["att_1__sec_1__para_2"] == (False, None)
 
 
 @pytest.mark.parametrize(
@@ -600,8 +614,8 @@ def test_a_revised_text_is_a_new_expression_of_the_same_work() -> None:
     [
         ("<p>Article 1</p><p>a. Members shall keep registers.</p>", "att_1__art_1"),
         ("<p>1. Adherents should:</p><p>a) keep registers;</p><p>b) publish them.</p>",
-         "att_1__para_1"),
-        ("<p>1. Members shall keep registers</p>", "att_1__para_1"),
+         "att_1__sec_1__para_1"),
+        ("<p>1. Members shall keep registers</p>", "att_1__sec_1__para_1"),
     ],
 )  # fmt: skip
 def test_an_annex_never_takes_its_first_unit_as_a_caption(annex: str, first_unit: str) -> None:
@@ -631,3 +645,202 @@ def test_a_verb_line_inside_an_article_continues_the_article() -> None:
     para = root.find(".//a:paragraph[@eId='art_1__para_a']", NS)
     assert para is not None
     assert "NOTES that this undertaking covers every harbour." in "".join(para.itertext())
+
+
+def _marked(root: etree._Element) -> set[str]:
+    return {el.get("eId") or "" for el in root.iter() if el.get("refersTo") == "#nonAdherentDuty"}
+
+
+def _clean(xml: str) -> None:
+    validate_akn(xml)
+    assert run_validator(xml) == []
+
+
+def test_a_ministerial_declaration_speaks_in_the_first_person() -> None:
+    body = """
+<p>WE, the Ministers and Representatives of the lantern ports,</p>
+<p>CONSIDERING that:</p>
+<p>1. Harbours need light at night.</p>
+<p>2. Keepers are scarce.</p>
+<p>DECLARE that we:</p>
+<p>1. Support the work of the harbour masters.</p>
+<p>2. Call on the OECD to:</p>
+<p>- Map every lantern;</p>
+<p>- Report on keepers.</p>
+<p>3. Plan to light every harbour by 2030.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert root.findtext(".//a:preamble/a:p", namespaces=NS).startswith("WE, the Ministers")  # type: ignore[union-attr]
+    assert len(root.findall(".//a:preamble/a:recitals/a:recital", NS)) == 3
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [s.findtext("a:heading", namespaces=NS) for s in sections] == ["DECLARE"]
+    assert _eids(root, "paragraph") == ["sec_I__para_1", "sec_I__para_2", "sec_I__para_3"]
+    # Only the item calling on the OECD binds someone other than the declarants.
+    assert _marked(root) == {"sec_I__para_2", "sec_I__para_2__indent_1", "sec_I__para_2__indent_2"}
+
+
+def test_governments_declare_numbered_paragraphs() -> None:
+    body = """
+<p>THE GOVERNMENTS OF THE LANTERN PORTS:</p>
+<p>RECOGNISING that harbours grow busier;</p>
+<p>DECLARE that:</p>
+<p>1. The lighting of harbours is a shared objective.</p>
+<p>2. They will co-operate on keepers.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert (
+        root.findtext(".//a:preamble/a:p", namespaces=NS) == "THE GOVERNMENTS OF THE LANTERN PORTS:"
+    )
+    assert _eids(root, "paragraph") == ["sec_I__para_1", "sec_I__para_2"]
+    assert _marked(root) == set()
+
+
+def test_ministerial_conclusions_report_in_the_past_tense() -> None:
+    body = """
+<p>AT THEIR MEETING, MINISTERS OF THE LANTERN PORTS:</p>
+<p>WELCOMED the work on harbour lighting.</p>
+<p>INVITED the Secretary-General to report on keepers.</p>
+<p>AGREED that Adherents should light every harbour.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [s.findtext("a:heading", namespaces=NS) for s in sections] == [
+        "WELCOMED", "INVITED", "AGREED",
+    ]  # fmt: skip
+    assert _marked(root) == {"sec_II"}
+
+
+def test_numbered_paragraphs_opening_on_a_verb_start_the_body() -> None:
+    body = """
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>CONSIDERING that lanterns matter;</p>
+<p>1. DECLARE that harbours must be lit;</p>
+<p>2. CALL on all shipping lines to report outages;</p>
+<p>3. INVITE the Secretary-General to keep a register;</p>
+<p>4. AGREE that Adherents will share their registers.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert len(root.findall(".//a:preamble/a:recitals/a:recital", NS)) == 1
+    assert _eids(root, "paragraph") == [f"sec_1__para_{n}" for n in range(1, 5)]
+    assert _marked(root) == {"sec_1__para_2", "sec_1__para_3"}
+
+
+def test_a_text_without_operative_verbs_is_all_body() -> None:
+    body = """
+<p>Preamble</p>
+<p>1. Harbours are lit by keepers.</p>
+<p>2. Keepers are scarce.</p>
+<p>What the ports want to achieve</p>
+<p>3. Each port should:</p>
+<p>1. Keep a register;</p>
+<p>2. Train new keepers.</p>
+<p>4. The ports will meet every year.</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    assert root.find(".//a:preamble", NS) is None
+    sections = root.findall(".//a:body/a:section", NS)
+    assert [(s.get("eId"), s.findtext("a:heading", namespaces=NS)) for s in sections] == [
+        ("sec_1", "Preamble"),
+        ("sec_2", "What the ports want to achieve"),
+    ]
+    # `3. … should:` then `1.`, `2.`: a list inside paragraph 3, and `4.` resumes.
+    assert _eids(root, "paragraph") == [
+        "sec_1__para_1", "sec_1__para_2", "sec_2__para_3", "sec_2__para_4",
+    ]  # fmt: skip
+    assert _eids(root, "point") == ["sec_2__para_3__point_1", "sec_2__para_3__point_2"]
+
+
+def test_a_french_declaration_marks_its_call_on_the_oecd() -> None:
+    body = """
+<p>NOUS, MINISTRES ET REPRÉSENTANTS des ports,</p>
+<p>NOUS RECONNAISSONS que les lanternes comptent.</p>
+<p>NOUS APPELONS l’OCDE à cartographier chaque lanterne.</p>
+<p>NOUS INVITONS les Adhérents à partager leurs registres.</p>
+"""
+    xml, _, root = _convert(body, type="declaration", lang="fr")
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_1__para_1", "sec_1__para_2", "sec_1__para_3"]
+    assert _marked(root) == {"sec_1__para_2"}
+
+
+def test_a_quoted_excerpt_opens_on_its_section() -> None:
+    body = """
+<p>“III. Commitments</p>
+<p>4. Members agree to the following guidelines:</p>
+<p>i) To light every lantern;</p>
+<p>ii) To keep a register.”</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    assert _eids(root, "section") == ["sec_III"]
+    assert _eids(root, "point") == ["sec_III__para_4__point_i", "sec_III__para_4__point_ii"]
+
+
+def test_an_agreement_numbers_articles_in_roman_and_paragraphs_in_parentheses() -> None:
+    body = """
+<p>The Parties to this Agreement,</p>
+<p>CONSIDERING that harbours need light,</p>
+<p>HAVE AGREED as follows:</p>
+<p>Article I</p>
+<p>Objective</p>
+<p>1) The objective is to light every harbour.</p>
+<p>2) Collaboration shall be peaceful.</p>
+<p>Article II</p>
+<p>Forms of collaboration</p>
+<p>Collaboration may include:</p>
+<p>a) joint lighting;</p>
+<p>b) exchange of keepers.</p>
+"""
+    xml, _, root = _convert(body, type="agreement")
+    _clean(xml)
+    assert [(a.get("eId"), a.findtext("a:heading", namespaces=NS))
+            for a in root.iter(f"{{{NS['a']}}}article")] == [
+        ("art_i", "Objective"), ("art_ii", "Forms of collaboration"),
+    ]  # fmt: skip
+    assert _eids(root, "paragraph")[:2] == ["art_i__para_1", "art_i__para_2"]
+
+
+def test_lettered_items_under_a_numbered_paragraph_are_its_points() -> None:
+    body = """
+<p>THE COMMITTEE,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>1. Develop lighting policies, including to:</p>
+<p>a. Foster a culture of maintenance;</p>
+<p>b. Ensure senior commitment.</p>
+<p>2. Develop keeper support, including to:</p>
+<p>a. Provide training;</p>
+<p>b. Publish registers.</p>
+"""
+    xml, _, root = _convert(body)
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_I__para_1", "sec_I__para_2"]
+    assert _eids(root, "point") == [
+        "sec_I__para_1__point_a", "sec_I__para_1__point_b",
+        "sec_I__para_2__point_a", "sec_I__para_2__point_b",
+    ]  # fmt: skip
+
+
+def test_items_under_a_colon_lead_in_each_name_their_addressee() -> None:
+    body = """
+<p>THE GOVERNMENTS OF THE LANTERN PORTS,</p>
+<p>DECLARE THAT:</p>
+<p>They will light every harbour.</p>
+<p>They will keep registers, by:</p>
+<p>a) training keepers;</p>
+<p>b) publishing outages.</p>
+<p>INVITE:</p>
+<p>Other ports to take this Declaration into account.</p>
+<p>Adherents to share their registers.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert _eids(root, "paragraph") == [
+        "sec_I__para_1", "sec_I__para_2", "sec_II__para_3", "sec_II__para_4",
+    ]  # fmt: skip
+    assert _eids(root, "point") == ["sec_I__para_2__point_a", "sec_I__para_2__point_b"]
+    assert _marked(root) == {"sec_II__para_3"}

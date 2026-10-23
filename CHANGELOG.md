@@ -161,6 +161,23 @@ New, additive:
 
 Fixed:
 
+- `oecd_html` reads declarations, ministerial conclusions, arrangements and
+  agreements that raised "no operative text". It recognises:
+  - `WE, the Ministers…` and `NOUS, MINISTRES…` openers
+  - first-person, third-person-plural and past-tense verbs (`DECLARE that we:`,
+    `DÉCLARONS`, `WELCOMED`)
+  - numbered paragraphs that open on a verb, and numbered lists inside a
+    paragraph
+  - Roman article numbers, `1)` paragraphs, `a.` points under a `1.` paragraph
+  - a sentence per item under a colon lead-in
+  - an excerpt that opens with a quotation mark
+
+  A text with no operative verb is all body. Paragraphs straight under the body
+  or an annex sit in unnumbered sections that open at each heading line, and a
+  paragraph the source does not number gets no `<num>`. The addressee rule also
+  marks `WE CALL ON…` paragraphs, `5. CALL on…` paragraphs and items under a
+  section in the declarants' own voice.
+
 - Riigi Teataja converter: a line break ends one `<p>` and the text after it
   starts the next, which Bluebell reads as a line too. Every `sisuTekst` of a
   unit is written, not only the first: text before a paragraph's lõiked is its
