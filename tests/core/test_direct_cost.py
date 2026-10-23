@@ -110,3 +110,54 @@ def test_an_unpriced_model_says_so_once() -> None:
     warned = [c for c in captured if c["event"] == "llm_model_unpriced"]
     assert len(warned) == 1, captured
     assert warned[0]["model"] == "mistral-ocr-4-1"
+
+
+def _agent_messages() -> list[Any]:
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+    from pydantic_ai.usage import RequestUsage
+
+    return [
+        ModelRequest(parts=[UserPromptPart(content="q")]),
+        ModelResponse(
+            parts=[TextPart("a")], usage=RequestUsage(input_tokens=100, output_tokens=40)
+        ),
+        ModelRequest(parts=[UserPromptPart(content="q2")]),
+        ModelResponse(
+            parts=[TextPart("b")], usage=RequestUsage(input_tokens=300, output_tokens=60)
+        ),
+    ]
+
+
+def _agent_observed(monkeypatch: pytest.MonkeyPatch, messages: list[Any]) -> list[dict[str, Any]]:
+    opened: list[dict[str, Any]] = []
+
+    @contextmanager
+    def _stub(name: str, **kwargs: Any) -> Iterator[_Observation]:
+        observation = _Observation()
+        yield observation
+        opened.append({"name": name, **kwargs, **observation.fields})
+
+    monkeypatch.setattr(tracing, "direct_observation", _stub)
+    tracing.record_agent_usage("agent.repair", "gemini/gemini-3.6-flash", messages)
+    return opened
+
+
+def test_an_agent_run_is_priced_from_every_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    (observed,) = _agent_observed(monkeypatch, _agent_messages())
+    assert observed["usage_details"] == {"input": 400, "output": 100}
+    assert observed["cost_details"] == pytest.approx(
+        {"input": 0.0003, "output": 0.000375, "total": 0.000675}
+    )
+    assert observed["metadata"] == {"route": "agent", "requests": 2}
+
+
+def test_an_agent_run_with_no_response_records_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _agent_observed(monkeypatch, _agent_messages()[:1]) == []
+
+
+def test_an_agent_run_that_reported_no_usage_records_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic_ai.messages import ModelResponse, TextPart
+
+    assert _agent_observed(monkeypatch, [ModelResponse(parts=[TextPart("a")])]) == []
