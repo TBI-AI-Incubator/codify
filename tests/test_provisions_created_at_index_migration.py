@@ -61,14 +61,14 @@ def _run(url: str, fn, *args: str) -> None:
     fn(Config(str(_CORE_INI)), *args)
 
 
-def _indexes(url: str) -> set[str]:
+def _indexes(url: str) -> dict[str, str]:
     engine = create_engine(_sync(url))
     try:
         with engine.connect() as conn:
             rows = conn.execute(
-                text("SELECT indexname FROM pg_indexes WHERE tablename = 'provisions'")
+                text("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'provisions'")
             )
-            return {r[0] for r in rows}
+            return {r[0]: r[1] for r in rows}
     finally:
         engine.dispose()
 
@@ -76,7 +76,8 @@ def _indexes(url: str) -> set[str]:
 def test_upgrade_swaps_the_index_and_downgrade_restores_it(temp_db: str) -> None:
     _run(temp_db, command.upgrade, "head")
     after = _indexes(temp_db)
-    assert _NEW in after and _OLD not in after
+    assert _OLD not in after
+    assert after[_NEW].endswith("(version_id, created_at)"), after.get(_NEW)
 
     _run(temp_db, command.downgrade, "-1")
     before = _indexes(temp_db)
@@ -98,5 +99,5 @@ def test_max_created_at_for_a_version_is_an_index_descent(temp_db: str) -> None:
             )
     finally:
         engine.dispose()
-    # With seqscan off the planner picks the cheapest index; only the new one holds created_at.
-    assert _NEW in plan, plan
+    # Only an index holding created_at can answer this without reading the heap.
+    assert "Limit" in plan and "Index Only Scan" in plan and _NEW in plan, plan
