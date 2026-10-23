@@ -153,3 +153,11 @@ def test_an_agent_run_is_priced_from_every_response(monkeypatch: pytest.MonkeyPa
 
 def test_an_agent_run_with_no_response_records_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _agent_observed(monkeypatch, _agent_messages()[:1]) == []
+
+
+def test_an_agent_run_that_reported_no_usage_records_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic_ai.messages import ModelResponse, TextPart
+
+    assert _agent_observed(monkeypatch, [ModelResponse(parts=[TextPart("a")])]) == []

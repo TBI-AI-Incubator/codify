@@ -393,10 +393,13 @@ def record_usage(observation: Any, model: str, usage: Mapping[str, Any]) -> None
 
 def record_agent_usage(name: str, model: str, messages: Iterable[Any]) -> None:
     """Price an agent run's model responses as one direct generation, for an agent
-    whose endpoint reports no cost. Pass captured messages so a failed run counts.
+    whose endpoint reports no cost. Pass only this run's messages, not reused history.
     """
     responses = [m for m in messages if getattr(m, "kind", None) == "response"]
-    if not responses:
+    input_tokens = sum(r.usage.input_tokens for r in responses)
+    output_tokens = sum(r.usage.output_tokens for r in responses)
+    # Zero usage would log a priced model as unpriced.
+    if not (input_tokens or output_tokens):
         return
     with direct_observation(
         name,
@@ -404,14 +407,7 @@ def record_agent_usage(name: str, model: str, messages: Iterable[Any]) -> None:
         model=model,
         metadata={"route": "agent", "requests": len(responses)},
     ) as observation:
-        record_usage(
-            observation,
-            model,
-            {
-                "input": sum(r.usage.input_tokens for r in responses),
-                "output": sum(r.usage.output_tokens for r in responses),
-            },
-        )
+        record_usage(observation, model, {"input": input_tokens, "output": output_tokens})
 
 
 # Messages that are a host, timeout, filename, key or parse offset, never a
