@@ -141,8 +141,16 @@ _DECLARANTS = re.compile(r"(?:we|they|nous|ils)\b", re.IGNORECASE)
 _NON_ADHERENTS = re.compile(
     r"\bnon[-‐\s]+(?:OECD[-‐\s]+)?(?:Adherents?|Members?|Adhérents?|Membres?)\b", re.IGNORECASE
 )
-# Encouraging an activity names no addressee, so an item opening on it is never marked.
+# Encouraging names an activity as often as an actor: an item opening on it is
+# marked only when its object is an actor (`the Secretary-General`, `all countries`),
+# not `efforts to develop proposals`.
 _ENCOURAGING = frozenset({"ENCOURAGES", "ENCOURAGE", "ENCOURAGENT", "ENCOURAGEONS", "ENCOURAGED"})
+_ACTOR = re.compile(
+    r"\b(?:[A-Z][\w’'-]*|countries|governments|members|actors|stakeholders|authorities"
+    r"|organi[sz]ations|institutions|parties|partners|donors|holders|producers|businesses"
+    r"|enterprises|companies|agencies|bodies|pays|gouvernements|acteurs|autorités"
+    r"|entreprises)\b"
+)
 # Adherents or Members, in either language, but not non-Adherents.
 _ADHERENTS = re.compile(r"(?<![\w‐-])(?:Adherents?|Members?|Adhérents?|Membres?)\b")
 
@@ -394,13 +402,7 @@ class _Builder:
             if resumes and (closed or number != int(inner.num[:-1]) + 1):
                 return False
             return number == int(inner.num[:-1]) + 1
-        return (
-            number == 1
-            and outer is not None
-            and outer.num[:-1].isdigit()
-            and int(outer.num[:-1]) > 1
-            and _lead_in(outer)
-        )
+        return number == 1 and outer is not None and outer.num[:-1].isdigit() and _lead_in(outer)
 
     def feed_prose(self, block: str) -> None:
         """Keep `block` as a paragraph of its own, whatever it looks like."""
@@ -570,6 +572,14 @@ def _mark_subtree(node: _Node) -> None:
         _mark_subtree(child)
 
 
+def _encourages_an_actor(addressee: str) -> bool:
+    """Whether what is encouraged is an actor: an actor noun among its first
+    words, within one sentence (`the Working Group`, `all countries that …`)."""
+    if re.search(r"[.;]\s", addressee):
+        return False
+    return _ACTOR.search(" ".join(addressee.split()[:4])) is not None
+
+
 def _lead_verb(text: str) -> tuple[str, str] | None:
     """A verb opening the text that may bind someone other than the Adherents,
     after a `WE`/`NOUS` subject if there is one, with the words that follow it."""
@@ -639,7 +649,12 @@ def _mark_non_adherent_duties(
             lead = _lead_verb(text)
             # An item names its addressee before an infinitive or a colon
             # (`Call on the OECD to:`); `ENCOURAGE green investment` names none.
-            if lead is not None and lead[0] not in _ENCOURAGING and _ADDRESSEE_END.search(lead[1]):
+            addressee = _addressee(lead[1]) if lead and _ADDRESSEE_END.search(lead[1]) else None
+            if (
+                lead is not None
+                and addressee is not None
+                and (lead[0] not in _ENCOURAGING or _encourages_an_actor(addressee))
+            ):
                 _decide(node, lead[1])
                 continue
         verb_section = node.kind == "section" and node.heading in OPERATIVE_VERBS
@@ -745,9 +760,10 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
             inst.recitals.append([block])
         i += 1
     body_blocks = blocks[i:]
-    if i == len(blocks):
+    if i == len(blocks) and inst.formula is None:
         # No operative token anywhere: a text of numbered or plain paragraphs. The
-        # body is all of it but the opener and citations, not a long preamble.
+        # body is all of it but the opener and citations, not a long preamble. An
+        # enacting line with nothing after it is a page without operative text.
         body_blocks = [b for k, b in enumerate(blocks) if k not in kept]
         inst.recitals = []
     builder = _Builder()

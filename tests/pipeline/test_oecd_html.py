@@ -985,11 +985,15 @@ def test_the_declarants_own_commitments_stay_unmarked() -> None:
 <p>4. INVITE the Secretary-General to report.</p>
 <p>5. INVITE contributions from harbour users.</p>
 <p>6. URGE the Harbour Committee to report.</p>
+<p>7. ENCOURAGE the Secretary-General to report.</p>
+<p>8. ENCOURAGE green lighting. In this respect, We are resolved to fund it.</p>
+<p>9. ENCOURAGE wider use of lighting in Harbour towns to grow.</p>
 """
     xml, _, root = _convert(body, type="declaration")
     _clean(xml)
     # `Non-OECD Members` are not the Adherents, whatever the regex for Members finds.
-    assert _marked(root) == {"sec_I__para_3", "sec_I__para_4", "sec_I__para_6"}
+    # Encouraging an activity names no one; encouraging an actor does.
+    assert _marked(root) == {"sec_I__para_3", "sec_I__para_4", "sec_I__para_6", "sec_I__para_7"}
 
 
 def test_appendices_and_labels_keep_their_text() -> None:
@@ -1092,3 +1096,24 @@ def test_an_annex_caption_may_end_in_a_colon() -> None:
     xml, _, root = _convert(body, type="decision")
     _clean(xml)
     assert root.findtext(".//a:attachment/a:heading", namespaces=NS) == "Annex I to the Code:"
+
+
+def test_a_terminal_enacting_line_is_no_operative_text() -> None:
+    body = "<p>THE COUNCIL,</p><p>HAVING REGARD to the Lantern Convention;</p><p>DECIDES:</p>"
+    page = wrap_body(body, meta=_META).decode()
+    with pytest.raises(OecdHtmlError, match="no operative text"):
+        instrument_html_to_akn(page, frbr_work_uri="/akn/oecd/act/recommendation/2020/9002")
+
+
+def test_paragraph_one_may_hold_a_numbered_list() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>1. Each port should:</p>
+<p>1. Keep a register;</p>
+<p>2. Train new keepers.</p>
+<p>2. Ports will meet annually.</p>
+"""
+    xml, _, root = _convert(body, type="arrangement")
+    _clean(xml)
+    assert _eids(root, "paragraph") == ["sec_1__para_1", "sec_1__para_2"]
+    assert _eids(root, "point") == ["sec_1__para_1__point_1", "sec_1__para_1__point_2"]
