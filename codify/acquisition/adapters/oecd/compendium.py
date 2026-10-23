@@ -234,7 +234,6 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         )
 
 
-
 def _metadata(record: dict[str, Any], key: str, listed_adopted: str) -> dict[str, Any]:
     """The record's details, JSON-safe, as the ingest stores them."""
     summary = record.get("statusSummary") or {}
