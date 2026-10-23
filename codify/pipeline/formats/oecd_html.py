@@ -608,10 +608,10 @@ def _lead_subject(text: str) -> str:
     return (lead[: m.start()] if m else lead).strip()
 
 
-def _decide(node: _Node, lead: str) -> None:
+def _decide(node: _Node, lead: str, encouraging: bool = False) -> None:
     """Mark `node` when its lead-in addresses someone other than the Adherents; a
     lead-in naming no one leaves each item to name its own, and the node is
-    marked only when every item is."""
+    marked only when every item is. An encouraged item must name an actor."""
     addressee = _addressee(lead)
     if addressee is not None:
         if not _binds_adherents(addressee):
@@ -619,7 +619,11 @@ def _decide(node: _Node, lead: str) -> None:
         return
     for child in node.children:
         item = _addressee(child.text[0]) if child.text else None
-        if item is not None and not _binds_adherents(item):
+        if (
+            item is not None
+            and not _binds_adherents(item)
+            and (not encouraging or _encourages_an_actor(item))
+        ):
             _mark_subtree(child)
     node.non_adherent = bool(node.children) and all(c.non_adherent for c in node.children)
 
@@ -647,16 +651,17 @@ def _mark_non_adherent_duties(
             )
         ):
             lead = _lead_verb(text)
-            # An item names its addressee before an infinitive or a colon
-            # (`Call on the OECD to:`); `ENCOURAGE green investment` names none.
-            addressee = _addressee(lead[1]) if lead and _ADDRESSEE_END.search(lead[1]) else None
-            if (
-                lead is not None
-                and addressee is not None
-                and (lead[0] not in _ENCOURAGING or _encourages_an_actor(addressee))
-            ):
-                _decide(node, lead[1])
-                continue
+            if lead is not None:
+                verb, rest = lead
+                encouraging = verb in _ENCOURAGING
+                # An item names its addressee before an infinitive or a colon
+                # (`Call on the OECD to:`); a bare `INVITE:` leaves it to its items.
+                addressee = _addressee(rest) if _ADDRESSEE_END.search(rest) else None
+                if not rest or (
+                    addressee is not None and (not encouraging or _encourages_an_actor(addressee))
+                ):
+                    _decide(node, rest, encouraging)
+                    continue
         verb_section = node.kind == "section" and node.heading in OPERATIVE_VERBS
         # The lead-in's subject decides whose acts its items are: `… that we:`
         # speaks for the declarants, `… that Adherents should:` for the Adherents.

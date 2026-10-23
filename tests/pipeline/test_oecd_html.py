@@ -996,6 +996,22 @@ def test_the_declarants_own_commitments_stay_unmarked() -> None:
     assert _marked(root) == {"sec_I__para_3", "sec_I__para_4", "sec_I__para_6", "sec_I__para_7"}
 
 
+def test_a_bare_verb_leaves_each_item_to_name_its_addressee() -> None:
+    body = """
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>DECLARE that we:</p>
+<p>1. INVITE:</p>
+<p>a) the Secretary-General to report;</p>
+<p>b) Adherents to share records.</p>
+<p>2. ENCOURAGE:</p>
+<p>a) green investment in harbour lighting;</p>
+<p>b) the Harbour Committee to report.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert _marked(root) == {"sec_I__para_1__point_a", "sec_I__para_2__point_b"}
+
+
 def test_appendices_and_labels_keep_their_text() -> None:
     body = """
 <p>PREAMBLE</p>
