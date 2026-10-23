@@ -1,25 +1,26 @@
-"""Prices for the calls that bypass the LiteLLM gateway.
+"""Prices for calls whose endpoint reports usage but no cost.
 
-The gateway computes cost for everything it proxies, from the per-model keys in
-`infra/litellm/config.yaml`. Embeddings, the answer model and Azure Foundry OCR
-are called direct, so without this they land at $0.00.
+A `telemetry_mode="direct"` client and an agent run priced through
+`record_agent_usage` cost their calls here; without a price they land at $0.00.
+A `provider/` prefix on the model id is ignored.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
-# USD per token, (input, output). Mirrors infra/litellm/config.yaml, which stays
-# the source of truth; test_pricing.py fails when the two drift.
+# USD per token, (input, output). Gemini: https://ai.google.dev/gemini-api/docs/pricing
 _TOKEN_PRICES: dict[str, tuple[float, float]] = {
     "gemini-3.5-flash": (0.0000015, 0.000009),
-    "gemini-3.6-flash": (0.0000015, 0.0000075),
+    # 3.6 and 3.7 are on intro pricing to 2026-12-31, then $1.50 and $7.50.
+    "gemini-3.6-flash": (0.00000075, 0.00000375),
     "gemini-3.7-flash": (0.00000075, 0.00000375),
     "gemini-3.5-flash-lite": (0.0000003, 0.0000025),
-    # The gateway config lists this model but gives it no cost keys, and the
-    # call is direct anyway. Text tier, $0.20 per 1M:
-    # https://ai.google.dev/gemini-api/docs/pricing
+    # Text tier; embeddings bill no output.
     "gemini-embedding-2": (0.0000002, 0.0),
+    # Azure Global Standard, short context: meters "5.6 sol ShortCo Inp Std Gl"
+    # and "5.6 sol ShortCo Opt Std Gl" in the Azure retail prices API.
+    "gpt-5.6-sol": (0.000004, 0.00002),
 }
 
 # USD per page on the meter this subscription bills: "OCR 4 DZ Pages", SE

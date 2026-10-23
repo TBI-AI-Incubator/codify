@@ -69,6 +69,7 @@ codify.core.tracing:get_telemetry_context
 codify.core.tracing:langfuse_trace_context
 codify.core.tracing:make_request_telemetry
 codify.core.tracing:make_run_telemetry
+codify.core.tracing:record_agent_usage
 codify.core.tracing:set_current_actor
 codify.core.tracing:set_current_session
 codify.core.tracing:trace_url

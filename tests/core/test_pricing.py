@@ -56,3 +56,8 @@ def test_embedding_output_is_free_and_omitted() -> None:
 def test_unpriced_returns_none_rather_than_zero(model: str, usage: dict[str, int]) -> None:
     # A zero reads as free; an absent cost reads as unpriced, which is the truth.
     assert cost_details(model, usage) is None
+
+
+def test_the_content_filter_fallback_is_priced() -> None:
+    costs = cost_details("azure/gpt-5.6-sol", {"input": 1_000_000, "output": 1_000_000})
+    assert costs == pytest.approx({"input": 4.0, "output": 20.0, "total": 24.0})

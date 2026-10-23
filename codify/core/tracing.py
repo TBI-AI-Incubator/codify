@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -391,6 +391,29 @@ def record_usage(observation: Any, model: str, usage: Mapping[str, Any]) -> None
         logger.warning("llm_model_unpriced", model=model)
 
 
+def record_agent_usage(name: str, model: str, messages: Iterable[Any]) -> None:
+    """Price an agent run's model responses as one direct generation, for an agent
+    whose endpoint reports no cost. Pass captured messages so a failed run counts.
+    """
+    responses = [m for m in messages if getattr(m, "kind", None) == "response"]
+    if not responses:
+        return
+    with direct_observation(
+        name,
+        as_type="generation",
+        model=model,
+        metadata={"route": "agent", "requests": len(responses)},
+    ) as observation:
+        record_usage(
+            observation,
+            model,
+            {
+                "input": sum(r.usage.input_tokens for r in responses),
+                "output": sum(r.usage.output_tokens for r in responses),
+            },
+        )
+
+
 # Messages that are a host, timeout, filename, key or parse offset, never a
 # payload. Everything else keeps its type name only.
 _SAFE_MESSAGE_TYPES: tuple[type[BaseException], ...] = (
@@ -465,6 +488,7 @@ __all__ = [
     "make_request_telemetry",
     "make_run_telemetry",
     "proxy_trace_headers",
+    "record_agent_usage",
     "record_usage",
     "set_current_actor",
     "set_current_session",

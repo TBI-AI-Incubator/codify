@@ -158,9 +158,15 @@ New, additive:
   headings. A `marked` row is still law: `LAW_REASONS` lets the reference
   resolver and the in-document link pass land on it, as they never land on a
   placeholder. The `oecd` config lists `#nonAdherentDuty`.
+- `codify.core.tracing.record_agent_usage` prices an agent run's model responses
+  as one direct Langfuse generation, for an agent whose endpoint reports no cost.
+- `codify.core.pricing` prices `gpt-5.6-sol` at Azure's Global Standard short-context
+  rate.
 
 Fixed:
 
+- `codify.core.pricing` prices `gemini-3.6-flash` at its intro rate to 2026-12-31,
+  $0.75 in and $3.75 out per million tokens, which it had at double.
 - `oecd_html` reads declarations, ministerial conclusions, arrangements and
   agreements that raised "no operative text". It recognises:
   - `WE, the Ministers…` and `NOUS, MINISTRES…` openers
