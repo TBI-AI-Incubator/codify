@@ -192,14 +192,16 @@ async def _reads_scope_first(session: AsyncSession, scope: VersionScope) -> bool
     `SCOPE_FIRST_MAX_VERSIONS` laws holding at most `SCOPE_FIRST_MAX_ROWS`
     provisions, each counted no further than its limit."""
     if isinstance(scope, CurrentScope):
-        if scope.jurisdiction_ids is None:
+        if scope == CurrentScope(undated=scope.undated):
             return False  # the whole corpus: the walk discards nothing
         _, pred, params = scope_filter(scope, "sv.id")
         versions_sql = _SCOPE_VERSIONS_CURRENT.format(pred=pred)
         versions = await _count(session, versions_sql, params, SCOPE_FIRST_MAX_VERSIONS)
         rows_sql = _SCOPE_ROWS_CURRENT.format(pred=pred)
     else:
-        versions, rows_sql, params = len(set(scope)), _SCOPE_ROWS_IDS, {"version_ids": list(scope)}
+        # Distinct, as the search's `= ANY` reads them: a repeated id is one version.
+        ids = list(dict.fromkeys(scope))
+        versions, rows_sql, params = len(ids), _SCOPE_ROWS_IDS, {"version_ids": ids}
     if versions > SCOPE_FIRST_MAX_VERSIONS:
         return False
     return await _count(session, rows_sql, params, SCOPE_FIRST_MAX_ROWS) <= SCOPE_FIRST_MAX_ROWS

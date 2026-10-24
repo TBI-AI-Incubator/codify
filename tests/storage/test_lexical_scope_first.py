@@ -48,7 +48,9 @@ def statements(session: AsyncSession) -> Iterator[list[str]]:
     event.remove(sync_engine, "before_cursor_execute", _record)
 
 
-async def _law(session: AsyncSession, code: str, texts: list[str]) -> uuid.UUID:
+async def _law(
+    session: AsyncSession, code: str, texts: list[str], doctype: str = "act"
+) -> uuid.UUID:
     """One law in `code` with a paragraph per text; returns its version id."""
     suffix = uuid.uuid4().hex[:8]
     doc = Document(
@@ -72,7 +74,7 @@ async def _law(session: AsyncSession, code: str, texts: list[str]) -> uuid.UUID:
         ],
     )
     return await save_document(
-        session, doc, jurisdiction_code=code, law_title=f"Act {suffix}", doctype="act", year=2024
+        session, doc, jurisdiction_code=code, law_title=f"Act {suffix}", doctype=doctype, year=2024
     )
 
 
@@ -130,6 +132,27 @@ async def test_a_scope_of_too_many_laws_is_walked_without_counting_its_rows(
     row_counts = [s for s in statements if "LATERAL" in s]
 
     assert (at_limit, past_it, row_counts) == ((True, True), (False, False), [])
+
+
+async def test_a_repeated_id_is_counted_once(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The search reads `= ANY(ids)`, so a repeated version is one version's rows."""
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["one", "two"])
+    monkeypatch.setattr(retrieval, "SCOPE_FIRST_MAX_ROWS", await _rows(session, version))
+
+    assert await _reads_scope_first(session, [version, version]) is True
+
+
+async def test_a_scope_narrowed_only_by_law_fields_is_counted(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No jurisdiction named, but one doctype: a scope of one law, not the corpus."""
+    doctype = f"d{uuid.uuid4().hex[:8]}"
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["one"], doctype=doctype)
+    monkeypatch.setattr(retrieval, "SCOPE_FIRST_MAX_ROWS", await _rows(session, version))
+
+    assert await _reads_scope_first(session, CurrentScope(doctype=doctype)) is True
 
 
 async def test_the_whole_corpus_is_always_walked(
