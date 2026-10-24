@@ -71,6 +71,7 @@ def test_indexable_vector_selection_reads_one_model_in_scope(hybrid):
 async def test_both_vector_paths_enable_transaction_local_iterative_scan(tokens):
     session = AsyncMock()
     session.execute.return_value.all = lambda: []
+    session.execute.return_value.scalar_one = lambda: 1
     with patch("codify.storage.retrieval.query_tokens_for", return_value=tokens):
         assert (
             await hybrid_search(
@@ -87,8 +88,9 @@ async def test_both_vector_paths_enable_transaction_local_iterative_scan(tokens)
         )
     statements = [str(call.args[0]) for call in session.execute.await_args_list]
     assert statements[0] == "SET LOCAL hnsw.iterative_scan = 'relaxed_order'"
-    # The setting, the partition lookup, the search.
-    assert len(statements) == 3
+    # The setting, the partition lookup, the scope's size when a term is
+    # searched, the search.
+    assert len(statements) == (4 if tokens else 3)
 
 
 async def test_empty_scope_does_not_execute_or_change_settings():
