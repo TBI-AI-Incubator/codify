@@ -154,8 +154,8 @@ def _hybrid_sql(
 # Measured on the demo corpus: reading a scope costs about 6 us a row warm
 # (45,553 rows in 279 ms), so this keeps the read near a second.
 SCOPE_FIRST_MAX_ROWS = 150_000
-# Counting a large scope's rows cost 2 s cold, so past this many laws it is
-# walked uncounted. Measured: no jurisdiction above it holds under 150,000.
+# Counting 150,000 of a large scope's rows took 2 s cold, so past this many laws
+# a scope is walked uncounted. No demo jurisdiction above it holds fewer rows.
 SCOPE_FIRST_MAX_VERSIONS = 10_000
 
 # The LIMIT inside LATERAL keeps the count driven by the scope's versions: a

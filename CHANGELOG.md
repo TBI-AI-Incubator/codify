@@ -124,6 +124,10 @@ New, additive:
   page's laws are dated; the ingested sort still aggregates every version.
 - The hybrid search's keyword arm keeps the top `pool` matches before
   numbering them, a bounded sort instead of a sort of every match.
+- The keyword arm reads a scope of at most 10,000 laws and 150,000 provisions
+  before ranking its matches; a larger scope, or the whole corpus, keeps the
+  BM25 index walk. The walk filtered to the scope only as it went, so terms
+  common in the corpus but rare in the scope read past most of it.
 - `structuring.recurring_furniture`: for a layout engine that files footnotes
   and page-top captions under header or footer. Furniture is then a bare page
   number or a short block another page repeats, a running head split across
