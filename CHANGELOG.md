@@ -236,6 +236,11 @@ Fixed:
   the first; one that holds a table is read like content, in source order.
 - Provision text, intro and wrap-up included, keeps table rows, cells and a
   cell's paragraphs apart.
+- `document_to_rows`: a container's `intro` is its `__intro` row, and a
+  `wrapUp` closing rowed provisions is a `__wrapup` row after them; the reader
+  renders each from its own subtree, and an anchor inside closing text lands
+  on its row. A UK subsection's lead-in and an EU article's intro, dropped
+  before, now have rows.
 - `ensure_unique_eids`: a renamed duplicate never takes an eId the document
   already publishes, so a reference to an id such as `x_dup2` keeps naming the
   element it named.
