@@ -406,6 +406,63 @@ def test_direct_sisu_tekst_and_html_konteiner() -> None:
     assert "Punkt 1 muudetakse. § 43⁸ jäetakse välja." in akn_xml
 
 
+_PREAMBLE_ONLY_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt id="pre-1" xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Riigikogu</valjaandja>
+		<dokumentLiik>seadus</dokumentLiik>
+		<vastuvoetud><aktikuupaev>2001-05-09</aktikuupaev></vastuvoetud>
+	</metaandmed>
+	<aktinimi><nimi><pealkiri>Näidislepingu ratifitseerimise seadus</pealkiri></nimi></aktinimi>
+	<sisu>
+		<preambul>
+			<tavatekst>Ratifitseerida juurdelisatud </tavatekst>
+			<viide>
+				<kuvatavTekst>näidisleping</kuvatavTekst>
+				<viideURID><viideURI>./1001</viideURI></viideURID>
+			</viide>
+			<tavatekst>, mis on alla kirjutatud Tallinnas.</tavatekst>
+		</preambul>
+		<sisuTekst><HTMLKonteiner><![CDATA[
+			<table><tbody><tr><td></td><td>Riigikogu esimees</td></tr></tbody></table>
+		]]></HTMLKonteiner></sisuTekst>
+	</sisu>
+</oigusakt>"""
+
+
+def test_an_act_whose_only_text_is_its_preamble_puts_it_in_the_body() -> None:
+    akn_xml, _ = riigi_teataja_to_akn(_PREAMBLE_ONLY_XML)
+    validate_akn(akn_xml)
+    root = etree.fromstring(akn_xml.encode())
+    ns = {"a": AKN_NS}
+    assert not root.findall(".//a:preamble", ns)
+    body_text = " ".join("".join(root.find(".//a:body", ns).itertext()).split())
+    assert (
+        body_text == "Ratifitseerida juurdelisatud näidisleping, mis on alla kirjutatud Tallinnas."
+    )
+    assert root.find(".//a:body//a:ref", ns).get("href") == "./1001"
+    assert len(parse_akn(akn_xml).body) == 1
+
+
+def test_a_preamble_table_is_not_flattened_into_the_body() -> None:
+    xml = _PREAMBLE_ONLY_XML.replace(
+        "<tavatekst>Ratifitseerida juurdelisatud </tavatekst>",
+        "<tabel><tr><tc><sisuTekst><tavatekst>A1</tavatekst></sisuTekst></tc>"
+        "<tc><sisuTekst><tavatekst>B1</tavatekst></sisuTekst></tc></tr></tabel>",
+    )
+    akn_xml, _ = riigi_teataja_to_akn(xml)
+    root = etree.fromstring(akn_xml.encode())
+    assert root.find(".//{%s}preamble//{%s}table" % (AKN_NS, AKN_NS)) is not None
+
+
+def test_a_preamble_beside_provisions_stays_a_preamble() -> None:
+    akn_xml, _ = riigi_teataja_to_akn(_SAMPLE_EST_XML)
+    root = etree.fromstring(akn_xml.encode())
+    preamble = root.find(".//{%s}preamble" % AKN_NS)
+    assert preamble is not None
+    assert "ettevõtluse toetamiseks" in "".join(preamble.itertext())
+
+
 def test_display_numbers_keep_their_superscripts() -> None:
     # The source wraps a superscripted kuvatavNr in CDATA, so its <sup> arrives as text.
     xml = """<?xml version="1.0" encoding="UTF-8"?>
