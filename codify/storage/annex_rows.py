@@ -12,9 +12,10 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.models import AnnexRow, Version
-from codify.tables.resolve import resolve_tables
+from codify.tables.resolve import ResolvedRow, resolve_tables
 
 logger = structlog.get_logger()
 
@@ -30,12 +31,20 @@ __all__ = [
 ]
 
 
+def _resolve_rows(akn_xml: str, language: str) -> list[tuple[ResolvedRow, str]]:
+    """Each resolved row with its search tokens: the CPU half, for the pool."""
+    return [
+        (item, tokenise_to_text(item.resolved_text, language)) for item in resolve_tables(akn_xml)
+    ]
+
+
 async def index_version_annex_rows(
     session: AsyncSession, version_id: uuid.UUID, akn_xml: str | None = None
 ) -> tuple[int, str | None]:
     """Rewrite one version's table rows, as (count, skipped reason).
 
-    Idempotent by replacement, so a retry does not double-count.
+    Idempotent by replacement, so a retry does not double-count. Resolution and
+    tokenising run on the CPU pool: a large annex takes most of a second.
     """
     language = "eng"
     if akn_xml is None:
@@ -56,7 +65,9 @@ async def index_version_annex_rows(
     # Resolve before deleting. The caller commits regardless, so a failure
     # after the delete would leave a version that had rows yesterday with none.
     try:
-        resolved = resolve_tables(akn_xml)
+        resolved: list[tuple[ResolvedRow, str]] = await on_the_cpu_pool(
+            _resolve_rows, akn_xml, language
+        )
     except Exception as exc:  # noqa: BLE001, the prior rows are worth more than this run
         logger.warning(
             "annex_rows_resolve_failed",
@@ -66,7 +77,7 @@ async def index_version_annex_rows(
         return 0, f"{type(exc).__name__}: {str(exc)[:120]}"
     await session.execute(delete(AnnexRow).where(AnnexRow.version_id == version_id))
 
-    for item in resolved:
+    for item, tokens in resolved:
         session.add(
             AnnexRow(
                 version_id=version_id,
@@ -77,14 +88,14 @@ async def index_version_annex_rows(
                 lineage=list(item.lineage),
                 mechanisms=sorted(item.mechanisms),
                 resolved_text=item.resolved_text,
-                search_tokens=tokenise_to_text(item.resolved_text, language),
+                search_tokens=tokens,
                 search_pipeline_version=TOKENISER_VERSION,
             )
         )
     # A row with no mechanism carries no context beyond its frame. That is
     # correct for a flat listing and a defect for a table whose structure was
     # missed, and the two are indistinguishable without the count.
-    contextless = sum(1 for item in resolved if not item.mechanisms)
+    contextless = sum(1 for item, _ in resolved if not item.mechanisms)
     if contextless:
         logger.info(
             "annex_rows_indexed",
