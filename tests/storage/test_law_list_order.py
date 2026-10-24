@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from codify.search import tokenise_to_text
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.laws import list_laws
 from codify.storage.models import Law, Version
@@ -124,13 +125,15 @@ async def test_relevance_order_survives_a_join_that_reorders(session: AsyncSessi
     code = "x" + uuid.uuid4().hex[:6]
     word = "q" + "".join(chr(ord("a") + int(c, 16) % 26) for c in uuid.uuid4().hex[:10])
     jurisdiction = await get_or_create_jurisdiction(session, code, languages=["en"])
-    # Longer titles score lower; URIs run against that order.
+    # Longer titles score lower; URIs run against that order. Tokenised as the
+    # writer would, so a stemmable word stores what the query searches for.
     for i in range(12):
+        title = " ".join([word.title(), *["Harbour"] * i, "Act"])
         session.add(
             Law(
                 jurisdiction_id=jurisdiction.id,
-                title=" ".join([word.title(), *["Harbour"] * i, "Act"]),
-                title_tokens=" ".join([word, *["harbour"] * i, "act"]),
+                title=title,
+                title_tokens=tokenise_to_text(title, "eng"),
                 doctype="act",
                 frbr_work_uri=f"/akn/{code}/act/2001/{99 - i}",
             )
@@ -144,7 +147,7 @@ async def test_relevance_order_survives_a_join_that_reorders(session: AsyncSessi
                     "ORDER BY title_tokens <@> to_bm25query(:w, 'laws_title_bm25_idx'), "
                     "frbr_work_uri, id"
                 ),
-                {"w": word},
+                {"w": tokenise_to_text(word, "eng")},
             )
         )
         .scalars()
