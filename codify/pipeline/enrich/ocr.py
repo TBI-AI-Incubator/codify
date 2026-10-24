@@ -21,6 +21,7 @@ from pypdf import PdfReader, PdfWriter
 from codify.core.llm import LLMClient, VisionText, content_filtered
 from codify.core.tracing import error_fields
 from codify.pipeline.enrich.scripts import ScriptPack
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.quality.legibility import lexicon_rate
 from codify.quality.lexicons import ARABIC_WORDS
 from codify.quality.page_read import BLANK_INK, PageVerdict, divergence, ink_ratio, score_page
@@ -45,6 +46,12 @@ VISION_RENDER_WINDOW = 8
 # Pillow's bomb guard sits at ~89 Mpx per image. Eight A4 pages at 300dpi is
 # ~70 Mpx and ~1 GB resident.
 MAX_WINDOW_PIXELS = 70_000_000
+# Longest side of a page image sent to the vision model. Gemini shrinks any image
+# to fit 3072 px; 4096 leaves A4 at the default 300 dpi as rendered.
+MAX_VISION_EDGE_PX = 4096
+# A downscaled page goes as JPEG, a few MB where the PNG ran to tens. At 90 small
+# print stays legible.
+VISION_JPEG_QUALITY = 90
 # A page whose /MediaBox is missing: poppler defaults to US Letter.
 LETTER_AREA_SQ_IN = 8.5 * 11.0
 # A guard, not a tuning: no diverted page measured so far carries a text layer
@@ -611,6 +618,44 @@ async def render_block(
     return await asyncio.to_thread(_crop)
 
 
+def cap_vision_image(image_bytes: bytes, max_edge: int = MAX_VISION_EDGE_PX) -> bytes:
+    """The page image, downscaled to `max_edge` on its longest side and re-encoded
+    as JPEG. Bytes within the cap, or that will not decode, come back unchanged.
+
+    Synchronous and seconds long on a plan sheet: callers run it on the CPU pool.
+    """
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            # The header gives the size without decoding the page.
+            if max(image.size) <= max_edge:
+                return image_bytes
+            page: Image.Image
+            if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+                # Onto white: dropping alpha makes a transparent black ground opaque.
+                rgba = image.convert("RGBA")
+                page = Image.new("RGB", rgba.size, "white")
+                page.paste(rgba, mask=rgba.getchannel("A"))
+            elif image.mode in ("L", "RGB"):
+                page = image
+            else:
+                # Before the resize: Pillow resizes bilevel and palette images nearest-neighbour.
+                page = image.convert("L" if image.mode == "1" else "RGB")
+            page.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            page.save(buf, format="JPEG", quality=VISION_JPEG_QUALITY)
+    except (OSError, UnidentifiedImageError):
+        return image_bytes
+    return buf.getvalue()
+
+
+def _vision_page(image_bytes: bytes) -> tuple[bytes, float | None]:
+    """The capped image and its ink, in one pool call."""
+    capped = cap_vision_image(image_bytes)
+    return capped, ink_ratio(capped)
+
+
 def _is_ocr_only_model(model: str | None) -> TypeGuard[str]:
     return model is not None and model.startswith(OCR_ONLY_MODEL_PREFIXES)
 
@@ -1023,6 +1068,9 @@ async def extract_text_from_pdf(
 
         async def ocr_page(page_num: int, image_bytes: bytes | None) -> PageResult:
             async with gate:
+                ink: float | None = None
+                if image_bytes is not None:
+                    image_bytes, ink = await on_the_cpu_pool(_vision_page, image_bytes)
                 anchor = _vision_anchor(
                     divert_reasons.get(page_num, ""), ocr_fallback_text.get(page_num, "")
                 )
@@ -1059,7 +1107,7 @@ async def extract_text_from_pdf(
                     layout=layouts.get(page_num),
                     rival_text=rivals.get(page_num, ""),
                     divergence=divergence(text, rivals.get(page_num, "")),
-                    ink=ink_ratio(image_bytes) if image_bytes is not None else None,
+                    ink=ink,
                     finish_reason=finish_reason,
                 )
 
@@ -1129,6 +1177,8 @@ async def _ocr_page_with_context(
         # `combine_page_texts` drops it and the run reports success, which is
         # the silent loss this module keeps having to relearn.
         raise RuntimeError(f"page {page_number} could not be rendered for OCR")
+    # A no-op past the fan-out, which capped already; this covers the fallbacks above.
+    image_bytes = await on_the_cpu_pool(cap_vision_image, image_bytes)
 
     # Mistral OCR path is handled by the full-PDF fast path in
     # extract_text_from_pdf. This per-page fallback only runs for the chat
