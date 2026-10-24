@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 from lxml import etree
 
 from codify.lang import normalise_digits
@@ -128,6 +126,23 @@ def count_provisions_by_kind(root: etree._Element) -> dict[str, int]:
 _BASIC_UNIT_KINDS = frozenset({"article", "section", "rule"})
 
 
+_ASCII_DIGITS = frozenset("0123456789")
+
+
+def _unit_number(raw: str) -> str:
+    """A `<num>` as a key: digits folded to ASCII, letters kept, everything else
+    dropped, in the order written. "1 bis" and "1bis" key alike, a Roman or
+    spelled number keeps its letters, and A1, which a UK Act inserts before
+    section 1, stays apart from 1A, inserted after it. Gathering the digits
+    ahead of the letters, as this once did, read those two as one unit.
+
+    One digit fold for the whole project: the anchor scan already keys
+    Devanagari, Bengali and Thai numerals through `normalise_digits`, so the
+    unit set must fold the same scripts or those articles vanish.
+    """
+    return "".join(ch for ch in normalise_digits(raw) if ch.isalpha() or ch in _ASCII_DIGITS)
+
+
 def basic_unit_numbers(root: etree._Element) -> frozenset[str]:
     """The basic units (article/section/rule) as ``"kind:number"`` keys.
 
@@ -135,7 +150,8 @@ def basic_unit_numbers(root: etree._Element) -> frozenset[str]:
     lists and regroups chapters, so counts churn and a raw total masks real loss (act
     2014/23 shed 48 articles while its other counts rose). Digits are normalised across
     every non-Latin block `codify.lang` folds, so an article and a section both numbered 5 stay
-    two units, and a spelled or Roman number keeps its letters rather than vanishing. A
+    two units, and a spelled or Roman number keeps its letters rather than vanishing, in
+    the order written. A
     named `<hcontainer>` is a basic unit; only the bare Bluebell wrapper is not.
 
     A lone <section> numbered 1 with no article or rule is the structureless fallback and
@@ -157,16 +173,12 @@ def basic_unit_numbers(root: etree._Element) -> frozenset[str]:
             continue
         num_el = next((c for c in el if local_name(c.tag) == "num"), None)
         raw = "".join(num_el.itertext()) if num_el is not None else ""
-        # One digit fold for the whole project: the anchor scan already keys
-        # Devanagari, Bengali and Thai numerals through `normalise_digits`, so
-        # the unit set must fold the same scripts or those articles vanish.
-        digits = re.sub(r"[^0-9]", "", normalise_digits(raw))
-        suffix = "".join(ch for ch in raw if ch.isalpha())  # bis / Roman / spelled marker
+        number = _unit_number(raw)
         # A named container keys on its name (`mukrrar`), so two differently
         # named units of the same number cannot alias onto one another.
         kind = el.get("name") or name
-        if digits or suffix:
-            units.add(f"{kind}:{digits}{suffix}")
+        if number:
+            units.add(f"{kind}:{number}")
     if units == {"section:1"}:  # the _verbatim_single_section structureless fallback
         units = set()
     return frozenset(units)
