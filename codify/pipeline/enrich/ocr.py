@@ -631,12 +631,17 @@ def cap_vision_image(image_bytes: bytes, max_edge: int = MAX_VISION_EDGE_PX) -> 
             # The header gives the size without decoding the page.
             if max(image.size) <= max_edge:
                 return image_bytes
-            # Before the resize: Pillow resizes bilevel and palette images nearest-neighbour.
-            page: Image.Image = (
-                image
-                if image.mode in ("L", "RGB")
-                else image.convert("L" if image.mode == "1" else "RGB")
-            )
+            page: Image.Image
+            if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+                # Onto white: dropping alpha makes a transparent black ground opaque.
+                rgba = image.convert("RGBA")
+                page = Image.new("RGB", rgba.size, "white")
+                page.paste(rgba, mask=rgba.getchannel("A"))
+            elif image.mode in ("L", "RGB"):
+                page = image
+            else:
+                # Before the resize: Pillow resizes bilevel and palette images nearest-neighbour.
+                page = image.convert("L" if image.mode == "1" else "RGB")
             page.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
             buf = io.BytesIO()
             page.save(buf, format="JPEG", quality=VISION_JPEG_QUALITY)

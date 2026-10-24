@@ -29,6 +29,23 @@ def _page(size: tuple[int, int]) -> bytes:
     return buf.getvalue()
 
 
+def _transparent_scan(size: tuple[int, int], mode: str) -> bytes:
+    """`_page`'s bars, opaque black on a fully transparent black ground."""
+    with Image.open(io.BytesIO(_page(size))) as ruled:
+        bars = ruled.point(lambda v: 255 if v < 128 else 0)
+    if mode == "P":
+        image = Image.new("P", size, 0)
+        image.putpalette([0, 0, 0] * 2)
+        image.paste(1, mask=bars)
+        image.info["transparency"] = 0
+    else:
+        image = Image.new(mode, size, (0,) * len(mode))
+        image.putalpha(bars)
+    buf = io.BytesIO()
+    image.save(buf, format="PNG", **({"transparency": 0} if mode == "P" else {}))
+    return buf.getvalue()
+
+
 def _size_and_format(data: bytes) -> tuple[tuple[int, int], str | None]:
     with Image.open(io.BytesIO(data)) as image:
         return image.size, image.format
@@ -52,6 +69,18 @@ def test_a_page_over_the_cap_is_downscaled_keeping_its_aspect(size: tuple[int, i
     original_ink, capped_ink = ink_ratio(original), ink_ratio(capped)
     assert original_ink is not None and capped_ink is not None
     assert abs(capped_ink - original_ink) < 0.01, (original_ink, capped_ink)
+
+
+@pytest.mark.parametrize("mode", ["RGBA", "LA", "P"])
+def test_a_transparent_scan_over_the_cap_lands_on_white(mode: str) -> None:
+    """Dropping alpha turns a transparent black ground opaque, and the page black."""
+    size = (9934, 7016)
+    opaque_ink = ink_ratio(_page(size))
+
+    capped_ink = ink_ratio(cap_vision_image(_transparent_scan(size, mode)))
+
+    assert opaque_ink is not None and capped_ink is not None
+    assert abs(capped_ink - opaque_ink) < 0.01, (mode, opaque_ink, capped_ink)
 
 
 # A4 at the default 300 dpi, and a page exactly at the cap.
