@@ -109,6 +109,21 @@ New, additive:
   `(version_id, created_at)` and drops `provisions_version_id_idx`, which the
   new key's prefix makes redundant. `max(created_at)` for one version is then
   a single index descent instead of a read of every provision.
+- Migration `0027_query_index_hygiene` drops the unread GIN over
+  `provisions.text_search` (the column stays), an HNSW over
+  `version_unit_embeddings` that no migration created and no query orders by,
+  and `sections_version_id_idx`, `annex_rows_version_idx` and
+  `law_links_source_idx`, whose columns lead a wider index on the same table.
+  It indexes `registry_works.law_id`, `repair_proposals.run_id` and
+  `runs.params->>'retried_from'`, and vacuums `provisions` after 2% new rows.
+- `prune_dead_terms` scans for orphaned terms without a lock, then takes the
+  `laws`/`provisions` share lock only to re-check those candidates through the
+  `search_tsv`/`title_tsv` GIN indexes. It refuses with `55P03` if DDL holds
+  either table, and raises unless the session is READ COMMITTED.
+- `list_laws` chooses its page before reading version dates, so only the
+  page's laws are dated; the ingested sort still aggregates every version.
+- The hybrid search's keyword arm keeps the top `pool` matches before
+  numbering them, a bounded sort instead of a sort of every match.
 - `structuring.recurring_furniture`: for a layout engine that files footnotes
   and page-top captions under header or footer. Furniture is then a bare page
   number or a short block another page repeats, a running head split across

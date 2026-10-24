@@ -142,27 +142,29 @@ async def _prune(engine: AsyncEngine) -> int:
 
 async def test_a_dead_term_goes_and_carried_terms_stay(engine: AsyncEngine) -> None:
     carried, titled, dead = _word(), _word(), _word()
-    # Parses to two lexemes, both carried, but no row carries the term itself.
-    split = "45e45" + _word()
+    # Each parses to two lexemes, both carried, but no row carries the term itself.
+    split, title_split = "45e45" + _word(), "46e46" + _word()
     async with async_sessionmaker(engine)() as s:
         law_id, _ = await _seed(s, f"alpha {carried} omega 45e45 {split[5:]}")
         await s.execute(
-            text("UPDATE laws SET title_tokens = :t WHERE id = :id"), {"t": titled, "id": law_id}
+            text("UPDATE laws SET title_tokens = :t WHERE id = :id"),
+            {"t": f"{titled} 46e46 {title_split[5:]}", "id": law_id},
         )
-        for term in (carried, titled, dead, split):
+        for term in (carried, titled, dead, split, title_split):
             await _add_term(s, term)
         await s.commit()
 
     async with async_sessionmaker(engine)() as s:
         proposed = set(await lexicon._dead_term_candidates(s))
-    assert {dead, split} <= proposed
+    assert {dead, split, title_split} <= proposed
     assert not {carried, titled} & proposed
 
-    assert await _prune(engine) >= 2
+    assert await _prune(engine) >= 3
     assert await _present(engine, carried)
     assert await _present(engine, titled)
     assert not await _present(engine, dead)
     assert not await _present(engine, split)
+    assert not await _present(engine, title_split)
 
 
 # A word, and one the 'simple' parser finds no lexeme in, which the GIN cannot see.

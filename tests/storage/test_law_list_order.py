@@ -117,3 +117,44 @@ async def test_ingested_order_and_offset_pages(session: AsyncSession) -> None:
         for o in range(0, len(whole), 3)
     ]
     assert [r.id for p in pages for r in p] == [r.id for r in whole]
+
+
+async def test_relevance_order_survives_a_join_that_reorders(session: AsyncSession) -> None:
+    """The page's order must be re-applied outside it: a hash join need not keep it."""
+    code = "x" + uuid.uuid4().hex[:6]
+    word = "q" + "".join(chr(ord("a") + int(c, 16) % 26) for c in uuid.uuid4().hex[:10])
+    jurisdiction = await get_or_create_jurisdiction(session, code, languages=["en"])
+    # Longer titles score lower; URIs run against that order.
+    for i in range(12):
+        session.add(
+            Law(
+                jurisdiction_id=jurisdiction.id,
+                title=" ".join([word.title(), *["Harbour"] * i, "Act"]),
+                title_tokens=" ".join([word, *["harbour"] * i, "act"]),
+                doctype="act",
+                frbr_work_uri=f"/akn/{code}/act/2001/{99 - i}",
+            )
+        )
+    await session.flush()
+    expected = (
+        (
+            await session.execute(
+                text(
+                    "SELECT id FROM laws WHERE title_tsv @@ to_tsquery('simple', :w) "
+                    "ORDER BY title_tokens <@> to_bm25query(:w, 'laws_title_bm25_idx'), "
+                    "frbr_work_uri, id"
+                ),
+                {"w": word},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(expected) == 12
+    await session.execute(text("SET LOCAL enable_nestloop = off"))
+    await session.execute(text("SET LOCAL enable_mergejoin = off"))
+    rows, _ = await list_laws(session, q=word, limit=50)
+    assert [r.id for r in rows] == list(expected)
+    # The re-rank reads the score as the last column; equal ranks keep BM25's order.
+    reranked, _ = await list_laws(session, q=word, limit=50, doctype_ranks={(code, "act"): 1})
+    assert [r.id for r in reranked] == list(expected)
