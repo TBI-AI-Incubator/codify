@@ -41,7 +41,7 @@ RRF_K = 60
 # ascending only, so lower is better and ORDER BY stays plain. It has no boolean
 # form and scores a non-matching row 0 rather than dropping it, so `search_tsv`
 # decides membership and BM25 orders what survives. The `version_id` predicate
-# pre-filters through `provisions_version_id_idx`, `pg_textsearch`'s documented
+# pre-filters through the `version_id` btree prefix, `pg_textsearch`'s documented
 # best case. An empty `search_tsv` is a row the tokeniser has not reached, which
 # backfill-search-tokens closes.
 #
