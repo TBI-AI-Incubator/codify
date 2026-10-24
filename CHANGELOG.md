@@ -37,6 +37,8 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- A Riigi Teataja act whose only text is its preamble converts to a body paragraph, not
+  a `<preamble>` over an empty body. An act with provisions keeps its preamble.
 - `akn_native` acquirer: a ref carrying `extra["pdf_fallback"]` takes the PDF that a
   document of metadata alone names, instead of failing as PDF-only. The PDF is the
   untitled alternative in the ref's language (English unless `languages` names Welsh), on

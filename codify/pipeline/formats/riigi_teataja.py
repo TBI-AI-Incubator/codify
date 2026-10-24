@@ -747,6 +747,30 @@ def _convert_osa(
     return part, o_eid
 
 
+def _move_lone_preamble_to_body(
+    act: etree._Element, preamble: etree._Element, body: etree._Element
+) -> None:
+    """An act whose only text is its preamble would have no provisions: that text becomes
+    the body's paragraph."""
+    placeholder = {"body", "paragraph", "content", "p"}
+    if (
+        "".join(body.itertext()).strip()
+        or {etree.QName(e).localname for e in body.iter() if isinstance(e.tag, str)} - placeholder
+    ):
+        return
+    lines = preamble.findall(f".//{_q('p')}")
+    if not lines or preamble.find(f".//{_q('table')}") is not None:
+        return
+    act.remove(preamble)
+    for child in list(body):
+        body.remove(child)
+    para = etree.SubElement(body, _q("paragraph"), eId="para_1", wId="para_1")
+    content = etree.SubElement(para, _q("content"))
+    for n, line in enumerate(lines, start=1):
+        line.set("eId", f"para_1__p_{n}")
+        content.append(line)
+
+
 def riigi_teataja_to_akn(
     source_xml: str | bytes,
     *,
@@ -879,6 +903,7 @@ def riigi_teataja_to_akn(
 
     # Preamble
     sisu = root.find("{*}sisu")
+    preamble: etree._Element | None = None
     if sisu is not None:
         preambul = sisu.find("{*}preambul")
         if preambul is not None:
@@ -985,6 +1010,9 @@ def riigi_teataja_to_akn(
                     owner_eid=p_eid,
                     left_out=left_out,
                 )
+
+    if preamble is not None:
+        _move_lone_preamble_to_body(act, preamble, body)
 
     # Attachments
     lisad = annex_elements(root)
