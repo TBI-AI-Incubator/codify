@@ -6,6 +6,7 @@ one a writer adds between the scan and the re-check.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
@@ -141,23 +142,31 @@ async def _prune(engine: AsyncEngine) -> int:
 
 async def test_a_dead_term_goes_and_carried_terms_stay(engine: AsyncEngine) -> None:
     carried, titled, dead = _word(), _word(), _word()
+    # Parses to two lexemes, both carried, but no row carries the term itself.
+    split = "45e45" + _word()
     async with async_sessionmaker(engine)() as s:
-        law_id, _ = await _seed(s, f"alpha {carried} omega")
+        law_id, _ = await _seed(s, f"alpha {carried} omega 45e45 {split[5:]}")
         await s.execute(
             text("UPDATE laws SET title_tokens = :t WHERE id = :id"), {"t": titled, "id": law_id}
         )
-        for term in (carried, titled, dead):
+        for term in (carried, titled, dead, split):
             await _add_term(s, term)
         await s.commit()
 
-    assert await _prune(engine) >= 1
+    async with async_sessionmaker(engine)() as s:
+        proposed = set(await lexicon._dead_term_candidates(s))
+    assert {dead, split} <= proposed
+    assert not {carried, titled} & proposed
+
+    assert await _prune(engine) >= 2
     assert await _present(engine, carried)
     assert await _present(engine, titled)
     assert not await _present(engine, dead)
+    assert not await _present(engine, split)
 
 
 # A word, and one the 'simple' parser finds no lexeme in, which the GIN cannot see.
-@pytest.mark.parametrize("term", ["word", "́"])
+@pytest.mark.parametrize("term", ["word", "\u0301"])
 @pytest.mark.parametrize("carrier", ["provision", "title"])
 async def test_a_term_written_between_scan_and_recheck_survives(
     engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch, term: str, carrier: str
@@ -211,7 +220,7 @@ async def test_an_uncommitted_writer_refuses_the_sweep(engine: AsyncEngine) -> N
     await _seed(writer, term)
     try:
         with pytest.raises(DBAPIError) as refused:
-            await _prune(engine)
+            await asyncio.wait_for(_prune(engine), timeout=30)
         assert getattr(refused.value.orig, "sqlstate", None) == _LOCK_NOT_AVAILABLE
     finally:
         await writer.commit()
@@ -225,7 +234,7 @@ async def test_ddl_refuses_the_sweep_rather_than_queueing_it(engine: AsyncEngine
     await holder.execute(text("LOCK TABLE laws IN ACCESS EXCLUSIVE MODE"))
     try:
         with pytest.raises(DBAPIError) as refused:
-            await _prune(engine)
+            await asyncio.wait_for(_prune(engine), timeout=30)
         assert getattr(refused.value.orig, "sqlstate", None) == _LOCK_NOT_AVAILABLE
     finally:
         await holder.rollback()
