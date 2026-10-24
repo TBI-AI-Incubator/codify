@@ -74,12 +74,12 @@ def _indexes(url: str) -> dict[str, str]:
 
 
 def test_upgrade_swaps_the_index_and_downgrade_restores_it(temp_db: str) -> None:
-    _run(temp_db, command.upgrade, "head")
+    _run(temp_db, command.upgrade, "0026_provisions_created_at_idx")
     after = _indexes(temp_db)
     assert _OLD not in after
     assert after[_NEW].endswith("(version_id, created_at)"), after.get(_NEW)
 
-    _run(temp_db, command.downgrade, "-1")
+    _run(temp_db, command.downgrade, "0025_atlas_build_kind")
     before = _indexes(temp_db)
     assert _OLD in before and _NEW not in before
 

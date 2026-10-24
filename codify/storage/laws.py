@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import Float, and_, func, literal_column, or_, select, text, union
+from sqlalchemy import Float, and_, func, literal_column, or_, select, text, true, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -80,6 +80,18 @@ def _title_match(tsquery: str, citation: tuple[str, int] | None) -> Any:
     return match if citation is None else or_(match, _cites(citation))
 
 
+def _version_dates() -> Any:
+    """The latest expression and ingest of the outer query's law, as a LATERAL."""
+    return (
+        select(
+            func.max(Version.expression_date).label("latest"),
+            func.max(Version.ingested_at).label("ingested"),
+        )
+        .where(Version.law_id == Law.id)
+        .lateral("dates")
+    )
+
+
 def _relevance_candidates(
     tsquery: str,
     citation: tuple[str, int] | None,
@@ -125,7 +137,7 @@ def _relevance_candidates(
     return arms.cte("candidates").prefix_with("MATERIALIZED")
 
 
-def _law_order(sort: str | None) -> list[Any]:
+def _law_order(sort: str | None, ingested: Any) -> list[Any]:
     """ORDER BY for a law listing without a relevance-ranked query, falling back
     to browse order. Every sort ends on `frbr_work_uri, id` so paging is
     deterministic."""
@@ -139,7 +151,7 @@ def _law_order(sort: str | None) -> list[Any]:
     if sort == "year_asc":
         return [Law.year.asc().nulls_last(), *tail]
     if sort == "ingested":
-        return [text("ingested DESC NULLS LAST"), *tail]
+        return [ingested.desc().nulls_last(), *tail]
     return [Law.year.desc().nulls_last(), *tail]
 
 
@@ -163,34 +175,6 @@ async def list_laws(
     cursor encodes the browse order, so a `q` or `sort` call returns None and
     pages by offset instead.
     """
-    latest_date_sq = (
-        select(
-            Version.law_id,
-            func.max(Version.expression_date).label("latest"),
-            func.max(Version.ingested_at).label("ingested"),
-        )
-        .group_by(Version.law_id)
-        .subquery()
-    )
-    stmt = (
-        select(
-            Law.id,
-            Jurisdiction.code,
-            Law.title,
-            Law.short_title,
-            Law.doctype,
-            Law.status,
-            Law.year,
-            Law.number,
-            Law.frbr_work_uri,
-            latest_date_sq.c.latest,
-            Law.title_translations,
-            latest_date_sq.c.ingested,
-        )
-        .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
-        .outerjoin(latest_date_sq, latest_date_sq.c.law_id == Law.id)
-    )
-
     # A title query turns this listing into a finder. Membership comes from the
     # generated tsvector through its GIN index, order from BM25 over the same
     # tokens, matching how the provision arm splits the two jobs.
@@ -245,6 +229,9 @@ async def list_laws(
     # falls back whole to relevance order, so nothing is shown twice.
     relevance = matched and sort in (None, "relevance")
     rerank = bool(doctype_ranks) and relevance and offset + limit <= RERANK_WINDOW
+    # The page is chosen first and dated after, so only its laws' versions are
+    # read, except under the ingested sort, which orders by those dates.
+    page_q = select(Law.id.label("id")).join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
     if relevance:
         # The re-rank window is fixed, never widened by the offset: a larger set
         # re-sorts, and a law admitted at 205 could push a shown row back into view.
@@ -252,19 +239,58 @@ async def list_laws(
         candidates = _relevance_candidates(
             tsquery, parse_citation(q or ""), bm25_tokens, filters, window
         )
-        stmt = stmt.join(candidates, candidates.c.id == Law.id).order_by(
-            candidates.c.score, Law.frbr_work_uri, Law.id
+        page_q = (
+            page_q.join(candidates, candidates.c.id == Law.id)
+            .add_columns(candidates.c.score)
+            .order_by(candidates.c.score, Law.frbr_work_uri, Law.id)
         )
-        if rerank:
-            stmt = stmt.add_columns(candidates.c.score)
     else:
-        stmt = stmt.where(*filters)
+        page_q = page_q.where(*filters)
         if matched:
-            stmt = stmt.where(_title_match(tsquery, parse_citation(q or "")))
-        stmt = stmt.order_by(*_law_order(sort))
-    stmt = stmt.limit(RERANK_WINDOW if rerank else limit + 1)
+            page_q = page_q.where(_title_match(tsquery, parse_citation(q or "")))
+        # One aggregate over every version, measured faster than a LATERAL per
+        # law once the sort needs all of them.
+        every = (
+            select(Version.law_id, func.max(Version.ingested_at).label("ingested"))
+            .group_by(Version.law_id)
+            .subquery()
+        )
+        if sort == "ingested":
+            page_q = page_q.outerjoin(every, every.c.law_id == Law.id)
+        page_q = page_q.order_by(*_law_order(sort, every.c.ingested))
+    page_q = page_q.limit(RERANK_WINDOW if rerank else limit + 1)
     if offset and not rerank:
-        stmt = stmt.offset(offset)
+        page_q = page_q.offset(offset)
+    page = page_q.subquery("page")
+
+    dates = _version_dates()
+    stmt = (
+        select(
+            Law.id,
+            Jurisdiction.code,
+            Law.title,
+            Law.short_title,
+            Law.doctype,
+            Law.status,
+            Law.year,
+            Law.number,
+            Law.frbr_work_uri,
+            dates.c.latest,
+            Law.title_translations,
+            dates.c.ingested,
+        )
+        .select_from(page)
+        .join(Law, Law.id == page.c.id)
+        .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
+        .outerjoin(dates, true())
+    )
+    # The same total order again, since a join does not keep the page's.
+    if relevance:
+        stmt = stmt.order_by(page.c.score, Law.frbr_work_uri, Law.id)
+        if rerank:
+            stmt = stmt.add_columns(page.c.score)
+    else:
+        stmt = stmt.order_by(*_law_order(sort, dates.c.ingested))
     rows = (await session.execute(stmt)).all()
 
     if rerank:

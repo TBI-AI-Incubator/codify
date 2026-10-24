@@ -54,6 +54,8 @@ RRF_K = 60
 # `SUM(1.0 / (:rrf_k + rn))`, so two ids each seen by one arm at the same rank
 # score identically; without it Postgres orders those ties any way it likes and
 # the ranking is not reproducible offline.
+# Both arms order and limit before numbering. A window over the whole scope
+# made the lexical arm sort every match rather than keep the top `pool`.
 # The dense arm orders and limits on `provision_embeddings` itself, which is
 # partitioned by jurisdiction with one HNSW each: the jurisdiction predicate
 # prunes to the scope's partitions and the version predicate is applied inside
@@ -63,16 +65,19 @@ RRF_K = 60
 # planner would otherwise take its order for the window's.
 _HYBRID_TEMPLATE = """
     WITH fts AS (
-      SELECT p.id, ROW_NUMBER() OVER (
-               ORDER BY p.search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')
-             ) AS rn
-      FROM provisions p {fts_join}
-      WHERE {fts_scope}
-        AND p.search_tsv @@ to_tsquery('simple', :query_match)
-        AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-        AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
-      LIMIT :pool
+      SELECT id, ROW_NUMBER() OVER (ORDER BY score) AS rn
+      FROM (
+        SELECT p.id,
+               p.search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx') AS score
+        FROM provisions p {fts_join}
+        WHERE {fts_scope}
+          AND p.search_tsv @@ to_tsquery('simple', :query_match)
+          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
+          AND (p.normative OR CAST(:include_non_normative AS boolean))
+          AND p.excluded_from_pool IS NOT TRUE
+        ORDER BY score
+        LIMIT :pool
+      ) ranked
     ),
     vec AS (
       SELECT id, ROW_NUMBER() OVER (ORDER BY distance + 0) AS rn

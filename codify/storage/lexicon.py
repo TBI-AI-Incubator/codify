@@ -124,34 +124,76 @@ async def record_terms(session: AsyncSession, version_id: uuid.UUID) -> int:
     return result.rowcount or 0
 
 
+_DEAD_CANDIDATES = text(
+    """
+    SELECT st.term FROM search_terms st
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM provisions p,
+             LATERAL unnest(string_to_array(p.search_tokens, ' ')) AS t(term)
+        WHERE p.search_tokens IS NOT NULL AND t.term = st.term
+    )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM laws l,
+             LATERAL unnest(string_to_array(l.title_tokens, ' ')) AS t(term)
+        WHERE l.title_tokens IS NOT NULL AND t.term = st.term
+    )
+    """
+)
+
+# Through the tsvector GIN indexes, which hold every lexeme the 'simple' parser
+# finds in a stored token, then the exact token. A term that parses to no
+# lexeme cannot be looked up that way, so it stays.
+_DELETE_STILL_DEAD = text(
+    """
+    DELETE FROM search_terms st
+    WHERE st.term = ANY(CAST(:candidates AS text[]))
+      AND numnode(plainto_tsquery('simple', st.term)) > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM provisions p
+        WHERE p.search_tsv @@ plainto_tsquery('simple', st.term)
+          AND st.term = ANY(string_to_array(p.search_tokens, ' '))
+    )
+      AND NOT EXISTS (
+        SELECT 1 FROM laws l
+        WHERE l.title_tsv @@ plainto_tsquery('simple', st.term)
+          AND st.term = ANY(string_to_array(l.title_tokens, ' '))
+    )
+    """
+)
+
+
+async def _dead_term_candidates(session: AsyncSession) -> list[str]:
+    """Terms nothing carried at this statement's snapshot. Reads every row's
+    tokens, so it runs unlocked and only proposes."""
+    return list((await session.execute(_DEAD_CANDIDATES)).scalars().all())
+
+
 async def prune_dead_terms(session: AsyncSession) -> int:
     """Drop terms nothing carries. Title search expands through this lexicon
-    too, so a term any title holds survives, and both tables are locked because
-    a writer of either could commit after this snapshot and lose its term.
-    NOWAIT, not a timeout: writers disagree on lock order, and a sweep that
-    waits can make a user's workflow the deadlock victim instead of itself."""
-    await session.execute(text("LOCK TABLE laws, provisions IN SHARE MODE NOWAIT"))
-    result = await session.execute(
-        text(
-            """
-            DELETE FROM search_terms st
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM provisions p,
-                     LATERAL unnest(string_to_array(p.search_tokens, ' ')) AS t(term)
-                WHERE p.search_tokens IS NOT NULL AND t.term = st.term
-            )
-              AND NOT EXISTS (
-                SELECT 1
-                FROM laws l,
-                     LATERAL unnest(string_to_array(l.title_tokens, ' ')) AS t(term)
-                WHERE l.title_tokens IS NOT NULL AND t.term = st.term
-            )
-            """
-        )
-    )
-    removed = result.rowcount or 0
-    logger.info("lexicon_dead_terms_pruned", removed=removed)
+    too, so a term any title holds survives.
+
+    The full scan runs unlocked and only names candidates. Both tables are then
+    locked while each candidate is re-checked by index, because a writer of
+    either may have committed, or still hold, a row carrying it. NOWAIT, not a
+    timeout: writers disagree on lock order, and a sweep that waits can make a
+    user's workflow the deadlock victim instead of itself. READ COMMITTED, so
+    the re-check reads past the scan's snapshot."""
+    isolation = (
+        await session.execute(text("SELECT current_setting('transaction_isolation')"))
+    ).scalar_one()
+    if isolation != "read committed":
+        raise RuntimeError(f"prune_dead_terms needs read committed, not {isolation}")
+    # Writers pass; DDL refuses the sweep rather than queueing it for minutes.
+    await session.execute(text("LOCK TABLE laws, provisions IN ACCESS SHARE MODE NOWAIT"))
+    candidates = await _dead_term_candidates(session)
+    removed = 0
+    if candidates:
+        await session.execute(text("LOCK TABLE laws, provisions IN SHARE MODE NOWAIT"))
+        result = await session.execute(_DELETE_STILL_DEAD, {"candidates": candidates})
+        removed = result.rowcount or 0
+    logger.info("lexicon_dead_terms_pruned", candidates=len(candidates), removed=removed)
     return removed
 
 
