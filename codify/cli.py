@@ -571,6 +571,7 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
         max_files=args.max_files,
         on_progress=None if args.quiet else progress,
         as_of=date.fromisoformat(args.as_of) if args.as_of else None,
+        keep_ended=args.keep_ended,
     )
     out = Path(args.out or index_path("ee"))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -955,6 +956,11 @@ def main(argv: list[str] | None = None) -> int:
     ee_idx.add_argument("--max-files", type=int, default=None, help="stop after N members")
     ee_idx.add_argument(
         "--as-of", default=None, help="keep redactions in force on this ISO date (default: today)"
+    )
+    ee_idx.add_argument(
+        "--keep-ended",
+        action="store_true",
+        help="also list redactions ended before the as-of date, under their own section",
     )
     ee_idx.add_argument("--quiet", action="store_true", help="suppress progress")
     ee_idx.set_defaults(func=_run_index_ee_archive)

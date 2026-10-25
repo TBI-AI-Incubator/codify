@@ -37,6 +37,11 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- `build_ee_index` and `index-ee-archive` record the redaction group (`group`) on every
+  entry, so one act's texts can be joined. With `keep_ended` (`--keep-ended`), a state-act
+  text whose validity ended before the as-of date is listed under `ended`, with its
+  validity end (`valid_to`); `entries` and `repealed` are as before, and without the option
+  the index has no `ended` section.
 - A Riigi Teataja act whose only text is its preamble converts to a body paragraph, not
   a `<preamble>` over an empty body. An act with provisions keeps its preamble.
 - `akn_native` acquirer: a ref carrying `extra["pdf_fallback"]` takes the PDF that a

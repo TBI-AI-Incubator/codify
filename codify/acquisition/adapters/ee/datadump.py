@@ -213,11 +213,24 @@ def _prefix(f: IO[bytes]) -> bytes:
     return f.read(_HEAD_LIMIT)
 
 
+def _group(head: str) -> str | None:
+    """The id shared by every redaction of one act, or None where the member names none."""
+    m = re.search(r"<terviktekstiGrupiID\b[^>]*>(\d+)</terviktekstiGrupiID>", head)
+    return m.group(1) if m else None
+
+
 def _index_entry(
-    member: str, data: bytes, *, today: date, principal_only: bool
-) -> tuple[str, dict[str, Any], bool] | None:
-    """A member's key, entry and whether it only marks a repeal, or None for another kind
-    of document, a municipal act, a redaction no longer in force, or one with no title."""
+    member: str,
+    data: bytes,
+    *,
+    today: date,
+    principal_only: bool,
+    keep_ended: bool = False,
+) -> tuple[str, dict[str, Any], str] | None:
+    """A member's key, entry and kind (``entry``, ``repeal`` for a redaction that only marks
+    a repeal, or ``ended`` for a text whose validity ended before `today`, kept only with
+    `keep_ended`), or None for another kind of document, a municipal act, a redaction
+    no longer in force, or one with no title."""
     prefix = data.decode("utf-8", errors="ignore")
     cut = data.find(_HEAD_END)
     head = prefix if cut < 0 else data[: cut + len(_HEAD_END)].decode("utf-8", errors="ignore")
@@ -230,7 +243,8 @@ def _index_entry(
         return None
 
     lopp = _field(head, "kehtivuseLopp")
-    if lopp and date.fromisoformat(lopp[:10]) < today:
+    ended = bool(lopp) and date.fromisoformat(lopp[:10]) < today
+    if ended and not keep_ended:
         return None
 
     # Newer files give the title an id attribute.
@@ -275,12 +289,17 @@ def _index_entry(
         "principal": is_principal or is_code,
         "code": is_code,
         "original": original,
+        "group": _group(head),
     }
     # Repealed acts keep a last redaction with no text; it has no end date.
     if _is_repeal_stub(prefix):
+        if ended:
+            return None
         own = {i for i in (doc_id, original) if i}
-        return doc_id, {**entry, "repealed_by": _repealing_act(prefix, own)}, True
-    return doc_id, entry, False
+        return doc_id, {**entry, "repealed_by": _repealing_act(prefix, own)}, "repeal"
+    if ended:
+        return doc_id, {**entry, "valid_to": lopp[:10]}, "ended"
+    return doc_id, entry, "entry"
 
 
 def build_ee_index(
@@ -290,16 +309,20 @@ def build_ee_index(
     max_files: int | None = None,
     on_progress: Any = None,
     as_of: date | None = None,
+    keep_ended: bool = False,
 ) -> dict[str, Any]:
     """Walk an Estonian bulk XML zip archive and index the state statutes not ended by
     `as_of` (today), so a text published ahead of its start is kept. Repeal-only
-    redactions go under ``repealed``, which no ingest reads."""
+    redactions go under ``repealed``, which no ingest reads. With `keep_ended`, texts
+    ended before `as_of` go under ``ended``, each with its validity end."""
     from datetime import UTC, datetime
 
     archive_path = Path(archive)
     today = as_of or date.today()
     entries: dict[str, Any] = {}
     repealed: dict[str, Any] = {}
+    ended: dict[str, Any] = {}
+    sections = {"entry": entries, "repeal": repealed, "ended": ended}
     scanned = 0
     skipped = 0
 
@@ -312,11 +335,17 @@ def build_ee_index(
             scanned += 1
             try:
                 with zf.open(n) as f:
-                    found = _index_entry(n, _prefix(f), today=today, principal_only=principal_only)
-                if found is None or found[2]:
+                    found = _index_entry(
+                        n,
+                        _prefix(f),
+                        today=today,
+                        principal_only=principal_only,
+                        keep_ended=keep_ended,
+                    )
+                if found is None or found[2] == "repeal":
                     skipped += 1
                 if found is not None:
-                    (repealed if found[2] else entries)[found[0]] = found[1]
+                    sections[found[2]][found[0]] = found[1]
             except Exception:
                 skipped += 1
 
@@ -328,7 +357,7 @@ def build_ee_index(
     except ValueError:
         portable_archive = str(archive_path)
 
-    return {
+    payload: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
         "archive": portable_archive,
         "language": "est",
@@ -341,6 +370,10 @@ def build_ee_index(
         "entries": entries,
         "repealed": repealed,
     }
+    if keep_ended:
+        payload["stats"]["ended"] = len(ended)
+        payload["ended"] = ended
+    return payload
 
 
 def index_remote_ee_archive(
@@ -370,7 +403,7 @@ def index_remote_ee_archive(
                 f"more than the {max_members} one read takes"
             )
 
-        def entry(info: zipfile.ZipInfo) -> tuple[str, dict[str, Any], bool] | None:
+        def entry(info: zipfile.ZipInfo) -> tuple[str, dict[str, Any], str] | None:
             loc = MemberLocation.of(info)
             data = remote.member_prefix(loc, limit=_HEAD_LIMIT)
             try:
@@ -398,12 +431,12 @@ def index_remote_ee_archive(
         "modified_since": modified_since.isoformat(),
         "stats": {
             "files_scanned": len(changed),
-            "indexed": sum(1 for f in found if not f[2]),
-            "repealed": sum(1 for f in found if f[2]),
-            "skipped": len(changed) - sum(1 for f in found if not f[2]),
+            "indexed": sum(1 for f in found if f[2] == "entry"),
+            "repealed": sum(1 for f in found if f[2] == "repeal"),
+            "skipped": len(changed) - sum(1 for f in found if f[2] == "entry"),
         },
-        "entries": {k: e for k, e, stub in found if not stub},
-        "repealed": {k: e for k, e, stub in found if stub},
+        "entries": {k: e for k, e, kind in found if kind == "entry"},
+        "repealed": {k: e for k, e, kind in found if kind == "repeal"},
     }
 
 
