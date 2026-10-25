@@ -462,11 +462,16 @@ def test_ended_redactions_are_filed_as_current_ones_are(tmp_path: Path) -> None:
     ended_stub = _repeal_stub("744", repealer="900004").replace(
         b"</kehtivus>", b"<kehtivuseLopp>2026-10-03</kehtivuseLopp></kehtivus>"
     )
+    amending = _member(
+        "746", title="Näidise seaduse muutmise seadus", kind="seadus", end="2026-10-03"
+    )
     kept = _member("745", end="2026-10-03")
     payload = _indexed_payload(
         tmp_path, municipal, decision, untitled, ended_stub, kept, keep_ended=True
     )
     assert (list(payload["ended"]), payload["repealed"]) == (["745"], {})
+    principal = _indexed_payload(tmp_path, amending, keep_ended=True, principal_only=True)
+    assert principal["ended"] == {}
 
 
 @pytest.fixture

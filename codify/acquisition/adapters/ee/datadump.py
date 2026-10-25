@@ -227,10 +227,7 @@ def _index_entry(
     principal_only: bool,
     keep_ended: bool = False,
 ) -> tuple[str, dict[str, Any], str] | None:
-    """A member's key, entry and kind (``entry``, ``repeal`` for a redaction that only marks
-    a repeal, or ``ended`` for a text whose validity ended before `today`, kept only with
-    `keep_ended`), or None for another kind of document, a municipal act, a redaction
-    no longer in force, or one with no title."""
+    """Key, entry and kind (entry, repeal or ended), or None where a filter drops the member."""
     prefix = data.decode("utf-8", errors="ignore")
     cut = data.find(_HEAD_END)
     head = prefix if cut < 0 else data[: cut + len(_HEAD_END)].decode("utf-8", errors="ignore")
@@ -313,8 +310,8 @@ def build_ee_index(
 ) -> dict[str, Any]:
     """Walk an Estonian bulk XML zip archive and index the state statutes not ended by
     `as_of` (today), so a text published ahead of its start is kept. Repeal-only
-    redactions go under ``repealed``, which no ingest reads. With `keep_ended`, texts
-    ended before `as_of` go under ``ended``, each with its validity end."""
+    redactions go under ``repealed``, which no ingest reads; with `keep_ended`, texts
+    ended before `as_of` go under ``ended``."""
     from datetime import UTC, datetime
 
     archive_path = Path(archive)
