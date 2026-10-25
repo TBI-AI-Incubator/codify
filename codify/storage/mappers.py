@@ -115,6 +115,15 @@ def _exclusion(
     return {"excluded_from_pool": reason is not None, "exclusion_reason": reason}
 
 
+# The rows a lead-in and a wrap-up get when children have rows of their own.
+INTRO_SUFFIX = "__intro"
+WRAP_UP_SUFFIX = "__wrapup"
+
+
+def _joined(*runs: str) -> str:
+    return "\n".join(r for r in runs if r.strip())
+
+
 def document_to_rows(
     doc: Document,
     law_id: uuid.UUID,
@@ -161,6 +170,23 @@ def document_to_rows(
         section_pos[section_id] = pos + 1
         return pos
 
+    def _append_wrap_up(
+        element: BodyElement, section_id: uuid.UUID | None, normative: bool
+    ) -> None:
+        provisions.append(
+            ProvisionRow(
+                version_id=version.id,
+                section_id=section_id,
+                akn_eid=f"{element.akn_eid}{WRAP_UP_SUFFIX}",
+                akn_wid=f"{element.akn_wid}{WRAP_UP_SUFFIX}",
+                akn_type="paragraph",
+                text=_normalise(element.wrap_up),
+                position=_next_pos(section_id),
+                normative=normative,
+                **_exclusion(element.wrap_up, element.akn_eid, markers, element.id in scoped),
+            )
+        )
+
     def _walk(
         element: BodyElement,
         parent_section_id: uuid.UUID | None,
@@ -200,7 +226,7 @@ def document_to_rows(
                         ),
                     )
                 )
-            elif element.text.strip():
+            elif lead := _joined(element.intro, element.text):
                 # Container has both inline lead-in text AND leaf children
                 # (e.g. "The Authority shall: (a)… (b)…"). Keep the lead-in as a
                 # position-0 provision so it isn't dropped ahead of the points.
@@ -208,26 +234,32 @@ def document_to_rows(
                     ProvisionRow(
                         version_id=version.id,
                         section_id=section_row.id,
-                        akn_eid=f"{element.akn_eid}__intro",
-                        akn_wid=f"{element.akn_wid}__intro",
+                        akn_eid=f"{element.akn_eid}{INTRO_SUFFIX}",
+                        akn_wid=f"{element.akn_wid}{INTRO_SUFFIX}",
                         akn_type="paragraph",
-                        text=_normalise(element.text),
+                        text=_normalise(lead),
                         position=_next_pos(section_row.id),
                         normative=normative,
-                        **_exclusion(
-                            element.text, f"{element.akn_eid}", markers, element.id in scoped
-                        ),
+                        **_exclusion(lead, f"{element.akn_eid}", markers, element.id in scoped),
                     )
                 )
             for child in element.children:
                 _walk(child, parent_section_id=section_row.id, normative=normative)
+            # The reader puts a section's rows before its subsections, so a wrap-up
+            # closing subsections would read first; only one closing provisions is rowed.
+            if element.wrap_up.strip() and not any(
+                c.kind in ROW_SECTION_KINDS for c in element.children
+            ):
+                _append_wrap_up(element, section_row.id, normative)
         elif element.kind in LEAF_KINDS:
             # A grouping point carries its lead-in in `intro` (and any tail in
             # `wrap_up`) with an empty `text`; fold both in so the lead-in isn't
             # dropped, otherwise a first sub-point the body-fill merged into the
             # lead-in (e.g. "أ- …التالية:- ١- …") would vanish entirely.
-            own_text = "\n".join(
-                p for p in (element.intro, element.text, element.wrap_up) if p.strip()
+            # A wrap-up after rowed children is its own row after them, in reading order.
+            closes_children = bool(element.children) and bool(element.wrap_up.strip())
+            own_text = _joined(
+                element.intro, element.text, "" if closes_children else element.wrap_up
             )
             # Skip a truly empty point (a bare marker grouping sub-points, or a
             # mis-detected enumerator), its children still reparent below.
@@ -254,6 +286,8 @@ def document_to_rows(
             # Nested leaves (point > indent) collapse to siblings in v2 schema.
             for child in element.children:
                 _walk(child, parent_section_id=parent_section_id, normative=normative)
+            if closes_children:
+                _append_wrap_up(element, parent_section_id, normative)
         else:
             raise ValueError(f"unknown element kind: {element.kind}")
 
