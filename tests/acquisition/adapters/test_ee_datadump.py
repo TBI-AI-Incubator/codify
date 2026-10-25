@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import zipfile
+from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -172,12 +173,15 @@ def _member(
     ids: bool = True,
     changes: int = 0,
     end: str = "",
+    group: str = "",
 ) -> bytes:
     """One archive member. `ids` writes the newer layout, `changes` lengthens the
-    metadata ahead of the title, `end` closes the redaction's validity."""
+    metadata ahead of the title, `end` closes the redaction's validity, `group` names
+    the act's redaction group."""
     attr = ' id="0c1e5b9a-8d1f-4a52-9c3e-2f6b7d8e9a01"' if ids else ""
     lopp = f"<kehtivuseLopp>{end}</kehtivuseLopp>" if end else ""
     history = "".join(_VERSION_CHANGE.format(n=n) for n in range(changes))
+    grouped = f"<terviktekstiGrupiID{attr}>{group}</terviktekstiGrupiID>" if group else ""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <oigusakt{attr} xmlns="Juurakt" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 \t<metaandmed>
@@ -198,7 +202,7 @@ def _member(
 \t\t<globaalID>{gid}</globaalID>
 \t\t<metaandmedVersioon>6</metaandmedVersioon>
 \t\t<metaandmedVersioonKuupaev>2026-09-30</metaandmedVersioonKuupaev>
-\t\t<metaandmedVersioonPohjustaja>Näidis Toimetaja</metaandmedVersioonPohjustaja>{history}
+\t\t<metaandmedVersioonPohjustaja>Näidis Toimetaja</metaandmedVersioonPohjustaja>{grouped}{history}
 \t</metaandmed>
 \t<aktinimi{attr}>
 \t\t<nimi{attr}>
@@ -291,7 +295,12 @@ _BODY = re.compile(rb"\t<sisu\b.*?</sisu>", re.S)
 
 
 def _repeal_stub(
-    gid: str, *, repealer: str | None = None, note: str | None = None, original: str = ""
+    gid: str,
+    *,
+    repealer: str | None = None,
+    note: str | None = None,
+    original: str = "",
+    group: str = "",
 ) -> bytes:
     """A redaction whose text is gone: no body, or only a "Kehtetu" note naming the act
     that repealed it. A repeal mark citing `repealer` follows the title."""
@@ -300,7 +309,7 @@ def _repeal_stub(
         if note is None
         else f"\t<sisu><sisuTekst><tavatekst>{note}</tavatekst></sisuTekst></sisu>".encode()
     )
-    member = _BODY.sub(body, _member(gid, ids=False))
+    member = _BODY.sub(body, _member(gid, ids=False, group=group))
     if original:
         member = member.replace(
             b"\t\t\t<aktiNr>42</aktiNr>",
@@ -386,15 +395,108 @@ def test_the_original_publication_is_read_from_the_adoption_block_alone(
     assert (entry["original"], entry["repealed_by"]) == (None, "900011")
 
 
-def _indexed_payload(tmp_path: Path, *members: bytes) -> dict[str, Any]:
+def _indexed_payload(tmp_path: Path, *members: bytes, **options: Any) -> dict[str, Any]:
     archive = tmp_path / "archive.zip"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
         for i, data in enumerate(members):
             zf.writestr(f"{i:012d}.xml", data)
-    return build_ee_index(archive)
+    return build_ee_index(archive, **options)
 
 
 def test_text_after_the_title_is_not_read_as_metadata(tmp_path: Path) -> None:
     # An abbreviation in the body is not the act's own, so it cannot make it the constitution.
     member = _member("607").replace(b"</sisu>", b"<lyhend>PS</lyhend></sisu>")
     assert _indexed(tmp_path, member)["607"]["doctype"] == "maarrus"
+
+
+# --- redactions of one act: the group, and texts whose validity has ended -------------
+
+
+@pytest.mark.parametrize("ids", [True, False], ids=["newer-layout", "older-layout"])
+def test_an_entry_records_its_redaction_group(tmp_path: Path, ids: bool) -> None:
+    payload = _indexed_payload(tmp_path, _member("701", group="9001", ids=ids), _member("703"))
+    assert (payload["entries"]["701"]["group"], payload["entries"]["703"]["group"]) == (
+        "9001",
+        None,
+    )
+
+
+def test_a_repeal_only_entry_records_its_redaction_group(tmp_path: Path) -> None:
+    stub = _repeal_stub("702", repealer="900002", group="9002")
+    assert _indexed_payload(tmp_path, stub)["repealed"]["702"]["group"] == "9002"
+
+
+def test_ended_redactions_are_kept_in_their_own_section_when_asked(tmp_path: Path) -> None:
+    current = _member("711", group="9100")
+    ended = _member("712", group="9100", end="2026-10-03")
+    asked = _indexed_payload(tmp_path, current, ended, keep_ended=True)
+    assert (list(asked["entries"]), list(asked["ended"])) == (["711"], ["712"])
+    assert (asked["ended"]["712"]["group"], asked["ended"]["712"]["valid_to"]) == (
+        "9100",
+        "2026-10-03",
+    )
+    assert asked["stats"]["ended"] == 1
+
+
+def test_the_index_is_as_before_unless_ended_redactions_are_asked_for(tmp_path: Path) -> None:
+    payload = _indexed_payload(tmp_path, _member("721"), _member("722", end="2026-10-03"))
+    assert list(payload["entries"]) == ["721"]
+    assert "ended" not in payload and "ended" not in payload["stats"]
+    assert payload["stats"]["skipped"] == 1
+
+
+@pytest.mark.parametrize(("day", "section"), [((2026, 10, 3), "entries"), ((2026, 10, 4), "ended")])
+def test_a_redaction_is_ended_only_once_its_last_day_has_passed(
+    tmp_path: Path, day: tuple[int, int, int], section: str
+) -> None:
+    payload = _indexed_payload(
+        tmp_path, _member("731", end="2026-10-03"), as_of=date(*day), keep_ended=True
+    )
+    assert list(payload[section]) == ["731"]
+
+
+def test_ended_redactions_are_filed_as_current_ones_are(tmp_path: Path) -> None:
+    municipal = _member("741", issuer="Näidise Linnavalitsus", end="2026-10-03")
+    decision = _member("742", kind="otsus", issuer="Vabariigi Valitsus", end="2026-10-03")
+    untitled = _member("743", title="", end="2026-10-03")
+    ended_stub = _repeal_stub("744", repealer="900004").replace(
+        b"</kehtivus>", b"<kehtivuseLopp>2026-10-03</kehtivuseLopp></kehtivus>"
+    )
+    amending = _member(
+        "746", title="Näidise seaduse muutmise seadus", kind="seadus", end="2026-10-03"
+    )
+    kept = _member("745", end="2026-10-03")
+    payload = _indexed_payload(
+        tmp_path, municipal, decision, untitled, ended_stub, kept, keep_ended=True
+    )
+    assert (list(payload["ended"]), payload["repealed"]) == (["745"], {})
+    principal = _indexed_payload(tmp_path, amending, keep_ended=True, principal_only=True)
+    assert principal["ended"] == {}
+
+
+@pytest.fixture
+def _restore_structlog() -> Iterator[None]:
+    """`main` repoints structlog's global configuration at a stream pytest later closes."""
+    import structlog
+
+    saved = structlog.get_config().copy()
+    yield
+    structlog.configure(**saved)
+
+
+def test_the_command_writes_the_ended_section_only_with_its_flag(
+    tmp_path: Path, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    archive = tmp_path / "archive.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("000000000751.xml", _member("751", end="2026-10-03", group="9300"))
+    written: dict[str, dict[str, Any]] = {}
+    for flags in ([], ["--keep-ended"]):
+        out = tmp_path / f"index{len(flags)}.json"
+        args = ["index-ee-archive", str(archive), "--out", str(out), "--as-of", "2026-10-20"]
+        assert main([*args, *flags, "--quiet"]) == 0
+        written[" ".join(flags)] = json.loads(out.read_text(encoding="utf-8"))
+    assert "ended" not in written[""]
+    assert list(written["--keep-ended"]["ended"]) == ["751"]
