@@ -71,7 +71,9 @@ class GacetaAcquirer(BaseAcquirer):
     _CONCURRENCY: ClassVar[int] = 1
     _client: httpx.AsyncClient
 
-    def __init__(self, adapter: SourceAdapter, *, client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self, adapter: SourceAdapter, *, client: httpx.AsyncClient | None = None
+    ) -> None:
         super().__init__(adapter, client=client)
         self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._listing: list[dict[str, Any]] | None = None
@@ -83,13 +85,19 @@ class GacetaAcquirer(BaseAcquirer):
             resp.raise_for_status()
             found = [i for i in map(_issue, resp.json()) if i is not None]
             found.sort(
-                key=lambda i: (i["year"], int(i["number"]) if i["number"].isdigit() else 0),
+                key=lambda i: (
+                    i["year"],
+                    int(i["number"]) if i["number"].isdigit() else 0,
+                ),
                 reverse=True,
             )
             self._listing = found
         return self._listing
 
     async def discover(self, query: DiscoveryQuery) -> AsyncIterator[DocumentRef]:
+        # The source holds whole issues only.
+        if query.doctype not in (None, DOCTYPE):
+            return
         yielded = 0
         for issue in await self.issues():
             if query.year_from is not None and issue["year"] < query.year_from:
@@ -108,13 +116,22 @@ class GacetaAcquirer(BaseAcquirer):
             )
 
     async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
-        issue = next((i for i in await self.issues() if i["number"] == ref.number), None)
+        issue = next(
+            (
+                i
+                for i in await self.issues()
+                if i["number"] == ref.number and i["year"] == ref.year
+            ),
+            None,
+        )
         if issue is None:
             raise FileNotFoundError(f"no published Gaceta Oficial issue {ref.number!r}")
         url = f"{self._base}{issue['pdf']}"
         resp = await self._client.get(url)
         if resp.status_code == 404:
-            raise FileNotFoundError(f"Gaceta Oficial issue {ref.number!r} PDF missing at {url}")
+            raise FileNotFoundError(
+                f"Gaceta Oficial issue {ref.number!r} PDF missing at {url}"
+            )
         resp.raise_for_status()
         language = ref.languages[0] if ref.languages else authoritative_language("do")
         return AcquiredDocument(

@@ -27,7 +27,11 @@ def _item(id_: str, title: str, year: int, **over: object) -> dict[str, object]:
         "createdAt": "2042-03-04T10:00:00.000Z",
         "updatedAt": "2042-03-04T10:00:00.000Z",
         "uploaderId": "u-1",
-        "uploader": {"id": "u-1", "name": "Invented Person", "email": "x@example.invalid"},
+        "uploader": {
+            "id": "u-1",
+            "name": "Invented Person",
+            "email": "x@example.invalid",
+        },
     }
     return item | over
 
@@ -50,7 +54,9 @@ def _client(calls: list[str]) -> httpx.AsyncClient:
         calls.append(request.url.path)
         if request.url.path == "/api/documents":
             return httpx.Response(200, json=LISTING)
-        if request.url.path.startswith("/uploads/") and request.url.path.endswith(".pdf"):
+        if request.url.path.startswith("/uploads/") and request.url.path.endswith(
+            ".pdf"
+        ):
             return httpx.Response(200, content=PDF, headers={"etag": '"g1"'})
         return httpx.Response(404)
 
@@ -59,7 +65,8 @@ def _client(calls: list[str]) -> httpx.AsyncClient:
 
 def _acquirer(calls: list[str]) -> GacetaAcquirer:
     return GacetaAcquirer(
-        SourceAdapter(kind="pdf_gazette", name="gaceta", base_url=BASE), client=_client(calls)
+        SourceAdapter(kind="pdf_gazette", name="gaceta", base_url=BASE),
+        client=_client(calls),
     )
 
 
@@ -95,7 +102,12 @@ async def test_discover_filters_year_range_and_limit() -> None:
 @pytest.mark.asyncio
 async def test_listing_drops_uploader_fields() -> None:
     issues = await _acquirer([]).issues()
-    leaked = [k for i in issues for k, v in i.items() if "uploader" in k or "Invented" in str(v)]
+    leaked = [
+        k
+        for i in issues
+        for k, v in i.items()
+        if "uploader" in k or "Invented" in str(v)
+    ]
     assert leaked == []
 
 
@@ -104,7 +116,11 @@ async def test_fetch_resolves_issue_to_pdf() -> None:
     calls: list[str] = []
     acquirer = _acquirer(calls)
     ref = DocumentRef(
-        jurisdiction_code="do", doctype="gazette", year=2041, number="9002", languages=["spa"]
+        jurisdiction_code="do",
+        doctype="gazette",
+        year=2041,
+        number="9002",
+        languages=["spa"],
     )
     acquired = await acquirer.fetch(ref)
     await acquirer.fetch(ref)
@@ -132,11 +148,46 @@ async def test_fetch_resolves_issue_to_pdf() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("number", ["9999", "9004", "9005", "9006", "9008", "9009"])
-async def test_fetch_missing_issue_is_a_permanent_miss(number: str) -> None:
-    ref = DocumentRef(jurisdiction_code="do", doctype="gazette", year=2042, number=number)
+@pytest.mark.parametrize(
+    ("number", "year"),
+    [
+        ("9999", 2042),
+        ("9004", 2042),
+        ("9005", 2042),
+        ("9006", 2042),
+        ("9008", 2042),
+        ("9001", 2042),
+    ],
+    ids=["absent", "draft", "not-gazette", "no-year", "no-pdf", "wrong-year"],
+)
+async def test_fetch_missing_issue_is_a_permanent_miss(number: str, year: int) -> None:
+    ref = DocumentRef(
+        jurisdiction_code="do", doctype="gazette", year=year, number=number
+    )
+    calls: list[str] = []
     with pytest.raises(FileNotFoundError):
-        await _acquirer([]).fetch(ref)
+        await _acquirer(calls).fetch(ref)
+    # A listing miss never reaches a PDF.
+    assert calls == ["/api/documents"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_a_listed_issue_whose_pdf_is_gone_is_a_permanent_miss() -> None:
+    ref = DocumentRef(
+        jurisdiction_code="do", doctype="gazette", year=2039, number="9009"
+    )
+    calls: list[str] = []
+    with pytest.raises(FileNotFoundError):
+        await _acquirer(calls).fetch(ref)
+    assert calls == ["/api/documents", "/gone/g-9009.pdf"]
+
+
+@pytest.mark.asyncio
+async def test_discover_returns_nothing_for_another_doctype() -> None:
+    calls: list[str] = []
+    refs = [r async for r in _acquirer(calls).discover(DiscoveryQuery(doctype="ley"))]
+    assert refs == [] and calls == []
+    assert len(await _discover(DiscoveryQuery(doctype="gazette"))) == 4
 
 
 def test_do_resolves_via_registry() -> None:
