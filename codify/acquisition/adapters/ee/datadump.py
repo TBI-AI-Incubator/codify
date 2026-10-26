@@ -349,14 +349,12 @@ def build_ee_index(
             if on_progress is not None and scanned % 10000 == 0:
                 on_progress(scanned, total, len(entries))
 
-    try:
-        portable_archive = str(archive_path.absolute().relative_to(Path.cwd()))
-    except ValueError:
-        portable_archive = str(archive_path)
+    # As given: a relative path stays relative to the working directory, an absolute one is kept.
+    recorded = os.path.abspath(archive_path) if archive_path.is_absolute() else str(archive_path)
 
     payload: dict[str, Any] = {
         "generated_at": datetime.now(UTC).isoformat(),
-        "archive": portable_archive,
+        "archive": recorded,
         "language": "est",
         "stats": {
             "files_scanned": scanned,

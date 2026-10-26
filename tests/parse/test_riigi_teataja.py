@@ -175,6 +175,34 @@ def test_is_riigi_teataja_detection() -> None:
     assert not is_riigi_teataja("not xml")
 
 
+@pytest.mark.parametrize(
+    "namespace",
+    [
+        "maarus_1_10.02.2010",
+        "muutmismaarus_1_10.02.2010",
+        "tyviseadus_1_10.02.2010",
+        "juurakt_1_10.02.2010",
+    ],
+)
+def test_a_versioned_schema_namespace_is_riigi_teataja(namespace: str) -> None:
+    xml = _SAMPLE_EST_XML.replace('xmlns="Juurakt"', f'xmlns="{namespace}"')
+    assert xml != _SAMPLE_EST_XML
+    assert is_riigi_teataja(xml)
+    akn_xml, meta = riigi_teataja_to_akn(xml)
+    validate_akn(akn_xml)
+    assert meta["title"] == "Äriregistri seadus"
+
+
+@pytest.mark.parametrize("namespace", ["maarus_1_10.02.2010", "Juurakt"])
+async def test_dispatch_routes_a_versioned_namespace_member_to_the_converter(
+    tmp_path: Path, namespace: str
+) -> None:
+    src = tmp_path / "105082011004.xml"
+    src.write_text(_SAMPLE_EST_XML.replace('xmlns="Juurakt"', f'xmlns="{namespace}"'), "utf-8")
+    events = [event async for event in ingest_document(src, "ee")]
+    assert any(isinstance(event, Complete) for event in events)
+
+
 def test_riigi_teataja_to_akn_validates_and_parses() -> None:
     akn_xml, meta = riigi_teataja_to_akn(_SAMPLE_EST_XML)
 
@@ -318,6 +346,9 @@ async def test_oversized_riigi_teataja_document(
     [
         b"<!DOCTYPE oigusakt><oigusakt xmlns='Juurakt'/>",
         b"<oigusakt xmlns='Elsewhere'/>",
+        b"<oigusakt xmlns='maarus_1_10.02.2010x'/>",
+        b"<oigusakt xmlns='Maarus_1_10.02.2010'/>",
+        b"<oigusakt/>",
         b"<!--" + b"x" * 70_000 + b"--><oigusakt xmlns='Juurakt'/>",
         b"<akomaNtoso xmlns='http://docs.oasis-open.org/legaldocml/ns/akn/3.0'>"
         + b"x" * 10_000_005

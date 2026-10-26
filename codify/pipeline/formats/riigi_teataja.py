@@ -145,8 +145,12 @@ def _rewrite_viide_uri(raw_uri: str) -> str:
     return raw_uri
 
 
+_SCHEMA_NAMESPACE = re.compile(r"Juurakt|[a-z]+_\d+_\d{2}\.\d{2}\.\d{4}")
+
+
 def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
-    """Check if source is an Estonian Riigi Teataja XML document."""
+    """Check if source is an Estonian Riigi Teataja XML document, in the current namespace or an
+    older versioned schema one."""
     try:
         if isinstance(source, etree._Element):
             root = source
@@ -179,7 +183,11 @@ def is_riigi_teataja(source: Path | str | bytes | etree._Element) -> bool:
             parser.feed(prefix)
             _event, root = next(parser.read_events())
         name = etree.QName(root)
-        return bool(name.localname == "oigusakt" and name.namespace == "Juurakt")
+        return bool(
+            name.localname == "oigusakt"
+            and name.namespace is not None
+            and _SCHEMA_NAMESPACE.fullmatch(name.namespace)
+        )
     except Exception:
         return False
 

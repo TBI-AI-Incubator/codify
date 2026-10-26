@@ -42,6 +42,12 @@ New, additive:
   text whose validity ended before the as-of date is listed under `ended`, with its
   validity end (`valid_to`); `entries` and `repealed` are as before, and without the option
   the index has no `ended` section.
+- `is_riigi_teataja` also accepts an `oigusakt` root in an older versioned schema namespace
+  (for example `maarus_1_10.02.2010`), so those members reach the Riigi Teataja converter
+  and no longer fail in the native AKN parser.
+- `build_ee_index` records the archive path as given: an absolute path stays absolute
+  (normalised, symlinks unresolved) rather than becoming relative to the working
+  directory, and a relative path stays relative.
 - A Riigi Teataja act whose only text is its preamble converts to a body paragraph, not
   a `<preamble>` over an empty body. An act with provisions keeps its preamble.
 - `akn_native` acquirer: a ref carrying `extra["pdf_fallback"]` takes the PDF that a
