@@ -71,9 +71,7 @@ class GacetaAcquirer(BaseAcquirer):
     _CONCURRENCY: ClassVar[int] = 1
     _client: httpx.AsyncClient
 
-    def __init__(
-        self, adapter: SourceAdapter, *, client: httpx.AsyncClient | None = None
-    ) -> None:
+    def __init__(self, adapter: SourceAdapter, *, client: httpx.AsyncClient | None = None) -> None:
         super().__init__(adapter, client=client)
         self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._listing: list[dict[str, Any]] | None = None
@@ -117,11 +115,7 @@ class GacetaAcquirer(BaseAcquirer):
 
     async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
         issue = next(
-            (
-                i
-                for i in await self.issues()
-                if i["number"] == ref.number and i["year"] == ref.year
-            ),
+            (i for i in await self.issues() if i["number"] == ref.number and i["year"] == ref.year),
             None,
         )
         if issue is None:
@@ -129,9 +123,7 @@ class GacetaAcquirer(BaseAcquirer):
         url = f"{self._base}{issue['pdf']}"
         resp = await self._client.get(url)
         if resp.status_code == 404:
-            raise FileNotFoundError(
-                f"Gaceta Oficial issue {ref.number!r} PDF missing at {url}"
-            )
+            raise FileNotFoundError(f"Gaceta Oficial issue {ref.number!r} PDF missing at {url}")
         resp.raise_for_status()
         language = ref.languages[0] if ref.languages else authoritative_language("do")
         return AcquiredDocument(
