@@ -880,7 +880,7 @@ SourceAdapterKind = Literal[
     "akn_native",  # Native AKN3 export. legislation.gov.uk, laws.africa.
     "eurlex_cellar",  # EUR-Lex Cellar (AKN4EU).
     "html_portal",  # HTML portal, pages + linked PDFs.
-    "pdf_gazette",  # Date-keyed PDF gazette (qbz.gov.al, JORF).
+    "pdf_gazette",  # PDF gazette (qbz.gov.al, consultoria.gov.do, JORF).
     "paragraf_propisi",  # Paragraf Lex slug-keyed PDFs (rs).
     "sparql",  # SPARQL endpoint (non-Cellar).
     "bulk_xml_archive",  # Bulk XML archives (USLM, Indigo dumps).
