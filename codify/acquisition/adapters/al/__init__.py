@@ -1,10 +1,7 @@
-"""AL adapter, registers `pdf_gazette` on import."""
+"""AL adapter; `pdf_gazette` is registered in the parent package."""
 
 from __future__ import annotations
 
-from codify.acquisition import register_adapter
 from codify.acquisition.adapters.al.qbz import QbzAcquirer
-
-register_adapter("pdf_gazette", QbzAcquirer.from_config)
 
 __all__ = ["QbzAcquirer"]

@@ -16,9 +16,11 @@ def install_protocol_data(monkeypatch, tmp_path):
         "rs": {"zakon": "", "uredba": "uredba"},
         "ua": {"zakon": "", "law": ""},
         "al": {"ligj": "ligj"},
+        "do": {"gazette": "gazette"},
     }
     adapters = {
         "al": [dict(kind="pdf_gazette", name="qbz", base_url="https://qbz.gov.al")],
+        "do": [dict(kind="pdf_gazette", name="gaceta", base_url="https://gazette.invalid")],
         "eu": [
             dict(kind="eurlex_cellar", name="eu-sparql"),
             dict(kind="bulk_xml_archive", name="eu-datadump"),
