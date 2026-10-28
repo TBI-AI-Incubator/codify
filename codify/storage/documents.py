@@ -104,10 +104,11 @@ class InlineNote(BaseModel):
 
 
 class InlineAnchor(BaseModel):
-    """A citable point in running text, with no words of its own."""
+    """Running text a citation can name, such as a recital."""
 
     kind: Literal["anchor"] = "anchor"
     eid: str
+    children: list["InlineNode"] = Field(default_factory=list)
 
 
 InlineNode = Union[
@@ -126,6 +127,7 @@ InlineMod.model_rebuild()
 InlineEmph.model_rebuild()
 InlineStrong.model_rebuild()
 InlineNote.model_rebuild()
+InlineAnchor.model_rebuild()
 
 
 class DocumentTableCell(BaseModel):
@@ -786,7 +788,7 @@ def _quote_block(mod: etree._Element, quoted: etree._Element) -> DocumentProvisi
     )
 
 
-def _walk_text_block(el: etree._Element) -> list[InlineNode]:
+def _walk_text_block(el: etree._Element, citable: frozenset[str] | None = None) -> list[InlineNode]:
     """Flatten a `<preface>` / `<preamble>` container: each `<p>` is a
     paragraph, non-`<p>` containers recurse. Joined with `\\n\\n`.
 
@@ -805,13 +807,15 @@ def _walk_text_block(el: etree._Element) -> list[InlineNode]:
                 out.append(InlineText(text="\n\n"))
             out.extend(_walk_inline(child))
             continue
-        inner = _walk_text_block(child)
+        inner = _walk_text_block(child, citable)
         if inner:
             if out:
                 out.append(InlineText(text="\n\n"))
-            if cname == "recital" and child.get("eId"):
-                out.append(InlineAnchor(eid=child.get("eId", "")))
-            out.extend(inner)
+            eid = child.get("eId", "")
+            if cname == "recital" and eid and (citable is None or eid in citable):
+                out.append(InlineAnchor(eid=eid, children=inner))
+            else:
+                out.extend(inner)
     return out
 
 
@@ -980,11 +984,8 @@ async def get_version_document(
             if preface_el is not None:
                 preface_nodes = _walk_text_block(preface_el)
             if preamble_el is not None:
-                preamble_nodes = _walk_text_block(preamble_el)
-                rowed = {p.akn_eid for p in provisions if p.akn_type == RECITAL}
-                preamble_nodes = [
-                    n for n in preamble_nodes if not isinstance(n, InlineAnchor) or n.eid in rowed
-                ]
+                rowed = frozenset(p.akn_eid for p in provisions if p.akn_type == RECITAL)
+                preamble_nodes = _walk_text_block(preamble_el, rowed)
             conclusions_el = _direct_child(doc_root, "conclusions")
             if conclusions_el is not None:
                 conclusions_nodes = _walk_text_block(conclusions_el)

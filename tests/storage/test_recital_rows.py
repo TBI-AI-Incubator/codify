@@ -7,7 +7,7 @@ import uuid
 from lxml import etree
 
 from codify.akn._parser import parse_document
-from codify.storage.documents import InlineAnchor, _walk_text_block
+from codify.storage.documents import InlineAnchor, InlineText, _walk_text_block
 from codify.storage.mappers import document_to_rows, rows_to_document
 
 _HEAD = """<?xml version="1.0" encoding="UTF-8"?>
@@ -126,15 +126,16 @@ def test_rows_read_back_put_recitals_beside_the_body_not_in_it() -> None:
     assert all(e.akn_eid.startswith("art_1") for e in doc.body)
 
 
-def test_the_preamble_reading_marks_where_each_recital_begins() -> None:
+def test_the_preamble_reading_wraps_each_recital_in_an_anchor() -> None:
     el = etree.fromstring(_PREAMBLE.replace("<preamble>", _NS_PREAMBLE, 1))
     nodes = _walk_text_block(el)
-    assert [n.eid for n in nodes if isinstance(n, InlineAnchor)] == [
-        "recitals__rec_1",
-        "recitals__rec_2",
-    ]
-    anchors = [i for i, n in enumerate(nodes) if isinstance(n, InlineAnchor)]
-    assert "Lenses" in nodes[anchors[0] + 1].text  # type: ignore[union-attr]
+    anchors = [n for n in nodes if isinstance(n, InlineAnchor)]
+    assert [a.eid for a in anchors] == ["recitals__rec_1", "recitals__rec_2"]
+    assert "Lenses should be kept clean" in "".join(
+        n.text for n in anchors[0].children if isinstance(n, InlineText)
+    )
+    held = _walk_text_block(el, frozenset({"recitals__rec_2"}))
+    assert [n.eid for n in held if isinstance(n, InlineAnchor)] == ["recitals__rec_2"]
 
 
 _NS_PREAMBLE = '<preamble xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">'

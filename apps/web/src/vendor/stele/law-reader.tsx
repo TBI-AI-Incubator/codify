@@ -13,7 +13,7 @@ type InlineModNode = { kind: 'mod'; children: InlineNode[] };
 type InlineStrongNode = { kind: 'strong'; children: InlineNode[] };
 type InlineTextNode = { kind: 'text'; text: string };
 type InlineNoteNode = { kind: 'note'; children: InlineNode[]; inferred?: boolean };
-type InlineAnchorNode = { kind: 'anchor'; eid: string };
+type InlineAnchorNode = { kind: 'anchor'; eid: string; children: InlineNode[] };
 type InlineNode =
   | InlineTextNode
   | InlineRefNode
@@ -284,7 +284,11 @@ function InlineNodeView({ node }: { node: InlineNode }): React.ReactNode {
         </strong>
       );
     case 'anchor':
-      return <span id={node.eid} data-akn-target="true" />;
+      return (
+        <span id={node.eid} data-akn-target="true">
+          <Inline nodes={node.children} />
+        </span>
+      );
     case 'note':
       return (
         <span

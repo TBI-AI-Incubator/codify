@@ -1953,8 +1953,43 @@
         "type": "object"
       },
       "InlineAnchor": {
-        "description": "A citable point in running text, with no words of its own.",
+        "description": "Running text a citation can name, such as a recital.",
         "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
           "eid": {
             "title": "Eid",
             "type": "string"

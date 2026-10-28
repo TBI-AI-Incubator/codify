@@ -1023,9 +1023,11 @@ export interface components {
         };
         /**
          * InlineAnchor
-         * @description A citable point in running text, with no words of its own.
+         * @description Running text a citation can name, such as a recital.
          */
         InlineAnchor: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Eid */
             eid: string;
             /**
