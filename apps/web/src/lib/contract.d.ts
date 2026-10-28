@@ -1564,6 +1564,8 @@ export interface components {
             printed_page_pattern?: string | null;
             /** Skip Heading Patterns */
             skip_heading_patterns?: string[];
+            /** Trailing Section Patterns */
+            trailing_section_patterns?: string[];
         };
         /**
          * SeriesCitation
