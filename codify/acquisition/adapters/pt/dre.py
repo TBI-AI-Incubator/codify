@@ -142,7 +142,10 @@ class DiarioAcquirer(BaseAcquirer):
         return self._cache / f"{hashlib.sha256(key.encode()).hexdigest()[:24]}.json"
 
     async def _cached(
-        self, key: str, get: Callable[[], Awaitable[dict[str, Any]]]
+        self,
+        key: str,
+        get: Callable[[], Awaitable[dict[str, Any]]],
+        keep: Callable[[dict[str, Any]], bool] = lambda _: True,
     ) -> dict[str, Any]:
         # shortcut: a saved answer is never refreshed; delete the file to refetch.
         path = self._cache_path(key)
@@ -150,7 +153,8 @@ class DiarioAcquirer(BaseAcquirer):
             self._read_at[key] = datetime.fromtimestamp(path.stat().st_mtime, UTC)
             return dict(json.loads(path.read_text()))
         value = await get()
-        if path is not None:
+        # Only a positive answer is saved: an error page may be passing.
+        if path is not None and keep(value):
             path.parent.mkdir(parents=True, exist_ok=True)
             write_index(path, value)
         return value
@@ -163,15 +167,18 @@ class DiarioAcquirer(BaseAcquirer):
             for _ in range(5):
                 resp = await self._client.get(here, follow_redirects=False)
                 if resp.status_code not in _REDIRECTS or "location" not in resp.headers:
-                    # A refusal is not an answer; it must not be saved as one.
-                    resp.raise_for_status()
+                    if resp.status_code not in (404, 410):
+                        resp.raise_for_status()
                     break
                 here = urljoin(here, resp.headers["location"])
                 if urlparse(here).path.startswith("/dr/"):
                     break
             return {"final": here}
 
-        return str((await self._cached(f"GET {url}", go))["final"])
+        def landed(v: dict[str, Any]) -> bool:
+            return bool(_CONS_PATH.search(v["final"]) or _DETAIL_PATH.search(v["final"]))
+
+        return str((await self._cached(f"GET {url}", go, landed))["final"])
 
     async def _version(self) -> str:
         if self._module_version is None:
@@ -180,7 +187,13 @@ class DiarioAcquirer(BaseAcquirer):
             self._module_version = str(resp.json()["versionToken"])
         return self._module_version
 
-    async def _call(self, action: Action, variables: dict[str, Any], key: str) -> dict[str, Any]:
+    async def _call(
+        self,
+        action: Action,
+        variables: dict[str, Any],
+        key: str,
+        keep: Callable[[dict[str, Any]], bool] = lambda _: True,
+    ) -> dict[str, Any]:
         path, api, view = action
 
         async def go() -> dict[str, Any]:
@@ -205,11 +218,16 @@ class DiarioAcquirer(BaseAcquirer):
                 raise DrItemMissing(f"{path}: {out.get('exception')!r}")
             return dict(out["data"])
 
-        return await self._cached(key, go)
+        return await self._cached(key, go, keep)
 
     async def _detail(self, link: str) -> dict[str, Any]:
         tipo, key = link.split("/", 1)
-        data = await self._call(DETAIL, {"Tipo": tipo, "Key": key}, f"detail {link}")
+        data = await self._call(
+            DETAIL,
+            {"Tipo": tipo, "Key": key},
+            f"detail {link}",
+            lambda d: bool((d.get("DetalheConteudo") or {}).get("Id")),
+        )
         detail = data.get("DetalheConteudo")
         if not isinstance(detail, dict) or not detail.get("Id"):
             raise DrItemMissing(f"no act at {link!r}")
@@ -263,7 +281,9 @@ class DiarioAcquirer(BaseAcquirer):
                 last = str(data.get("DataUltimaConsolidada") or "")[:10]
                 cons = {
                     "url": landed,
-                    "date": last if last > "1900-01-01" else max(f["version_date"] for f in frags),
+                    "date": last
+                    if last > "1900-01-01"
+                    else max((f["version_date"] for f in frags), default=""),
                     "in_update": bool(
                         frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"].get("EmAtualizacao")
                     ),
@@ -294,10 +314,13 @@ class DiarioAcquirer(BaseAcquirer):
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
             raise DrItemMissing(f"{link} has no publication date")
         number, year = number_and_year(str(detail.get("Numero") or ""), published)
-        if (number, year) != (ref.number.upper(), str(ref.year)):
-            raise ValueError(f"ref asks for {ref.number}/{ref.year}; {link} is {number}/{year}")
+        named = {(ref.number.upper(), str(ref.year)), (eli_num.upper(), eli_year)}
+        if named != {(number, year)}:
+            raise ValueError(
+                f"ref asks for {ref.number}/{ref.year} by {eli}; {link} is {number}/{year}"
+            )
         work = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
-        as_of = cons["date"] if cons else published
+        as_of = (cons["date"] if cons else "") or published
         expression = build_frbr_expression_uri(work, "por", as_of)
         printed = str(detail.get("Texto") or "")
         title = " ".join(str(detail.get("Titulo") or "").split())

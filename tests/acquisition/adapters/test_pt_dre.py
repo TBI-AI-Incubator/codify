@@ -158,9 +158,16 @@ LANDINGS = {
 class Gazette:
     """The site's answers, and every request it was asked."""
 
-    def __init__(self, frags: list[dict[str, Any]] | None = None, *, changed: bool = False):
+    def __init__(
+        self,
+        frags: list[dict[str, Any]] | None = None,
+        *,
+        changed: bool = False,
+        last: str = "2043-03-01",
+    ):
         self.frags = CONSOLIDATED if frags is None else frags
         self.changed = changed
+        self.last = last
         self.seen: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -191,7 +198,7 @@ class Gazette:
                 }
             else:
                 assert v["GetDiplomaFragByIdAndApplicationSetting"]
-                data = {"LegConsBase": {"List": self.frags}, "DataUltimaConsolidada": "2043-03-01"}
+                data = {"LegConsBase": {"List": self.frags}, "DataUltimaConsolidada": self.last}
             return httpx.Response(200, json={"versionInfo": info, "data": data})
         raise AssertionError(f"unexpected request {request.url}")
 
@@ -451,3 +458,55 @@ def test_an_act_with_no_operative_text_is_refused() -> None:
     root = {"id": "1", "parent": "0", "label": "Diploma", "heading": "", "text": "Preâmbulo."}
     with pytest.raises(UnmappedFragment, match="no operative text"):
         to_bluebell([root])
+
+
+async def test_an_eli_and_detail_naming_different_acts_are_refused() -> None:
+    ref = _ref(
+        "4",
+        2043,
+        eli="https://data.dre.pt/eli/dec-lei/7/2042/03/02/p/dre",
+        detail="decreto-lei/4-2043-900002",
+    )
+    with pytest.raises(ValueError, match="by https://data.dre.pt/eli/dec-lei/7/2042"):
+        await _fetch(Gazette(), ref)
+
+
+async def test_only_positive_answers_are_saved(tmp_path: Path) -> None:
+    cache = tmp_path / "raw"
+    ref = _ref("4", 2043, eli="https://data.dre.pt/eli/dec-lei/4/2043/01/10/p/dre")
+    await _fetch(Gazette(), ref, cache=cache)
+    again = Gazette()
+    await _fetch(again, ref, cache=cache)
+    # "No consolidation" is asked again; the act's own landing and detail are not.
+    assert [r.url.path for r in again.seen] == [
+        "/eli/dec-lei/4/2043/p/cons/pt/html",
+        "/redirect/LinkELI.aspx",
+    ]
+    missing = _ref("5", 2043, detail="decreto-lei/5-2043-1")
+    with pytest.raises(DrItemMissing, match="no act at"):
+        await _fetch(Gazette(), missing, cache=cache)
+    assert len(list(cache.iterdir())) == 2
+
+
+async def test_an_eli_the_site_does_not_know_reads_as_no_consolidation() -> None:
+    gazette = Gazette()
+
+    def gone(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/p/cons/pt/html"):
+            return httpx.Response(404)
+        return gazette(request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(gone))
+    acquirer = DiarioAcquirer(SourceAdapter(kind="json_portal", name="dre"), client=client)
+    ref = _ref("4", 2043, eli="https://data.dre.pt/eli/dec-lei/4/2043/01/10/p/dre")
+    doc = await acquirer.fetch(ref)
+    await client.aclose()
+    assert doc.upstream_metadata["text_source"] == "printed"
+
+
+async def test_an_undated_consolidation_is_dated_by_its_versions_or_publication() -> None:
+    undated = [
+        {**f, "FragmentoVersao": {**f["FragmentoVersao"], "DataVersao": ""}} for f in CONSOLIDATED
+    ]
+    doc, _ = await _fetch(Gazette(undated, last=""), _ref("7", 2042))
+    assert doc.expression_uri == "/akn/pt/act/dl/2042/7/por@2042-03-02"
