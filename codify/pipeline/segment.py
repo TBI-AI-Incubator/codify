@@ -154,6 +154,8 @@ class _Heading:
     label: str
     key: str
     page: int | None
+    # The `number` group read as an integer, where the pattern has one.
+    number: int | None = None
 
 
 @dataclass(frozen=True)
@@ -252,6 +254,7 @@ def _headings(text: str, patterns: Sequence[re.Pattern[str]], pages: _Pages) -> 
                 label=text[start:end].strip(),
                 key=_key(match),
                 page=page.page if page else None,
+                number=_number(match),
             )
     return [found[k] for k in sorted(found)]
 
@@ -536,7 +539,7 @@ def segment(
     blocks, entries = _contents(text, rules, headings, markers, pages, config.code)
     checks = _Rules(config, blocks)
     # A region kept apart opens on its heading alone: its entry is no act to find.
-    entries = [e for e in entries if not checks.skips(e.label)]
+    entries = [e for e in entries if not checks.skips(_LEADER_RE.sub("", e.label).rstrip())]
     candidates = [h for h in headings if not _within(h.start, blocks)]
     # A provision a listing names is an entry: it neither opens nor numbers the body.
     markers = [m for m in markers if not _within(m.offset, blocks)]
@@ -623,12 +626,13 @@ def _decide_pass(
             decided.append((heading, signals))
             kept_apart = True
             continue
-        # The next act's number after kept-apart text: a quote left open there claims nothing.
-        sequel = kept_apart and last is not None and _number(heading.key) == last + 1
+        sequel = kept_apart and last is not None and heading.number == last + 1
+        # A quotation reaching it from kept-apart text: held unless the contents list it.
+        inherited = sequel and _quoted(text, heading.start, rules.country)
         veto = (
             ""
             if is_opening
-            else _veto(text, heading, open_heading, following, markers, rules, not sequel)
+            else _veto(text, heading, open_heading, following, markers, rules, not inherited)
         )
         if veto:
             rows.append(_row(heading, "vetoed", veto=veto))
@@ -662,11 +666,13 @@ def _decide_pass(
                 f" {heading.page}, where the contents lists it: which opens the act is unclear"
             )
             doubts.append(((earlier.start, heading.start), why))
-        if status in ("matched", "corroborated", "opening"):
+        if status in ("matched", "corroborated", "opening") and not (
+            inherited and status != "matched"
+        ):
             if not is_opening:
                 decided.append((heading, signals))
             open_heading, previous = heading, heading.start
-            last, kept_apart = _number(heading.key), False
+            last, kept_apart = heading.number, False
         elif signals or status not in ("heading_only", "citation"):
             at = (heading.start, heading.start)
             listed_at = pages.start_of(entry.pdf_page) if entry and entry.pdf_page else None
@@ -676,7 +682,7 @@ def _decide_pass(
             doubts.append((at, row.describe()))
             doubted.append(heading)
             if sequel:
-                last = _number(heading.key)
+                last = heading.number
         if is_opening:
             open_heading, previous = heading, heading.start
     for entry in unmatched:
@@ -735,7 +741,8 @@ def _veto(
         return "follows a declaration adopting another text"
     if rules.caption is not None and _found(rules.caption, text, country, lo, heading.start, skip):
         return "follows an attachment caption"
-    if rules.enacting is not None and open_heading is not None:
+    # Quote-masked, an inherited quotation would hide the formula too.
+    if rules.enacting is not None and open_heading is not None and quotes:
         # Each bounded by the heading after it, or one act's formula stands in for another's.
         opened = _opening_region(open_heading.start, heading.start, markers, len(text))
         here = _opening_region(heading.start, following, markers, len(text))
@@ -746,9 +753,9 @@ def _veto(
     return ""
 
 
-def _number(key: str) -> int | None:
-    found = re.search(r"\d+$", key)
-    return int(found.group()) if found else None
+def _number(match: re.Match[str]) -> int | None:
+    raw = re.sub(r"\s+", "", normalise_digits(match.groupdict().get("number") or ""))
+    return int(raw) if raw.isdecimal() else None
 
 
 def _opening_region(start: int, stop: int, markers: list[_Marker], length: int) -> tuple[int, int]:

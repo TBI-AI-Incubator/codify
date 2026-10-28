@@ -1647,13 +1647,15 @@ def test_an_act_continuing_under_a_repeated_heading_is_held(config: Jurisdiction
 
 
 # Headings of regions kept apart: a notices section, and a second text of each act.
-KEPT_APART = [r"(?P<section>NOTICES)\b", r"(?P<section>PARALLEL TEXT)[ \t]*$"]
+KEPT_APART = [r"(?P<section>NOTICES)[ \t]*$", r"(?P<section>PARALLEL TEXT)[ \t]*$"]
+# A prefix heading, so a contents line carrying leaders and a page is an entry.
+NOTICES_HEADING = r"(?P<section>NOTICES)\b"
 
 
-def _kept_config(**overrides: object) -> dict[str, object]:
+def _kept_config(act_heading: str = ACT_HEADING, **overrides: object) -> dict[str, object]:
     segmentation = {
         **SEGMENTATION,
-        "act_heading_patterns": [ACT_HEADING, *KEPT_APART],
+        "act_heading_patterns": [act_heading, NOTICES_HEADING, *KEPT_APART],
         "skip_heading_patterns": KEPT_APART,
     }
     return _config(segmentation=segmentation, **overrides)
@@ -1710,22 +1712,48 @@ def test_a_second_text_after_the_signature_is_kept_apart(
     _conserved(result, text)
 
 
-def test_the_next_act_after_kept_apart_text_opens_past_a_stray_quote(
-    kept: JurisdictionConfig,
+@pytest.mark.parametrize(
+    "act_heading", [ACT_HEADING, r"ACT No\. (?P<number>\d+) OF (?P<year>\d{4})"]
+)
+def test_the_next_act_after_kept_apart_text_opens_on_its_number(
+    act_heading: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Act 3 is unsigned and too short to restart from; the second text leaves a
-    quotation open that closes inside act 4. Only the number following act 3's opens it."""
-    act4 = _act(4, "THE PILOTS” ACT", 2)
-    act4 += ["ACT No. 5 OF 2020 is repealed.", ""]
-    lines = [*_act(3, "THE HARBOUR DUES ACT", 2), *_parallel("It cites “the dues"), *act4]
-    text, spans = _join([lines])
-    result = segment(text, spans, config=kept)
+    """Act 3 is unsigned and too short to restart from: only act 4's number, following
+    act 3's, opens it. A year captured beside the number changes nothing."""
+    act4 = [*_act(4, "THE PILOTS ACT", 2), "ACT No. 5 OF 2020 is repealed.", ""]
+    lines = [*_act(3, "THE HARBOUR DUES ACT", 2), *_parallel(), *act4]
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: _kept_config(act_heading)}):
+        text, spans = _join([lines])
+        result = segment(text, spans, config=load_config(COUNTRY))
     assert result.outcome == "decided"
-    assert [s.key for s in result.segments] == ["act 3", "paralleltext", "act 4"]
+    assert [s.text.split("\n")[0] for s in result.segments] == [
+        "ACT No. 3 OF 2020",
+        "PARALLEL TEXT",
+        "ACT No. 4 OF 2020",
+    ]
     assert result.segments[2].signals == ("next_number",)
-    assert result.segments[2].text.startswith("ACT No. 4 OF 2020")
     # Once act 4 opens, the number after it is no longer read past kept-apart text.
-    assert next(r.status for r in result.reconciliation if r.key == "act 5") == "citation"
+    act5 = next(r for r in result.reconciliation if r.label.startswith("ACT No. 5"))
+    assert act5.status == "citation"
+    _conserved(result, text)
+
+
+@pytest.mark.parametrize("enacting", [[], ["BE IT ENACTED"]])
+def test_the_next_act_inside_a_quote_from_kept_apart_text_is_held(
+    enacting: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second text opens a quotation that closes after act 4's enacting formula,
+    masking it: the number alone holds act 4, neither kept apart nor an act."""
+    act4 = _act(4, "THE PILOTS ACT", 2)
+    act4[act4.index("BE IT ENACTED by the Assembly:")] = "BE IT ENACTED by the Assembly” thus:"
+    lines = [*_act(3, "THE HARBOUR DUES ACT", 2), *_parallel("It cites “the dues"), *act4]
+    fields = _kept_config(enacting_formula_markers=enacting)
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([lines])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    assert result.outcome == "abstained"
+    assert [s.key for s in result.segments] == ["act 3"]
+    assert len(result.held) == 1 and "'ACT No. 4 OF 2020'" in result.held[0].reason
     _conserved(result, text)
 
 
@@ -1758,7 +1786,7 @@ def test_a_kept_apart_heading_above_the_first_act_is_front_matter(
     kept: JurisdictionConfig,
 ) -> None:
     pages = _three_act_issue()
-    pages[0].insert(1, "NOTICES AND ACTS OF THE ASSEMBLY")
+    pages[0].insert(1, "NOTICES")
     text, spans = _join(pages)
     result = segment(text, spans, config=kept)
     assert result.outcome == "decided"

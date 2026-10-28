@@ -89,7 +89,8 @@ New, additive:
   contents entry it names is no act to find. The open act's evidence runs on
   past the region, so it ends at the next act. After kept-apart text, the
   heading numbered next after the last act is evidence of its own
-  (`next_number`), and a quotation left open there does not claim it.
+  (`next_number`). Reached by a quotation opened in that text, it is held unless
+  the contents list it.
 - `codify.pipeline.segment`: splits a source holding several acts, such as a
   gazette issue, without a model call. `segment` returns a `Segmentation`:
   `single` (the text unchanged), `decided` (one segment per act) or
