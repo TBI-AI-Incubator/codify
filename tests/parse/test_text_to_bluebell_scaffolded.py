@@ -972,3 +972,49 @@ async def test_a_table_restored_from_the_source_counts_as_copied_in():
     )
     fill = traces[0].body_fill
     assert (fill.verbatim, fill.model_filled) == (("sec_1",), 0)
+
+
+_ARTICLELESS_DECISION = """DECISION
+on the allocation of a reserve fund
+
+Pursuant to
+article 26(10) of the Act on Public Finances, the Council of Ministers
+adopted this
+
+DECISION
+
+The sum of 1,000 crowns is allocated to the Lighthouse Authority.
+
+President of the Council
+"""
+
+
+@pytest.mark.asyncio
+async def test_a_wrapped_citation_does_not_halt_a_document_without_articles():
+    """A citation wrapped onto its own line is not a heading the scanner missed."""
+    result = await text_to_bluebell_scaffolded(
+        _ARTICLELESS_DECISION, client=_EchoUnless(), country="xa", doctype="code"
+    )
+    assert "ARTICLE" not in result
+
+
+@pytest.mark.asyncio
+async def test_lower_case_headings_the_scanner_misses_still_halt():
+    from codify.pipeline.enrich import structure as structure_mod
+
+    text = "".join(f"article {n}\nThe keeper shall tend light {n}.\n\n" for n in range(1, 6))
+    with pytest.raises(structure_mod.AnchorCoverageError):
+        await text_to_bluebell_scaffolded(text, client=_EchoUnless(), country="xa", doctype="code")
+
+
+def test_a_lower_case_alias_keeps_its_headings_in_coverage():
+    from codify.pipeline.enrich.anchors import _wrapped_sentence
+
+    text = "article 4 Definitions"
+    m = re.match(r"(?i)(?P<k_article>article) (?P<num>\d+)", text)
+    assert m is not None
+    assert _wrapped_sentence(text, m, "article", ["Article"])
+    assert not _wrapped_sentence(text, m, "article", ["article"])
+    titled = re.match(r"(?i)(?P<k_article>article) (?P<num>\d+)", "Article 4 Definitions")
+    assert titled is not None
+    assert not _wrapped_sentence("Article 4 Definitions", titled, "article", ["Article"])

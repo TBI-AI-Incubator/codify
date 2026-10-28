@@ -4707,8 +4707,20 @@ def _marker_numbers(
             continue
         if _opens_citation_run(text, m.end(), config.code if config else ""):
             continue
+        if _wrapped_sentence(text, m, kind, aliases):
+            continue
         distinct.add(_normalise_number(_repair_damaged_num(m)))
     return distinct | from_declared
+
+
+def _wrapped_sentence(text: str, m: re.Match[str], kind: str, aliases: list[str]) -> bool:
+    """A lower-case keyword no alias spells, with words running on after its number:
+    a sentence wrapped onto a new line, which the case-sensitive scanner rightly skips."""
+    keyword = m.group(_group_name(kind)) or ""
+    if not keyword[:1].islower() or any(a[:1].islower() for a in aliases):
+        return False
+    line_end = text.find("\n", m.end())
+    return any(c.isalpha() for c in text[m.end() : line_end if line_end >= 0 else len(text)])
 
 
 # Line-start Arabic article keyword, digit-agnostic and tolerant of the stray `)`
