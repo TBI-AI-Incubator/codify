@@ -1,6 +1,6 @@
 """Running-exemplar pool for register locking. Each body-fill batch samples one short
 deontic-rich provision, source and target, and later batches get it prepended as an
-already-agreed translation. Constructed per chapter in `translate_bodies`, so a bad
+already-agreed translation. Constructed per lane in `translate_bodies`, so a bad
 exemplar cannot cross; a bounded `collections.deque`, so the earliest rolls off.
 """
 

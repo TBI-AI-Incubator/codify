@@ -35,6 +35,7 @@ _PROMPTS = Path(__file__).parent / "prompts"
 BODY_FILL_PROMPT = (_PROMPTS / "translate_body_system.txt").read_text()
 
 DEFAULT_BATCH_SIZE = 8
+LANE_BATCHES = 8
 
 
 class TranslatedBlock(BaseModel):
@@ -166,9 +167,6 @@ async def translate_bodies(
     if not units:
         return BodyFillOutcome(response=BodyFillResponse(bodies=[]))
 
-    # Chapter-locality grouping: each chapter's batches iterate serially so
-    # exemplars from batch N of a chapter feed batch N+1 of the same
-    # chapter; chapters race the outer semaphore for wall-clock parallelism.
     groups = group_by_chapter(units, batch_size)
     all_batches: list[list[SourceUnit]] = [b for g in groups for b in g.batches]
     semaphore = asyncio.Semaphore(concurrency)
@@ -193,7 +191,7 @@ async def translate_bodies(
         pool: ExemplarPool | None,
     ) -> tuple[list[TranslatedBlock], bool]:
         """Translate one batch. Returns ``(blocks, llm_failed)`` so the
-        chapter loop can gate exemplar-pool feed on a real LLM response
+        lane loop can gate exemplar-pool feed on a real LLM response
         (a fallback batch echoes source and must not seed the pool)."""
         nonlocal done_count, bodies_fallback, headings_fallback
         nonlocal sentinels_missing, stray_sentinels
@@ -358,15 +356,14 @@ async def translate_bodies(
             out.append(TranslatedBlock(eid=u.akn_eid, heading=heading, lines=lines))
         return out, False
 
-    # Each chapter forks a fresh `ExemplarPool`, so a bad exemplar cannot cross;
-    # batches run serially within one so N feeds N+1, while the outer gather races
-    # the semaphore across them. Fallback batches feed nothing: an LLM failure
-    # emits `[UNTRANSLATED]`, and pooling that teaches later batches to skip work.
+    # Each lane runs serially on a fresh pool; fallback batches never feed it.
     pool_picks_total = 0
     pool_scans_total = 0
 
+    active = exemplar_pool is not None and exemplar_pool.active
+
     def _fresh_pool() -> ExemplarPool | None:
-        if exemplar_pool is None:
+        if exemplar_pool is None or not active:
             return None
         return ExemplarPool(
             target_language=exemplar_pool.target_language,
@@ -374,25 +371,24 @@ async def translate_bodies(
             capacity=exemplar_pool.capacity,
         )
 
-    # Precompute a stable batch index per (group, position) so the
-    # per-chapter loop can index into batch_manifests without an id() dict.
-    group_batch_offsets: list[int] = []
+    # An inert pool learns nothing, so each batch is its own lane.
+    lane_size = LANE_BATCHES if active else 1
+    lanes: list[list[int]] = []
     running = 0
     for g in groups:
-        group_batch_offsets.append(running)
+        ids = list(range(running, running + len(g.batches)))
         running += len(g.batches)
+        lanes.extend(ids[i : i + lane_size] for i in range(0, len(ids), lane_size))
 
-    async def _one_chapter(
-        group_idx: int, group_batches: list[list[SourceUnit]]
-    ) -> list[list[TranslatedBlock]]:
+    results: list[list[TranslatedBlock]] = [[] for _ in all_batches]
+
+    async def _one_lane(lane: list[int]) -> None:
         nonlocal pool_picks_total, pool_scans_total
         pool = _fresh_pool()
-        out: list[list[TranslatedBlock]] = []
-        base = group_batch_offsets[group_idx]
-        for offset, batch in enumerate(group_batches):
-            idx = base + offset
+        for idx in lane:
+            batch = all_batches[idx]
             blocks, llm_failed = await _one(idx, batch, pool)
-            out.append(blocks)
+            results[idx] = blocks
             if pool is not None and not llm_failed:
                 pool.pick_from(
                     [{"eid": u.akn_eid, "body": u.body_text or ""} for u in batch],
@@ -401,12 +397,16 @@ async def translate_bodies(
         if pool is not None:
             pool_picks_total += pool.picks
             pool_scans_total += pool.scans
-        return out
 
-    results_by_group = await asyncio.gather(
-        *[_one_chapter(i, g.batches) for i, g in enumerate(groups)]
-    )
-    results = [batch_result for group in results_by_group for batch_result in group]
+    tasks = [asyncio.create_task(_one_lane(lane)) for lane in lanes]
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        # Stop queued lanes calling the model once the run has failed.
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
     # `BodyBlock.model_construct` skips the ingest-side strict validator;
     # `TranslatedBlock` ran its own translation-tuned check above.

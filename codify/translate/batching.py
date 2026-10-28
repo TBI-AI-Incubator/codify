@@ -1,7 +1,7 @@
 """Chapter-locality batching for body-fill. Flat batching split one chapter across
 independent calls with no shared register; these groups carry articles from the
-same nearest chapter container, and a group's batches run serially so exemplars
-feed later ones. No chapter-tier containers falls back to one flat group.
+same nearest chapter container, and a group's batches run in serial lanes so
+exemplars feed later ones. No chapter-tier containers falls back to one flat group.
 """
 
 from __future__ import annotations
