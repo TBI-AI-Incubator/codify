@@ -39,7 +39,7 @@ New, additive:
 
 - Preamble recitals that carry an `eId` become provision rows with `akn_type='recital'`
   and `normative=false`, outside any section. `Document.recitals` holds them, and the
-  version document marks where each begins in the preamble with an `anchor` node.
+  version document wraps each recital in the preamble in an `anchor` node.
   A recital is embedded and found by its `eId`; search leaves it out unless
   `include_non_normative` is set. `add_missing_recital_rows` adds them to a version
   already stored, and `embed_and_stamp(missing_only=True)` embeds only the rows that
