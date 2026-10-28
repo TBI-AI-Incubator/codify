@@ -412,10 +412,8 @@ export interface components {
         /**
          * BindingRegime
          * @description Non-membership binding regime, treaty frameworks, bilateral regimes,
-         *     constitutional annexes. Used for things like the Dayton Framework (BA),
-         *     the Compact of Free Association (PW/MH), and the Lateran Concordat (VA)
-         *     which are legally binding on a jurisdiction but are not memberships in an
-         *     international organisation.
+         *     constitutional annexes. Used for instruments that are legally binding on a
+         *     jurisdiction but are not memberships in an international organisation.
          */
         BindingRegime: {
             /** Code */
@@ -468,14 +466,13 @@ export interface components {
          *     kind selects which optional fields apply:
          *
          *     - epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,
-         *                     where epoch_year is an integer offset (ROC 1911, Juche 1911,
-         *                     Buddhist -543).
+         *                     where epoch_year is an integer offset (Buddhist Era -543).
          *     - era_table     named era segments with boundaries.
-         *     - hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.
-         *     - hijri_solar   Iranian Hijri, Gregorian year length.
+         *     - hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.
+         *     - hijri_solar   Solar calendar, Gregorian year length.
          *     - ethiopian     ~7-8 year offset, 13-month year.
-         *     - buddhist      Thai/Lao, epoch_year -543.
-         *     - bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the
+         *     - buddhist      Buddhist Era calendar, epoch_year -543.
+         *     - bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the
          *                     mid-April new year).
          */
         CalendarConversion: {
@@ -532,11 +529,11 @@ export interface components {
          *
          *     signal          what `pattern` is tested against
          *       date_range      nothing; the match is `date_from`/`date_until` alone, for laws
-         *                       post-dating a regime change (a decree-law class from 1961-07-15)
+         *                       post-dating a regime change
          *       preamble_match  the preamble or enacting-formula text
-         *       issuer_role     the enacting body's role ("Pope", "Council of Ministers", "OHR")
+         *       issuer_role     the enacting body's role (for example a head of state or a cabinet)
          *       gazette_series  the official gazette series the document was published in
-         *       title_regex     the document title ("Basic Law:", "Motu Proprio")
+         *       title_regex     the document title (a fixed prefix such as "Regulation:")
          */
         ClassificationRule: {
             /** Date From */
@@ -1438,12 +1435,13 @@ export interface components {
          * ResidualLaw
          * @description Another jurisdiction's corpus that is still residually applicable here.
          *
-         *     Used for layered legal systems where pre-independence or foreign law
-         *     continues in force alongside native legislation. Examples:
-         *       - VA: Italian law as suppletive in Vatican City State.
-         *       - SY, IQ, LB: Ottoman Mejelle for general private law.
-         *       - ZA, LS, SZ, NA: Roman-Dutch common law (but usually too embedded
-         *             to carve out as discrete residuals).
+         *     Used for layered legal systems where historical residual law, law inherited
+         *     from a predecessor legal order, or foreign law continues in force alongside
+         *     native legislation. Examples:
+         *       - another jurisdiction's law applied as a suppletive source.
+         *       - a historical codification still applied to general private law.
+         *       - an inherited common law (but usually too embedded to carve out as
+         *             discrete residuals).
          *
          *     `source_jurisdiction` is a Codify code that must resolve to an existing
          *     config. Downstream consolidation/amendment agents can traverse these to
@@ -1754,9 +1752,7 @@ export interface components {
          *
          *     Used inside `SupranationalMembership.suspension_periods` to record the
          *     start and (optional) end of a suspension, plus its scope. A list is the
-         *     right shape because several jurisdictions have cycled through multiple
-         *     suspensions (Fiji at the PIF/Commonwealth; Pakistan at the Commonwealth;
-         *     coup states at AU/ECOWAS).
+         *     right shape because a jurisdiction can cycle through multiple suspensions.
          */
         SuspensionPeriod: {
             /**
