@@ -107,8 +107,7 @@ async def embed_version_provisions(
 ) -> int:
     """Read provisions for a version, embed them, upsert. Returns rows written.
 
-    `missing_only` leaves a provision that already has a vector under `model_id`
-    alone, so adding rows to a version does not pay to embed the rest again.
+    `missing_only` skips a provision that already has a vector under `model_id`.
 
     `path_context` puts the act's title before the section's, which is what a
     provision otherwise never states: measured at 0.53 to 0.85 on reference
@@ -196,9 +195,22 @@ async def embed_and_stamp(
     # A version whose every provision is a non-transcription marker embeds nothing
     # and is still finished: without the stamp it stays unembedded forever and
     # anything gating on `embedded_at` re-runs it on every pass.
-    if count or await _has_only_placeholders(session, version_id):
+    # `missing_only` writing nothing means every embeddable row already has a vector.
+    if (
+        count
+        or await _has_only_placeholders(session, version_id)
+        or (missing_only and await _has_provisions(session, version_id))
+    ):
         await mark_version_embedded(session, version_id)
     return count
+
+
+async def _has_provisions(session: AsyncSession, version_id: uuid.UUID) -> bool:
+    return (
+        await session.execute(
+            select(Provision.id).where(Provision.version_id == version_id).limit(1)
+        )
+    ).first() is not None
 
 
 async def _has_only_placeholders(session: AsyncSession, version_id: uuid.UUID) -> bool:

@@ -112,3 +112,29 @@ async def test_backfill_adds_only_the_missing_recitals_and_embeds_only_them(
     )
     assert await add_missing_recital_rows(session, vid) == 0
     assert await _eids(session, vid) == ["recitals__rec_1", "recitals__rec_2"]
+
+
+async def test_a_version_fully_embedded_but_unstamped_is_stamped_by_a_missing_only_pass(
+    session: AsyncSession,
+) -> None:
+    vid = await _saved(session)
+    await embed_and_stamp(session, vid, client=_Client(), path_context=False)
+    await session.execute(text("UPDATE versions SET embedded_at = NULL WHERE id = :v"), {"v": vid})
+    again = _Client()
+    await embed_and_stamp(session, vid, client=again, path_context=False, missing_only=True)
+    assert again.embedded == 0
+    stamped = await session.scalar(
+        text("SELECT embedded_at FROM versions WHERE id = :v"), {"v": vid}
+    )
+    assert stamped is not None
+
+
+async def test_backfilled_recital_words_reach_the_search_lexicon(session: AsyncSession) -> None:
+    vid = await _saved(session)
+    await session.execute(
+        text("DELETE FROM provisions WHERE version_id = :v AND akn_type = 'recital'"), {"v": vid}
+    )
+    await session.execute(text("DELETE FROM search_terms WHERE term = 'legibl'"))
+    await add_missing_recital_rows(session, vid)
+    found = await session.scalar(text("SELECT count(*) FROM search_terms WHERE term = 'legibl'"))
+    assert found == 1

@@ -528,12 +528,9 @@ def _derive_rows(
 
 
 async def add_missing_recital_rows(session: AsyncSession, version_id: uuid.UUID) -> int:
-    """Insert the recital rows a version's stored AKN carries and its rows lack.
+    """Insert the recital rows the stored AKN carries and the version lacks.
 
-    Every other row is left in place, with its embeddings and inbound references,
-    and the new rows take the version's latest `created_at`, so anything keyed to
-    when its rows were built stays valid. Returns the rows added. Caller embeds the
-    new rows and commits.
+    Other rows stay, and the new ones take the latest `created_at`. Caller embeds and commits.
     """
     version = (
         await session.execute(select(Version).where(Version.id == version_id))
@@ -559,6 +556,7 @@ async def add_missing_recital_rows(session: AsyncSession, version_id: uuid.UUID)
             row.created_at = built
     session.add_all(fresh)
     await session.flush()
+    await record_terms_from_rows(session, fresh)
     return len(fresh)
 
 
