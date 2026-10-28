@@ -85,6 +85,11 @@ New, additive:
   blocking writes.
   `segmentation.skip_heading_patterns` names instruments that are not acts
   (notices, appointments): their segments are cut as skipped, kept and listed.
+  Such a heading opens its region on its own, whatever the contents lists, and a
+  contents entry it names is no act to find. The open act's evidence runs on
+  past the region, so it ends at the next act. After kept-apart text, the
+  heading numbered next after the last act is evidence of its own
+  (`next_number`), and a quotation left open there does not claim it.
 - `codify.pipeline.segment`: splits a source holding several acts, such as a
   gazette issue, without a model call. `segment` returns a `Segmentation`:
   `single` (the text unchanged), `decided` (one segment per act) or

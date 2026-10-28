@@ -449,6 +449,12 @@ class _Rules:
         self.adoption = _adoption_pattern(tuple(config.adoption_markers))
         self.caption = _caption_regex(config)
         self.enacting = _phrases_regex(config.enacting_formula_markers)
+        rules = config.segmentation
+        self.skip = _heading_patterns(rules.skip_heading_patterns) if rules else []
+
+    def skips(self, label: str) -> bool:
+        """Whether a heading names a kind of instrument kept apart, not an act."""
+        return any(p.search(label) for p in self.skip)
 
 
 def _page_start(text: str, heading: _Heading, pages: _Pages) -> bool:
@@ -528,12 +534,15 @@ def segment(
     headings = _headings(text, _heading_patterns(rules.act_heading_patterns), pages)
     markers = _markers(text, config, doctype or config.default_document_class)
     blocks, entries = _contents(text, rules, headings, markers, pages, config.code)
+    checks = _Rules(config, blocks)
+    # A region kept apart opens on its heading alone: its entry is no act to find.
+    entries = [e for e in entries if not checks.skips(e.label)]
     candidates = [h for h in headings if not _within(h.start, blocks)]
     # A provision a listing names is an entry: it neither opens nor numbers the body.
     markers = [m for m in markers if not _within(m.offset, blocks)]
     if not candidates and not entries:
         return _single(text, spans)
-    return _decide(text, pages, candidates, entries, markers, _Rules(config, blocks))
+    return _decide(text, pages, candidates, entries, markers, checks)
 
 
 def _decide(
@@ -591,10 +600,36 @@ def _decide_pass(
     doubted: list[_Heading] = []
     open_heading: _Heading | None = None
     previous = 0
+    # The last act's number, and whether a region kept apart has opened since it.
+    last: int | None = None
+    kept_apart = False
     for index, heading in enumerate(candidates):
         following = _bound(text, candidates, index, markers, pages, rules, listed)
         is_opening = heading is opening
-        veto = "" if is_opening else _veto(text, heading, open_heading, following, markers, rules)
+        if (
+            not is_opening
+            and (opening is None or heading.start > opening.start)
+            and rules.skips(heading.label)
+        ):
+            if _quoted(text, heading.start, rules.country):
+                rows.append(_row(heading, "vetoed", veto="inside a quotation"))
+                continue
+            # Kept apart, so the open act's evidence runs on past it to the next act.
+            signals = (
+                *_signals(text, heading, previous, following, markers, pages, rules),
+                "skip_heading",
+            )
+            rows.append(_row(heading, "corroborated", signals))
+            decided.append((heading, signals))
+            kept_apart = True
+            continue
+        # The next act's number after kept-apart text: a quote left open there claims nothing.
+        sequel = kept_apart and last is not None and _number(heading.key) == last + 1
+        veto = (
+            ""
+            if is_opening
+            else _veto(text, heading, open_heading, following, markers, rules, not sequel)
+        )
         if veto:
             rows.append(_row(heading, "vetoed", veto=veto))
             vetoed.append(heading)
@@ -604,6 +639,8 @@ def _decide_pass(
             if is_opening
             else _signals(text, heading, previous, following, markers, pages, rules)
         )
+        if sequel:
+            signals = (*signals, "next_number")
         status: Status
         entry: _Entry | None = None
         if entries:
@@ -629,6 +666,7 @@ def _decide_pass(
             if not is_opening:
                 decided.append((heading, signals))
             open_heading, previous = heading, heading.start
+            last, kept_apart = _number(heading.key), False
         elif signals or status not in ("heading_only", "citation"):
             at = (heading.start, heading.start)
             listed_at = pages.start_of(entry.pdf_page) if entry and entry.pdf_page else None
@@ -637,6 +675,8 @@ def _decide_pass(
                 at = (min(listed_at, heading.start), max(listed_at, heading.start))
             doubts.append((at, row.describe()))
             doubted.append(heading)
+            if sequel:
+                last = _number(heading.key)
         if is_opening:
             open_heading, previous = heading, heading.start
     for entry in unmatched:
@@ -681,8 +721,9 @@ def _veto(
     following: int,
     markers: list[_Marker],
     rules: _Rules,
+    quotes: bool = True,
 ) -> str:
-    if _quoted(text, heading.start, rules.country):
+    if quotes and _quoted(text, heading.start, rules.country):
         return "inside a quotation"
     if open_heading is not None and heading.key == open_heading.key:
         return "repeats the open act's own heading"
@@ -703,6 +744,11 @@ def _veto(
         ):
             return "carries no enacting formula where the act before it does"
     return ""
+
+
+def _number(key: str) -> int | None:
+    found = re.search(r"\d+$", key)
+    return int(found.group()) if found else None
 
 
 def _opening_region(start: int, stop: int, markers: list[_Marker], length: int) -> tuple[int, int]:
