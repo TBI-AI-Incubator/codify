@@ -160,6 +160,7 @@ async def ingest(
                 divert_reason=page.divert_reason,
                 finish_reason=page.finish_reason,
                 unreadable=unreadable_reason(page),
+                skipped=page.skipped,
             )
         if on_pages:
             on_pages(pages)

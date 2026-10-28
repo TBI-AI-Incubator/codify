@@ -685,8 +685,15 @@ class SegmentationConfig(BaseModel):
     printed_page_pattern: str | None = None
     # Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.
     skip_heading_patterns: list[str] = Field(default_factory=list)
+    # Whole lines opening a trailing section never ingested: no engine reads from there on.
+    trailing_section_patterns: list[str] = Field(default_factory=list)
 
-    @field_validator("act_heading_patterns", "issue_heading_patterns", "skip_heading_patterns")
+    @field_validator(
+        "act_heading_patterns",
+        "issue_heading_patterns",
+        "skip_heading_patterns",
+        "trailing_section_patterns",
+    )
     @classmethod
     def _headings_compile(cls, value: list[str]) -> list[str]:
         for pattern in value:
