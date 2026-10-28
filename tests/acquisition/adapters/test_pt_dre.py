@@ -635,3 +635,30 @@ async def test_an_empty_consolidation_is_not_saved(tmp_path: Path) -> None:
 def test_alinea_runs_past_four_letters_stay_points() -> None:
     body = [x.strip() for x in article_body("Lista:\rzzzz) quarta;\raaaaa) quinta.", "")]
     assert [x for x in body if x.startswith("POINT")] == ["POINT zzzz)", "POINT aaaaa)"]
+
+
+async def test_an_unwritable_index_dir_fetches_without_a_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "datadumps"
+    root.mkdir()
+    root.chmod(0o555)
+    monkeypatch.setenv("ACQUISITION_INDEX_DIR", str(root))
+    try:
+        acquirer = DiarioAcquirer.from_config("pt", SourceAdapter(kind="json_portal", name="dre"))
+        assert acquirer._cache is None
+        acquirer._client = httpx.AsyncClient(transport=httpx.MockTransport(Gazette()))
+        doc = await acquirer.fetch(_ref("7", 2042))
+        await acquirer._client.aclose()
+    finally:
+        root.chmod(0o755)
+    assert doc.frbr_work_uri == "/akn/pt/act/dl/2042/7"
+    assert not (root / "pt").exists()
+
+
+def test_a_writable_index_dir_keeps_the_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ACQUISITION_INDEX_DIR", str(tmp_path))
+    acquirer = DiarioAcquirer.from_config("pt", SourceAdapter(kind="json_portal", name="dre"))
+    assert acquirer._cache == tmp_path / "pt" / "raw"
