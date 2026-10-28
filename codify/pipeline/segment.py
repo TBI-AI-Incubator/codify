@@ -72,7 +72,7 @@ _LINE_END_NUMBER_RE = re.compile(r"(?m)(\d+)[ \t]*$")
 # Longer than this between an entry's heading and its page, and it is body text.
 _ENTRY_MAX_CHARS = 1000
 # A leader run then a page number, ending a line: a contents entry, not body text.
-_LEADER_RE = re.compile(r"(?:\.{3,}|\u2026+)[ \t]*(\d+)[ \t]*$", re.MULTILINE)
+_LEADER_RE = re.compile(r"(?:\.{3,}|\u2026)[.\u2026]*[ \t]*(\d+)[ \t]*$", re.MULTILINE)
 _NOT_WORD_RE = re.compile(r"[\W_]+")
 
 
@@ -358,11 +358,13 @@ def _leads_to_page(text: str, at: int, pages: _Pages, country: str) -> bool:
 def _reference(
     text: str, start: int, stop: int, pages: _Pages, country: str
 ) -> tuple[int, int] | None:
-    """The printed and PDF page an entry names: its last live line-end number that
-    is a page of this source."""
+    """The printed and PDF page an entry names: its first live leader number that
+    is a page of this source, else its last live line-end number that is one. A
+    leader closes the entry, so a later one belongs to an entry not read as a heading."""
     stop = min(stop, start + _ENTRY_MAX_CHARS)
+    leaders = list(_live(_LEADER_RE.finditer(text, start, stop), text, country))
     hits = _LINE_END_NUMBER_RE.finditer(text, start, stop)
-    for number in reversed(list(_live(hits, text, country))):
+    for number in [*leaders, *reversed(list(_live(hits, text, country)))]:
         printed = int(normalise_digits(number.group(1)))
         pdf_page = pages.pdf_page(printed)
         if pdf_page is not None:
@@ -649,6 +651,8 @@ def _decide_pass(
         entry: _Entry | None = None
         if entries:
             status, entry = _against_contents(heading, entries, unmatched, named, claims)
+            if status == "page_mismatch" and entry is not None:
+                status = _spilled(text, heading, entry, following, pages, entries, unmatched)
             if entry is not None:
                 unmatched.remove(entry)
                 rows.append(_entry_row(entry, status))
@@ -829,6 +833,30 @@ def _against_contents(
     if placed is not None:
         return "label_mismatch", placed
     return "heading_only", None
+
+
+def _spilled(
+    text: str,
+    heading: _Heading,
+    entry: _Entry,
+    following: int,
+    pages: _Pages,
+    entries: list[_Entry],
+    unmatched: list[_Entry],
+) -> Status:
+    """Matched where the contents list the page after the heading's and the act's
+    text runs onto it, unless an act listed after it is already placed."""
+    listed = entry.pdf_page
+    begins = pages.start_of(listed) if listed is not None else None
+    if (
+        heading.page is not None
+        and listed == heading.page + 1
+        and begins is not None
+        and not _bare(text[begins:following], pages.pattern)
+        and all(e in unmatched for e in entries[entries.index(entry) + 1 :])
+    ):
+        return "matched"
+    return "page_mismatch"
 
 
 def _row(

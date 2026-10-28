@@ -230,6 +230,85 @@ def test_a_contents_page_number_that_disagrees_holds_the_region(
     assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
 
 
+def _foot_of_page_issue(listed: list[tuple[str, int]]) -> list[list[str]]:
+    """Act 4's heading closes page 2; its formula and sections open page 3."""
+    act = _act(4, "THE PILOTS ACT", 3)
+    return [
+        _contents_page(listed),
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed(), *act[:2]],
+        ["- 3 -", "", *act[2:], *_signed()],
+    ]
+
+
+def test_a_heading_at_a_page_foot_matches_the_next_page_listed(
+    config: JurisdictionConfig,
+) -> None:
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)]
+    text, spans = _join(_foot_of_page_issue(listed))
+    result = segment(text, spans, config=config)
+    assert result.outcome == "decided"
+    assert [(s.key, s.first_page, s.last_page) for s in result.segments] == [
+        ("act 3", 2, 2),
+        ("act 4", 2, 3),
+    ]
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "matched"), ("heading", "matched")]
+    _conserved(result, text)
+
+
+def test_an_act_ending_before_the_listed_page_is_still_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 4 ends on page 2 and act 5 opens page 3, so page 3 holds none of act 4."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3), ("ACT No. 5 OF 2020", 3)]
+    pages = [
+        _contents_page(listed),
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+        + [*_act(4, "THE PILOTS ACT", 1), *_signed()],
+        ["- 3 -", "", *_act(5, "THE BUOYS ACT", 3), *_signed()],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert result.outcome == "abstained"
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def test_a_heading_at_a_page_foot_out_of_contents_order_is_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 5 is listed after act 4 but already stands before it."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3), ("ACT No. 5 OF 2020", 2)]
+    pages = _foot_of_page_issue(listed)
+    pages[1][-2:-2] = [*_act(5, "THE BUOYS ACT", 2), *_signed()]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert result.outcome == "abstained"
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def test_an_entry_takes_its_own_leader_page_not_an_unread_entry_after_it(
+    config: JurisdictionConfig,
+) -> None:
+    """The notice's entry is no heading, so its page follows act 4's inside one entry."""
+    contents = ["THE ATLANTIS GAZETTE", "ISSUE No. 12", "", "Contents", ""]
+    contents += ["ACT No. 3 OF 2020 The Harbour Dues Act ......... 2"]
+    contents += ["ACT No. 4 OF 2020 The Pilots Act\u2026\u2026. 2"]
+    contents += ["9. Notice of the Harbour Board ......... 3", ""]
+    pages = [
+        contents,
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+        + [*_act(4, "THE PILOTS ACT", 3), *_signed()],
+        ["- 3 -", "", "Notice of the Harbour Board", "The harbour closes at dusk."],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    listed = [(r.key, r.printed_page) for r in result.reconciliation if r.source == "contents"]
+    assert listed == [("act 3", 2), ("act 4", 2)]
+    assert [s.key for s in result.segments] == ["act 3", "act 4"]
+
+
 def test_a_heading_no_signal_agrees_with_is_a_citation(config: JurisdictionConfig) -> None:
     """Mid-page, unsigned before, numbering carried on: a citation in the open act,
     neither split nor held, and reported as one."""
