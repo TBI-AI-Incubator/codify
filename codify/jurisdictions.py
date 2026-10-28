@@ -298,14 +298,13 @@ class CalendarConversion(BaseModel):
     kind selects which optional fields apply:
 
     - epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,
-                    where epoch_year is an integer offset (ROC 1911, Juche 1911,
-                    Buddhist -543).
+                    where epoch_year is an integer offset (Buddhist Era -543).
     - era_table     named era segments with boundaries.
-    - hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.
-    - hijri_solar   Iranian Hijri, Gregorian year length.
+    - hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.
+    - hijri_solar   Solar calendar, Gregorian year length.
     - ethiopian     ~7-8 year offset, 13-month year.
-    - buddhist      Thai/Lao, epoch_year -543.
-    - bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the
+    - buddhist      Buddhist Era calendar, epoch_year -543.
+    - bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the
                     mid-April new year).
     """
 
@@ -588,11 +587,11 @@ class ClassificationRule(BaseModel):
 
     signal          what `pattern` is tested against
       date_range      nothing; the match is `date_from`/`date_until` alone, for laws
-                      post-dating a regime change (a decree-law class from 1961-07-15)
+                      post-dating a regime change
       preamble_match  the preamble or enacting-formula text
-      issuer_role     the enacting body's role ("Pope", "Council of Ministers", "OHR")
+      issuer_role     the enacting body's role (for example a head of state or a cabinet)
       gazette_series  the official gazette series the document was published in
-      title_regex     the document title ("Basic Law:", "Motu Proprio")
+      title_regex     the document title (a fixed prefix such as "Regulation:")
     """
 
     model_config = _STRICT

@@ -122,9 +122,7 @@ class SuspensionPeriod(BaseModel):
 
     Used inside `SupranationalMembership.suspension_periods` to record the
     start and (optional) end of a suspension, plus its scope. A list is the
-    right shape because several jurisdictions have cycled through multiple
-    suspensions (Fiji at the PIF/Commonwealth; Pakistan at the Commonwealth;
-    coup states at AU/ECOWAS).
+    right shape because a jurisdiction can cycle through multiple suspensions.
     """
 
     model_config = _STRICT
@@ -194,10 +192,8 @@ class SupranationalMembership(BaseModel):
 
 class BindingRegime(BaseModel):
     """Non-membership binding regime, treaty frameworks, bilateral regimes,
-    constitutional annexes. Used for things like the Dayton Framework (BA),
-    the Compact of Free Association (PW/MH), and the Lateran Concordat (VA)
-    which are legally binding on a jurisdiction but are not memberships in an
-    international organisation.
+    constitutional annexes. Used for instruments that are legally binding on a
+    jurisdiction but are not memberships in an international organisation.
     """
 
     model_config = _STRICT
@@ -226,12 +222,13 @@ class BindingRegime(BaseModel):
 class ResidualLaw(BaseModel):
     """Another jurisdiction's corpus that is still residually applicable here.
 
-    Used for layered legal systems where pre-independence or foreign law
-    continues in force alongside native legislation. Examples:
-      - VA: Italian law as suppletive in Vatican City State.
-      - SY, IQ, LB: Ottoman Mejelle for general private law.
-      - ZA, LS, SZ, NA: Roman-Dutch common law (but usually too embedded
-            to carve out as discrete residuals).
+    Used for layered legal systems where historical residual law, law inherited
+    from a predecessor legal order, or foreign law continues in force alongside
+    native legislation. Examples:
+      - another jurisdiction's law applied as a suppletive source.
+      - a historical codification still applied to general private law.
+      - an inherited common law (but usually too embedded to carve out as
+            discrete residuals).
 
     `source_jurisdiction` is a Codify code that must resolve to an existing
     config. Downstream consolidation/amendment agents can traverse these to
