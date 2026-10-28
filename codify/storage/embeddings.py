@@ -107,7 +107,7 @@ async def embed_version_provisions(
 ) -> int:
     """Read provisions for a version, embed them, upsert. Returns rows written.
 
-    `missing_only` skips a provision that already has a vector under `model_id`.
+    `missing_only` skips a provision that already has a vector under any model.
 
     `path_context` puts the act's title before the section's, which is what a
     provision otherwise never states: measured at 0.53 to 0.85 on reference
@@ -143,8 +143,7 @@ async def embed_version_provisions(
             (
                 await session.execute(
                     select(ProvisionEmbedding.provision_id).where(
-                        ProvisionEmbedding.version_id == version_id,
-                        ProvisionEmbedding.model_id == model_id,
+                        ProvisionEmbedding.version_id == version_id
                     )
                 )
             )

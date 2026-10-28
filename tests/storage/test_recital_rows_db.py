@@ -138,3 +138,13 @@ async def test_backfilled_recital_words_reach_the_search_lexicon(session: AsyncS
     await add_missing_recital_rows(session, vid)
     found = await session.scalar(text("SELECT count(*) FROM search_terms WHERE term = 'legibl'"))
     assert found == 1
+
+
+async def test_missing_only_leaves_rows_embedded_under_another_model_alone(
+    session: AsyncSession,
+) -> None:
+    vid = await _saved(session)
+    await embed_and_stamp(session, vid, client=_Client(), path_context=False)
+    again = _Client()
+    await embed_and_stamp(session, vid, client=again, path_context=True, missing_only=True)
+    assert again.embedded == 0
