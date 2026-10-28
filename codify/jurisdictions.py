@@ -92,6 +92,9 @@ MarkerForm = Literal[
     # The operative subdivision of an article, printed as "(1) " with no
     # keyword of its own.
     "parenthesized_arabic",
+    # A body container headed by a bare Roman numeral and an all-caps title,
+    # "II. ORCHARD COUNCILS", taken only in an I, II, III sequence.
+    "upper_roman_title",
 ]
 ValidationStatus = Literal["production", "draft", "stub"]
 JurisdictionType = Literal["national", "supranational", "subnational", "crown_dependency"]

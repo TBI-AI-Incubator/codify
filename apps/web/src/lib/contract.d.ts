@@ -975,7 +975,7 @@ export interface components {
                 [key: string]: string;
             } | null;
             /** Marker Form */
-            marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic") | null;
+            marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic" | "upper_roman_title") | null;
             /**
              * Note
              * @default
