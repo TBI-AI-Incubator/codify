@@ -2426,6 +2426,54 @@ def _drop_uk_prose_containers(text: str, anchors: list[StructuralAnchor]) -> lis
 # judgments number their paragraphs this way and write no hierarchy keyword.
 _BRACKETED_DECIMAL_RE = re.compile(r"(?m)^[^\S\n]{0,8}\[(?P<num>\d+(?:\.\d+)+)\]")
 
+_ROMAN_TITLE_RE = re.compile(r"(?m)^[^\S\n]{0,12}(?P<num>[IVXL]+)\.[^\S\n]+(?P<title>\S[^\n]*)")
+_ROMAN_TITLE_PASS = "roman_title"  # noqa: S105, pass name, not a credential
+
+
+def _caps_title(line: str) -> bool:
+    """An all-caps heading line: no digits, no sentence punctuation."""
+    letters = [c for c in line if c.isalpha()]
+    return (
+        len(letters) >= 3
+        and len(line) <= _HEADING_MAX_LEN
+        and all(c.isupper() for c in letters)
+        and not any(c.isdigit() or c in ".:;?!…" for c in line)
+    )
+
+
+def _roman_title_anchors(
+    text: str, toc_end: int, kind: str, mask: Sequence[bool]
+) -> list[StructuralAnchor]:
+    """Containers headed "II. TITLE", kept only as an unbroken I, II, III run."""
+    out: list[StructuralAnchor] = []
+    for m in _ROMAN_TITLE_RE.finditer(text):
+        title = m.group("title").strip()
+        if (
+            m.start() < toc_end
+            or mask[m.start("num")]
+            or _roman_or_digit(m.group("num")) != len(out) + 1
+            or not _caps_title(title)
+        ):
+            continue
+        nxt_end = _line_end(text, m.end() + 1)
+        nxt = text[m.end() + 1 : nxt_end].strip()
+        if nxt and _caps_title(nxt):
+            title = title[:-1] + nxt if title.endswith("-") else f"{title} {nxt}"
+        out.append(
+            StructuralAnchor(
+                kind=kind,
+                keyword=f"{m.group('num')}.",
+                number=m.group("num"),
+                char_offset=m.start(),
+                line=text.count("\n", 0, m.start()) + 1,
+                matched_text=f"{m.group('num')}.",
+                heading=title if kind in _HEADING_KINDS else None,
+                source_pass=_ROMAN_TITLE_PASS,
+            )
+        )
+    return out if len(out) >= 2 else []
+
+
 # Outline markers. An annex numbers its own content without a keyword, so each
 # form is the whole marker: glyph class, terminator, then required space.
 _OUTLINE_PASS = "attachment_outline"  # noqa: S105, pass name, not a credential
@@ -2680,6 +2728,10 @@ def _scan_declared_markers(
                         matched_text=m.group(0).strip(),
                     )
                 )
+        elif entry.marker_form == "upper_roman_title":
+            if mask is None:
+                mask = _quote_mask(text, country)
+            out.extend(_roman_title_anchors(text, toc_end, entry.akn_element, mask))
         elif entry.marker_form == "bracketed_decimal":
             # Forward citations must not suppress the following host sequence.
             intervals: dict[int, list[re.Match[str]]] = {}
@@ -3955,7 +4007,7 @@ def _capture_container_headings(
     sorted_offsets = sorted(offsets)
     out = list(anchors)
     for i, anchor in enumerate(anchors):
-        if anchor.kind not in eligible:
+        if anchor.kind not in eligible or anchor.source_pass == _ROMAN_TITLE_PASS:
             continue
         heading = _heading_for(text, anchor, offsets[i], sorted_offsets, regex)
         if heading:
