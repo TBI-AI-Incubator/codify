@@ -27,7 +27,9 @@ def test_an_unknown_key_is_refused() -> None:
         SegmentationConfig.model_validate({"act_heading_pattern": ["ACT"]})
 
 
-@pytest.mark.parametrize("field", ["act_heading_patterns", "issue_heading_patterns"])
+@pytest.mark.parametrize(
+    "field", ["act_heading_patterns", "issue_heading_patterns", "trailing_section_patterns"]
+)
 @pytest.mark.parametrize(
     "pattern", ["", "   ", r"(?:ACT)?", r"\d*", r"(?:ACT)?\b", r"(?=ACT)", r"ACT|"]
 )

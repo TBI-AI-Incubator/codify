@@ -37,6 +37,13 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- `segmentation.trailing_section_patterns` declares whole lines that open a trailing
+  section a source never ingests, such as notices. `extract_text_from_pdf` finds the
+  first such line in the text layer, past page one and the first quarter of the
+  document, and sends no page from there on to any OCR, layout or vision call. Those
+  pages stay in the result with their text layer and `skipped="trailing_section"`,
+  which `PageExtracted.skipped` carries. A heading on a page with no text layer, or
+  listed with a page number, cuts nothing. Without the key, extraction is as before.
 - `build_ee_index` and `index-ee-archive` record the redaction group (`group`) on every
   entry, so one act's texts can be joined. With `keep_ended` (`--keep-ended`), a state-act
   text whose validity ended before the as-of date is listed under `ended`, with its

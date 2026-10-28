@@ -27,6 +27,8 @@ class PageExtracted(_EventBase):
     # Why the page's content is missing from the read (`unreadable_reason`);
     # empty for a page read whole or a blank leaf.
     unreadable: str = ""
+    # Why no engine read the page (`PageResult.skipped`); empty for a page read.
+    skipped: str = ""
 
 
 class MetadataExtracted(_EventBase):

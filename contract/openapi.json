@@ -3476,6 +3476,13 @@
             },
             "title": "Skip Heading Patterns",
             "type": "array"
+          },
+          "trailing_section_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trailing Section Patterns",
+            "type": "array"
           }
         },
         "title": "SegmentationConfig",
