@@ -2441,10 +2441,18 @@ def _caps_title(line: str) -> bool:
     )
 
 
+def _has_sentence(span: str) -> bool:
+    """A prose line ending a sentence, which contents rows and leaders never do."""
+    return any(
+        line.endswith((".", ";", ":")) and ".." not in line
+        for line in (raw.strip() for raw in span.splitlines())
+    )
+
+
 def _roman_title_anchors(
     text: str, toc_end: int, kind: str, mask: Sequence[bool]
 ) -> list[StructuralAnchor]:
-    """Containers headed "II. TITLE": the first unbroken I, II, III run with prose
+    """Containers headed "II. TITLE": the first unbroken I, II, III run with a sentence
     between its headings, so a contents list or an appended restatement is not it."""
     runs: list[list[tuple[StructuralAnchor, int]]] = []
     for m in _ROMAN_TITLE_RE.finditer(text):
@@ -2485,7 +2493,7 @@ def _roman_title_anchors(
         )
     for run in runs:
         gaps = [text[end : nxt.char_offset] for (_a, end), (nxt, _e) in zip(run, run[1:])]
-        if gaps and all(any(c.islower() for c in gap) for gap in gaps):
+        if gaps and all(_has_sentence(gap) for gap in gaps):
             return [a for a, _end in run]
     return []
 

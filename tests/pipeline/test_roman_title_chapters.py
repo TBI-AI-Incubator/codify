@@ -248,3 +248,21 @@ def test_an_all_caps_sentence_is_not_a_heading(monkeypatch: pytest.MonkeyPatch) 
     )
     headings = [a.heading for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
     assert headings == ["GENERAL PROVISIONS", "ORCHARD COUNCILS"]
+
+
+@pytest.mark.parametrize("leader", ["", " .......... 3", " .........."])
+def test_a_contents_list_of_article_captions_does_not_take_the_body_run(
+    monkeypatch: pytest.MonkeyPatch, leader: str
+) -> None:
+    contents = (
+        f"I. GENERAL PROVISIONS\nArticle 1 - Scope{leader}\n"
+        f"II. ORCHARD COUNCILS\nArticle 2 - Councils{leader}\n"
+    )
+    body = (
+        "I. GENERAL PROVISIONS\n\nArticle 1\nThis Act governs orchards.\n\n"
+        "II. ORCHARD COUNCILS\n\nArticle 2\nEach district has a council.\n"
+    )
+    text = f"CONTENTS\n{contents}\n{body}"
+    anchors = _anchors(monkeypatch, text)
+    start = text.index(body)
+    assert [a.char_offset >= start for a in anchors if a.kind == "chapter"] == [True, True]
