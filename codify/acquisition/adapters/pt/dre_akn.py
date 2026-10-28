@@ -266,6 +266,7 @@ DIV_LINE = re.compile(rf"^({'|'.join(DIVISIONS)})\s+([IVXLC]+(?:-[A-Z])?|\d+|[A-
 ART_LINE = re.compile(r"^(?:Artigo\s+\d+\.?\s*º(?:-[A-Z]{1,3})?|Artigo único)$")
 # Older portarias number provisions 1.º, 2.º without the word Artigo.
 BARE_ART_LINE = re.compile(r"^\d+\.º(?:-[A-Z])?$")
+ANY_ART_LINE = re.compile(f"{ART_LINE.pattern}|{BARE_ART_LINE.pattern}")
 ANNEX_LINE = re.compile(r"^ANEXO(?:\s+[IVXLC]+(?:-[A-Z])?|\s+\d+)?$")
 SIGN_LINE = re.compile(
     r"^(Visto e aprovado em Conselho|Aprovad[ao] em \d|Promulgad[ao] em \d|Publique-se)"
@@ -283,12 +284,13 @@ def _is_epigrafe(line: str) -> bool:
 def from_printed(text: str) -> list[dict[str, Any]]:
     """Fragments read from the printed text, for an act the gazette has not consolidated."""
     src = lines(text)
-    art = next((a for a in (ART_LINE, BARE_ART_LINE) if any(a.match(x) for x in src)), None)
-    if art is None:
+    art = ANY_ART_LINE
+    first = next((i for i, x in enumerate(src) if art.match(x)), None)
+    if first is None:
         raise UnmappedFragment("the printed text has no articles")
-    bare = art is BARE_ART_LINE
-    first = next(i for i, x in enumerate(src) if art.match(x))
-    cut = max((i for i, x in enumerate(src[:first]) if FORMULA.search(x)), default=first - 1)
+    # With no enacting formula the body opens at its first division or article.
+    opening = next(i for i, x in enumerate(src) if art.match(x) or DIV_LINE.match(x))
+    cut = max((i for i, x in enumerate(src[:first]) if FORMULA.search(x)), default=opening - 1)
     frags: list[dict[str, Any]] = [
         {
             "id": "0",
@@ -343,7 +345,8 @@ def from_printed(text: str) -> list[dict[str, Any]]:
                 nxt if _is_epigrafe(nxt) and not (art.match(nxt) or DIV_LINE.match(nxt)) else ""
             )
             i += bool(heading)
-            cur = add(f"Artigo {line}" if bare else line, stack[-1][1] if stack else top, heading)
+            label = line if line.startswith("Artigo") else f"Artigo {line}"
+            cur = add(label, stack[-1][1] if stack else top, heading)
             continue
         cur["text"] += line + "\n"
     return frags

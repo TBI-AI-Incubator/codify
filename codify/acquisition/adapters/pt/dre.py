@@ -260,6 +260,9 @@ class DiarioAcquirer(BaseAcquirer):
         return f"{ELI_BASE}/{eli_type}/{ref.number.lower()}/{ref.year}/p/cons"
 
     async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
+        """The current text (`as_of="latest"`), or the text as printed (`"enacted"`)."""
+        if ref.as_of not in ("latest", "enacted"):
+            raise ValueError(f"the gazette's consolidation is read as of today, not {ref.as_of}")
         eli = ref.extra.get("eli", "").replace("http://", "https://").rstrip("/")
         given = ref.extra.get("detail", "")
         link = dm.group(1) if (dm := _DETAIL_PATH.search(given)) else given.strip("/")
@@ -277,7 +280,7 @@ class DiarioAcquirer(BaseAcquirer):
         if cm := _CONS_PATH.search(landed):
             frag, data, data_key = await self._consolidated(*cm.groups())
             frags = fragments(data)
-            if frags:
+            if frags and ref.as_of == "latest":
                 last = str(data.get("DataUltimaConsolidada") or "")[:10]
                 cons = {
                     "url": landed,
@@ -289,6 +292,9 @@ class DiarioAcquirer(BaseAcquirer):
                     ),
                     "fragments": frags,
                     "raw": data,
+                    "legis_id": str(
+                        frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
+                    ),
                 }
             sitemap = str(
                 frag["ConsolidadaConteudoDetalhe"]["DiplomaLegis"].get("LinkSitemap") or ""
@@ -306,6 +312,8 @@ class DiarioAcquirer(BaseAcquirer):
             link = dm.group(1)
         detail = detail or await self._detail(link)
 
+        if cons and cons["legis_id"] != str(detail.get("Id")):
+            raise ValueError(f"the consolidation at {cons['url']} is not the act at {link}")
         source_type = str(detail.get("TipoDiploma") or "")
         doctype = DOCTYPES.get(source_type)
         if doctype != ref.doctype:

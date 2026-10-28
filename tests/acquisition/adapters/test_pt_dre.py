@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from codify.acquisition.adapters.pt.dre import (
     SiteChanged,
     number_and_year,
 )
-from codify.acquisition.adapters.pt.dre_akn import UnmappedFragment, to_bluebell
+from codify.acquisition.adapters.pt.dre_akn import UnmappedFragment, from_printed, to_bluebell
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.events import Complete, Failed
@@ -139,7 +140,7 @@ DETAILS = {
         "7/2042",
         "2042-03-02",
         "https://data.dre.pt/eli/dec-lei/7/2042/03/02/p/dre/pt/html",
-        PREAMBLE,
+        PREAMBLE + "\rArtigo 1.º\rObjeto\rO presente decreto-lei aprova o regime anexo.",
     ),
     "decreto-lei/4-2043-900002": _detail(
         "900002",
@@ -460,14 +461,41 @@ def test_an_act_with_no_operative_text_is_refused() -> None:
         to_bluebell([root])
 
 
-async def test_an_eli_and_detail_naming_different_acts_are_refused() -> None:
+async def test_a_consolidation_of_another_act_than_the_detail_is_refused() -> None:
     ref = _ref(
         "4",
         2043,
         eli="https://data.dre.pt/eli/dec-lei/7/2042/03/02/p/dre",
         detail="decreto-lei/4-2043-900002",
     )
-    with pytest.raises(ValueError, match="by https://data.dre.pt/eli/dec-lei/7/2042"):
+    with pytest.raises(ValueError, match="is not the act at decreto-lei/4-2043-900002"):
+        await _fetch(Gazette(), ref)
+
+
+async def test_an_eli_naming_another_act_than_the_detail_is_refused() -> None:
+    ref = _ref(
+        "7",
+        2042,
+        eli="https://data.dre.pt/eli/dec-lei/4/2043/01/10/p/dre",
+        detail="decreto-lei/7-2042-900001",
+    )
+    with pytest.raises(ValueError, match="by https://data.dre.pt/eli/dec-lei/4/2043"):
+        await _fetch(Gazette(), ref)
+
+
+async def test_the_enacted_text_is_the_printed_one() -> None:
+    ref = DocumentRef(jurisdiction_code="pt", doctype="dl", year=2042, number="7", as_of="enacted")
+    doc, _ = await _fetch(Gazette(), ref)
+    assert doc.upstream_metadata["text_source"] == "printed"
+    assert doc.expression_uri == "/akn/pt/act/dl/2042/7/por@2042-03-02"
+    assert _eids(doc) == ["art_1"]
+
+
+async def test_a_dated_version_is_refused() -> None:
+    ref = DocumentRef(
+        jurisdiction_code="pt", doctype="dl", year=2042, number="7", as_of=date(2043, 1, 1)
+    )
+    with pytest.raises(ValueError, match="as of today"):
         await _fetch(Gazette(), ref)
 
 
@@ -510,3 +538,29 @@ async def test_an_undated_consolidation_is_dated_by_its_versions_or_publication(
     ]
     doc, _ = await _fetch(Gazette(undated, last=""), _ref("7", 2042))
     assert doc.expression_uri == "/akn/pt/act/dl/2042/7/por@2042-03-02"
+
+
+def _shape(frags: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    labels = {f["id"]: f["label"] for f in frags}
+    return [(f["label"], labels.get(f["parent"], "")) for f in frags[1:]]
+
+
+def test_bare_provisions_and_annexed_articles_are_both_read() -> None:
+    text = (
+        "Portaria n.º 9/2042\rManda o Governo, pelo membro responsável, o seguinte:\r"
+        "1.º\rObjeto\rFixa as taxas.\r2.º\rAs taxas constam do anexo.\r"
+        "ANEXO\rArtigo 1.º\rÂmbito\rTexto do anexo."
+    )
+    assert _shape(from_printed(text)) == [
+        ("Artigo 1.º", "Diploma"),
+        ("Artigo 2.º", "Diploma"),
+        ("Anexo", "Diploma"),
+        ("Artigo 1.º", "Anexo"),
+    ]
+
+
+def test_without_an_enacting_formula_the_body_opens_at_its_first_division() -> None:
+    text = "Lei n.º 1/2042\rCAPÍTULO I\rDisposições gerais\rArtigo 1.º\rObjeto\rTexto."
+    frags = from_printed(text)
+    assert frags[0]["text"] == "Lei n.º 1/2042"
+    assert _shape(frags) == [("Capítulo I", "Diploma"), ("Artigo 1.º", "Capítulo I")]
