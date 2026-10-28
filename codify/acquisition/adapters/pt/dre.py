@@ -356,6 +356,7 @@ class DiarioAcquirer(BaseAcquirer):
         expression = build_frbr_expression_uri(work, "por", as_of)
         printed = str(detail.get("Texto") or "")
         title = " ".join(str(detail.get("Titulo") or "").split())
+        summary = " ".join(str(detail.get("Sumario") or "").split())
         alias = work_eli(str(detail.get("ELI") or ""))
         issue = str((detail.get("DiarioRepublica") or {}).get("Numero") or "")
         publication = {
@@ -367,7 +368,7 @@ class DiarioAcquirer(BaseAcquirer):
         def convert() -> str:
             frags = cons["fragments"] if cons else from_printed(printed)
             return to_akn(
-                to_bluebell(frags, printed=printed),
+                to_bluebell(frags, printed=printed, title=title, summary=summary),
                 number=number,
                 work=work,
                 published=published,
