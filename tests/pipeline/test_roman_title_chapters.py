@@ -139,3 +139,112 @@ def test_a_level_without_the_form_is_unchanged(monkeypatch: pytest.MonkeyPatch) 
     plain = _scan(monkeypatch, opt_in=False)
     assert [a.kind for a in plain] == ["article"] * 5
     assert [a.akn_eid for a in plain] == [f"art_{n}" for n in range(1, 6)]
+
+
+def _roman(n: int) -> str:
+    out = ""
+    for value, glyph in ((90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX")):
+        while n >= value:
+            out, n = out + glyph, n - value
+    return out + ("", "I", "II", "III", "IV", "V", "VI", "VII", "VIII")[n]
+
+
+def _anchors(monkeypatch: pytest.MonkeyPatch, text: str) -> list[StructuralAnchor]:
+    cfg = _config(opt_in=True)
+    monkeypatch.setattr("codify.pipeline.enrich.anchors.load_config", lambda _c: cfg)
+    return scan_anchors(text, build_anchor_regex(cfg, "act"), country="xe", doctype="act")
+
+
+def test_numerals_past_fifty_continue_the_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    text = "".join(f"{_roman(n)}. HEADING NUMBER\n\nArticle {n}\nText.\n\n" for n in range(1, 92))
+    chapters = [a.number for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
+    assert chapters == [_roman(n) for n in range(1, 92)]
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "I. GENERAL PROVISIONS\nII. ORCHARD COUNCILS\n",
+        "I. GENERAL PROVISIONS\n3\nII. ORCHARD COUNCILS\n7\n",
+    ],
+)
+def test_a_contents_list_does_not_take_the_body_run(
+    monkeypatch: pytest.MonkeyPatch, contents: str
+) -> None:
+    body = "I. GENERAL PROVISIONS\n\nArticle 1\nText.\n\nII. ORCHARD COUNCILS\n\nArticle 2\nText.\n"
+    text = f"CONTENTS\n{contents}\n{body}"
+    anchors = _anchors(monkeypatch, text)
+    start = text.index(body)
+    assert [a.char_offset >= start for a in anchors if a.kind == "chapter"] == [True, True]
+    assert [a.akn_eid for a in anchors if a.kind == "article"] == [
+        "chp_I__art_1",
+        "chp_II__art_2",
+    ]
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "II. ORCHARD COUNCILS AND THEIR\nDUTIES OF COORDINATION",
+        "II. ORCHARD COUNCILS AND THEIR DU-\nTIES OF COORDINATION",
+    ],
+)
+def test_assembly_prints_a_wrapped_title_once(
+    monkeypatch: pytest.MonkeyPatch, heading: str
+) -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    cfg = _config(opt_in=True)
+    monkeypatch.setattr("codify.pipeline.enrich.anchors.load_config", lambda _c: cfg)
+    monkeypatch.setattr(
+        "codify.pipeline.enrich.verbatim.cached_regex",
+        lambda _c, _d: build_anchor_regex(cfg, "act"),
+    )
+    text = (
+        "I. GENERAL PROVISIONS\n\nArticle 1\nOrchards are shared.\n\n"
+        f"{heading}\n\nArticle 2\nEach district has a council.\n"
+    )
+    bluebell, _summary, _anchors = text_to_bluebell_verbatim(text, country="xe", doctype="act")
+    assert bluebell.count("COORDINATION") == 1
+    assert "TIES OF" not in bluebell.replace("DUTIES OF", "")
+    assert "ORCHARD COUNCILS AND THEIR DUTIES OF COORDINATION" in bluebell
+
+
+def test_an_appended_restatement_does_not_replace_the_body_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    body = "I. GENERAL PROVISIONS\n\nArticle 1\nText.\n\nII. ORCHARD COUNCILS\n\nArticle 2\nText.\n"
+    restated = "I. PROVISIONES GENERALES\n\nItem one.\n\nII. CONSILIA\n\nItem two.\n"
+    anchors = _anchors(monkeypatch, f"{body}\n{restated}")
+    chapters = [a for a in anchors if a.kind == "chapter"]
+    assert [a.char_offset < len(body) for a in chapters] == [True, True]
+
+
+def test_an_article_caption_does_not_replace_the_title(monkeypatch: pytest.MonkeyPatch) -> None:
+    text = (
+        "I. GENERAL PROVISIONS\n\nSubject matter\nArticle 1\nText.\n\n"
+        "II. ORCHARD COUNCILS\n\nArticle 2\nText.\n"
+    )
+    headings = [a.heading for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
+    assert headings == ["GENERAL PROVISIONS", "ORCHARD COUNCILS"]
+
+
+def test_a_stray_numeral_does_not_capture_the_next_heading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = (
+        "I. GENERAL PROVISIONS\n\nArticle 1\nText.\n\nV. STRAY HEADING\n\nArticle 2\nText.\n\n"
+        "II. ORCHARD COUNCILS\n\nArticle 3\nText.\n"
+    )
+    chapters = [a.number for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
+    assert chapters == ["I", "II"]
+
+
+def test_an_all_caps_sentence_is_not_a_heading(monkeypatch: pytest.MonkeyPatch) -> None:
+    text = (
+        "I. GENERAL PROVISIONS\n\nArticle 1\nFees apply as follows:\n"
+        "II. NO FEE IS PAYABLE BEFORE 2030.\n\n"
+        "II. ORCHARD COUNCILS\n\nArticle 2\nText.\n"
+    )
+    headings = [a.heading for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
+    assert headings == ["GENERAL PROVISIONS", "ORCHARD COUNCILS"]

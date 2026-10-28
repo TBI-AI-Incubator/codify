@@ -2426,7 +2426,7 @@ def _drop_uk_prose_containers(text: str, anchors: list[StructuralAnchor]) -> lis
 # judgments number their paragraphs this way and write no hierarchy keyword.
 _BRACKETED_DECIMAL_RE = re.compile(r"(?m)^[^\S\n]{0,8}\[(?P<num>\d+(?:\.\d+)+)\]")
 
-_ROMAN_TITLE_RE = re.compile(r"(?m)^[^\S\n]{0,12}(?P<num>[IVXL]+)\.[^\S\n]+(?P<title>\S[^\n]*)")
+_ROMAN_TITLE_RE = re.compile(r"(?m)^[^\S\n]{0,12}(?P<num>[IVXLCDM]+)\.[^\S\n]+(?P<title>\S[^\n]*)")
 _ROMAN_TITLE_PASS = "roman_title"  # noqa: S105, pass name, not a credential
 
 
@@ -2444,34 +2444,50 @@ def _caps_title(line: str) -> bool:
 def _roman_title_anchors(
     text: str, toc_end: int, kind: str, mask: Sequence[bool]
 ) -> list[StructuralAnchor]:
-    """Containers headed "II. TITLE", kept only as an unbroken I, II, III run."""
-    out: list[StructuralAnchor] = []
+    """Containers headed "II. TITLE": the first unbroken I, II, III run with prose
+    between its headings, so a contents list or an appended restatement is not it."""
+    runs: list[list[tuple[StructuralAnchor, int]]] = []
     for m in _ROMAN_TITLE_RE.finditer(text):
         title = m.group("title").strip()
+        value = _roman_or_digit(m.group("num"))
+        run = next((r for r in reversed(runs) if len(r) + 1 == value), None)
         if (
             m.start() < toc_end
             or mask[m.start("num")]
-            or _roman_or_digit(m.group("num")) != len(out) + 1
+            or (run is None and value != 1)
             or not _caps_title(title)
         ):
             continue
-        nxt_end = _line_end(text, m.end() + 1)
-        nxt = text[m.end() + 1 : nxt_end].strip()
+        end = m.end()
+        nxt_end = _line_end(text, end + 1)
+        nxt = text[end + 1 : nxt_end].strip()
         if nxt and _caps_title(nxt):
             title = title[:-1] + nxt if title.endswith("-") else f"{title} {nxt}"
-        out.append(
-            StructuralAnchor(
-                kind=kind,
-                keyword=f"{m.group('num')}.",
-                number=m.group("num"),
-                char_offset=m.start(),
-                line=text.count("\n", 0, m.start()) + 1,
-                matched_text=f"{m.group('num')}.",
-                heading=title if kind in _HEADING_KINDS else None,
-                source_pass=_ROMAN_TITLE_PASS,
+            end = nxt_end
+        if run is None:
+            run = []
+            runs.append(run)
+        run.append(
+            (
+                StructuralAnchor(
+                    kind=kind,
+                    keyword=f"{m.group('num')}.",
+                    number=m.group("num"),
+                    char_offset=m.start(),
+                    line=text.count("\n", 0, m.start()) + 1,
+                    # The whole heading span, so body fill does not repeat a wrapped line.
+                    matched_text=text[m.start("num") : end],
+                    heading=title if kind in _HEADING_KINDS else None,
+                    source_pass=_ROMAN_TITLE_PASS,
+                ),
+                end,
             )
         )
-    return out if len(out) >= 2 else []
+    for run in runs:
+        gaps = [text[end : nxt.char_offset] for (_a, end), (nxt, _e) in zip(run, run[1:])]
+        if gaps and all(any(c.islower() for c in gap) for gap in gaps):
+            return [a for a, _end in run]
+    return []
 
 
 # Outline markers. An annex numbers its own content without a keyword, so each
