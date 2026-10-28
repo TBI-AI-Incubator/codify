@@ -25,12 +25,14 @@ from codify.acquisition.adapters.pt.dre_akn import (
     UnmappedFragment,
     article_body,
     from_printed,
+    to_akn,
     to_bluebell,
 )
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.events import Complete, Failed
 from codify.pipeline.formats import akn_native
+from codify.storage.repository import _extract_long_title, short_title_from_akn
 
 NS = {"a": "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"}
 SITE = "https://diariodarepublica.pt"
@@ -230,6 +232,56 @@ def _ref(number: str, year: int, **extra: str) -> DocumentRef:
 def _eids(doc: Any) -> list[str]:
     root = etree.fromstring(doc.primary().content)
     return [str(e) for e in root.xpath("//a:article/@eId | //a:chapter/@eId", namespaces=NS)]
+
+
+async def test_the_law_takes_its_sumario_as_title_and_its_citation_as_short_title() -> None:
+    doc, _ = await _fetch(Gazette(), _ref("7", 2042))
+    xml = doc.primary().content.decode()
+    root = etree.fromstring(doc.primary().content)
+    assert [" ".join(p.itertext()) for p in root.xpath("//a:preface//a:p", namespaces=NS)] == [
+        "Decreto-Lei n.º 7/2042",
+        "de 2 de março",
+        "Aprova o regime de exemplo.",
+    ]
+    # What `save_document` writes to `laws.title` and `laws.short_title`.
+    assert _extract_long_title(xml) == "Aprova o regime de exemplo."
+    assert short_title_from_akn(xml, "", "pt") == "Decreto-Lei n.º 7/2042"
+
+
+@pytest.mark.parametrize(
+    ("stated", "preface"),
+    [
+        ("", ["Lei n.º 3/2041", "Cria o exemplo."]),
+        (
+            "Lei n.º 3/2041, de 2 de março\rSumário:",
+            ["Lei n.º 3/2041 , de 2 de março", "Cria o exemplo."],
+        ),
+    ],
+)
+def test_a_preface_that_omits_them_takes_the_gazettes_citation_and_sumario(
+    stated: str, preface: list[str]
+) -> None:
+    frags = [
+        {"id": "1", "parent": "0", "label": "Diploma", "heading": "", "text": stated},
+        {"id": "2", "parent": "1", "label": "Artigo 1.º", "heading": "", "text": "Texto."},
+    ]
+    bluebell = to_bluebell(frags, title="Lei n.º 3/2041", summary="Cria o exemplo.")
+    work = "/akn/pt/act/2041/3"
+    xml = to_akn(
+        bluebell,
+        number="3",
+        work=work,
+        published="2041-03-02",
+        expression=f"{work}/por@2041-03-02",
+        as_of="2041-03-02",
+        title="Lei n.º 3/2041",
+    )
+    root = etree.fromstring(xml.encode())
+    assert [" ".join(p.itertext()) for p in root.xpath("//a:preface//a:p", namespaces=NS)] == (
+        preface
+    )
+    assert _extract_long_title(xml) == "Cria o exemplo."
+    assert short_title_from_akn(xml, "", "pt") == "Lei n.º 3/2041"
 
 
 async def test_consolidated_act_keeps_structure_and_leaves_repealed_out() -> None:

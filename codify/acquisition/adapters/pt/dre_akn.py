@@ -40,6 +40,7 @@ TITLE_LINE = re.compile(
     r"^(Decreto-Lei|Lei|Portaria|Lei Orgânica)\b.*\bn\.º|^de \d{1,2} de \w+|^Sumário:"
 )
 FORMULA = re.compile(r"seguinte\s*:\s*$")
+SUMMARY = re.compile(r"^Sumário:\s*")
 OPEN_QUOTE = {"«", '"', "“"}
 
 
@@ -198,9 +199,12 @@ def _annex(node: dict[str, Any], kids: Tree, pad: str, out: list[str]) -> None:
     out += later
 
 
-def to_bluebell(frags: list[dict[str, Any]], *, printed: str = "") -> str:
+def to_bluebell(
+    frags: list[dict[str, Any]], *, printed: str = "", title: str = "", summary: str = ""
+) -> str:
     """Fragments in source order as one Bluebell document; repealed ones are left out.
-    `printed` supplies the preamble where the consolidation's root has none."""
+    `printed` supplies the preamble where the consolidation's root has none; `title` and
+    `summary` the citation and sumário where the text does not state them."""
     if not frags:
         raise UnmappedFragment("no fragments")
     every: Tree = defaultdict(list)
@@ -234,6 +238,10 @@ def to_bluebell(frags: list[dict[str, Any]], *, printed: str = "") -> str:
     preface = [" ".join(root["heading"].split())] if root["heading"].strip() else []
     while text and TITLE_LINE.search(text[0]):
         preface.append(text.pop(0))
+    if title and not any(" ".join(x.split()).startswith(title) for x in preface):
+        preface.insert(0, title)
+    if summary and not any(SUMMARY.match(x) for x in preface):
+        preface.append(f"Sumário: {summary}")
     body: list[str] = []
     concl: list[str] = []
     schedules: list[str] = []
@@ -247,7 +255,13 @@ def to_bluebell(frags: list[dict[str, Any]], *, printed: str = "") -> str:
             _emit(k, kids, "  ", body, schedules)
     doc: list[str] = []
     if preface:
-        doc += ["PREFACE"] + [f"  {escape(x)}" for x in preface]
+        # The sumário is the act's long title.
+        doc += ["PREFACE"] + [
+            f"  LONGTITLE {escape(SUMMARY.sub('', x) or summary)}"
+            if SUMMARY.match(x)
+            else f"  {escape(x)}"
+            for x in preface
+        ]
     if text:
         doc += ["PREAMBLE"] + [f"  {escape(x)}" for x in text]
     if all(x.split()[0] in GROUPS.values() for x in body):
@@ -363,7 +377,8 @@ def from_printed(text: str) -> list[dict[str, Any]]:
 
 
 def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> str:
-    """The work ELI as an `eli` alias, the act's title, and its gazette publication."""
+    """The work ELI as an `eli` alias, the act's title as alias and preface `docTitle`, and
+    its gazette publication."""
     root = parse_xml(akn)
     work = root.find(f"./*/{{{AKN_NS}}}meta/{{{AKN_NS}}}identification/{{{AKN_NS}}}FRBRWork")
     if work is None:
@@ -371,6 +386,13 @@ def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> st
     for alias in work.findall(f"{{{AKN_NS}}}FRBRalias"):
         if alias.get("name") == "title" and title:
             alias.set("value", title)
+    for p in root.iterfind(f"./*/{{{AKN_NS}}}preface/{{{AKN_NS}}}p"):
+        stated = " ".join((p.text or "").split())
+        if title and stated.startswith(title):
+            p.text = None
+            name = etree.SubElement(p, f"{{{AKN_NS}}}docTitle")
+            name.text, name.tail = title, stated[len(title) :] or None
+            break
     if eli:
         anchor = work.findall(f"{{{AKN_NS}}}FRBRalias") or work.findall(f"{{{AKN_NS}}}FRBRuri")
         anchor[-1].addnext(etree.Element(f"{{{AKN_NS}}}FRBRalias", value=eli, name="eli"))
