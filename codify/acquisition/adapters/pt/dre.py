@@ -248,7 +248,10 @@ class DiarioAcquirer(BaseAcquirer):
         legis = frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
         v |= {"DiplomaLegisId": legis, "GetDiplomaFragByIdAndApplicationSetting": frag}
         key = f"data {tipo}/{ano}-{frag_id}"
-        return frag, await self._call(DATA, v, key), key
+        data = await self._call(
+            DATA, v, key, lambda d: bool((d.get("LegConsBase") or {}).get("List"))
+        )
+        return frag, data, key
 
     def consolidated_eli(self, ref: DocumentRef) -> str:
         """The undated ELI a ref's class, number and year name, for classes that have one."""
@@ -276,7 +279,10 @@ class DiarioAcquirer(BaseAcquirer):
 
         cons: dict[str, Any] | None = None
         data_key = ""
-        landed = await self._resolve(f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/pt/html")
+        # The enacted text needs the consolidation only to find its detail page.
+        current = ref.as_of == "latest" or not (link or dated)
+        cons_eli = f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/pt/html"
+        landed = await self._resolve(cons_eli) if current else ""
         if cm := _CONS_PATH.search(landed):
             frag, data, data_key = await self._consolidated(*cm.groups())
             frags = fragments(data)

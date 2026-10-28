@@ -21,6 +21,7 @@ from codify.acquisition.adapters.pt.dre import (
     number_and_year,
 )
 from codify.acquisition.adapters.pt.dre_akn import (
+    ROMAN,
     UnmappedFragment,
     article_body,
     from_printed,
@@ -580,3 +581,57 @@ def test_a_quote_opened_mid_line_keeps_the_quoted_markers_prose() -> None:
         "Artigo 2.º\rEntrada em vigor\rEntra em vigor amanhã."
     )
     assert _shape(from_printed(printed)) == [("Artigo 1.º", "Diploma"), ("Artigo 2.º", "Diploma")]
+
+
+def test_a_self_parented_fragment_is_refused() -> None:
+    root = {"id": "1", "parent": "0", "label": "Diploma", "heading": "", "text": ""}
+    one = {"id": "2", "parent": "1", "label": "Artigo 1.º", "heading": "", "text": "Um."}
+    loop = {"id": "3", "parent": "3", "label": "Artigo 2.º", "heading": "", "text": "Dois."}
+    with pytest.raises(UnmappedFragment, match="outside the act's tree"):
+        to_bluebell([root, one, loop])
+
+
+def test_divisions_alone_are_no_operative_text() -> None:
+    root = {"id": "1", "parent": "0", "label": "Diploma", "heading": "", "text": ""}
+    chapter = {"id": "2", "parent": "1", "label": "Capítulo I", "heading": "", "text": ""}
+    gone = {"id": "3", "parent": "2", "label": "Artigo 1.º", "heading": "", "text": "", "state": 4}
+    with pytest.raises(UnmappedFragment, match="no operative text"):
+        to_bluebell([root, {**chapter, "state": 6}, gone])
+
+
+def test_long_roman_subalineas_stay_nested() -> None:
+    items = "\r".join(f"{r}) item;" for r in ROMAN)
+    body = [x.strip() for x in article_body(f"a) alínea:\r{items}", "")]
+    assert [x for x in body if x.startswith(("POINT", "INDENT"))] == ["POINT a)"] + [
+        f"INDENT {r})" for r in ROMAN
+    ]
+
+
+async def test_the_enacted_text_by_detail_skips_the_consolidation() -> None:
+    gazette = Gazette()
+    ref = DocumentRef(
+        jurisdiction_code="pt",
+        doctype="dl",
+        year=2042,
+        number="7",
+        as_of="enacted",
+        extra={"detail": "decreto-lei/7-2042-900001"},
+    )
+    doc, _ = await _fetch(gazette, ref)
+    assert doc.upstream_metadata["text_source"] == "printed"
+    assert [r.url.path for r in gazette.seen if "/p/cons/" in r.url.path] == []
+    assert [r for r in gazette.seen if "LegCons" in r.url.path] == []
+
+
+async def test_an_empty_consolidation_is_not_saved(tmp_path: Path) -> None:
+    cache = tmp_path / "raw"
+    ref = _ref("7", 2042, eli="https://data.dre.pt/eli/dec-lei/7/2042/03/02/p/dre")
+    first, _ = await _fetch(Gazette([]), ref, cache=cache)
+    assert first.upstream_metadata["text_source"] == "printed"
+    second, _ = await _fetch(Gazette(), ref, cache=cache)
+    assert second.upstream_metadata["text_source"] == "consolidated"
+
+
+def test_alinea_runs_past_four_letters_stay_points() -> None:
+    body = [x.strip() for x in article_body("Lista:\rzzzz) quarta;\raaaaa) quinta.", "")]
+    assert [x for x in body if x.startswith("POINT")] == ["POINT zzzz)", "POINT aaaaa)"]

@@ -30,7 +30,8 @@ GROUPS = {
 }
 UNITS = {"Artigo", "Base"}
 PARA = re.compile(r"^(\d+(?:\.\d+)*)\s*-\s+(.*)$")
-POINT = re.compile(r"^([a-z]{1,4})\)\s+(.*)$")
+# Long lists run on past z) as aa), aaa) and beyond; roman items run to xviii).
+POINT = re.compile(r"^([a-z]{1,4}|(?P<run>[a-z])(?P=run){4,}|[ivx]{5,})\)\s+(?P<text>.*)$")
 ROMAN = "i ii iii iv v vi vii viii ix x xi xii xiii xiv xv xvi xvii xviii xix xx".split()
 ART_NUM = re.compile(
     r"^(?:Artigo|Base)\s+(\d+|[IVXLC]+|único)\.?\s*[º°o]?\s*(?:-\s*([A-Z]{1,3}))?", re.IGNORECASE
@@ -140,7 +141,7 @@ def article_body(text: str, pad: str) -> list[str]:
                 depth = 2 if in_para else 1
                 keyword = "POINT"
             ind = "  " * depth
-            out += [f"{pad}{ind}{keyword} {tok})", f"{pad}{ind}  {escape(p.group(2))}"]
+            out += [f"{pad}{ind}{keyword} {tok})", f"{pad}{ind}  {escape(p.group('text'))}"]
             continue
         out.append(f"{pad}{'  ' * (depth + 1)}{escape(line)}")
     return out
@@ -214,12 +215,17 @@ def to_bluebell(frags: list[dict[str, Any]], *, printed: str = "") -> str:
     if not kept(root):
         raise UnmappedFragment("the consolidation marks the whole act repealed")
     live = [f for f in frags if kept(f)]
-    ids = {f["id"] for f in live}
-    if stray := [f["label"] for f in live[1:] if f["parent"] not in ids]:
-        raise UnmappedFragment(f"fragments outside the act's tree: {stray[:3]}")
     kids: Tree = defaultdict(list)
     for f in live:
         kids[f["parent"]].append(f)
+    reached: set[str] = set()
+    todo = [root["id"]]
+    while todo:
+        node = todo.pop()
+        reached.add(node)
+        todo += [k["id"] for k in kids.get(node, []) if k["id"] not in reached]
+    if stray := [f["label"] for f in live if f["id"] not in reached]:
+        raise UnmappedFragment(f"fragments outside the act's tree: {stray[:3]}")
     text = lines(root["text"])
     if not text:
         orig = lines(printed)
@@ -244,7 +250,7 @@ def to_bluebell(frags: list[dict[str, Any]], *, printed: str = "") -> str:
         doc += ["PREFACE"] + [f"  {escape(x)}" for x in preface]
     if text:
         doc += ["PREAMBLE"] + [f"  {escape(x)}" for x in text]
-    if not body:
+    if all(x.split()[0] in GROUPS.values() for x in body):
         raise UnmappedFragment("no operative text to form a body")
     doc += ["BODY"] + body
     if concl:
