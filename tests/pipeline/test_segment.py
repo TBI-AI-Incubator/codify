@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -272,6 +273,34 @@ def test_an_act_ending_before_the_listed_page_is_still_a_mismatch(
     assert result.outcome == "abstained"
     rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
     assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def test_a_mention_mid_act_does_not_take_the_next_page_listing(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 3 names act 4 on page 2 and runs onto page 3; act 4 opens mid-page 4."""
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)])
+    first = _act(3, "THE HARBOUR DUES ACT", 4)
+    pages = [
+        contents,
+        ["- 2 -", "", *first[:7], "ACT No. 4 OF 2020 follows below.", "", *first[7:10]],
+        ["- 3 -", "", *first[10:]],
+        ["- 4 -", "", "Section 5. Duty 5", "", *_signed(), *_act(4, "THE PILOTS ACT", 3)],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert all(not s.text.startswith("ACT No. 4 OF 2020 follows") for s in result.segments)
+    assert not any(s.key == "act 4" and s.first_page == 2 for s in result.segments)
+
+
+def test_a_dot_run_without_a_page_number_is_read_in_linear_time(
+    config: JurisdictionConfig,
+) -> None:
+    contents = ["Contents", "", "ACT No. 3 OF 2020 The Act " + "." * 3000, ""]
+    text, spans = _join([contents, ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 2)]])
+    began = time.perf_counter()
+    segment(text, spans, config=config)
+    assert time.perf_counter() - began < 1.0
 
 
 def test_a_listed_page_with_only_its_number_is_still_a_mismatch(

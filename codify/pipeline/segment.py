@@ -72,7 +72,7 @@ _LINE_END_NUMBER_RE = re.compile(r"(?m)(\d+)[ \t]*$")
 # Longer than this between an entry's heading and its page, and it is body text.
 _ENTRY_MAX_CHARS = 1000
 # A leader run then a page number, ending a line: a contents entry, not body text.
-_LEADER_RE = re.compile(r"(?:\.{3,}|\u2026)[.\u2026]*[ \t]*(\d+)[ \t]*$", re.MULTILINE)
+_LEADER_RE = re.compile(r"(?<![.\u2026])(?:\.{3}|\u2026)[.\u2026]*[ \t]*(\d+)[ \t]*$", re.MULTILINE)
 _NOT_WORD_RE = re.compile(r"[\W_]+")
 
 
@@ -651,7 +651,9 @@ def _decide_pass(
         entry: _Entry | None = None
         if entries:
             status, entry = _against_contents(heading, entries, unmatched, named, claims)
-            if status == "page_mismatch" and entry is not None:
+            # A later heading naming the same act may be its own: leave the doubt.
+            again = any(c.key == heading.key for c in candidates[index + 1 :])
+            if status == "page_mismatch" and entry is not None and not again:
                 kept = (
                     c.start
                     for c in candidates[index + 1 :]
