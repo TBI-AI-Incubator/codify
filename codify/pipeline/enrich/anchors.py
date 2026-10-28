@@ -2441,11 +2441,14 @@ def _caps_title(line: str) -> bool:
     )
 
 
+_SENTENCE_CLOSERS = "\"')]\u201c\u201d\u2019\u00bb"
+
+
 def _has_sentence(span: str) -> bool:
     """A prose line ending a sentence, which contents rows and leaders never do."""
     return any(
         line.endswith((".", ";", ":")) and ".." not in line
-        for line in (raw.strip() for raw in span.splitlines())
+        for line in (raw.strip().rstrip(_SENTENCE_CLOSERS) for raw in span.splitlines())
     )
 
 

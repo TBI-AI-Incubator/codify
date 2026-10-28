@@ -266,3 +266,24 @@ def test_a_contents_list_of_article_captions_does_not_take_the_body_run(
     anchors = _anchors(monkeypatch, text)
     start = text.index(body)
     assert [a.char_offset >= start for a in anchors if a.kind == "chapter"] == [True, True]
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        'It reads "Shared fruit trees."',
+        "It reads “Shared fruit trees.”",
+        "It reads «Shared fruit trees.»",
+        "It applies to councils (see above.)",
+        "It applies to councils [see above.]",
+    ],
+)
+def test_a_sentence_closed_by_a_quote_or_bracket_is_prose(
+    monkeypatch: pytest.MonkeyPatch, sentence: str
+) -> None:
+    text = (
+        f"I. GENERAL PROVISIONS\n\nArticle 1\n{sentence}\n\n"
+        "II. ORCHARD COUNCILS\n\nArticle 2\nEach district has a council.\n"
+    )
+    chapters = [a.number for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
+    assert chapters == ["I", "II"]
