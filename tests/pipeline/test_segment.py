@@ -274,6 +274,19 @@ def test_an_act_ending_before_the_listed_page_is_still_a_mismatch(
     assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
 
 
+def test_a_listed_page_with_only_its_number_is_still_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Page 3 carries only its number; act 4 resumes on page 4."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)]
+    pages = _foot_of_page_issue(listed)
+    pages[2:] = [["- 3 -", ""], ["- 4 -", "", *pages[2][2:]]]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
 def test_a_heading_at_a_page_foot_out_of_contents_order_is_a_mismatch(
     config: JurisdictionConfig,
 ) -> None:
@@ -1789,6 +1802,21 @@ def test_a_second_text_after_the_signature_is_kept_apart(
     assert result.segments[1].text.startswith("PARALLEL TEXT")
     assert result.segments[2].text.startswith("ACT No. 4 OF 2020")
     _conserved(result, text)
+
+
+def test_a_kept_apart_region_on_the_listed_page_is_not_the_act_running_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Act 4 ends on page 2; page 3, where the contents list it, is a second text."""
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)])
+    page = ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+    page += [*_act(4, "THE PILOTS ACT", 1), *_signed()]
+    fields = _kept_config(enacting_formula_markers=["BE IT ENACTED"])
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([contents, page, ["- 3 -", "", *_parallel()]])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
 
 
 @pytest.mark.parametrize(

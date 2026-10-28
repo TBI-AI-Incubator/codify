@@ -652,7 +652,13 @@ def _decide_pass(
         if entries:
             status, entry = _against_contents(heading, entries, unmatched, named, claims)
             if status == "page_mismatch" and entry is not None:
-                status = _spilled(text, heading, entry, following, pages, entries, unmatched)
+                kept = (
+                    c.start
+                    for c in candidates[index + 1 :]
+                    if rules.skips(c.label) and not _quoted(text, c.start, rules.country)
+                )
+                stop = min(following, next(kept, following))
+                status = _spilled(text, heading, entry, stop, pages, entries, unmatched)
             if entry is not None:
                 unmatched.remove(entry)
                 rows.append(_entry_row(entry, status))
@@ -839,20 +845,19 @@ def _spilled(
     text: str,
     heading: _Heading,
     entry: _Entry,
-    following: int,
+    stop: int,
     pages: _Pages,
     entries: list[_Entry],
     unmatched: list[_Entry],
 ) -> Status:
     """Matched where the contents list the page after the heading's and the act's
-    text runs onto it, unless an act listed after it is already placed."""
-    listed = entry.pdf_page
-    begins = pages.start_of(listed) if listed is not None else None
+    text, ending at `stop`, runs onto it, unless an act listed after it is placed."""
+    span = next((s for s in pages.spans if s.page == entry.pdf_page), None)
     if (
         heading.page is not None
-        and listed == heading.page + 1
-        and begins is not None
-        and not _bare(text[begins:following], pages.pattern)
+        and entry.pdf_page == heading.page + 1
+        and span is not None
+        and not _bare(text[span.start : min(stop, span.end)], pages.pattern)
         and all(e in unmatched for e in entries[entries.index(entry) + 1 :])
     ):
         return "matched"
