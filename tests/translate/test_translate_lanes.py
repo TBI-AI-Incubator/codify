@@ -6,6 +6,10 @@ import asyncio
 import json
 from typing import Any
 
+import httpx
+import openai
+import pytest
+
 from codify.translate.anchors import SourceUnit
 from codify.translate.exemplars import ExemplarPool
 from codify.translate.translate_bodies import LANE_BATCHES, translate_bodies
@@ -35,6 +39,7 @@ class _RecordingLLM:
         self.max_in_flight = 0
         self.prompts: dict[str, str] = {}
         self.fail_first_eids = fail_first_eids
+        self.outage_first_eids: frozenset[str] = frozenset()
 
     async def chat_schema(self, prompt: str, schema: Any, **kw: Any) -> Any:
         payload = json.loads(prompt[prompt.rfind("Batch:\n") + len("Batch:\n") :])
@@ -45,6 +50,8 @@ class _RecordingLLM:
             await asyncio.sleep(0.01)
         finally:
             self.in_flight -= 1
+        if payload[0]["eid"] in self.outage_first_eids:
+            raise openai.APIConnectionError(request=httpx.Request("POST", "http://gateway"))
         if payload[0]["eid"] in self.fail_first_eids:
             raise ValueError("model refused")
         return schema.model_validate(
@@ -144,3 +151,18 @@ async def test_failed_batch_falls_back_and_does_not_feed_the_pool() -> None:
     assert {f["code"] for f in outcome.flags} == {"translate_batch_fallback"}
     assert "Already-agreed" not in llm.prompts[units[8].akn_eid]
     assert f"Target: T: {units[8].body_text}" in llm.prompts[units[16].akn_eid]
+
+
+async def test_connection_error_cancels_the_other_lanes() -> None:
+    units = [_unit(i) for i in range(80)]
+    llm = _RecordingLLM()
+    llm.outage_first_eids = frozenset({units[0].akn_eid})
+
+    with pytest.raises(openai.APIConnectionError):
+        await _run(units, llm, INERT_SOURCE, concurrency=2)
+    assert llm.in_flight == 0
+    started = len(llm.prompts)
+    await asyncio.sleep(0.05)
+
+    assert started < 10
+    assert len(llm.prompts) == started

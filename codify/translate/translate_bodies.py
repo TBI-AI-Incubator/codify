@@ -398,7 +398,15 @@ async def translate_bodies(
             pool_picks_total += pool.picks
             pool_scans_total += pool.scans
 
-    await asyncio.gather(*[_one_lane(lane) for lane in lanes])
+    tasks = [asyncio.create_task(_one_lane(lane)) for lane in lanes]
+    try:
+        await asyncio.gather(*tasks)
+    except BaseException:
+        # Stop queued lanes calling the model once the run has failed.
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
     # `BodyBlock.model_construct` skips the ingest-side strict validator;
     # `TranslatedBlock` ran its own translation-tuned check above.
