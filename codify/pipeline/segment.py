@@ -72,7 +72,9 @@ _LINE_END_NUMBER_RE = re.compile(r"(?m)(\d+)[ \t]*$")
 # Longer than this between an entry's heading and its page, and it is body text.
 _ENTRY_MAX_CHARS = 1000
 # A leader run then a page number, ending a line: a contents entry, not body text.
-_LEADER_RE = re.compile(r"(?<![.\u2026])(?:\.{3}|\u2026)[.\u2026]*[ \t]*(\d+)[ \t]*$", re.MULTILINE)
+_LEADER_RE = re.compile(
+    r"(?<![.\u2026])(?:\.{3}|\.{0,2}\u2026)[.\u2026]*[ \t]*(\d+)[ \t]*$", re.MULTILINE
+)
 _NOT_WORD_RE = re.compile(r"[\W_]+")
 
 

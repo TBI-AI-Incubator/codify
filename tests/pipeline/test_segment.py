@@ -19,6 +19,7 @@ import codify.jurisdictions as jurisdictions
 from codify.jurisdictions import JurisdictionConfig, load_config
 from codify.pipeline.enrich.ocr import PageSpan
 from codify.pipeline.segment import (
+    _LEADER_RE,
     PAGE_SEPARATOR,
     QUOTE_LOOKAHEAD,
     Issue,
@@ -301,6 +302,9 @@ def test_a_dot_run_without_a_page_number_is_read_in_linear_time(
     began = time.perf_counter()
     segment(text, spans, config=config)
     assert time.perf_counter() - began < 1.0
+    began = time.perf_counter()
+    assert _LEADER_RE.search("x" + "." * 20000 + "x") is None
+    assert time.perf_counter() - began < 0.5
 
 
 def test_a_listed_page_with_only_its_number_is_still_a_mismatch(
@@ -330,13 +334,14 @@ def test_a_heading_at_a_page_foot_out_of_contents_order_is_a_mismatch(
     assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
 
 
+@pytest.mark.parametrize("leader", ["\u2026\u2026.", ".\u2026", "..\u2026"])
 def test_an_entry_takes_its_own_leader_page_not_an_unread_entry_after_it(
-    config: JurisdictionConfig,
+    config: JurisdictionConfig, leader: str
 ) -> None:
     """The notice's entry is no heading, so its page follows act 4's inside one entry."""
     contents = ["THE ATLANTIS GAZETTE", "ISSUE No. 12", "", "Contents", ""]
     contents += ["ACT No. 3 OF 2020 The Harbour Dues Act ......... 2"]
-    contents += ["ACT No. 4 OF 2020 The Pilots Act\u2026\u2026. 2"]
+    contents += [f"ACT No. 4 OF 2020 The Pilots Act{leader} 2"]
     contents += ["9. Notice of the Harbour Board ......... 3", ""]
     pages = [
         contents,
