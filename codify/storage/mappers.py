@@ -31,6 +31,7 @@ from codify.akn.analysis import (
 )
 from codify.akn.elements import BodyElement, ElementBase
 from codify.akn.references import InlineReference
+from codify.akn.vocabulary import RECITAL
 from codify.jurisdictions import placeholder_markers_for, pool_excluded_refers_to_for
 from codify.quality.sentinels import exclusion_reason, marked_scope
 from codify.search import TOKENISER_VERSION, tokenise_to_text
@@ -271,6 +272,11 @@ def document_to_rows(
             normative=_attachment_is_normative(doc, top.heading),
         )
 
+    taken = {p.akn_eid for p in provisions} | {s.akn_eid for s in sections}
+    for recital in doc.recitals:
+        if recital.akn_eid not in taken:
+            _walk(recital, parent_section_id=None, normative=False)
+
     amendment_effects = [
         AmendmentEffectRow(
             version_id=version.id,
@@ -450,10 +456,11 @@ def rows_to_document(
         )
 
     body: list[BodyElement] = []
+    recitals: list[BodyElement] = []
     for top in section_children.get(None, []):
         body.append(_build_section(top))
     for prov in provisions_by_section.get(None, []):
-        body.append(_build_provision(prov))
+        (recitals if prov.akn_type == RECITAL else body).append(_build_provision(prov))
 
     textual_mods = [_row_to_textual_mod(row) for row in (amendment_effects or [])]
     lifecycle_domain = [_row_to_lifecycle_event(row) for row in (lifecycle_events or [])]
@@ -465,6 +472,7 @@ def rows_to_document(
         language=version.language,
         expression_date=version.expression_date,
         body=body,
+        recitals=recitals,
         textual_mods=textual_mods,
         lifecycle_events=lifecycle_domain,
     )

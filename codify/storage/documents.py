@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.akn._schema import safe_parser
-from codify.akn.vocabulary import TAG_TO_KIND, is_lifted_note, table_row_eid
+from codify.akn.vocabulary import RECITAL, TAG_TO_KIND, is_lifted_note, table_row_eid
 from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
@@ -103,8 +103,17 @@ class InlineNote(BaseModel):
     inferred: bool = False
 
 
+class InlineAnchor(BaseModel):
+    """Running text a citation can name, such as a recital."""
+
+    kind: Literal["anchor"] = "anchor"
+    eid: str
+    children: list["InlineNode"] = Field(default_factory=list)
+
+
 InlineNode = Union[
     InlineText,
+    InlineAnchor,
     InlineRef,
     InlineTerm,
     InlineCitation,
@@ -118,6 +127,7 @@ InlineMod.model_rebuild()
 InlineEmph.model_rebuild()
 InlineStrong.model_rebuild()
 InlineNote.model_rebuild()
+InlineAnchor.model_rebuild()
 
 
 class DocumentTableCell(BaseModel):
@@ -778,7 +788,7 @@ def _quote_block(mod: etree._Element, quoted: etree._Element) -> DocumentProvisi
     )
 
 
-def _walk_text_block(el: etree._Element) -> list[InlineNode]:
+def _walk_text_block(el: etree._Element, citable: frozenset[str] | None = None) -> list[InlineNode]:
     """Flatten a `<preface>` / `<preamble>` container: each `<p>` is a
     paragraph, non-`<p>` containers recurse. Joined with `\\n\\n`.
 
@@ -797,11 +807,15 @@ def _walk_text_block(el: etree._Element) -> list[InlineNode]:
                 out.append(InlineText(text="\n\n"))
             out.extend(_walk_inline(child))
             continue
-        inner = _walk_text_block(child)
+        inner = _walk_text_block(child, citable)
         if inner:
             if out:
                 out.append(InlineText(text="\n\n"))
-            out.extend(inner)
+            eid = child.get("eId", "")
+            if cname == "recital" and eid and (citable is None or eid in citable):
+                out.append(InlineAnchor(eid=eid, children=inner))
+            else:
+                out.extend(inner)
     return out
 
 
@@ -970,7 +984,8 @@ async def get_version_document(
             if preface_el is not None:
                 preface_nodes = _walk_text_block(preface_el)
             if preamble_el is not None:
-                preamble_nodes = _walk_text_block(preamble_el)
+                rowed = frozenset(p.akn_eid for p in provisions if p.akn_type == RECITAL)
+                preamble_nodes = _walk_text_block(preamble_el, rowed)
             conclusions_el = _direct_child(doc_root, "conclusions")
             if conclusions_el is not None:
                 conclusions_nodes = _walk_text_block(conclusions_el)
@@ -1000,7 +1015,9 @@ async def get_version_document(
         for s in children_by_parent.get(None, [])
     ]
     root_provisions = [
-        _to_provision(p, xml_index, persisted_eids) for p in provisions_by_section.get(None, [])
+        _to_provision(p, xml_index, persisted_eids)
+        for p in provisions_by_section.get(None, [])
+        if p.akn_type != RECITAL
     ]
 
     return VersionDocument(
@@ -1023,6 +1040,7 @@ __all__ = [
     "DocumentProvision",
     "DocumentProvisionBlock",
     "DocumentSection",
+    "InlineAnchor",
     "InlineCitation",
     "InlineEmph",
     "InlineNode",

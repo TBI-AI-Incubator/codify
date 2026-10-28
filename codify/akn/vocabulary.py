@@ -42,6 +42,9 @@ TAG_TO_KIND: dict[str, str] = {
 
 PROVISION_ELEMENTS = frozenset(TAG_TO_KIND)
 
+# A preamble recital's row type: citable, never operative.
+RECITAL = "recital"
+
 # Model-written text. Compared for presence, never for content.
 PROSE_ELEMENTS = frozenset({"p", "content", "listIntroduction"})
 

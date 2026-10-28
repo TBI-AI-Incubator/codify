@@ -943,6 +943,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -994,6 +997,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1141,6 +1147,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1944,6 +1953,61 @@
         "title": "IngestUrl",
         "type": "object"
       },
+      "InlineAnchor": {
+        "description": "Running text a citation can name, such as a recital.",
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "eid": {
+            "title": "Eid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "anchor",
+            "default": "anchor",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eid"
+        ],
+        "title": "InlineAnchor",
+        "type": "object"
+      },
       "InlineCitation": {
         "properties": {
           "href": {
@@ -1986,6 +2050,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2033,6 +2100,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -2076,6 +2146,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2155,6 +2228,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -4289,6 +4365,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4343,6 +4422,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4373,6 +4455,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
