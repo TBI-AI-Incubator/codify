@@ -110,9 +110,10 @@ def article_body(text: str, pad: str) -> list[str]:
     quote = 0
     body = lines(text)
     for n, line in enumerate(body):
-        if quote or line[:1] in OPEN_QUOTE:
+        # A quote opened on an earlier line, even mid-line, keeps this one prose.
+        was, quote = quote, quote_depth(quote, line)
+        if was or line[:1] in OPEN_QUOTE:
             out.append(f"{pad}{'  ' * (depth + 1)}{escape(line)}")
-            quote = quote_depth(quote, line)
             continue
         m, p = PARA.match(line), POINT.match(line)
         if m:
@@ -321,8 +322,11 @@ def from_printed(text: str) -> list[dict[str, Any]]:
     while i < len(src):
         line, nxt = src[i], (src[i + 1] if i + 1 < len(src) else "")
         i += 1
-        if quote or (line[:1] in OPEN_QUOTE and word(cur["label"]) in UNITS):
+        was = quote
+        if was or word(cur["label"]) in UNITS:
             quote = quote_depth(quote, line)
+        if was or (line[:1] in OPEN_QUOTE and word(cur["label"]) in UNITS):
+            pass
         elif ANNEX_LINE.match(line):
             cur = add("Anexo" + line[5:], "0")
             top, stack = cur["id"], []

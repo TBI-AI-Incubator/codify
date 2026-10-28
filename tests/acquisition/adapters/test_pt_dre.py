@@ -20,7 +20,12 @@ from codify.acquisition.adapters.pt.dre import (
     SiteChanged,
     number_and_year,
 )
-from codify.acquisition.adapters.pt.dre_akn import UnmappedFragment, from_printed, to_bluebell
+from codify.acquisition.adapters.pt.dre_akn import (
+    UnmappedFragment,
+    article_body,
+    from_printed,
+    to_bluebell,
+)
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.events import Complete, Failed
@@ -564,3 +569,14 @@ def test_without_an_enacting_formula_the_body_opens_at_its_first_division() -> N
     frags = from_printed(text)
     assert frags[0]["text"] == "Lei n.º 1/2042"
     assert _shape(frags) == [("Capítulo I", "Diploma"), ("Artigo 1.º", "Capítulo I")]
+
+
+def test_a_quote_opened_mid_line_keeps_the_quoted_markers_prose() -> None:
+    text = "1 - O texto passa a ser: «\r2 - Regra citada.»\r2 - Regra atual."
+    assert [x.strip() for x in article_body(text, "") if "PARA" in x] == ["PARA 1", "PARA 2"]
+    printed = (
+        "Lei n.º 2/2042\rA Assembleia decreta o seguinte:\r"
+        "Artigo 1.º\rAlteração\rO artigo 8.º passa a ser: «\rArtigo 8.º\rRegra\rTexto.»\r"
+        "Artigo 2.º\rEntrada em vigor\rEntra em vigor amanhã."
+    )
+    assert _shape(from_printed(printed)) == [("Artigo 1.º", "Diploma"), ("Artigo 2.º", "Diploma")]
