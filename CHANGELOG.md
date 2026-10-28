@@ -109,8 +109,11 @@ New, additive:
   heading no signal agrees with is read as a citation where it stands, named
   in the reconciliation table, and neither splits nor holds. `segment_volume`
   reads a bound volume a page at a time, cuts it into issues by the same rule
-  and segments each issue. Configured by the jurisdiction's `segmentation`
-  block: `act_heading_patterns`, `issue_heading_patterns`, `contents_keywords`
+  and segments each issue. A heading on the page before the one its entry
+  lists matches it where its act runs onto that page and no act listed after
+  it stands earlier. An entry's page is its first leader number, so a later
+  entry not read as a heading cannot lend it its page. Configured by the
+  jurisdiction's `segmentation` block: `act_heading_patterns`, `issue_heading_patterns`, `contents_keywords`
   and `printed_page_pattern`, each pattern refused at load if it does not
   compile or can match empty text.
 - `codify ingest-one` writes `page_spans.json` (the page count, where each
