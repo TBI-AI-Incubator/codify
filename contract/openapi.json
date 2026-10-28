@@ -943,6 +943,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -994,6 +997,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1141,6 +1147,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1943,6 +1952,26 @@
         "title": "IngestUrl",
         "type": "object"
       },
+      "InlineAnchor": {
+        "description": "A citable point in running text, with no words of its own.",
+        "properties": {
+          "eid": {
+            "title": "Eid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "anchor",
+            "default": "anchor",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eid"
+        ],
+        "title": "InlineAnchor",
+        "type": "object"
+      },
       "InlineCitation": {
         "properties": {
           "href": {
@@ -1985,6 +2014,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2032,6 +2064,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -2075,6 +2110,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2154,6 +2192,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -4288,6 +4329,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4342,6 +4386,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4372,6 +4419,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"

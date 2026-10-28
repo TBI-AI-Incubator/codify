@@ -25,5 +25,7 @@ class Document(BaseModel):
     # Attachment content, kept out of `body` because it restates the body's
     # numbering and merging the two would collide every eId.
     attachments: list[BodyElement] = Field(default_factory=list)
+    # Preamble recitals: citable statements of purpose, not operative text.
+    recitals: list[BodyElement] = Field(default_factory=list)
     textual_mods: list[TextualMod] = Field(default_factory=list)
     lifecycle_events: list[LifecycleEvent] = Field(default_factory=list)

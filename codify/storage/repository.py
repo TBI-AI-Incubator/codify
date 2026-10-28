@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 from lxml import etree
-from sqlalchemy import delete, false, or_, select, text, true
+from sqlalchemy import delete, false, func, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from codify.akn import Document
 from codify.akn._parser import carried_ids
 from codify.akn._schema import parse_xml
 from codify.akn.io import parse_akn
+from codify.akn.vocabulary import RECITAL
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.quality.sentinels import LAW_REASONS
 from codify.search import TOKENISER_VERSION, tokenise_to_text
@@ -524,6 +525,41 @@ def _derive_rows(
         for provision in provisions:
             provision.search_tokens = tokenise_to_text(provision.text, language)
     return doc.language, sections, provisions, cross_refs, amendment_effects, lifecycle_events
+
+
+async def add_missing_recital_rows(session: AsyncSession, version_id: uuid.UUID) -> int:
+    """Insert the recital rows a version's stored AKN carries and its rows lack.
+
+    Every other row is left in place, with its embeddings and inbound references,
+    and the new rows take the version's latest `created_at`, so anything keyed to
+    when its rows were built stays valid. Returns the rows added. Caller embeds the
+    new rows and commits.
+    """
+    version = (
+        await session.execute(select(Version).where(Version.id == version_id))
+    ).scalar_one_or_none()
+    if version is None:
+        return 0
+    derived: _DerivedRows = await on_the_cpu_pool(
+        _derive_rows, version.akn_xml, version.law_id, version_id, version.language
+    )
+    held = set(
+        (await session.execute(select(Provision.akn_eid).where(Provision.version_id == version_id)))
+        .scalars()
+        .all()
+    )
+    built = (
+        await session.execute(
+            select(func.max(Provision.created_at)).where(Provision.version_id == version_id)
+        )
+    ).scalar()
+    fresh = [p for p in derived[2] if p.akn_type == RECITAL and p.akn_eid not in held]
+    for row in fresh:
+        if built is not None:
+            row.created_at = built
+    session.add_all(fresh)
+    await session.flush()
+    return len(fresh)
 
 
 async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, akn_xml: str) -> None:

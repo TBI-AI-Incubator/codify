@@ -103,8 +103,12 @@ async def embed_version_provisions(
     client: EmbeddingClient,
     model_id: str | None = None,
     path_context: bool = False,
+    missing_only: bool = False,
 ) -> int:
     """Read provisions for a version, embed them, upsert. Returns rows written.
+
+    `missing_only` leaves a provision that already has a vector under `model_id`
+    alone, so adding rows to a version does not pay to embed the rest again.
 
     `path_context` puts the act's title before the section's, which is what a
     provision otherwise never states: measured at 0.53 to 0.85 on reference
@@ -135,6 +139,20 @@ async def embed_version_provisions(
             )
         )
         logger.info("embed_skipped_placeholders", version_id=str(version_id), skipped=len(skipped))
+    if missing_only and rows:
+        held = set(
+            (
+                await session.execute(
+                    select(ProvisionEmbedding.provision_id).where(
+                        ProvisionEmbedding.version_id == version_id,
+                        ProvisionEmbedding.model_id == model_id,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        rows = [r for r in rows if r[0].id not in held]
     if not rows:
         return 0
 
@@ -164,6 +182,7 @@ async def embed_and_stamp(
     *,
     client: EmbeddingClient,
     path_context: bool,
+    missing_only: bool = False,
 ) -> int:
     """Embed a version and stamp it, or neither. Returns rows written.
 
@@ -172,7 +191,7 @@ async def embed_and_stamp(
     from codify.storage.versions import mark_version_embedded
 
     count = await embed_version_provisions(
-        session, version_id, client=client, path_context=path_context
+        session, version_id, client=client, path_context=path_context, missing_only=missing_only
     )
     # A version whose every provision is a non-transcription marker embeds nothing
     # and is still finished: without the stamp it stays unembedded forever and

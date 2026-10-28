@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.akn._schema import safe_parser
-from codify.akn.vocabulary import TAG_TO_KIND, is_lifted_note, table_row_eid
+from codify.akn.vocabulary import RECITAL, TAG_TO_KIND, is_lifted_note, table_row_eid
 from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
@@ -103,8 +103,16 @@ class InlineNote(BaseModel):
     inferred: bool = False
 
 
+class InlineAnchor(BaseModel):
+    """A citable point in running text, with no words of its own."""
+
+    kind: Literal["anchor"] = "anchor"
+    eid: str
+
+
 InlineNode = Union[
     InlineText,
+    InlineAnchor,
     InlineRef,
     InlineTerm,
     InlineCitation,
@@ -801,6 +809,8 @@ def _walk_text_block(el: etree._Element) -> list[InlineNode]:
         if inner:
             if out:
                 out.append(InlineText(text="\n\n"))
+            if cname == "recital" and child.get("eId"):
+                out.append(InlineAnchor(eid=child.get("eId", "")))
             out.extend(inner)
     return out
 
@@ -1000,7 +1010,9 @@ async def get_version_document(
         for s in children_by_parent.get(None, [])
     ]
     root_provisions = [
-        _to_provision(p, xml_index, persisted_eids) for p in provisions_by_section.get(None, [])
+        _to_provision(p, xml_index, persisted_eids)
+        for p in provisions_by_section.get(None, [])
+        if p.akn_type != RECITAL
     ]
 
     return VersionDocument(
@@ -1023,6 +1035,7 @@ __all__ = [
     "DocumentProvision",
     "DocumentProvisionBlock",
     "DocumentSection",
+    "InlineAnchor",
     "InlineCitation",
     "InlineEmph",
     "InlineNode",

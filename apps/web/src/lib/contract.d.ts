@@ -732,12 +732,12 @@ export interface components {
             /** Heading */
             heading?: string | null;
             /** Intro */
-            intro?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            intro?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Num */
             num?: string | null;
             table?: components["schemas"]["DocumentTable"] | null;
             /** Wrap Up */
-            wrap_up?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            wrap_up?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
         };
         /**
          * DocumentSection
@@ -792,7 +792,7 @@ export interface components {
              */
             colspan: number;
             /** Content */
-            content?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            content?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Header
              * @default false
@@ -1021,6 +1021,20 @@ export interface components {
              */
             url: string;
         };
+        /**
+         * InlineAnchor
+         * @description A citable point in running text, with no words of its own.
+         */
+        InlineAnchor: {
+            /** Eid */
+            eid: string;
+            /**
+             * Kind
+             * @default anchor
+             * @constant
+             */
+            kind: "anchor";
+        };
         /** InlineCitation */
         InlineCitation: {
             /** Href */
@@ -1039,7 +1053,7 @@ export interface components {
         /** InlineEmph */
         InlineEmph: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default emph
@@ -1053,7 +1067,7 @@ export interface components {
          */
         InlineMod: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default mod
@@ -1067,7 +1081,7 @@ export interface components {
          */
         InlineNote: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Inferred
              * @default false
@@ -1096,7 +1110,7 @@ export interface components {
         /** InlineStrong */
         InlineStrong: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default strong
@@ -1892,7 +1906,7 @@ export interface components {
             /** Amendment Markers */
             amendment_markers?: string[];
             /** Conclusions */
-            conclusions?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            conclusions?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Expression Date
              * Format: date
@@ -1910,9 +1924,9 @@ export interface components {
              */
             law_id: string;
             /** Preamble */
-            preamble?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            preamble?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Preface */
-            preface?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            preface?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Provisions */
             provisions?: components["schemas"]["DocumentProvision"][];
             /** Sections */
