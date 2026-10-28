@@ -4720,7 +4720,8 @@ def _wrapped_sentence(text: str, m: re.Match[str], kind: str, aliases: list[str]
     if not keyword[:1].islower() or any(a[:1].islower() for a in aliases):
         return False
     line_end = text.find("\n", m.end())
-    return any(c.isalpha() for c in text[m.end() : line_end if line_end >= 0 else len(text)])
+    rest = text[m.end() : line_end if line_end >= 0 else len(text)]
+    return any(c.isalpha() for c in _NUMBER_DECORATIONS_RE.sub("", rest, count=1))
 
 
 # Line-start Arabic article keyword, digit-agnostic and tolerant of the stray `)`

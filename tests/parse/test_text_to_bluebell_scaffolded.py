@@ -1018,3 +1018,13 @@ def test_a_lower_case_alias_keeps_its_headings_in_coverage():
     titled = re.match(r"(?i)(?P<k_article>article) (?P<num>\d+)", "Article 4 Definitions")
     assert titled is not None
     assert not _wrapped_sentence("Article 4 Definitions", titled, "article", ["Article"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("note", ["[a]", " [a]"])
+async def test_footnoted_lower_case_headings_the_scanner_misses_still_halt(note):
+    from codify.pipeline.enrich import structure as structure_mod
+
+    text = "".join(f"article {n}{note}\nThe keeper shall tend light {n}.\n\n" for n in range(1, 6))
+    with pytest.raises(structure_mod.AnchorCoverageError):
+        await text_to_bluebell_scaffolded(text, client=_EchoUnless(), country="xa", doctype="code")
