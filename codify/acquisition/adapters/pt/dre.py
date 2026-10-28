@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
@@ -15,6 +16,7 @@ from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
 
 import httpx
+import structlog
 
 from codify.acquisition.adapters.pt.dre_akn import (
     REPEALED,
@@ -69,6 +71,18 @@ _CONS_PATH = re.compile(r"/dr/legislacao-consolidada/([a-z-]+)/(\d{4})-(\d+)")
 _DETAIL_PATH = re.compile(r"/dr/detalhe/([a-z-]+/[0-9a-z-]+)")
 _NUMBER = re.compile(r"^(\d+(?:-[A-Z]+)?)/(\d{2}|\d{4})(?:/\d+)?$")
 _REDIRECTS = {301, 302, 303, 307, 308}
+
+
+logger = structlog.get_logger()
+
+
+def writable_dir(path: Path) -> Path | None:
+    """`path`, created if need be, when files can be written there; otherwise None."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    return path if os.access(path, os.W_OK) else None
 
 
 class DrItemMissing(LookupError):
@@ -128,13 +142,17 @@ class DiarioAcquirer(BaseAcquirer):
 
     @classmethod
     def from_config(cls, jurisdiction_code: str, adapter: object) -> DiarioAcquirer:
-        """As configured, reading responses saved beside the index before the network."""
+        """As configured, reading saved responses before the network when the cache is writable."""
         if jurisdiction_code != cls.JURISDICTION:
             raise ValueError(
                 f"DiarioAcquirer only supports {cls.JURISDICTION!r}, got {jurisdiction_code!r}"
             )
         assert isinstance(adapter, SourceAdapter)
-        return cls(adapter, cache_dir=index_path(cls.JURISDICTION).parent / "raw")
+        raw = index_path(cls.JURISDICTION).parent / "raw"
+        cache = writable_dir(raw)
+        if cache is None:
+            logger.warning("dre_cache_disabled", path=str(raw), reason="not writable")
+        return cls(adapter, cache_dir=cache)
 
     def _cache_path(self, key: str) -> Path | None:
         if self._cache is None:
