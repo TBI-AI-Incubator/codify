@@ -10,7 +10,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.akn.io import parse_akn
-from codify.storage.documents import get_version_document
+from codify.storage.documents import InlineAnchor, get_version_document
 from codify.storage.embeddings import embed_and_stamp
 from codify.storage.models import Provision, ProvisionEmbedding
 from codify.storage.provisions import find_provision_id_by_eid
@@ -148,3 +148,15 @@ async def test_missing_only_leaves_rows_embedded_under_another_model_alone(
     again = _Client()
     await embed_and_stamp(session, vid, client=again, path_context=True, missing_only=True)
     assert again.embedded == 0
+
+
+async def test_an_anchor_is_kept_only_for_a_recital_that_has_a_row(session: AsyncSession) -> None:
+    vid = await _saved(session)
+    await session.execute(
+        text("DELETE FROM provisions WHERE version_id = :v AND akn_eid = 'recitals__rec_2'"),
+        {"v": vid},
+    )
+    document = await get_version_document(session, vid)
+    assert document is not None
+    anchors = [n.eid for n in document.preamble if isinstance(n, InlineAnchor)]
+    assert anchors == ["recitals__rec_1"]

@@ -981,6 +981,10 @@ async def get_version_document(
                 preface_nodes = _walk_text_block(preface_el)
             if preamble_el is not None:
                 preamble_nodes = _walk_text_block(preamble_el)
+                rowed = {p.akn_eid for p in provisions if p.akn_type == RECITAL}
+                preamble_nodes = [
+                    n for n in preamble_nodes if not isinstance(n, InlineAnchor) or n.eid in rowed
+                ]
             conclusions_el = _direct_child(doc_root, "conclusions")
             if conclusions_el is not None:
                 conclusions_nodes = _walk_text_block(conclusions_el)

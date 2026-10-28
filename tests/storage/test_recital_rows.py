@@ -77,6 +77,17 @@ def test_recitals_are_read_with_number_and_prose_only() -> None:
     assert [b.akn_eid for b in doc.body] == ["art_1"]
 
 
+def test_a_note_beside_a_recitals_prose_is_not_its_prose() -> None:
+    sibling = AKN.replace(
+        '</p>\n        </recital>\n        <recital eId="recitals__rec_2">',
+        '</p><authorialNote placement="bottom" eId="fn_2"><p>Side note.</p></authorialNote>'
+        '\n        </recital>\n        <recital eId="recitals__rec_2">',
+        1,
+    )
+    assert "Side note." in sibling
+    assert parse_document(sibling).recitals[0].text == "Lenses should be kept clean."
+
+
 def test_recitals_become_non_normative_rows_beside_unchanged_operative_rows() -> None:
     _, _, provisions, cross_refs, *_ = _rows()
     by_eid = {p.akn_eid: p for p in provisions}

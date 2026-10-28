@@ -125,8 +125,9 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
         num_el = _akn_child(el, "num")
         # Copied so that dropping the number leaves the parsed tree untouched.
         prose = copy.deepcopy(el)
-        for num in _akn_findall(prose, "num"):
-            prose.remove(num)
+        for child in list(prose):
+            if isinstance(child.tag, str) and (_local(child) == "num" or is_lifted_note(child)):
+                prose.remove(child)
         text, _refs = _extract_text_and_refs(prose)
         seen.add(eid)
         out.append(
