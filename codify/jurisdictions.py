@@ -892,7 +892,7 @@ SourceAdapterKind = Literal[
     "sparql",  # SPARQL endpoint (non-Cellar).
     "bulk_xml_archive",  # Bulk XML archives (USLM, Indigo dumps).
     "gazette_xml",  # Official-gazette XML per item (BOE).
-    "json_portal",  # JSON document API with per-unit sections (OCS).
+    "json_portal",  # JSON document API with per-unit sections (OCS, Diário da República).
     "oecd_compendium",  # Compendium of OECD Legal Instruments (JSON API + HTML bodies).
 ]
 
