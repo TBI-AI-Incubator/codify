@@ -221,17 +221,19 @@
     "laws_africa_reference": "ulii.org publishes unofficial consolidations built by Laws.Africa; official texts are the Gazette and the revised edition."
   },
   "ocr_header_patterns": [
-    "^(?-i:\\s*\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]\\s+[A-Z].*)$",
-    "^(?-i:.+\\[Cap\\.\\s*\\d+\\.\\s+\\d{3,5})\\s*$",
-    "^(?-i:Act\\s+\\d+\\s+(?:(?:[A-Z(][^\\s]*|\\d+\\)|of|and|the|for|in|on|to|by)\\s+)*Act(?:\\s+\\d{4})?)\\s*$"
+    "^[^\\S\\n]*(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act)[^\\S\\n]*$",
+    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$",
+    "^[^\\S\\n]*(?-i:Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$"
   ],
   "furniture_line_patterns": [
-    "^(?-i:\\s*\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]\\s+[A-Z].*)$",
-    "^(?-i:.+\\[Cap\\.\\s*\\d+\\.\\s+\\d{3,5})\\s*$",
-    "^(?-i:Act\\s+\\d+\\s+(?:(?:[A-Z(][^\\s]*|\\d+\\)|of|and|the|for|in|on|to|by)\\s+)*Act(?:\\s+\\d{4})?)\\s*$"
+    "^[^\\S\\n]*(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act)[^\\S\\n]*$",
+    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$",
+    "^[^\\S\\n]*(?-i:Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$"
   ],
   "furniture_inline_patterns": [
-    "(?-i:\\b\\d{3,5}\\s+Cap\\.\\s*\\d+\\.\\]?\\s+[A-Z][A-Za-z ()]+ Act\\b)"
+    "(?m)\\A\\s*(?:#{1,6}[^\\S\\n]*)?(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act|[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5}|Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$",
+    "(?m)^[^\\S\\n]*(?:#{1,6}[^\\S\\n]*)?(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act|[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5}|Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)\\s*\\Z",
+    "(?-i:\\b\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\][^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by)[^\\S\\n]+)*?Act\\b)"
   ],
   "tier": 4,
   "status": "draft",

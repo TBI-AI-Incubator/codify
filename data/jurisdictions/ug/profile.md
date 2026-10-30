@@ -33,11 +33,12 @@ under them.
 ## Identifiers
 
 An Act's FRBR number is its number as passed ("Act 8 of 2008"), read from the
-cover or the running head. A revised-edition chapter number ("Cap. 230")
-identifies the consolidation, not the work, so minting a work URI from a
-revised-edition text needs the year and number of the original enactment; the
-revised edition prints them in the History line at the end of the Act. For the
-same reason the Act hierarchy has no chapter level: a revised-edition cover line
+cover or from a head below the masthead on page one. A running head at a page's
+edge leaves the text before metadata extraction, so a number printed only there
+is lost. A revised-edition chapter number ("Cap. 230") identifies the
+consolidation, not the work, so minting a work URI from a revised-edition text
+needs the year and number of the original enactment; the revised edition prints
+them in the History line at the end of the Act. For the same reason the Act hierarchy has no chapter level: a revised-edition cover line
 "CHAPTER 230" names the Act, and reading it as a container would wrap the whole
 Act in a phantom chapter.
 
@@ -70,6 +71,18 @@ Act hierarchy.
 
 Revised-edition pages carry a running head with the volume page number and the
 chapter ("8216 Cap. 230.] National Social Security Fund Act" on the left-hand
-page, the mirror on the right); Acts as passed carry "Act 8 ... Act 2008". The
-header patterns strip these when they land on their own line, and the inline
-pattern catches the case where a page break fuses the head into a sentence.
+page, the mirror on the right); Acts as passed carry "Act 8 ... Act 2008". A
+title reads as capitalised words and lowercase joining words, opens on a
+capitalised word, and ends at "Act". The header patterns strip a head on its own
+line. Page bodies pass through the inline set alone, so that set removes a
+whole-line head only as a page's first or last line: the same words mid-page are
+text, and on page one the masthead can sit above the head that carries the Act's
+number. One line goes from each edge, so a second head stacked on the first
+stays. The exception is a left-hand head that keeps its closing bracket: the
+inline set removes it on any line, on its own or fused into a sentence, and ends
+it at the title's first "Act", unless the title holds "the", "or" or "with". A
+mirrored or Acts Supplement head fused into a sentence stays in the text, as does
+one that opens a page below a bare page number. A title word holding a digit
+outside brackets also keeps the head in the text. A line at a page's edge that
+reads as a head goes whether or not it is one, such as "The Minister of the Water
+Act [Cap. 999. 4411", or a left-hand head that runs on into "of the Water Act".
