@@ -71,8 +71,9 @@ def _verb(type_of_effect: str) -> tuple[str, bool]:
     """The verb the publisher's wording reduces to, and whether what was
     dropped to reach it narrowed the effect to part of the provision."""
     s = type_of_effect.strip().lower()
-    # Before the parentheses go, so "(in part)" reads as "in part" does.
-    narrowed = bool(_IN_PART.search(s))
+    # Read the effect clause before parentheses go, retaining "(in part)"
+    # without mistaking a provenance reference to "in Part 2" for scope.
+    narrowed = bool(_IN_PART.search(_PROVENANCE.sub("", s)))
     s = _PARENS.sub("", s)  # drop "(with modifications)", "(S.N.I.)"
     s = _PROVENANCE.sub("", s)  # drop "... by S.I. ...", "... for ss. 49, 50"
     s = _IN_PART.sub("", s)

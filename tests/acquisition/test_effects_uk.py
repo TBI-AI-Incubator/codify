@@ -193,6 +193,22 @@ def test_these_forms_stay_unmapped(raw: str) -> None:
     assert crosswalk(raw) == (None, None)
 
 
+@pytest.mark.parametrize(
+    ("raw", "narrowed"),
+    [
+        ("repealed by provisions in Part 2 of S.I. 2020/9901", False),
+        ("repealed (in part) by provisions in Part 2 of S.I. 2020/9901", True),
+        ("repealed in part by provisions in Part 2 of S.I. 2020/9901", True),
+        ("repealed (6.4.2021) by provisions in Part 2 of S.I. 2020/9901", False),
+    ],
+)
+def test_a_provenance_part_reference_does_not_narrow_a_repeal(raw: str, narrowed: bool) -> None:
+    effect = parse_effects_csv(_HEAD + _ROW.replace("words substituted", raw), {}).effects[0]
+    assert effect.akn_action == "repeal"
+    assert effect.narrowed is narrowed
+    assert effect.raw_type == raw
+
+
 def test_a_meta_effect_is_marked_and_still_mapped() -> None:
     """An amendment to an earlier amending provision is about the amendment,
     not the act, and `is_meta` says so; its verb still maps and still narrows."""
