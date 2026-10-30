@@ -17,6 +17,7 @@ from codify.acquisition.effects.uk import (
     RESULTS_CAP,
     crosswalk,
     effects_csv_url,
+    narrows,
     parse_effects_csv,
     parse_inforce_feed,
 )
@@ -86,6 +87,135 @@ def test_the_publisher_id_is_carried() -> None:
 )
 def test_the_crosswalk_covers_the_common_verbs(raw: str, action: str) -> None:
     assert crosswalk(raw)[0] == action
+
+
+# --- What the crosswalk narrowed on the way to the verb -----------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "narrowed"),
+    [("words omitted", True), ("repealed in part", True), ("repealed", False)],
+)
+def test_a_narrowed_repeal_is_told_apart_from_a_whole_one(raw: str, narrowed: bool) -> None:
+    """All three map to `repeal`, which a timeline reads as the end of the
+    provision. Only the third is: the others take words out and leave it in
+    force, and the record has to say so where the action cannot."""
+    effect = parse_effects_csv(_HEAD + _ROW.replace("words substituted", raw), {}).effects[0]
+    assert effect.akn_action == "repeal"
+    assert effect.narrowed is narrowed
+    assert effect.raw_type == raw
+
+
+# The forms the publisher's Changes to Legislation export writes, with invented
+# references where one is written in: (type of effect, action, category, narrowed).
+_UK_EFFECT_VERBS = [
+    # The whole provision, or a scope or force effect on it: not narrowed.
+    ("inserted", "insertion", "textual", False),
+    ("added", "insertion", "textual", False),
+    ("substituted", "substitution", "textual", False),
+    ("substituted (prosp.)", "substitution", "textual", False),
+    ("omitted", "repeal", "textual", False),
+    ("repealed", "repeal", "textual", False),
+    ("repealed (6.4.2021)", "repeal", "textual", False),
+    ("revoked", "repeal", "textual", False),
+    ("modified", "variation", "meaning", False),
+    ("modified (temp.)", "variation", "meaning", False),
+    ("applied", "extensionOfScope", "scope", False),
+    ("applied (with modifications)", "extensionOfScope", "scope", False),
+    (
+        "applied (with modifications) by S.I. 2020/9901, Sch. 2 (as substituted)",
+        "extensionOfScope",
+        "scope",
+        False,
+    ),
+    ("extended", "extensionOfScope", "scope", False),
+    ("excluded", "exceptionOfScope", "scope", False),
+    ("restricted", "exceptionOfScope", "scope", False),
+    ("coming into force", "entryIntoForce", "force", False),
+    ("Commencement Order", "entryIntoForce", "force", False),
+    # Words, an entry, a sum or a heading within it: narrowed.
+    ("words omitted", "repeal", "textual", True),
+    ("word omitted", "repeal", "textual", True),
+    ("words repealed", "repeal", "textual", True),
+    ("entry repealed", "repeal", "textual", True),
+    ("entries repealed", "repeal", "textual", True),
+    (
+        "words omitted in earlier amending provision S.I. 2020/9901, reg. 36(a)",
+        "repeal",
+        "textual",
+        True,
+    ),
+    ("words substituted", "substitution", "textual", True),
+    ("word substituted", "substitution", "textual", True),
+    ("sum substituted", "substitution", "textual", True),
+    ("heading substituted", "substitution", "textual", True),
+    ("entries substituted", "substitution", "textual", True),
+    ("words inserted", "insertion", "textual", True),
+    ("word inserted", "insertion", "textual", True),
+    ("words added", "insertion", "textual", True),
+    ("entry inserted", "insertion", "textual", True),
+    ("entries inserted", "insertion", "textual", True),
+    # Part of it: narrowed, whatever the verb.
+    ("repealed in part", "repeal", "textual", True),
+    ("revoked in part", "repeal", "textual", True),
+    ("modified in part", "variation", "meaning", True),
+    ("applied in part", "extensionOfScope", "scope", True),
+    ("applied in part (with modifications)", "extensionOfScope", "scope", True),
+    ("applied (with modifications) in part", "extensionOfScope", "scope", True),
+    ("excluded in part", "exceptionOfScope", "scope", True),
+    ("restricted in part", "exceptionOfScope", "scope", True),
+]
+
+
+@pytest.mark.parametrize(("raw", "action", "category", "narrowed"), _UK_EFFECT_VERBS)
+def test_the_uk_effect_verbs(raw: str, action: str, category: str, narrowed: bool) -> None:
+    """A quantifier and "in part" narrow; a date, "(temp.)", "(prosp.)",
+    "(with modifications)" and a provenance tail do not."""
+    assert crosswalk(raw) == (action, category)
+    assert narrows(raw) is narrowed
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "amended",
+        "power to amend conferred",
+        "amendment to earlier affecting provision S.I. 2020/9901, reg. 66",
+        "savings for effects of commencing S.I. 2020/9902",
+        "s. 901 renumbered as s. 901(1)",
+    ],
+)
+def test_these_forms_stay_unmapped(raw: str) -> None:
+    """Pinned so that mapping one is a decision. The publisher writes a
+    renumbering from the provision ("s. 901 renumbered as s. 901(1)") rather
+    than from its verb, so `renumbered` in the table is seldom reached."""
+    assert crosswalk(raw) == (None, None)
+
+
+@pytest.mark.parametrize(
+    ("raw", "narrowed"),
+    [
+        ("repealed by provisions in Part 2 of S.I. 2020/9901", False),
+        ("repealed (in part) by provisions in Part 2 of S.I. 2020/9901", True),
+        ("repealed in part by provisions in Part 2 of S.I. 2020/9901", True),
+        ("repealed (6.4.2021) by provisions in Part 2 of S.I. 2020/9901", False),
+    ],
+)
+def test_a_provenance_part_reference_does_not_narrow_a_repeal(raw: str, narrowed: bool) -> None:
+    effect = parse_effects_csv(_HEAD + _ROW.replace("words substituted", raw), {}).effects[0]
+    assert effect.akn_action == "repeal"
+    assert effect.narrowed is narrowed
+    assert effect.raw_type == raw
+
+
+def test_a_meta_effect_is_marked_and_still_mapped() -> None:
+    """An amendment to an earlier amending provision is about the amendment,
+    not the act, and `is_meta` says so; its verb still maps and still narrows."""
+    raw = "words substituted in earlier amending provision S.I. 2020/9901, Sch. 2 para. 3"
+    effect = parse_effects_csv(_HEAD + _ROW.replace("words substituted", raw), {}).effects[0]
+    assert effect.is_meta is True
+    assert (effect.akn_action, effect.narrowed) == ("substitution", True)
 
 
 def test_the_earliest_in_force_date_wins() -> None:
