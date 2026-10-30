@@ -228,6 +228,11 @@ class TestRunningHeads:
                 "A board shall 4412 Cap. 999.] Village Water Supply Act of the Water Act appoint.",
                 "A board shall of the Water Act appoint.",
             ),
+            (
+                "shall be paid 8216 Cap. 999.] Village Water Supply Act the employer under "
+                "this Act shall",
+                "shall be paid the employer under this Act shall",
+            ),
         ):
             assert clean_page_text(line, furniture_inline_patterns("ug")) == kept
 
