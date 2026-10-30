@@ -87,6 +87,7 @@ MarkerForm = Literal[
     "upper_roman_period",
     "lower_letter_period",
     "arabic_period",
+    "alphanumeric_period",
     "arabic_closing_paren",
     "lower_letter_closing_paren",
     # The operative subdivision of an article, printed as "(1) " with no

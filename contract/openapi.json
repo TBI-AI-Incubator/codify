@@ -1861,6 +1861,7 @@
                   "upper_roman_period",
                   "lower_letter_period",
                   "arabic_period",
+                  "alphanumeric_period",
                   "arabic_closing_paren",
                   "lower_letter_closing_paren",
                   "parenthesized_arabic",

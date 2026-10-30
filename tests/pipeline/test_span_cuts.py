@@ -228,3 +228,47 @@ def test_unmapped_artifact_text_never_stands_as_a_childs_evidence() -> None:
     )
     _dossier, source = assemble_dossier(inputs)
     assert source == "ACT No. 3\nThree."
+
+
+@pytest.mark.parametrize("from_reads", [False, True])
+def test_repair_trim_does_not_clean_a_schedule_entry_as_a_new_page_edge(from_reads: bool) -> None:
+    from codify.pipeline.enrich.ocr import (
+        PageResult,
+        combine_page_texts_with_spans,
+        furniture_inline_patterns,
+    )
+    from codify.repair.dossier import DossierInputs, PageReadInput, SpanTrim, assemble_dossier
+
+    # First combine removes the header. The retained schedule entry becomes an
+    # edge only after the neighbouring act is trimmed away.
+    row = "Act 12 Village Water Supply Act"
+    page = f"Act 9 Village Wells Act\nNeighbouring act.\n{row}\nAn entry in a schedule of Acts."
+    text, spans = combine_page_texts_with_spans(
+        [
+            PageResult(
+                page_number=1, text=page, method="ocr", furniture=furniture_inline_patterns("ug")
+            )
+        ]
+    )
+    at = text.index(row)
+    cuts = (
+        SpanCut("act", 1, 1, 0, at, start_marker="Neighbouring act."),
+        SpanCut("act", 1, 1, at, None, start_marker=row),
+    )
+    inputs = DossierInputs(
+        version_id="v",
+        country="ug",
+        akn_xml="<akomaNtoso xmlns='http://docs.oasis-open.org/legaldocml/ns/akn/3.0'><act/></akomaNtoso>",
+        stored_source_text=text[at:],
+        span_trim=SpanTrim(1, 1, 1, cuts),
+    )
+    if from_reads:
+        inputs.page_reads = [PageReadInput(page_number=1, engine="ocr", text=page)]
+    else:
+        inputs.fallback_text = text
+        inputs.fallback_spans = [s.model_dump() for s in spans]
+    dossier, source = assemble_dossier(inputs)
+    assert source == text[at:]
+    assert not dossier.source_text_mismatch
+    assert dossier.spans[0]["start"] == 0
+    assert dossier.spans[0]["end"] == len(source)

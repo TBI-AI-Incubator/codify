@@ -275,7 +275,6 @@ def _trim_to_span(
     doc_text: str,
     spans: list[PageSpan],
     trim: SpanTrim,
-    furniture: Any,
     version_id: str,
 ) -> tuple[str, list[PageSpan]]:
     """The span's own text out of whole shared pages. A cut lost or reordered by a
@@ -294,7 +293,9 @@ def _trim_to_span(
         lo = start if page == trim.first_page else 0
         hi = end if page == trim.last_page and end is not None else len(body)
         kept.append(
-            PageResult(page_number=page, text=body[lo:hi], method="span", furniture=furniture)
+            # These slices already passed page cleaning before cuts were located.
+            # New edges are legal text, not evidence of a running header.
+            PageResult(page_number=page, text=body[lo:hi], method="span")
         )
     return combine_with_spans(kept)
 
@@ -302,11 +303,10 @@ def _trim_to_span(
 def assemble_dossier(inputs: DossierInputs) -> tuple[RepairDossier, str]:
     """Build the dossier and its combined source text, deterministically.
 
-    With page reads, the combined text and spans are rebuilt from the per-page
-    texts (`combine_with_spans`; the cleaning steps are idempotent, so pages
-    with text reproduce the ingest-time combine, a page whose read came back
-    empty gets no span, and any resulting drift from the stored flat text is
-    flagged, never fatal). Without them, the caller-supplied fallback stands.
+    With page reads, the original per-page texts reproduce the ingest-time
+    combine and page map. Span cuts then slice that cleaned text without
+    treating newly exposed edges as furniture. Drift from the stored flat
+    text is flagged, never fatal. Without reads, the supplied fallback stands.
     """
     reads = inputs.page_reads
     if reads:
@@ -320,7 +320,7 @@ def assemble_dossier(inputs: DossierInputs) -> tuple[RepairDossier, str]:
         doc_text, span_models = combine_with_spans(results)
         if inputs.span_trim is not None:
             doc_text, span_models = _trim_to_span(
-                doc_text, span_models, inputs.span_trim, furniture, inputs.version_id
+                doc_text, span_models, inputs.span_trim, inputs.version_id
             )
         spans = spans_to_json(span_models)
     else:
@@ -335,7 +335,6 @@ def assemble_dossier(inputs: DossierInputs) -> tuple[RepairDossier, str]:
                 doc_text,
                 [PageSpan.model_validate(x) for x in spans],
                 inputs.span_trim,
-                furniture_inline_patterns(inputs.country),
                 inputs.version_id,
             )
             spans = spans_to_json(trimmed)

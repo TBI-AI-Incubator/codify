@@ -2516,6 +2516,10 @@ _OUTLINE_RES: dict[str, re.Pattern[str]] = {
     "arabic_period": re.compile(
         r"(?m)^[^\S\n]{0,12}(?:\*\*)?(?P<num>\d{1,3})(?:\*\*)?\.(?:\*\*)?[^\S\n]+(?=\S)"
     ),
+    "alphanumeric_period": re.compile(
+        r"(?m)^[^\S\n]{0,12}(?:\*\*)?(?P<num>(?:[A-Z]{1,3}\d{1,3}|\d{1,3}[A-Z]{0,3}))"
+        r"(?:\*\*)?\.(?:\*\*)?[^\S\n]+(?=\S)"
+    ),
     "arabic_closing_paren": re.compile(
         r"(?m)^[^\S\n]{0,12}(?:\*\*)?(?P<num>\d{1,3})(?:\*\*)?\)(?:\*\*)?[^\S\n]+(?=\S)"
     ),

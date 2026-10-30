@@ -12,7 +12,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors
+from codify.pipeline.enrich.anchors import anchor_coverage, build_anchor_regex, scan_anchors
 from codify.pipeline.enrich.arabic_normalise import _compile_patterns, strip_ocr_headers_text
 from codify.pipeline.enrich.enacting import emit_enacting_formula, split_opening_material
 from codify.pipeline.enrich.ocr import (
@@ -358,3 +358,20 @@ def test_translation_preserves_an_act_citation_without_page_context() -> None:
     assert strip_ocr_headers_text(line, patterns) == (line, 0)
     assert split_opening_material(line, "ug") == (line, None)
     assert _combined(f"{line}\n{_BODY}") == [_BODY]
+
+
+@pytest.mark.parametrize("number", ["1A", "1B", "1AA", "A1"])
+def test_lettered_sections_are_anchored_and_counted(number: str) -> None:
+    text = (
+        "1. Establishment\nA board is established.\n"
+        f"{number}. Records\nThe board keeps records.\n"
+        "2. Accounts\nThe board keeps accounts."
+    )
+    config = load_config("ug")
+    anchors = scan_anchors(text, build_anchor_regex(config, "act"), country="ug", doctype="act")
+    assert [a.number for a in anchors if a.kind == "section"] == ["1", number, "2"]
+    kept = [a for a in anchors if a.number != number]
+    coverage = anchor_coverage(text, kept, config, "act", "section")
+    assert coverage.expected == frozenset({"1", number, "2"})
+    assert coverage.missing == frozenset({number})
+    assert coverage.ratio == pytest.approx(2 / 3)
