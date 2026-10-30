@@ -39,7 +39,7 @@
           "level": "basic",
           "bluebell_keyword": "SECTION",
           "numbering": "arabic_continuous",
-          "marker_form": "arabic_period"
+          "marker_form": "alphanumeric_period"
         },
         {
           "local_term": "Subsection",

@@ -27,8 +27,10 @@ repealing quoted text introduced by "the following—". The enacting formula is
 "BE IT ENACTED by Parliament as follows:", with a colon or an em dash.
 
 Because the section keyword is absent, the section level declares
-`marker_form: "arabic_period"`; without it the scan finds Parts and nothing
-under them.
+`marker_form: "alphanumeric_period"` for Acts, accepting numeric and lettered
+insertions such as "1A.". The same form supplies coverage checks. Statutory
+instruments retain the provisional numeric-only form until source evidence
+confirms their insertion numbering.
 
 ## Identifiers
 
