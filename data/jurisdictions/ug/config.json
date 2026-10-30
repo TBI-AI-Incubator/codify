@@ -222,13 +222,11 @@
   },
   "ocr_header_patterns": [
     "^[^\\S\\n]*(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act)[^\\S\\n]*$",
-    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$",
-    "^[^\\S\\n]*(?-i:Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$"
+    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$"
   ],
   "furniture_line_patterns": [
     "^[^\\S\\n]*(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act)[^\\S\\n]*$",
-    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$",
-    "^[^\\S\\n]*(?-i:Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$"
+    "^[^\\S\\n]*(?-i:[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5})[^\\S\\n]*$"
   ],
   "furniture_inline_patterns": [
     "(?m)\\A\\s*(?:#{1,6}[^\\S\\n]*)?(?-i:\\d{3,5}[^\\S\\n]+Cap\\.[^\\S\\n]*\\d+\\.\\]?[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act|[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act[^\\S\\n]+\\[Cap\\.[^\\S\\n]*\\d+\\.[^\\S\\n]+\\d{3,5}|Act[^\\S\\n]+\\d+[^\\S\\n]+[A-Z][a-z][^\\s\\d]*[^\\S\\n]+(?:(?:[A-Z][a-z][^\\s\\d]*|\\([A-Z]\\S*|\\d+\\)|of|and|for|in|on|to|by|or|with|the)[^\\S\\n]+)*?Act(?:[^\\S\\n]+\\d{4})?)[^\\S\\n]*$",
@@ -237,5 +235,8 @@
   ],
   "tier": 4,
   "status": "draft",
-  "public_reference": true
+  "public_reference": true,
+  "enacting_formula_markers": [
+    "BE IT ENACTED by Parliament as follows"
+  ]
 }

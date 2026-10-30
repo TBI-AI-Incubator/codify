@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import time
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors
 from codify.pipeline.enrich.arabic_normalise import _compile_patterns, strip_ocr_headers_text
+from codify.pipeline.enrich.enacting import emit_enacting_formula, split_opening_material
 from codify.pipeline.enrich.ocr import (
     PageResult,
     _strip_furniture_lines,
@@ -175,8 +177,7 @@ class TestRunningHeads:
             "Act 9 Village Water Supply Act",
             "Act 4 Village Water Supply (Amendment) (No. 2) Act 2032",
         ):
-            out = _strip_furniture_lines(f"{head}\n{_BODY}", furniture_line_patterns("ug"))
-            assert out == _BODY
+            assert _combined(f"{head}\n{_BODY}") == [_BODY]
 
     def test_a_body_line_that_starts_with_an_act_number_stays(self) -> None:
         for line in (
@@ -197,8 +198,10 @@ class TestRunningHeads:
     def test_the_line_set_reads_heads_as_the_page_set_does(self) -> None:
         patterns = furniture_line_patterns("ug")
         for head in _HEADS:
-            if not head.startswith("#"):
+            if not head.startswith(("#", "Act")):
                 assert _strip_furniture_lines(head, patterns) == ""
+            elif head.startswith("Act"):
+                assert _strip_furniture_lines(head, patterns) == head
         for line in _TEXT_LINES:
             assert _strip_furniture_lines(line, patterns) == line
 
@@ -334,3 +337,24 @@ class TestRunningHeads:
         furniture = furniture_inline_patterns("ug")
         once = clean_page_text("\n".join([head, *lines, head]), furniture)
         assert clean_page_text(once, furniture) == once
+
+
+@pytest.mark.parametrize("ending", [":", "—"])
+def test_a_printed_enacting_formula_is_not_duplicated(ending: str) -> None:
+    formula = f"BE IT ENACTED by Parliament as follows{ending}"
+    preface, preamble = split_opening_material(f"Village Water Supply Act\n{formula}", "ug")
+    assert preface == "Village Water Supply Act"
+    assert preamble == formula
+    xml = (
+        '<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">'
+        f"<act><preamble><p>{preamble}</p></preamble><body/></act></akomaNtoso>"
+    )
+    assert emit_enacting_formula(xml, "ug", "act", "2031-01-01") == xml
+
+
+def test_translation_preserves_an_act_citation_without_page_context() -> None:
+    line = "Act 12 Village Water Supply Act"
+    patterns = _compile_patterns(load_config("ug").ocr_header_patterns)
+    assert strip_ocr_headers_text(line, patterns) == (line, 0)
+    assert split_opening_material(line, "ug") == (line, None)
+    assert _combined(f"{line}\n{_BODY}") == [_BODY]

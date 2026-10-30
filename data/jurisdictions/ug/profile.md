@@ -73,8 +73,10 @@ Revised-edition pages carry a running head with the volume page number and the
 chapter ("8216 Cap. 230.] National Social Security Fund Act" on the left-hand
 page, the mirror on the right); Acts as passed carry "Act 8 ... Act 2008". A
 title reads as capitalised words and lowercase joining words, opens on a
-capitalised word, and ends at "Act". The header patterns strip a head on its own
-line. Page bodies pass through the inline set alone, so that set removes a
+capitalised word, and ends at "Act". The header patterns strip chapter heads on
+their own lines. Acts Supplement heads are removed only at page edges; translation
+and opening-material cleanup keep those lines because they may be schedule entries.
+Page bodies pass through the inline set alone, so that set removes a
 whole-line head only as a page's first or last line: the same words mid-page are
 text, and on page one the masthead can sit above the head that carries the Act's
 number. One line goes from each edge, so a second head stacked on the first
