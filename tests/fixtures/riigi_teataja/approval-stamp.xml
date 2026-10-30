@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Näidisminister</valjaandja>
+		<dokumentLiik>määrus</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>2010-07-08</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>2010-07-08</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidiskooli klasside vastavustabel</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<paragrahv>
+			<paragrahvNr>8</paragrahvNr>
+			<kuvatavNr><![CDATA[§ 8. ]]></kuvatavNr>
+			<paragrahvPealkiri>Määruse jõustumine</paragrahvPealkiri>
+			<loige>
+				<sisuTekst>
+					<tavatekst>Määrus jõustub 2010. aasta 1. augustil.</tavatekst>
+				</sisuTekst>
+				<sisuTekst>
+					<HTMLKonteiner><![CDATA[<table summary="seotud dokument" width="100%">
+  <tbody>
+  <tr valign="top">
+    <td width="60%"/>
+    <td align="center" width="39%"><p align="center">Lisa<br/>KINNITATUD<br/>näidisministri 1. juuli 2010. a 
+  määrusega nr 9</p></td></tr></tbody></table>]]></HTMLKonteiner>
+					<HTMLKonteiner><![CDATA[<p align="center"><b>VASTAVUSTABEL</b></p>
+					<table align="center" class="data" rules="all">
+  <tbody>
+  <tr>
+    <td><p align="center"><b>Aastad</b></p></td>
+    <td colspan="2">
+      <p align="center"><b>Klassid<br/>näidiskoolis</b>    </p></td>
+    <td colspan="3">
+      <p align="center"><b>Klassid<br/>tavakoolis</b> </p></td></tr>
+  <tr>
+    <td align="middle">  1 </td>
+    <td align="middle">1<sup>st</sup> </td>
+    <td rowspan="5">
+      <p align="center">Algkool </p></td>
+    <td align="middle">  1. klass </td>
+    <td rowspan="5"><p align="center">Põhikool </p></td>
+    <td rowspan="5"><p align="center">I aste </p></td></tr>
+  <tr><td>  2 </td><td>2<sup>nd</sup> </td><td>  2. klass </td></tr>
+  <tr><td>  3 </td><td>3<sup>rd</sup> </td><td>  3. klass </td></tr>
+  <tr><td>  4 </td><td>4<sup>th</sup> </td><td>  4. klass </td></tr>
+  <tr><td>  5 </td><td>5<sup>th</sup> </td><td>  5. klass </td></tr>
+</tbody></table>]]></HTMLKonteiner>
+				</sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>

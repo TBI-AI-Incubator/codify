@@ -113,6 +113,17 @@ class TestAnUndatedExpression:
             "/akn/xz/act/2007/237/eng@2007-03-17.xml",
         ]
 
+    def test_restatement_replaces_the_whole_timestamp(self) -> None:
+        timestamped = _doc().replace("eng@2026-08-02", "eng@2026-08-02T14:00:00.000001Z")
+        got = normalise_akn_meta(timestamped, work_date="2007-03-17", expression_undated=True)
+        assert all("eng@2007-03-17T" not in uri for uri in _uris(got) if uri)
+        assert _uris(got)[2:6] == [
+            "/akn/xz/act/2007/237/eng@2007-03-17",
+            "/akn/xz/act/2007/237/eng@2007-03-17",
+            "/akn/xz/act/2007/237/eng@2007-03-17.xml",
+            "/akn/xz/act/2007/237/eng@2007-03-17.xml",
+        ]
+
     def test_a_year_only_work_still_supplies_one(self) -> None:
         """The lane that most needs this has no `raw_date` at all: the year came
         from the URI, so the run date would otherwise survive."""

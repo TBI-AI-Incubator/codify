@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from codify.embed.client import EmbeddingClient
 from codify.storage.retrieval import RRF_K, hybrid_search
 from codify.storage.versions import (
+    VersionScope,
+    current_scope,
     latest_version_for_law,
     latest_versions_for_jurisdiction,
     versions_of_doctype,
@@ -76,7 +78,6 @@ async def retrieve(
     candidate_pool: int = 30,
     rrf_k: int = RRF_K,
     model_id: str | None = None,
-    fallback_model_id: str | None = None,
     doctype: str | None = None,
     akn_type: str | None = None,
     include_non_normative: bool = False,
@@ -90,14 +91,21 @@ async def retrieve(
     the candidate pool is drawn from matching rows instead of being sieved down
     to whatever survived a pool ranked across everything."""
     model_id = model_id or embedding_client.model
-    version_ids = await resolve_scope_versions(
-        session,
-        version_id=version_id,
-        law_id=law_id,
-        jurisdiction_code=jurisdiction_code,
-        language=language,
-        doctype=doctype,
-    )
+    version_ids: VersionScope
+    if jurisdiction_code is not None and law_id is None and version_id is None and not language:
+        # Joined rather than bound as ids, which the planner costs per id.
+        version_ids = await current_scope(
+            session, jurisdictions=(jurisdiction_code,), doctype=doctype
+        )
+    else:
+        version_ids = await resolve_scope_versions(
+            session,
+            version_id=version_id,
+            law_id=law_id,
+            jurisdiction_code=jurisdiction_code,
+            language=language,
+            doctype=doctype,
+        )
     if not version_ids:
         return []
 
@@ -112,7 +120,6 @@ async def retrieve(
         candidate_pool=candidate_pool,
         rrf_k=rrf_k,
         model_id=model_id,
-        fallback_model_id=fallback_model_id,
         akn_type=akn_type,
         include_non_normative=include_non_normative,
     )

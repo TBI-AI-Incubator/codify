@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<oigusakt xmlns="Juurakt">
+	<metaandmed>
+		<valjaandja>Näidisvalla Volikogu</valjaandja>
+		<dokumentLiik>määrus</dokumentLiik>
+		<tekstiliik>terviktekst</tekstiliik>
+		<vastuvoetud>
+			<aktikuupaev>2022-03-04</aktikuupaev>
+			<aktiNr>7</aktiNr>
+		</vastuvoetud>
+		<kehtivus>
+			<kehtivuseAlgus>2022-03-04</kehtivuseAlgus>
+		</kehtivus>
+	</metaandmed>
+	<aktinimi>
+		<nimi>
+			<pealkiri>Näidisvalla palgajuhend</pealkiri>
+		</nimi>
+	</aktinimi>
+	<sisu>
+		<paragrahv>
+			<paragrahvNr>3</paragrahvNr>
+			<kuvatavNr><![CDATA[§ 3. ]]></kuvatavNr>
+			<paragrahvPealkiri>Põhipalga määramine</paragrahvPealkiri>
+			<loige>
+				<loigeNr>1</loigeNr>
+				<kuvatavNr><![CDATA[(1)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Ametikohad jaotatakse palgagruppidesse.</tavatekst>
+				</sisuTekst>
+			</loige>
+			<loige>
+				<loigeNr>2</loigeNr>
+				<kuvatavNr><![CDATA[(2)]]></kuvatavNr>
+				<sisuTekst>
+					<tavatekst>Palgagruppide vahemikud on järgmised:<reavahetus/></tavatekst>
+				</sisuTekst>
+				<sisuTekst>
+					<tavatekst>
+						<reavahetus/>
+					</tavatekst>
+					<tabel pealkiriPaigutus="yleval">
+						<tr>
+							<tc>
+								<sisuTekst>
+									<tavatekst>Grupp</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>Vahemik eurodes,<reavahetus/>alammäär</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>Vahemik eurodes, ülemmäär</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>Ametikohad</tavatekst>
+								</sisuTekst>
+							</tc>
+						</tr>
+						<tr>
+							<tc>
+								<sisuTekst>
+									<tavatekst>I</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>Töötasu alammäär</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>1000</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>abistavad ametikohad</tavatekst>
+								</sisuTekst>
+							</tc>
+						</tr>
+						<tr>
+							<tc>
+								<sisuTekst>
+									<tavatekst>II</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>1001</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>2000</tavatekst>
+								</sisuTekst>
+							</tc>
+							<tc>
+								<sisuTekst>
+									<tavatekst>spetsialistid</tavatekst>
+								</sisuTekst>
+							</tc>
+						</tr>
+					</tabel>
+				</sisuTekst>
+			</loige>
+		</paragrahv>
+	</sisu>
+</oigusakt>

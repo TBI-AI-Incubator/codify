@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 from lxml import etree
-from sqlalchemy import delete, false, or_, select, text, true
+from sqlalchemy import delete, false, func, or_, select, text, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,9 @@ from codify.akn import Document
 from codify.akn._parser import carried_ids
 from codify.akn._schema import parse_xml
 from codify.akn.io import parse_akn
+from codify.akn.vocabulary import RECITAL
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
+from codify.quality.sentinels import LAW_REASONS
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.jurisdictions import get_or_create_jurisdiction
 from codify.storage.lexicon import record_terms_from_rows
@@ -455,7 +457,11 @@ async def _persist_derived_rows(
         await record_terms_from_rows(session, provisions)
     if cross_refs:
         # Resolve eligible local leaves while retaining the citation for reassessment.
-        provision_by_eid = {p.akn_eid: p for p in provisions if p.excluded_from_pool is not True}
+        provision_by_eid = {
+            p.akn_eid: p
+            for p in provisions
+            if p.excluded_from_pool is not True or p.exclusion_reason in LAW_REASONS
+        }
         for ref in cross_refs:
             if ref.target_uri and ref.target_uri.startswith("#"):
                 eid = ref.target_uri[1:]
@@ -485,24 +491,28 @@ def _effect_identity(row: AmendmentEffectRow) -> tuple[Any, ...]:
     )
 
 
-async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, akn_xml: str) -> None:
-    """Replace a version's derived section, provision and cross-ref rows from repaired
-    AKN. In-place repair only updates ``versions.akn_xml``, so without this the
-    ``provisions`` rows go stale. ``embedded_at`` is cleared, making a failed
-    re-embed a visible gap rather than a false positive. Caller re-embeds and
-    commits.
+_DerivedRows = tuple[
+    str,
+    list[Section],
+    list[Provision],
+    list[CrossReferenceRow],
+    list[AmendmentEffectRow],
+    list[LifecycleEventRow],
+]
+
+
+def _derive_rows(
+    akn_xml: str, law_id: uuid.UUID, version_id: uuid.UUID, language: str
+) -> _DerivedRows:
+    """The CPU half of `rederive_version_rows`, as (AKN language, rows...). Takes no
+    session and returns no lxml tree, so it runs whole on the CPU pool.
     """
-    version = (
-        await session.execute(select(Version).where(Version.id == version_id))
-    ).scalar_one_or_none()
-    if version is None:
-        return
     doc = parse_akn(akn_xml)
     # document_to_rows mints a throwaway version; the derived rows' internal FKs
     # (section_id, source/target provision) are self-consistent, so we only
     # repoint version_id onto the existing row.
     _new_version, sections, provisions, cross_refs, amendment_effects, lifecycle_events = (
-        document_to_rows(doc, law_id=version.law_id, known_ids=_ids_in(akn_xml))
+        document_to_rows(doc, law_id=law_id, known_ids=_ids_in(akn_xml))
     )
     for row in (*sections, *provisions, *amendment_effects, *lifecycle_events):
         row.version_id = version_id
@@ -511,15 +521,70 @@ async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, ak
     # versions (`bul` over English text). `document_to_rows` tokenised against
     # the AKN, so redo it where they disagree: otherwise a rederive stamps rows
     # current with tokens from the wrong language and nothing revisits them.
-    if doc.language != version.language:
+    if doc.language != language:
+        for provision in provisions:
+            provision.search_tokens = tokenise_to_text(provision.text, language)
+    return doc.language, sections, provisions, cross_refs, amendment_effects, lifecycle_events
+
+
+async def add_missing_recital_rows(session: AsyncSession, version_id: uuid.UUID) -> int:
+    """Insert the recital rows the stored AKN carries and the version lacks.
+
+    Other rows stay, and the new ones take the latest `created_at`. Caller embeds and commits.
+    """
+    version = (
+        await session.execute(select(Version).where(Version.id == version_id))
+    ).scalar_one_or_none()
+    if version is None:
+        return 0
+    derived: _DerivedRows = await on_the_cpu_pool(
+        _derive_rows, version.akn_xml, version.law_id, version_id, version.language
+    )
+    held = set(
+        (await session.execute(select(Provision.akn_eid).where(Provision.version_id == version_id)))
+        .scalars()
+        .all()
+    )
+    built = (
+        await session.execute(
+            select(func.max(Provision.created_at)).where(Provision.version_id == version_id)
+        )
+    ).scalar()
+    fresh = [p for p in derived[2] if p.akn_type == RECITAL and p.akn_eid not in held]
+    for row in fresh:
+        if built is not None:
+            row.created_at = built
+    session.add_all(fresh)
+    await session.flush()
+    await record_terms_from_rows(session, fresh)
+    return len(fresh)
+
+
+async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, akn_xml: str) -> None:
+    """Replace a version's derived section, provision and cross-ref rows from repaired
+    AKN. In-place repair only updates ``versions.akn_xml``, so without this the
+    ``provisions`` rows go stale. ``embedded_at`` is cleared, making a failed
+    re-embed a visible gap rather than a false positive. Caller re-embeds and
+    commits.
+
+    Parsing and mapping run on the CPU pool: seconds on a large act.
+    """
+    version = (
+        await session.execute(select(Version).where(Version.id == version_id))
+    ).scalar_one_or_none()
+    if version is None:
+        return
+    derived: _DerivedRows = await on_the_cpu_pool(
+        _derive_rows, akn_xml, version.law_id, version_id, version.language
+    )
+    akn_language, sections, provisions, cross_refs, amendment_effects, lifecycle_events = derived
+    if akn_language != version.language:
         logger.warning(
             "rederive_language_mismatch",
             version_id=str(version_id),
-            akn_language=doc.language,
+            akn_language=akn_language,
             row_language=version.language,
         )
-        for provision in provisions:
-            provision.search_tokens = tokenise_to_text(provision.text, version.language)
 
     # `cross_references` and `provision_embeddings` cascade with their
     # provisions, which also removes INBOUND refs from other versions. Rederive

@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import Float, and_, func, literal_column, or_, select, text, true, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -52,36 +52,97 @@ RERANK_WINDOW = 200
 RANK_WEIGHT = 0.35
 
 
+def _title_words(tsquery: str) -> Any:
+    return text("laws.title_tsv @@ to_tsquery('simple', :tsquery)").bindparams(tsquery=tsquery)
+
+
+def _cites(citation: tuple[str, int]) -> Any:
+    number, year = citation
+    # Stored numbers are sometimes zero-padded (`01`, `04-213-11` in the corpus
+    # today) and a reader does not type the padding. Compared with the padding
+    # stripped from both sides, since neither side owns the canonical form.
+    return and_(func.ltrim(Law.number, "0") == number, Law.year == year)
+
+
+def _bm25(tokens: str) -> Any:
+    """`<@>` is the negative BM25 score, so lower is better."""
+    # The index name stays a literal, as the ordered index scan needs to see it.
+    query = func.to_bm25query(tokens, literal_column("'laws_title_bm25_idx'"))
+    return Law.title_tokens.op("<@>", return_type=Float)(query)
+
+
 def _title_match(tsquery: str, citation: tuple[str, int] | None) -> Any:
     """Membership predicate for a title query: the words, or the citation. ORed
     rather than chosen, because a numeric citation is often in the stored title
     too and a reader typing one wants both routes to reach the same law.
     """
-    match = text("laws.title_tsv @@ to_tsquery('simple', :tsquery)").bindparams(tsquery=tsquery)
-    if citation is None:
-        return match
-    number, year = citation
-    # Stored numbers are sometimes zero-padded (`01`, `04-213-11` in the corpus
-    # today) and a reader does not type the padding. Compared with the padding
-    # stripped from both sides, since neither side owns the canonical form.
-    stored = func.ltrim(Law.number, "0")
-    return or_(match, and_(stored == number, Law.year == year))
+    match = _title_words(tsquery)
+    return match if citation is None else or_(match, _cites(citation))
 
 
-def _law_order(sort: str | None, *, matched: bool, bm25_tokens: str) -> list[Any]:
-    """ORDER BY for a law listing, falling back to browse order with no query.
-    Metadata sorts end on `frbr_work_uri, id` so paging is deterministic.
-    Relevance deliberately does not: a secondary key stops Postgres terminating
-    the BM25 scan early, 8,705 rows read instead of 626, 38ms to 218ms.
+def _version_dates() -> Any:
+    """The latest expression and ingest of the outer query's law, as a LATERAL."""
+    return (
+        select(
+            func.max(Version.expression_date).label("latest"),
+            func.max(Version.ingested_at).label("ingested"),
+        )
+        .where(Version.law_id == Law.id)
+        .lateral("dates")
+    )
+
+
+def _relevance_candidates(
+    tsquery: str,
+    citation: tuple[str, int] | None,
+    tokens: str,
+    filters: list[Any],
+    window: int,
+) -> Any:
+    """The laws a relevance listing ranks, each with its BM25 score.
+
+    Two arms, unioned and materialised before anything orders them. The title arm
+    takes `window` rows in the listing's own total order, so a tie at the cut is
+    the same tie on every page; an incremental sort over the BM25 index order
+    reads on only through the tied group, not the whole match. The citation arm
+    stands apart because an ordered BM25 scan yields only titles sharing a token
+    with the query: ORed into one predicate, a law found by its number and year
+    alone was lost whenever the planner chose it.
     """
+
+    def ids(predicate: Any) -> Select[Any]:
+        return (
+            select(Law.id.label("id"))
+            .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
+            .where(predicate, *filters)
+        )
+
+    def scored(rows: Any) -> Select[Any]:
+        # Scored once per surviving row, not for every row the sort reads through.
+        return select(Law.id.label("id"), _bm25(tokens).label("score")).join(
+            rows, rows.c.id == Law.id
+        )
+
+    titled = scored(
+        ids(_title_words(tsquery))
+        .order_by(_bm25(tokens), Law.frbr_work_uri, Law.id)
+        .limit(window)
+        .subquery("titled")
+    )
+    arms = (
+        titled
+        if citation is None
+        else union(titled, scored(ids(_cites(citation)).subquery("cited")))
+    )
+    return arms.cte("candidates").prefix_with("MATERIALIZED")
+
+
+def _law_order(sort: str | None, ingested: Any) -> list[Any]:
+    """ORDER BY for a law listing without a relevance-ranked query, falling back
+    to browse order. Every sort ends on `frbr_work_uri, id` so paging is
+    deterministic."""
     tail = [Law.frbr_work_uri.asc(), Law.id.asc()]
     if sort in (None, "relevance"):
-        if matched:
-            return [
-                text(
-                    "laws.title_tokens <@> to_bm25query(:bm25_tokens, 'laws_title_bm25_idx')"
-                ).bindparams(bm25_tokens=bm25_tokens)
-            ]
         return [Law.year.desc().nulls_last(), *tail]
     if sort == "title":
         # The row renders `short_title or title`, so ordering on `title` alone
@@ -90,7 +151,7 @@ def _law_order(sort: str | None, *, matched: bool, bm25_tokens: str) -> list[Any
     if sort == "year_asc":
         return [Law.year.asc().nulls_last(), *tail]
     if sort == "ingested":
-        return [text("ingested DESC NULLS LAST"), *tail]
+        return [ingested.desc().nulls_last(), *tail]
     return [Law.year.desc().nulls_last(), *tail]
 
 
@@ -114,15 +175,95 @@ async def list_laws(
     cursor encodes the browse order, so a `q` or `sort` call returns None and
     pages by offset instead.
     """
-    latest_date_sq = (
-        select(
-            Version.law_id,
-            func.max(Version.expression_date).label("latest"),
-            func.max(Version.ingested_at).label("ingested"),
+    # A title query turns this listing into a finder. Membership comes from the
+    # generated tsvector through its GIN index, order from BM25 over the same
+    # tokens, matching how the provision arm splits the two jobs.
+    matched = False
+    bm25_tokens = tsquery = ""
+    if q and q.strip():
+        bm25_tokens, tsquery = await title_query_tokens(session, q, jurisdictions)
+        if not bm25_tokens:
+            # Nothing lexical in the query: no title can match, and returning the
+            # unfiltered corpus would read as "your search matched everything".
+            return [], None
+        matched = True
+
+    filters: list[Any] = []
+    if jurisdictions:
+        filters.append(Jurisdiction.code.in_(jurisdictions))
+    if doctype:
+        filters.append(Law.doctype == doctype)
+    if status:
+        filters.append(Law.status == status)
+    if year is not None:
+        filters.append(Law.year == year)
+    if cursor:
+        cur_row = (
+            await session.execute(
+                select(Law.year, Law.frbr_work_uri, Law.id).where(Law.id == cursor)
+            )
+        ).first()
+        if cur_row is None:
+            return [], None
+        cur_year, cur_uri, cur_id = cur_row
+        if cur_year is None:
+            filters.append(
+                Law.year.is_(None)
+                & (
+                    (Law.frbr_work_uri > cur_uri)
+                    | ((Law.frbr_work_uri == cur_uri) & (Law.id > cur_id))
+                )
+            )
+        else:
+            filters.append(
+                or_(
+                    Law.year.is_(None),
+                    Law.year < cur_year,
+                    (Law.year == cur_year) & (Law.frbr_work_uri > cur_uri),
+                    (Law.year == cur_year) & (Law.frbr_work_uri == cur_uri) & (Law.id > cur_id),
+                )
+            )
+
+    # A rank-weighted order cannot use the BM25 index: 218ms against 38ms on
+    # 50k laws. The re-rank runs over a bounded window, and a page past it
+    # falls back whole to relevance order, so nothing is shown twice.
+    relevance = matched and sort in (None, "relevance")
+    rerank = bool(doctype_ranks) and relevance and offset + limit <= RERANK_WINDOW
+    # The page is chosen first and dated after, so only its laws' versions are
+    # read, except under the ingested sort, which orders by those dates.
+    page_q = select(Law.id.label("id")).join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
+    if relevance:
+        # The re-rank window is fixed, never widened by the offset: a larger set
+        # re-sorts, and a law admitted at 205 could push a shown row back into view.
+        window = RERANK_WINDOW if rerank else offset + limit + 1
+        candidates = _relevance_candidates(
+            tsquery, parse_citation(q or ""), bm25_tokens, filters, window
         )
-        .group_by(Version.law_id)
-        .subquery()
-    )
+        page_q = (
+            page_q.join(candidates, candidates.c.id == Law.id)
+            .add_columns(candidates.c.score)
+            .order_by(candidates.c.score, Law.frbr_work_uri, Law.id)
+        )
+    else:
+        page_q = page_q.where(*filters)
+        if matched:
+            page_q = page_q.where(_title_match(tsquery, parse_citation(q or "")))
+        # One aggregate over every version, measured faster than a LATERAL per
+        # law once the sort needs all of them.
+        every = (
+            select(Version.law_id, func.max(Version.ingested_at).label("ingested"))
+            .group_by(Version.law_id)
+            .subquery()
+        )
+        if sort == "ingested":
+            page_q = page_q.outerjoin(every, every.c.law_id == Law.id)
+        page_q = page_q.order_by(*_law_order(sort, every.c.ingested))
+    page_q = page_q.limit(RERANK_WINDOW if rerank else limit + 1)
+    if offset and not rerank:
+        page_q = page_q.offset(offset)
+    page = page_q.subquery("page")
+
+    dates = _version_dates()
     stmt = (
         select(
             Law.id,
@@ -134,85 +275,22 @@ async def list_laws(
             Law.year,
             Law.number,
             Law.frbr_work_uri,
-            latest_date_sq.c.latest,
+            dates.c.latest,
             Law.title_translations,
-            latest_date_sq.c.ingested,
+            dates.c.ingested,
         )
+        .select_from(page)
+        .join(Law, Law.id == page.c.id)
         .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
-        .outerjoin(latest_date_sq, latest_date_sq.c.law_id == Law.id)
+        .outerjoin(dates, true())
     )
-
-    # A title query turns this listing into a finder. Membership comes from the
-    # generated tsvector through its GIN index, order from BM25 over the same
-    # tokens, matching how the provision arm splits the two jobs.
-    matched = False
-    bm25_tokens = ""
-    if q and q.strip():
-        bm25_tokens, tsquery = await title_query_tokens(session, q, jurisdictions)
-        if not bm25_tokens:
-            # Nothing lexical in the query: no title can match, and returning the
-            # unfiltered corpus would read as "your search matched everything".
-            return [], None
-        matched = True
-        stmt = stmt.where(_title_match(tsquery, parse_citation(q)))
-
-    stmt = stmt.order_by(*_law_order(sort, matched=matched, bm25_tokens=bm25_tokens))
-
-    # A rank-weighted order cannot use the BM25 index: 218ms against 38ms on
-    # 50k laws. The re-rank runs over a bounded window, and a page past it
-    # falls back whole to relevance order, so nothing is shown twice.
-    rerank = (
-        bool(doctype_ranks)
-        and sort in (None, "relevance")
-        and bool(q and q.strip())
-        and offset + limit <= RERANK_WINDOW
-    )
-    if rerank:
-        # `<@>` returns the negative BM25 score, so lower is better throughout.
-        stmt = stmt.add_columns(
-            text(
-                "laws.title_tokens <@> to_bm25query(:rr_tokens, 'laws_title_bm25_idx')"
-            ).bindparams(rr_tokens=bm25_tokens)
-        )
-    # Fixed, never widened by the offset: a larger candidate set re-sorts, and
-    # a law admitted at 205 could push a row already shown back into view.
-    stmt = stmt.limit(RERANK_WINDOW if rerank else limit + 1)
-    if jurisdictions:
-        stmt = stmt.where(Jurisdiction.code.in_(jurisdictions))
-    if doctype:
-        stmt = stmt.where(Law.doctype == doctype)
-    if status:
-        stmt = stmt.where(Law.status == status)
-    if year is not None:
-        stmt = stmt.where(Law.year == year)
-    if cursor:
-        cur_row = (
-            await session.execute(
-                select(Law.year, Law.frbr_work_uri, Law.id).where(Law.id == cursor)
-            )
-        ).first()
-        if cur_row is None:
-            return [], None
-        cur_year, cur_uri, cur_id = cur_row
-        if cur_year is None:
-            stmt = stmt.where(
-                Law.year.is_(None)
-                & (
-                    (Law.frbr_work_uri > cur_uri)
-                    | ((Law.frbr_work_uri == cur_uri) & (Law.id > cur_id))
-                )
-            )
-        else:
-            stmt = stmt.where(
-                or_(
-                    Law.year.is_(None),
-                    Law.year < cur_year,
-                    (Law.year == cur_year) & (Law.frbr_work_uri > cur_uri),
-                    (Law.year == cur_year) & (Law.frbr_work_uri == cur_uri) & (Law.id > cur_id),
-                )
-            )
-    if offset and not rerank:
-        stmt = stmt.offset(offset)
+    # The same total order again, since a join does not keep the page's.
+    if relevance:
+        stmt = stmt.order_by(page.c.score, Law.frbr_work_uri, Law.id)
+        if rerank:
+            stmt = stmt.add_columns(page.c.score)
+    else:
+        stmt = stmt.order_by(*_law_order(sort, dates.c.ingested))
     rows = (await session.execute(stmt)).all()
 
     if rerank:

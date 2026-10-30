@@ -238,6 +238,11 @@
         "additionalProperties": true,
         "description": "A caption line opening an attachment. AKN models a schedule and a\nmandatory companion alike, so legal force is declared per caption.",
         "properties": {
+          "always_opens": {
+            "default": false,
+            "title": "Always Opens",
+            "type": "boolean"
+          },
           "caption": {
             "title": "Caption",
             "type": "string"
@@ -268,7 +273,7 @@
       },
       "BindingRegime": {
         "additionalProperties": false,
-        "description": "Non-membership binding regime, treaty frameworks, bilateral regimes,\nconstitutional annexes. Used for things like the Dayton Framework (BA),\nthe Compact of Free Association (PW/MH), and the Lateran Concordat (VA)\nwhich are legally binding on a jurisdiction but are not memberships in an\ninternational organisation.",
+        "description": "Non-membership binding regime, treaty frameworks, bilateral regimes,\nconstitutional annexes. Used for instruments that are legally binding on a\njurisdiction but are not memberships in an international organisation.",
         "properties": {
           "code": {
             "title": "Code",
@@ -402,7 +407,7 @@
       },
       "CalendarConversion": {
         "additionalProperties": false,
-        "description": "Deterministic conversion rule for non-Gregorian local calendars.\n\nkind selects which optional fields apply:\n\n- epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,\n                where epoch_year is an integer offset (ROC 1911, Juche 1911,\n                Buddhist -543).\n- era_table     named era segments with boundaries.\n- hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.\n- hijri_solar   Iranian Hijri, Gregorian year length.\n- ethiopian     ~7-8 year offset, 13-month year.\n- buddhist      Thai/Lao, epoch_year -543.\n- bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the\n                mid-April new year).",
+        "description": "Deterministic conversion rule for non-Gregorian local calendars.\n\nkind selects which optional fields apply:\n\n- epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,\n                where epoch_year is an integer offset (Buddhist Era -543).\n- era_table     named era segments with boundaries.\n- hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.\n- hijri_solar   Solar calendar, Gregorian year length.\n- ethiopian     ~7-8 year offset, 13-month year.\n- buddhist      Buddhist Era calendar, epoch_year -543.\n- bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the\n                mid-April new year).",
         "properties": {
           "date_cues": {
             "items": {
@@ -541,7 +546,7 @@
       },
       "ClassificationRule": {
         "additionalProperties": false,
-        "description": "Deterministic rule for assigning a document class from the incoming header or\nmetadata. Tried in descending priority; the first match wins. No match falls back to\n`default_document_class` and to whatever heuristics `StructuringConfig.prompt_additions`\nstill carries.\n\nsignal          what `pattern` is tested against\n  date_range      nothing; the match is `date_from`/`date_until` alone, for laws\n                  post-dating a regime change (a decree-law class from 1961-07-15)\n  preamble_match  the preamble or enacting-formula text\n  issuer_role     the enacting body's role (\"Pope\", \"Council of Ministers\", \"OHR\")\n  gazette_series  the official gazette series the document was published in\n  title_regex     the document title (\"Basic Law:\", \"Motu Proprio\")",
+        "description": "Deterministic rule for assigning a document class from the incoming header or\nmetadata. Tried in descending priority; the first match wins. No match falls back to\n`default_document_class` and to whatever heuristics `StructuringConfig.prompt_additions`\nstill carries.\n\nsignal          what `pattern` is tested against\n  date_range      nothing; the match is `date_from`/`date_until` alone, for laws\n                  post-dating a regime change\n  preamble_match  the preamble or enacting-formula text\n  issuer_role     the enacting body's role (for example a head of state or a cabinet)\n  gazette_series  the official gazette series the document was published in\n  title_regex     the document title (a fixed prefix such as \"Regulation:\")",
         "properties": {
           "date_from": {
             "anyOf": [
@@ -938,6 +943,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -989,6 +997,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1136,6 +1147,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -1849,7 +1863,8 @@
                   "arabic_period",
                   "arabic_closing_paren",
                   "lower_letter_closing_paren",
-                  "parenthesized_arabic"
+                  "parenthesized_arabic",
+                  "upper_roman_title"
                 ],
                 "type": "string"
               },
@@ -1938,6 +1953,61 @@
         "title": "IngestUrl",
         "type": "object"
       },
+      "InlineAnchor": {
+        "description": "Running text a citation can name, such as a recital.",
+        "properties": {
+          "children": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineRef"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineTerm"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineCitation"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineEmph"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineStrong"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineMod"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineNote"
+                }
+              ]
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "eid": {
+            "title": "Eid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "anchor",
+            "default": "anchor",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eid"
+        ],
+        "title": "InlineAnchor",
+        "type": "object"
+      },
       "InlineCitation": {
         "properties": {
           "href": {
@@ -1980,6 +2050,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2027,6 +2100,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -2070,6 +2146,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2149,6 +2228,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"
@@ -2530,6 +2612,13 @@
               "$ref": "#/components/schemas/PlaceholderMarker"
             },
             "title": "Placeholders",
+            "type": "array"
+          },
+          "pool_excluded_refers_to": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pool Excluded Refers To",
             "type": "array"
           },
           "public_reference": {
@@ -3155,7 +3244,7 @@
       },
       "ResidualLaw": {
         "additionalProperties": false,
-        "description": "Another jurisdiction's corpus that is still residually applicable here.\n\nUsed for layered legal systems where pre-independence or foreign law\ncontinues in force alongside native legislation. Examples:\n  - VA: Italian law as suppletive in Vatican City State.\n  - SY, IQ, LB: Ottoman Mejelle for general private law.\n  - ZA, LS, SZ, NA: Roman-Dutch common law (but usually too embedded\n        to carve out as discrete residuals).\n\n`source_jurisdiction` is a Codify code that must resolve to an existing\nconfig. Downstream consolidation/amendment agents can traverse these to\nfind the source corpus.",
+        "description": "Another jurisdiction's corpus that is still residually applicable here.\n\nUsed for layered legal systems where historical residual law, law inherited\nfrom a predecessor legal order, or foreign law continues in force alongside\nnative legislation. Examples:\n  - another jurisdiction's law applied as a suppletive source.\n  - a historical codification still applied to general private law.\n  - an inherited common law (but usually too embedded to carve out as\n        discrete residuals).\n\n`source_jurisdiction` is a Codify code that must resolve to an existing\nconfig. Downstream consolidation/amendment agents can traverse these to\nfind the source corpus.",
         "properties": {
           "in_force_from": {
             "anyOf": [
@@ -3464,6 +3553,13 @@
             },
             "title": "Skip Heading Patterns",
             "type": "array"
+          },
+          "trailing_section_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trailing Section Patterns",
+            "type": "array"
           }
         },
         "title": "SegmentationConfig",
@@ -3538,7 +3634,10 @@
               "pdf_gazette",
               "paragraf_propisi",
               "sparql",
-              "bulk_xml_archive"
+              "bulk_xml_archive",
+              "gazette_xml",
+              "json_portal",
+              "oecd_compendium"
             ],
             "title": "Kind",
             "type": "string"
@@ -3700,6 +3799,15 @@
             "title": "Marker Boundary",
             "type": "string"
           },
+          "marker_order": {
+            "default": "keyword_first",
+            "enum": [
+              "keyword_first",
+              "number_first"
+            ],
+            "title": "Marker Order",
+            "type": "string"
+          },
           "marker_tolerances": {
             "items": {
               "enum": [
@@ -3748,6 +3856,11 @@
             },
             "title": "Prose Precursors",
             "type": "array"
+          },
+          "recurring_furniture": {
+            "default": false,
+            "title": "Recurring Furniture",
+            "type": "boolean"
           },
           "reference_nouns": {
             "items": {
@@ -3927,7 +4040,7 @@
       },
       "SuspensionPeriod": {
         "additionalProperties": false,
-        "description": "One period of suspension from a supranational body.\n\nUsed inside `SupranationalMembership.suspension_periods` to record the\nstart and (optional) end of a suspension, plus its scope. A list is the\nright shape because several jurisdictions have cycled through multiple\nsuspensions (Fiji at the PIF/Commonwealth; Pakistan at the Commonwealth;\ncoup states at AU/ECOWAS).",
+        "description": "One period of suspension from a supranational body.\n\nUsed inside `SupranationalMembership.suspension_periods` to record the\nstart and (optional) end of a suspension, plus its scope. A list is the\nright shape because a jurisdiction can cycle through multiple suspensions.",
         "properties": {
           "reason": {
             "default": "",
@@ -4252,6 +4365,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4306,6 +4422,9 @@
                   "$ref": "#/components/schemas/InlineText"
                 },
                 {
+                  "$ref": "#/components/schemas/InlineAnchor"
+                },
+                {
                   "$ref": "#/components/schemas/InlineRef"
                 },
                 {
@@ -4336,6 +4455,9 @@
               "anyOf": [
                 {
                   "$ref": "#/components/schemas/InlineText"
+                },
+                {
+                  "$ref": "#/components/schemas/InlineAnchor"
                 },
                 {
                   "$ref": "#/components/schemas/InlineRef"

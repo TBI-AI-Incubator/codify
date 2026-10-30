@@ -5,8 +5,81 @@ the launch tag.
 
 ## Unreleased
 
+Breaks, in that the structurer's output changes for documents it already read:
+
+1. The UK keyword-less scan (`gb`, `gb-eng`, `gb-wls`, `gb-sct`, `gb-nir`) reads
+   the shapes a statutory instrument prints in a PDF. An article opening on its
+   first paragraph (`2.—(1)`, `2.-(1)`, with a space or a bold number) is a
+   unit. A stray middle dot or tilde after a number does not hide it, and a
+   Welsh month after a number reads as a date, not a heading. A short run of
+   sections, each numbered 100 or more and the smallest over eight times the
+   larger of the two beside the run, is dropped as page numbers. Where
+   `amendments.trigger_phrases` is declared, embedded amendment marking covers
+   the UK sections before the first schedule, which restarts the numbering. An
+   em dash or a soft hyphen ends a lead-in, and the quoted unit follows it
+   directly, under at most a heading line. A caption before the first
+   provision read is front matter when it is a cover note (a line inside it
+   that opens on a schedule keyword is its prose), or lists a schedule in a
+   contents list (it sits under a numbered entry or another such caption and
+   the text prints it again). Front matter ends no body and anchors nothing;
+   the last contents entry before a schedule's caption is no section, and a
+   schedule paragraph printed above its caption keeps its anchor. A line
+   of a keyword and a number inside a schedule, or beside its caption, is the
+   citation of the provision that introduces it, not a section.
+2. Every Riigi Teataja act whose source carries an abbreviation (`lyhend`) gets a
+   new work URI. The URI now slugs the full title on every path: the transformer,
+   `build_ee_index` and `EeDatadumpAcquirer.fetch`, which share
+   `codify.acquisition.adapters.ee.identity`. `fetch` reads the URI from the
+   member, not from the index or the ref. Only the constitution, known by document
+   type `põhiseadus`, abbreviation `PS` or its exact title, takes
+   `/akn/ee/act/1992/pohiseadus`. A title that merely contains `põhiseadus` no
+   longer does.
+
 New, additive:
 
+- Preamble recitals that carry an `eId` become provision rows with `akn_type='recital'`
+  and `normative=false`, outside any section. `Document.recitals` holds them, and the
+  version document wraps each recital in the preamble in an `anchor` node.
+  A recital is embedded and found by its `eId`; search leaves it out unless
+  `include_non_normative` is set. `add_missing_recital_rows` adds them to a version
+  already stored, and `embed_and_stamp(missing_only=True)` embeds only the rows that
+  lack a vector.
+- `segmentation.trailing_section_patterns` declares whole lines that open a trailing
+  section a source never ingests, such as notices. `extract_text_from_pdf` finds the
+  first such line in the text layer, past page one and the first quarter of the
+  document, and sends no page from there on to any OCR, layout or vision call. Those
+  pages stay in the result with their text layer and `skipped="trailing_section"`,
+  which `PageExtracted.skipped` carries. A heading on a page with no text layer, or
+  listed with a page number, cuts nothing. Without the key, extraction is as before.
+- `build_ee_index` and `index-ee-archive` record the redaction group (`group`) on every
+  entry, so one act's texts can be joined. With `keep_ended` (`--keep-ended`), a state-act
+  text whose validity ended before the as-of date is listed under `ended`, with its
+  validity end (`valid_to`); `entries` and `repealed` are as before, and without the option
+  the index has no `ended` section.
+- `is_riigi_teataja` also accepts an `oigusakt` root in an older versioned schema namespace
+  (for example `maarus_1_10.02.2010`), so those members reach the Riigi Teataja converter
+  and no longer fail in the native AKN parser.
+- `build_ee_index` records the archive path as given: an absolute path stays absolute
+  (normalised, symlinks unresolved) rather than becoming relative to the working
+  directory, and a relative path stays relative.
+- A Riigi Teataja act whose only text is its preamble converts to a body paragraph, not
+  a `<preamble>` over an empty body. An act with provisions keeps its preamble.
+- `akn_native` acquirer: a ref carrying `extra["pdf_fallback"]` takes the PDF that a
+  document of metadata alone names, instead of failing as PDF-only. The PDF is the
+  untitled alternative in the ref's language (English unless `languages` names Welsh), on
+  the document's own host, upgraded to https, and it must open with `%PDF-`. A redirect is
+  followed only while it stays on that host over https. A ref for a
+  language other than English takes that PDF even where the document has text, which is
+  English. An English ref to a document with text, and a ref without the flag, behave as
+  before.
+- `codify.pipeline.formats.boe` converts a Boletín Oficial del Estado item's
+  XML to AKN without a model: books, titles, chapters, sections, articles
+  (ordinal, cardinal and `bis` numbers), apartados and letters, the four kinds
+  of disposition as named `hcontainer`s, preamble and enacting formula,
+  conclusions and annexes. Text quoted for amendment stays inside its article.
+  `dispatch` routes a BOE item there by its root. `BoeAcquirer`, registered as
+  the new `gazette_xml` source kind, fetches the item by its ELI through the
+  polite client, and hands on the PDF when the XML carries no text.
 - Migration `0023_source_spans` and `codify.storage.spans`: a multi-act
   source's split is stored as spans over its pages, one generation at a time.
   Each span is an act, a held region, a skipped non-act or front matter; its
@@ -26,6 +99,12 @@ New, additive:
   blocking writes.
   `segmentation.skip_heading_patterns` names instruments that are not acts
   (notices, appointments): their segments are cut as skipped, kept and listed.
+  Such a heading opens its region on its own, whatever the contents lists, and a
+  contents entry it names is no act to find. The open act's evidence runs on
+  past the region, so it ends at the next act. After kept-apart text, the
+  heading numbered next after the last act is evidence of its own
+  (`next_number`). Reached by a quotation opened in that text, it is held unless
+  the contents list it.
 - `codify.pipeline.segment`: splits a source holding several acts, such as a
   gazette issue, without a model call. `segment` returns a `Segmentation`:
   `single` (the text unchanged), `decided` (one segment per act) or
@@ -37,8 +116,11 @@ New, additive:
   heading no signal agrees with is read as a citation where it stands, named
   in the reconciliation table, and neither splits nor holds. `segment_volume`
   reads a bound volume a page at a time, cuts it into issues by the same rule
-  and segments each issue. Configured by the jurisdiction's `segmentation`
-  block: `act_heading_patterns`, `issue_heading_patterns`, `contents_keywords`
+  and segments each issue. A heading on the page before the one its entry
+  lists matches it where its act runs onto that page and no act listed after
+  it stands earlier. An entry's page is its first leader number, so a later
+  entry not read as a heading cannot lend it its page. Configured by the
+  jurisdiction's `segmentation` block: `act_heading_patterns`, `issue_heading_patterns`, `contents_keywords`
   and `printed_page_pattern`, each pattern refused at load if it does not
   compile or can match empty text.
 - `codify ingest-one` writes `page_spans.json` (the page count, where each
@@ -46,12 +128,170 @@ New, additive:
   segmenter's outcome, acts, held regions and reconciliation table) into the
   bundle. `codify segment <bundle>` re-runs the segmenter over that stored
   text under the current config, with no model.
+- Migration `0024_current_versions`: `versions.is_current` marks each law's
+  current original version, kept by trigger on insert, delete and any update
+  of the columns that order versions, and unique per law.
+  `latest_versions_global` and `latest_versions_for_jurisdiction` read it when
+  no language is asked for. `CurrentScope` (built from jurisdiction codes by
+  `current_scope`) names those versions by jurisdiction, year range and
+  doctype; `hybrid_search`, `query_tokens_for` and `count_embedded_versions`
+  take one in place of an id list, `count_in_scope` counts it, and `retrieve`
+  uses one for a jurisdiction searched in its original language. The search
+  then joins the flag instead of binding every id, which the planner estimated
+  element by element: seconds of planning per query on a large corpus.
+- Migration `0025_atlas_build_kind` adds `atlas_build` to the run kinds; the
+  downgrade refuses while rows of that kind exist.
+- Migration `0026_provisions_created_at_idx` indexes `provisions` on
+  `(version_id, created_at)` and drops `provisions_version_id_idx`, which the
+  new key's prefix makes redundant. `max(created_at)` for one version is then
+  a single index descent instead of a read of every provision.
+- Migration `0027_query_index_hygiene` drops the unread GIN over
+  `provisions.text_search` (the column stays), an HNSW over
+  `version_unit_embeddings` that no migration created and no query orders by,
+  and `sections_version_id_idx`, `annex_rows_version_idx` and
+  `law_links_source_idx`, whose columns lead a wider index on the same table.
+  It indexes `registry_works.law_id`, `repair_proposals.run_id` and
+  `runs.params->>'retried_from'`, and vacuums `provisions` after 2% new rows.
+- `prune_dead_terms` scans for orphaned terms without a lock, then takes the
+  `laws`/`provisions` share lock only to re-check those candidates through the
+  `search_tsv`/`title_tsv` GIN indexes. It refuses with `55P03` if DDL holds
+  either table, and raises unless the session is READ COMMITTED.
+- `list_laws` chooses its page before reading version dates, so only the
+  page's laws are dated; the ingested sort still aggregates every version.
+- The hybrid search's keyword arm keeps the top `pool` matches before
+  numbering them, a bounded sort instead of a sort of every match.
+- The keyword arm reads a scope of at most 10,000 laws and 150,000 provisions
+  before ranking its matches; a larger scope, or the whole corpus, keeps the
+  BM25 index walk. The walk filtered to the scope only as it went, so terms
+  common in the corpus but rare in the scope read past most of it.
+- `structuring.recurring_furniture`: for a layout engine that files footnotes
+  and page-top captions under header or footer. Furniture is then a bare page
+  number or a short block another page repeats, a running head split across
+  blocks included. A block that opens with a declared attachment caption is not
+  a running head, nor evidence that another is. A one-off block stays in the text, and so does a number of
+  one or two digits among its page's text; a page loses no more lines of a number
+  than its layout holds blocks of it. A footnote is a block the engine filed as a
+  footer or reference and the run of lines at the foot of its page that says what
+  it says; it moves to the foot as its own paragraph, and where no such run is
+  found it stays where it is and `footnote_run_unplaced` is logged. A text block
+  at the foot that opens on a marker is a provision, whatever its place suggests.
+  `combine_text_for_structure` takes the jurisdiction as `country`.
+- `attachments[].always_opens`: a caption that titles no table in the body, so
+  numbering that continues past it does not read it as a table caption, and the
+  keyword reading of its line is dropped.
+- `codify.pipeline.formats.riigi_teataja_annexes`: `annex_files` reads the file
+  each Riigi Teataja annex embeds, base64, beside its link, keyed by the eId of
+  the attachment the converter writes for it. `fill_annex_text` writes a
+  transcript into those attachments, one `transcribedSource` `hcontainer` per
+  page after the link; an attachment already holding one is left alone.
+- `SourceAdapterKind` gains `oecd_compendium` (Tier 2), with
+  `OecdCompendiumAcquirer` over the Compendium of OECD Legal Instruments' JSON
+  API: `discover` lists the instruments in force with their publish date, and
+  `fetch` returns the bodies in the languages the ref names (English and French
+  when it names none), the first as primary, each wrapped in a head whose
+  `oecd.*` meta tags name the instrument and date its latest revision, the last
+  amendment in the record's change history (follow-up reports and entry into
+  force are not revisions). `last_modified` is the listing's
+  publish date. The record's committee, themes, related instruments, adherents
+  and monitoring reports travel as `upstream_metadata`. A packaged `oecd` config
+  names the adapter, so `get_acquirer("oecd")` resolves it.
+- `OecdCompendiumAcquirer.details` reads one instrument's record the way `fetch`
+  carries it, plus its English title, for an instrument of any status and with
+  or without a body text.
+- `codify.pipeline.formats.oecd_html` segments that body into AKN without a
+  model: preamble citations and recitals, the enacting line, English or French
+  verb sections with paragraphs numbered across them, parts, titles, chapters and
+  articles in codes and conventions, and `WE ...` declarations. The work is
+  dated by adoption and the expression by the latest revision, so a revised text
+  is a new expression. A verb section (`INVITES`, `INSTRUCTS` and the like)
+  whose addressee is not the Adherents, or each such item of a section naming
+  none, carries `refersTo="#nonAdherentDuty"` with its contents. An `Annex` line closes the operative text;
+  each annex becomes an attachment. `dispatch` routes a local HTML source
+  carrying the acquirer's head to it.
+- Body elements carry `refers_to`, read from and written back to `refersTo`.
+- `pool_excluded_refers_to` in a jurisdiction config: units at or under an
+  element whose `refersTo` names a listed value are stored with
+  `excluded_from_pool` and reason `marked`, by the mapper, by
+  `retokenise_version_provisions` (which reads the stored AKN) and by the
+  comparator's `is_excluded`. `marked_ids` takes a document's marked units once;
+  `is_excluded` and `provision_text` accept it, so a marked part of an unmarked
+  unit stays out of the text the comparator embeds and prompts with. The marker
+  survives translation, which rewrites
+  headings. A `marked` row is still law: `LAW_REASONS` lets the reference
+  resolver and the in-document link pass land on it, as they never land on a
+  placeholder. The `oecd` config lists `#nonAdherentDuty`.
+- `codify.core.tracing.record_agent_usage` prices an agent run's model responses
+  as one direct Langfuse generation, for an agent whose endpoint reports no cost.
+- `codify.core.pricing` prices `gpt-5.6-sol` at Azure's Global Standard short-context
+  rate.
 
 Fixed:
 
+- `codify.core.pricing` prices `gemini-3.6-flash` at its intro rate to 2026-12-31,
+  $0.75 in and $3.75 out per million tokens, which it had at double.
+- `oecd_html` reads declarations, ministerial conclusions, arrangements and
+  agreements that raised "no operative text". It recognises:
+  - `WE, the Ministers…` and `NOUS, MINISTRES…` openers
+  - first-person, third-person-plural and past-tense verbs (`DECLARE that we:`,
+    `DÉCLARONS`, `WELCOMED`)
+  - numbered paragraphs that open on a verb, and numbered lists inside a
+    paragraph
+  - Roman article numbers, `1)` paragraphs, `a.` points under a `1.` paragraph
+  - a sentence per item under a colon lead-in
+  - an excerpt that opens with a quotation mark
+
+  A text with no operative verb is all body. Paragraphs straight under the body
+  or an annex sit in unnumbered sections that open at each heading line. Where
+  the text has articles, a group with no heading is an `hcontainer`. A paragraph
+  the source does not number gets no `<num>`.
+- `oecd_html` reads `PARTIE`, `CHAPITRE` and `TITRE` as it reads `PART`,
+  `CHAPTER` and `TITLE`. A French part's lead-in no longer falls into the
+  section before it and takes that section's `#nonAdherentDuty` mark.
+- No source word is dropped:
+  - consecutive heading lines all reach the unit they head;
+  - a heading between list items ends the list;
+  - a heading left at the end is kept as a paragraph;
+  - a caption with no annex under it (a contents line) is kept as text;
+  - `APPENDIX` opens an attachment as `ANNEX` does;
+  - a `PREAMBLE` label stays in the preamble. The addressee rule also
+  marks `WE CALL ON…` paragraphs, `5. CALL on…` paragraphs and items under a
+  section in the declarants' own voice.
+
+- Riigi Teataja converter: a line break ends one `<p>` and the text after it
+  starts the next, which Bluebell reads as a line too. Every `sisuTekst` of a
+  unit is written, not only the first: text before a paragraph's lõiked is its
+  `intro`, text after them its `wrapUp`, text between two units follows the
+  first, and a top-level `punkt` keeps its points. Headings keep the text after inline markup, with superscript digits.
+  Unmapped inline markup keeps its text, and a space between two inline
+  elements stays. A native `tabel` or an HTML `table` becomes an AKN `table`
+  with row eIds, unless it only places text: lines of up to 100 characters
+  beside a column blank in every row, with no spanned cell, or every cell
+  reading `allkirjastatud` (signed). Those stay out of the body, as signatures
+  already do, and the conversion logs how many it left out.
+- The reader projection reads every `<p>` of an `intro` or `wrapUp`, not only
+  the first; one that holds a table is read like content, in source order.
+- Provision text, intro and wrap-up included, keeps table rows, cells and a
+  cell's paragraphs apart.
+- `ensure_unique_eids`: a renamed duplicate never takes an eId the document
+  already publishes, so a reference to an id such as `x_dup2` keeps naming the
+  element it named.
 - `segment`: where several headings name one listed act, the contents entry
   goes to the one on its listed page, so a prose mention elsewhere no longer
   makes the source abstain.
+- Scaffold: a `line_anchored` document whose first two units, in text order,
+  are 1 and 2 as the UK keyword-less scan read them before any schedule no
+  longer fails as a void boundary policy; those units show the layout held, and
+  `anchor_boundary_policy_held` is logged.
+- `recurring_furniture`: a line that opens an attachment is never furniture, so
+  a schedule's caption printed inside a repeated head block stays, and a head
+  that prints the previous page's caption again does not repeat it; a caption
+  block printed on a head's row is not part of the row.
+- `basic_unit_numbers` folds digits through `normalise_digits`, so an article
+  numbered in Devanagari, Bengali or Thai digits is in the unit set.
+- Riigi Teataja: an annex links its file under the text's own `globaalID`. The
+  first `aktViide` names the act's original publication, which does not hold a
+  consolidated text's later annex files, and older texts write it as a URL. A
+  text without a `globaalID` keeps the annex title unlinked.
 
 ## 0.6.0 (2026-10-02)
 

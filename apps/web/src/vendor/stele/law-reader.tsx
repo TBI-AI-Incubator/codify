@@ -13,6 +13,7 @@ type InlineModNode = { kind: 'mod'; children: InlineNode[] };
 type InlineStrongNode = { kind: 'strong'; children: InlineNode[] };
 type InlineTextNode = { kind: 'text'; text: string };
 type InlineNoteNode = { kind: 'note'; children: InlineNode[]; inferred?: boolean };
+type InlineAnchorNode = { kind: 'anchor'; eid: string; children: InlineNode[] };
 type InlineNode =
   | InlineTextNode
   | InlineRefNode
@@ -21,7 +22,8 @@ type InlineNode =
   | InlineEmphNode
   | InlineStrongNode
   | InlineModNode
-  | InlineNoteNode;
+  | InlineNoteNode
+  | InlineAnchorNode;
 
 type DocumentTableCell = {
   content: InlineNode[];
@@ -280,6 +282,12 @@ function InlineNodeView({ node }: { node: InlineNode }): React.ReactNode {
         <strong className="font-legislative font-bold">
           <Inline nodes={node.children} />
         </strong>
+      );
+    case 'anchor':
+      return (
+        <span id={node.eid} data-akn-target="true">
+          <Inline nodes={node.children} />
+        </span>
       );
     case 'note':
       return (

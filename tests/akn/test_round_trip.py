@@ -190,3 +190,30 @@ def test_unknown_kind_rejected() -> None:
                 ],
             }
         )
+
+
+def test_refers_to_survives_a_write_and_a_read() -> None:
+    from codify.akn import parse_akn, to_akn
+
+    doc = Document(
+        frbr_work_uri="/akn/xz/act/2020/1",
+        frbr_expression_uri="/akn/xz/act/2020/1/eng@2020-01-01",
+        language="eng",
+        expression_date=date(2020, 1, 1),
+        body=[
+            Section(
+                akn_eid="sec_1",
+                akn_type="section",
+                position=0,
+                refers_to="#a #b",
+                children=[
+                    Paragraph(akn_eid="sec_1__para_1", akn_type="paragraph", position=0, text="x")
+                ],
+            )
+        ],
+    )
+    back = parse_akn(to_akn(doc))
+    assert [(el.akn_eid, el.refers_to) for el in (back.body[0], back.body[0].children[0])] == [
+        ("sec_1", "#a #b"),
+        ("sec_1__para_1", None),
+    ]

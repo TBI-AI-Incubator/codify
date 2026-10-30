@@ -9,7 +9,8 @@ import structlog
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from codify.pipeline.enrich.goods_codes import extract_goods_codes
+from codify.pipeline.enrich.goods_codes import GoodsCode, extract_goods_codes
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.storage.models import GoodsCodeReference, Law, Version
 
 logger = structlog.get_logger()
@@ -19,7 +20,8 @@ async def index_version_goods_codes(
     session: AsyncSession, version_id: uuid.UUID, akn_xml: str | None = None
 ) -> int:
     """Rewrite one version's code rows, reading the stored AKN when none is
-    given. Idempotent by replacement, so a retry does not double-count."""
+    given. Idempotent by replacement, so a retry does not double-count.
+    Extraction runs on the CPU pool: most of a second on a large annex."""
     if akn_xml is None:
         akn_xml = (
             await session.execute(select(Version.akn_xml).where(Version.id == version_id))
@@ -30,7 +32,7 @@ async def index_version_goods_codes(
     # Extract before deleting. The caller commits regardless, so a failure
     # after the delete would leave a version that had codes yesterday with none.
     try:
-        codes = extract_goods_codes(akn_xml)
+        codes: list[GoodsCode] = await on_the_cpu_pool(extract_goods_codes, akn_xml)
     except Exception as exc:  # noqa: BLE001, the prior rows are worth more than this run
         logger.warning(
             "goods_codes_extract_failed",

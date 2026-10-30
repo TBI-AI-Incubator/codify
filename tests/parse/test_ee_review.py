@@ -12,8 +12,10 @@ from codify.acquisition import get_acquirer
 from codify.acquisition.adapters.ee.datadump import EeDatadumpAcquirer, build_ee_index
 from codify.pipeline.formats.riigi_teataja import riigi_teataja_to_akn
 
+_BODY = "<paragrahv><paragrahvNr>1</paragrahvNr><sisuTekst>Text</sisuTekst></paragrahv>"
 
-def source(end: str = "", title: str = "Synthetic Act", body: str = "") -> str:
+
+def source(end: str = "", title: str = "Synthetic Act", body: str = _BODY) -> str:
     return f"""<oigusakt><metaandmed><dokumentLiik>seadus</dokumentLiik>
     <valjaandja>Riigikogu</valjaandja><globaalID>123</globaalID>
     <vastuvoetud><aktikuupaev>2022-04-13</aktikuupaev></vastuvoetud>
@@ -44,12 +46,23 @@ def test_entities_agree_with_formatter(tmp_path: Path) -> None:
     assert f"/2022/{entry['slug']}" in akn
 
 
-def test_archive_portability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_archive_is_recorded_as_given(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = archive(tmp_path, source())
     monkeypatch.chdir(tmp_path)
-    assert build_ee_index(path)["archive"] == "laws.zip"
+    assert build_ee_index(path)["archive"] == str(path)
+    assert build_ee_index(Path("laws.zip"))["archive"] == "laws.zip"
     monkeypatch.chdir(tmp_path.parent)
-    assert build_ee_index(path)["archive"] == f"{tmp_path.name}/laws.zip"
+    assert build_ee_index(path)["archive"] == str(path)
+    assert (
+        build_ee_index(Path(tmp_path.name) / "laws.zip")["archive"] == f"{tmp_path.name}/laws.zip"
+    )
+
+
+def test_a_dotted_absolute_archive_is_recorded_normalised(tmp_path: Path) -> None:
+    path = archive(tmp_path, source())
+    (tmp_path / "sub").mkdir()
+    dotted = tmp_path / "sub" / ".." / "laws.zip"
+    assert build_ee_index(dotted)["archive"] == str(path)
 
 
 def test_normal_acquisition_loads_bundled_config() -> None:
@@ -84,7 +97,7 @@ def test_constitution_chapter_identity() -> None:
         f"<paragrahv><paragrahvNr>{n}</paragrahvNr></paragrahv></jagu>"
         for n in (1, 2)
     )
-    akn, _ = riigi_teataja_to_akn(source(title="Synthetic põhiseadus", body=body))
+    akn, _ = riigi_teataja_to_akn(source(title="Eesti Vabariigi põhiseadus", body=body))
     root = etree.fromstring(akn.encode())
     chapters = root.findall(".//{*}chapter")
     assert [c.get("eId") for c in chapters] == ["chp_1", "chp_2"]

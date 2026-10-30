@@ -92,6 +92,9 @@ MarkerForm = Literal[
     # The operative subdivision of an article, printed as "(1) " with no
     # keyword of its own.
     "parenthesized_arabic",
+    # A body container headed by a bare Roman numeral and an all-caps title,
+    # "II. ORCHARD COUNCILS", taken only in an I, II, III sequence.
+    "upper_roman_title",
 ]
 ValidationStatus = Literal["production", "draft", "stub"]
 JurisdictionType = Literal["national", "supranational", "subnational", "crown_dependency"]
@@ -298,14 +301,13 @@ class CalendarConversion(BaseModel):
     kind selects which optional fields apply:
 
     - epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,
-                    where epoch_year is an integer offset (ROC 1911, Juche 1911,
-                    Buddhist -543).
+                    where epoch_year is an integer offset (Buddhist Era -543).
     - era_table     named era segments with boundaries.
-    - hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.
-    - hijri_solar   Iranian Hijri, Gregorian year length.
+    - hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.
+    - hijri_solar   Solar calendar, Gregorian year length.
     - ethiopian     ~7-8 year offset, 13-month year.
-    - buddhist      Thai/Lao, epoch_year -543.
-    - bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the
+    - buddhist      Buddhist Era calendar, epoch_year -543.
+    - bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the
                     mid-April new year).
     """
 
@@ -588,11 +590,11 @@ class ClassificationRule(BaseModel):
 
     signal          what `pattern` is tested against
       date_range      nothing; the match is `date_from`/`date_until` alone, for laws
-                      post-dating a regime change (a decree-law class from 1961-07-15)
+                      post-dating a regime change
       preamble_match  the preamble or enacting-formula text
-      issuer_role     the enacting body's role ("Pope", "Council of Ministers", "OHR")
+      issuer_role     the enacting body's role (for example a head of state or a cabinet)
       gazette_series  the official gazette series the document was published in
-      title_regex     the document title ("Basic Law:", "Motu Proprio")
+      title_regex     the document title (a fixed prefix such as "Regulation:")
     """
 
     model_config = _STRICT
@@ -643,6 +645,9 @@ class AttachmentCaption(BaseModel):
     # True where the caption opens a longer title on the same line ("SCHEDULE of
     # fees…"), so the caption need only begin the line. The line is the heading.
     prefix: bool = False
+    # True where no table in the body carries this caption, so a line that opens
+    # with it always begins the attachment.
+    always_opens: bool = False
 
 
 def heading_line_pattern(pattern: str) -> re.Pattern[str]:
@@ -682,8 +687,15 @@ class SegmentationConfig(BaseModel):
     printed_page_pattern: str | None = None
     # Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.
     skip_heading_patterns: list[str] = Field(default_factory=list)
+    # Whole lines opening a trailing section never ingested: no engine reads from there on.
+    trailing_section_patterns: list[str] = Field(default_factory=list)
 
-    @field_validator("act_heading_patterns", "issue_heading_patterns", "skip_heading_patterns")
+    @field_validator(
+        "act_heading_patterns",
+        "issue_heading_patterns",
+        "skip_heading_patterns",
+        "trailing_section_patterns",
+    )
     @classmethod
     def _headings_compile(cls, value: list[str]) -> list[str]:
         for pattern in value:
@@ -725,6 +737,8 @@ class StructuringConfig(BaseModel):
     # `line_anchored` where the drafting standard puts the marker on its own
     # line and the sources keep it, so a mid-sentence citation cannot anchor.
     marker_boundary: Literal["relaxed", "line_anchored"] = "relaxed"
+    # `number_first` where the number precedes the keyword ("15. §", "I. FEJEZET").
+    marker_order: Literal["keyword_first", "number_first"] = "keyword_first"
     # Words ending the previous line when a citation wraps onto the next, which
     # a boundary rule cannot see. Empty falls back to the script pack's list.
     prose_precursors: list[str] = Field(default_factory=list)
@@ -739,6 +753,9 @@ class StructuringConfig(BaseModel):
     # Words that, following a marker's number on its own line, make the line a
     # citation list rather than a provision ("Article 5 to Article 9 apply").
     citation_successors: list[str] = Field(default_factory=list)
+    # True where the layout engine files footnotes and page-top captions under header
+    # or footer: furniture is then only what repeats, and a block opening on a marker is a note.
+    recurring_furniture: bool = False
 
     @field_validator("insertion_suffixes")
     @classmethod
@@ -752,6 +769,16 @@ class StructuringConfig(BaseModel):
             if not re.fullmatch(r"[a-z]+", form):
                 raise ValueError(f"insertion suffix {word!r} maps to {form!r}, not an eId form")
         return value
+
+    @model_validator(mode="after")
+    def _number_first_drops_keyword_tail_options(self) -> "StructuringConfig":
+        # Each reads what follows the number, where a number-first marker has its keyword.
+        dropped = set(self.marker_tolerances) & {"missing_separator", "split_number"}
+        if self.marker_order == "number_first" and (dropped or self.insertion_suffixes):
+            raise ValueError(
+                "number_first markers take no insertion_suffixes, missing_separator or split_number"
+            )
+        return self
 
     @field_validator("citation_successors", "prose_precursors", "sameline_precursors")
     @classmethod
@@ -862,10 +889,13 @@ SourceAdapterKind = Literal[
     "akn_native",  # Native AKN3 export. legislation.gov.uk, laws.africa.
     "eurlex_cellar",  # EUR-Lex Cellar (AKN4EU).
     "html_portal",  # HTML portal, pages + linked PDFs.
-    "pdf_gazette",  # Date-keyed PDF gazette (qbz.gov.al, JORF).
+    "pdf_gazette",  # PDF gazette (qbz.gov.al, consultoria.gov.do, JORF).
     "paragraf_propisi",  # Paragraf Lex slug-keyed PDFs (rs).
     "sparql",  # SPARQL endpoint (non-Cellar).
     "bulk_xml_archive",  # Bulk XML archives (USLM, Indigo dumps).
+    "gazette_xml",  # Official-gazette XML per item (BOE).
+    "json_portal",  # JSON document API with per-unit sections (OCS, Diário da República).
+    "oecd_compendium",  # Compendium of OECD Legal Instruments (JSON API + HTML bodies).
 ]
 
 
@@ -877,6 +907,9 @@ _ADAPTER_TIER: dict[SourceAdapterKind, Literal[1, 2, 3]] = {
     "html_portal": 2,
     "sparql": 2,
     "bulk_xml_archive": 2,
+    "gazette_xml": 2,
+    "json_portal": 2,
+    "oecd_compendium": 2,
     "paragraf_propisi": 3,
     "pdf_gazette": 3,
 }
@@ -1103,6 +1136,9 @@ class JurisdictionConfig(BaseModel):
     attachments: list[AttachmentCaption] = Field(default_factory=list)
     # Whole-string markers for missing or struck content, beyond the platform default.
     placeholders: list[PlaceholderMarker] = Field(default_factory=list)
+    # `refersTo` values marking a duty on someone other than the instrument's
+    # subjects: units at or under a marked element stay readable but leave the pool.
+    pool_excluded_refers_to: list[str] = Field(default_factory=list)
     # Where one source holds several instruments, how their openings are read.
     segmentation: SegmentationConfig | None = None
     amendments: AmendmentConfig | None = None
@@ -1596,6 +1632,18 @@ def placeholder_statuses_by_code() -> dict[str, tuple[tuple[str, str], ...]]:
 def placeholder_markers_for(work_uri: str | None) -> tuple[str, ...]:
     """The patterns alone, for the row-level exclusion rule."""
     return tuple(pattern for pattern, _ in placeholder_statuses_for(work_uri))
+
+
+def pool_excluded_refers_to_for(work_uri: str | None) -> frozenset[str]:
+    """The jurisdiction's `pool_excluded_refers_to`, keyed by the work URI's country
+    like the placeholder markers so every pass reads the same list."""
+    from codify.akn.frbr import country_of
+
+    country = country_of(work_uri) if work_uri else None
+    config = try_load_config(country) if country else None
+    if config is None:
+        return frozenset()
+    return frozenset(v.strip() for v in config.pool_excluded_refers_to if v.strip())
 
 
 def resolve_frbr_country(jurisdiction_code: str) -> FrbrCountry:

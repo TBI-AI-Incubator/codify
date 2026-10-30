@@ -29,6 +29,8 @@ class ElementBase(BaseModel):
     position: int
     number: str | None = None
     heading: str | None = None
+    # AKN `refersTo` as written: the concepts a publisher or structurer marked it with.
+    refers_to: str | None = None
     text: str = ""
     intro: str = ""
     wrap_up: str = ""

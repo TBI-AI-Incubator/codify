@@ -387,6 +387,11 @@ export interface components {
          *     mandatory companion alike, so legal force is declared per caption.
          */
         AttachmentCaption: {
+            /**
+             * Always Opens
+             * @default false
+             */
+            always_opens: boolean;
             /** Caption */
             caption: string;
             /** Hierarchy */
@@ -407,10 +412,8 @@ export interface components {
         /**
          * BindingRegime
          * @description Non-membership binding regime, treaty frameworks, bilateral regimes,
-         *     constitutional annexes. Used for things like the Dayton Framework (BA),
-         *     the Compact of Free Association (PW/MH), and the Lateran Concordat (VA)
-         *     which are legally binding on a jurisdiction but are not memberships in an
-         *     international organisation.
+         *     constitutional annexes. Used for instruments that are legally binding on a
+         *     jurisdiction but are not memberships in an international organisation.
          */
         BindingRegime: {
             /** Code */
@@ -463,14 +466,13 @@ export interface components {
          *     kind selects which optional fields apply:
          *
          *     - epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,
-         *                     where epoch_year is an integer offset (ROC 1911, Juche 1911,
-         *                     Buddhist -543).
+         *                     where epoch_year is an integer offset (Buddhist Era -543).
          *     - era_table     named era segments with boundaries.
-         *     - hijri_lunar   Islamic Hijri, ~354 days. Needs codify.calendar, not an offset.
-         *     - hijri_solar   Iranian Hijri, Gregorian year length.
+         *     - hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.
+         *     - hijri_solar   Solar calendar, Gregorian year length.
          *     - ethiopian     ~7-8 year offset, 13-month year.
-         *     - buddhist      Thai/Lao, epoch_year -543.
-         *     - bikram_samvat Nepali, 57-year offset, month-sensitive (Chaitra straddles the
+         *     - buddhist      Buddhist Era calendar, epoch_year -543.
+         *     - bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the
          *                     mid-April new year).
          */
         CalendarConversion: {
@@ -527,11 +529,11 @@ export interface components {
          *
          *     signal          what `pattern` is tested against
          *       date_range      nothing; the match is `date_from`/`date_until` alone, for laws
-         *                       post-dating a regime change (a decree-law class from 1961-07-15)
+         *                       post-dating a regime change
          *       preamble_match  the preamble or enacting-formula text
-         *       issuer_role     the enacting body's role ("Pope", "Council of Ministers", "OHR")
+         *       issuer_role     the enacting body's role (for example a head of state or a cabinet)
          *       gazette_series  the official gazette series the document was published in
-         *       title_regex     the document title ("Basic Law:", "Motu Proprio")
+         *       title_regex     the document title (a fixed prefix such as "Regulation:")
          */
         ClassificationRule: {
             /** Date From */
@@ -727,12 +729,12 @@ export interface components {
             /** Heading */
             heading?: string | null;
             /** Intro */
-            intro?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            intro?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Num */
             num?: string | null;
             table?: components["schemas"]["DocumentTable"] | null;
             /** Wrap Up */
-            wrap_up?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            wrap_up?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
         };
         /**
          * DocumentSection
@@ -787,7 +789,7 @@ export interface components {
              */
             colspan: number;
             /** Content */
-            content?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            content?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Header
              * @default false
@@ -973,7 +975,7 @@ export interface components {
                 [key: string]: string;
             } | null;
             /** Marker Form */
-            marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic") | null;
+            marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic" | "upper_roman_title") | null;
             /**
              * Note
              * @default
@@ -1016,6 +1018,22 @@ export interface components {
              */
             url: string;
         };
+        /**
+         * InlineAnchor
+         * @description Running text a citation can name, such as a recital.
+         */
+        InlineAnchor: {
+            /** Children */
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            /** Eid */
+            eid: string;
+            /**
+             * Kind
+             * @default anchor
+             * @constant
+             */
+            kind: "anchor";
+        };
         /** InlineCitation */
         InlineCitation: {
             /** Href */
@@ -1034,7 +1052,7 @@ export interface components {
         /** InlineEmph */
         InlineEmph: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default emph
@@ -1048,7 +1066,7 @@ export interface components {
          */
         InlineMod: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default mod
@@ -1062,7 +1080,7 @@ export interface components {
          */
         InlineNote: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Inferred
              * @default false
@@ -1091,7 +1109,7 @@ export interface components {
         /** InlineStrong */
         InlineStrong: {
             /** Children */
-            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            children?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Kind
              * @default strong
@@ -1220,6 +1238,8 @@ export interface components {
             opening_material_terminators?: string[];
             /** Placeholders */
             placeholders?: components["schemas"]["PlaceholderMarker"][];
+            /** Pool Excluded Refers To */
+            pool_excluded_refers_to?: string[];
             /**
              * Public Reference
              * @default false
@@ -1431,12 +1451,13 @@ export interface components {
          * ResidualLaw
          * @description Another jurisdiction's corpus that is still residually applicable here.
          *
-         *     Used for layered legal systems where pre-independence or foreign law
-         *     continues in force alongside native legislation. Examples:
-         *       - VA: Italian law as suppletive in Vatican City State.
-         *       - SY, IQ, LB: Ottoman Mejelle for general private law.
-         *       - ZA, LS, SZ, NA: Roman-Dutch common law (but usually too embedded
-         *             to carve out as discrete residuals).
+         *     Used for layered legal systems where historical residual law, law inherited
+         *     from a predecessor legal order, or foreign law continues in force alongside
+         *     native legislation. Examples:
+         *       - another jurisdiction's law applied as a suppletive source.
+         *       - a historical codification still applied to general private law.
+         *       - an inherited common law (but usually too embedded to carve out as
+         *             discrete residuals).
          *
          *     `source_jurisdiction` is a Codify code that must resolve to an existing
          *     config. Downstream consolidation/amendment agents can traverse these to
@@ -1557,6 +1578,8 @@ export interface components {
             printed_page_pattern?: string | null;
             /** Skip Heading Patterns */
             skip_heading_patterns?: string[];
+            /** Trailing Section Patterns */
+            trailing_section_patterns?: string[];
         };
         /**
          * SeriesCitation
@@ -1594,7 +1617,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive";
+            kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml" | "json_portal" | "oecd_compendium";
             /** Licence */
             licence?: string | null;
             /** Name */
@@ -1667,6 +1690,12 @@ export interface components {
              * @enum {string}
              */
             marker_boundary: "relaxed" | "line_anchored";
+            /**
+             * Marker Order
+             * @default keyword_first
+             * @enum {string}
+             */
+            marker_order: "keyword_first" | "number_first";
             /** Marker Tolerances */
             marker_tolerances?: ("missing_separator" | "keyword_glyph" | "digit_glyph" | "split_number")[];
             /** Ordinal Words */
@@ -1679,6 +1708,11 @@ export interface components {
             prompt_variant?: string | null;
             /** Prose Precursors */
             prose_precursors?: string[];
+            /**
+             * Recurring Furniture
+             * @default false
+             */
+            recurring_furniture: boolean;
             /** Reference Nouns */
             reference_nouns?: string[];
             /** Sameline Precursors */
@@ -1734,9 +1768,7 @@ export interface components {
          *
          *     Used inside `SupranationalMembership.suspension_periods` to record the
          *     start and (optional) end of a suspension, plus its scope. A list is the
-         *     right shape because several jurisdictions have cycled through multiple
-         *     suspensions (Fiji at the PIF/Commonwealth; Pakistan at the Commonwealth;
-         *     coup states at AU/ECOWAS).
+         *     right shape because a jurisdiction can cycle through multiple suspensions.
          */
         SuspensionPeriod: {
             /**
@@ -1872,7 +1904,7 @@ export interface components {
             /** Amendment Markers */
             amendment_markers?: string[];
             /** Conclusions */
-            conclusions?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            conclusions?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /**
              * Expression Date
              * Format: date
@@ -1890,9 +1922,9 @@ export interface components {
              */
             law_id: string;
             /** Preamble */
-            preamble?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            preamble?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Preface */
-            preface?: (components["schemas"]["InlineText"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
+            preface?: (components["schemas"]["InlineText"] | components["schemas"]["InlineAnchor"] | components["schemas"]["InlineRef"] | components["schemas"]["InlineTerm"] | components["schemas"]["InlineCitation"] | components["schemas"]["InlineEmph"] | components["schemas"]["InlineStrong"] | components["schemas"]["InlineMod"] | components["schemas"]["InlineNote"])[];
             /** Provisions */
             provisions?: components["schemas"]["DocumentProvision"][];
             /** Sections */

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from datetime import date
 from typing import Literal, cast
 
@@ -37,7 +38,6 @@ from codify.akn.vocabulary import (
     PRESENTATION_CONTAINER_NAMES,
     TAG_TO_KIND,
     is_lifted_note,
-    provision_text,
 )
 
 # Map AKN tags to model kinds; preserve the original tag for emission.
@@ -95,6 +95,7 @@ def parse_document(xml: str | bytes, *, huge_tree: bool = False) -> Document:
         work_date=cast("date | None", frbr["work_date"]),
         body=body_elements,
         attachments=_extract_attachments(doc_root),
+        recitals=_extract_recitals(doc_root),
         textual_mods=textual_mods,
         lifecycle_events=lifecycle_events,
     )
@@ -108,6 +109,38 @@ def carried_ids(root: etree._Element) -> set[str]:
     the document can answer for.
     """
     return {value for el in root.iter() for value in (el.get("eId"), el.get("wId")) if value}
+
+
+def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
+    """Each identified `<recital>` under the preamble, as a paragraph carrying its prose."""
+    preamble = _akn_child(doc_root, "preamble")
+    if preamble is None:
+        return []
+    out: list[BodyElement] = []
+    seen: set[str] = set()
+    for el in preamble.iter(f"{{{AKN_NS}}}recital"):
+        eid = el.get("eId", "")
+        if not eid or eid in seen:
+            continue
+        num_el = _akn_child(el, "num")
+        # Copied so that dropping the number leaves the parsed tree untouched.
+        prose = copy.deepcopy(el)
+        for child in list(prose):
+            if isinstance(child.tag, str) and (_local(child) == "num" or is_lifted_note(child)):
+                prose.remove(child)
+        text, _refs = _extract_text_and_refs(prose)
+        seen.add(eid)
+        out.append(
+            Paragraph(
+                akn_eid=eid,
+                akn_wid=(el.get("wId") or "").strip(),
+                akn_type="recital",
+                position=len(out),
+                number=num_el.text if num_el is not None and num_el.text else None,
+                text=text,
+            )
+        )
+    return out
 
 
 def _extract_attachments(doc_root: etree._Element) -> list[BodyElement]:
@@ -282,6 +315,7 @@ def _parse_element(el: etree._Element, position: int) -> ElementBase | None:
         position=position,
         number=num_el.text if num_el is not None and num_el.text else None,
         heading=heading_el.text if heading_el is not None and heading_el.text else None,
+        refers_to=el.get("refersTo") or None,
         text=text,
         intro=intro,
         wrap_up=wrap_up,
@@ -301,7 +335,7 @@ def _extract_plain(el: etree._Element) -> str:
     `intro` and `wrap_up` feed `provisions.text` the same way `text` does, so a
     note folded in here reaches search, the lens and the comparator identically.
     """
-    return provision_text(el)
+    return _extract_text_and_refs(el)[0]
 
 
 def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineReference]]:
@@ -325,8 +359,16 @@ def _extract_text_and_refs(content: etree._Element) -> tuple[str, list[InlineRef
 
     def visit(el: etree._Element) -> None:
         push(None if indentation(el.text) else el.text)
-        for child in el:
+        in_cell = _local(el) in ("td", "th")
+        for index, child in enumerate(el):
+            if not isinstance(child.tag, str):
+                # A comment is not text; the words after it are.
+                push(None if indentation(child.tail) else child.tail)
+                continue
             tag = _local(child)
+            # A table's rows, cells and a cell's paragraphs stay apart in the text.
+            if index and (tag in ("tr", "td", "th") or (in_cell and tag == "p")):
+                push("\n" if tag == "tr" else " ")
             if is_lifted_note(child):
                 # Notes are not provision text or provision references.
                 pass

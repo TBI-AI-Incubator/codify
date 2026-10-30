@@ -1,5 +1,8 @@
 codify.acquisition.adapters
 codify.acquisition.adapters.akn_native:AknNativeAcquirer
+codify.acquisition.adapters.ee.identity:is_constitution
+codify.acquisition.adapters.ee.identity:romanise
+codify.acquisition.adapters.ee.identity:work_uri
 codify.acquisition.adapters.eu.datadump:EuDatadumpAcquirer
 codify.acquisition.adapters.legislation_gov_uk:paths_for_work
 codify.acquisition.base:DiscoveryQuery
@@ -66,6 +69,7 @@ codify.core.tracing:get_telemetry_context
 codify.core.tracing:langfuse_trace_context
 codify.core.tracing:make_request_telemetry
 codify.core.tracing:make_run_telemetry
+codify.core.tracing:record_agent_usage
 codify.core.tracing:set_current_actor
 codify.core.tracing:set_current_session
 codify.core.tracing:trace_url
@@ -143,6 +147,7 @@ codify.pipeline.enrich.ocr:layout_to_json
 codify.pipeline.enrich.ocr:page_verdict
 codify.pipeline.enrich.ocr:render_block
 codify.pipeline.enrich.ocr:resolve_ocr_model
+codify.pipeline.enrich.ocr:unreadable_reason
 codify.pipeline.enrich.placeholder_status:mark_placeholder_status_if_changed
 codify.pipeline.enrich.region_text:combine_text_for_structure
 codify.pipeline.enrich.regions:Region
@@ -168,6 +173,9 @@ codify.pipeline.formats.eu_annex_splice:find_image_markers
 codify.pipeline.formats.eu_annex_splice:splice_transcriptions
 codify.pipeline.formats.eu_directive:configure_cpu_pool
 codify.pipeline.formats.eu_directive:on_the_cpu_pool
+codify.pipeline.formats.riigi_teataja_annexes:AnnexFile
+codify.pipeline.formats.riigi_teataja_annexes:annex_files
+codify.pipeline.formats.riigi_teataja_annexes:fill_annex_text
 codify.pipeline.formats:looks_like_eu
 codify.pipeline.parsers.base:AmendmentAnnotation
 codify.pipeline.parsers:get_parser

@@ -19,6 +19,7 @@ from codify.jurisdictions import JurisdictionConfig
 from codify.pipeline.enrich.anchors import (
     _kind_for_mangled_keyword,
     _kind_from_match,
+    _number_first,
     _quote_mask,
     cached_regex,
     keyword_aliases,
@@ -43,12 +44,19 @@ def _census_aliases(
     return {kind: tuple(dict.fromkeys(terms)) for kind, terms in regrouped.items()}
 
 
-def _keyword_line_re(aliases: tuple[str, ...]) -> re.Pattern[str] | None:
+def _keyword_line_re(
+    aliases: tuple[str, ...], *, number_first: bool = False
+) -> re.Pattern[str] | None:
     """Line-initial keyword plus the rest of its line. Looser than the scan
     regex on purpose: it must find the markers the scan refuses."""
     if not aliases:
         return None
     alts = "|".join(sorted((re.escape(a) for a in aliases), key=len, reverse=True))
+    if number_first:
+        # The group is the number token, playing the tail's part; a lone letter needs its stop.
+        return re.compile(
+            rf"(?m)^[^\S\n]*([^\s.]{{1,12}})(?:\.[^\S\n]*|(?<!\b[A-Za-z])[^\S\n]+)(?:{alts})(?![\w-])"
+        )
     # Allow column gaps so the marker form remains measurable.
     return re.compile(rf"(?m)^[^\S\n]*(?:{alts})([^\n]{{0,40}})")
 
@@ -113,7 +121,7 @@ def container_coverage(
     # line-initial count of them reports a rate above 100%.
     recall: dict[str, list[int]] = {}
     for kind in grouping:
-        line_re = _keyword_line_re(aliases.get(kind, ()))
+        line_re = _keyword_line_re(aliases.get(kind, ()), number_first=_number_first(config))
         if line_re is None:
             continue
         present = 0
@@ -134,7 +142,7 @@ def container_coverage(
     for other, other_aliases in _jurisdiction_grouping_aliases(config).items():
         if other in grouping:
             continue
-        other_re = _keyword_line_re(other_aliases)
+        other_re = _keyword_line_re(other_aliases, number_first=_number_first(config))
         if other_re is None:
             continue
         seen = len(other_re.findall(normalised_text))
@@ -169,6 +177,10 @@ _ORDINAL_TAIL_RE = re.compile(
     r"|ال(?:أول|أولى|ثاني|ثانية|ثالث|ثالثة|رابع|رابعة|خامس|خامسة"
     r"|سادس|سادسة|سابع|سابعة|ثامن|ثامنة|تاسع|تاسعة|عاشر|عاشرة|حادي))"
 )
+
+
+# A number-first heading's leading numeral, Roman included: "I. FEJEZET" cannot be a word.
+_NUMBER_TOKEN_RE = re.compile(r"\d+|[IVXLCDM]+")
 
 
 def container_coverage_probe(
@@ -211,15 +223,26 @@ def container_coverage_probe(
         if a.kind in grouping_aliases and not a.quoted_amendment
     }
 
+    first = _number_first(config)
+    # Number-first, the leading token is the ordinal: a numeral or a declared word.
+    words = (
+        set(config.structuring.ordinal_words) if first and config and config.structuring else set()
+    )
     present = 0
     found = 0
     seen_lines: set[int] = set()
     for alias in grouping_aliases.values():
-        line_re = _keyword_line_re(alias)
+        line_re = _keyword_line_re(alias, number_first=first)
         if line_re is None:
             continue
         for match in line_re.finditer(normalised_text):
-            if not _ORDINAL_TAIL_RE.match(match.group(1)):  # guard 2
+            token = match.group(1)
+            ordinal = (
+                _NUMBER_TOKEN_RE.fullmatch(token) or token in words or token.title() in words
+                if first
+                else _ORDINAL_TAIL_RE.match(token)
+            )
+            if not ordinal:  # guard 2
                 continue
             if quote_mask[match.start()]:  # guard 1: inside a quoted amendment
                 continue

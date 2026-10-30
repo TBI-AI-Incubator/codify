@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from uuid import UUID
 
 from codify.akn.document import Document
 from codify.akn.elements import BodyElement
@@ -29,10 +30,23 @@ def _own_text(el: BodyElement) -> str:
     return "\n".join(p for p in (el.intro, el.text, el.wrap_up) if p).strip()
 
 
-def is_excluded(el: BodyElement, doc: Document) -> bool:
+def marked_ids(doc: Document) -> frozenset[UUID]:
+    """Ids of the units the document marks with a `refersTo` its jurisdiction keeps
+    out of the pool. One walk per document: take it once and pass it on."""
+    from codify.jurisdictions import pool_excluded_refers_to_for
+    from codify.quality.sentinels import marked_scope
+
+    excluded = pool_excluded_refers_to_for(doc.frbr_work_uri)
+    return marked_scope([*doc.body, *doc.attachments], excluded) if excluded else frozenset()
+
+
+def is_excluded(el: BodyElement, doc: Document, marked: frozenset[UUID] | None = None) -> bool:
     """The stored exclusion rule on a unit's own text, as the mapper judges a
     row: a marker child never taints its parent, and a table-shaped child never
-    excludes a substantive one. Empty units stay with the structural rule."""
+    excludes a substantive one. Empty units stay with the structural rule. A marked
+    unit is excluded whole, as its row is; `marked` is `marked_ids(doc)`, taken once."""
+    if el.id in (marked if marked is not None else marked_ids(doc)):
+        return True
     return unit_excluded(el, markers_for(doc))
 
 
@@ -65,26 +79,31 @@ def effective_headings(doc: Document) -> dict[str, str]:
     return out
 
 
-def provision_text(el: BodyElement, markers: tuple[str, ...] | None = None) -> str:
+def provision_text(
+    el: BodyElement,
+    markers: tuple[str, ...] | None = None,
+    marked: frozenset[UUID] = frozenset(),
+) -> str:
     """The unit's text with its non-assessable descendants folded in. With
-    `markers`, descendants the exclusion rule would drop as rows are left out,
-    so the comparator reads the same text the row pool holds."""
+    `markers`, descendants the exclusion rule would drop as rows are left out, and
+    those in `marked` too, so the comparator reads the same text the row pool holds."""
     parts = [p for p in (el.intro, el.text, el.wrap_up) if p]
     # Include non-assessable sub-points, but avoid double-counting assessable
     # paragraph and section children.
     for child in el.children:
         if child.kind not in ASSESSABLE_KINDS:
-            if markers is not None and unit_excluded(child, markers):
+            if child.id in marked or (markers is not None and unit_excluded(child, markers)):
                 continue
-            child_text = provision_text(child, markers)
+            child_text = provision_text(child, markers, marked)
             if child_text:
                 parts.append(child_text)
     return "\n".join(parts).strip()
 
 
-def is_structural(el: BodyElement) -> bool:
-    """Heading-only container, such as ``Section I``; not a target."""
-    return not provision_text(el)
+def is_structural(el: BodyElement, marked: frozenset[UUID] = frozenset()) -> bool:
+    """Heading-only container, such as ``Section I``, or one whose only content is
+    marked out of the pool; not a target."""
+    return not provision_text(el, marked=marked)
 
 
 _ART_RE = re.compile(r"art_([0-9]+[a-z]?)")

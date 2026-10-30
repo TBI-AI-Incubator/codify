@@ -552,6 +552,8 @@ def _run_index_datadump(args: argparse.Namespace) -> int:
 
 def _run_index_ee_archive(args: argparse.Namespace) -> int:
     """Build index of active statutes from Estonian Riigi Teataja bulk XML zip."""
+    from datetime import date
+
     from codify.acquisition.adapters.ee.datadump import build_ee_index
     from codify.acquisition.index import index_path
 
@@ -568,6 +570,8 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
         principal_only=args.principal_only,
         max_files=args.max_files,
         on_progress=None if args.quiet else progress,
+        as_of=date.fromisoformat(args.as_of) if args.as_of else None,
+        keep_ended=args.keep_ended,
     )
     out = Path(args.out or index_path("ee"))
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -580,8 +584,8 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
 def _run_index_legislation_gov_uk(args: argparse.Namespace) -> int:
     """Walk the publisher's feeds for every type token the jurisdiction declares."""
     from codify.acquisition import selected_adapter
-    from codify.acquisition.adapters.legislation_gov_uk import build_index, write_index
-    from codify.acquisition.index import index_path
+    from codify.acquisition.adapters.legislation_gov_uk import build_index
+    from codify.acquisition.index import index_path, write_index
     from codify.acquisition.politeness import make_polite_client
     from codify.frbr import token_family
     from codify.jurisdictions import load_config
@@ -627,6 +631,87 @@ def _run_index_legislation_gov_uk(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+def _run_index_ocs(args: argparse.Namespace) -> int:
+    """Walk the Council of State's public search for every law and its subordinates."""
+    from codify.acquisition.adapters.th.ocs import OcsAcquirer, build_index
+    from codify.acquisition.index import index_path, write_index
+    from codify.jurisdictions import SourceAdapter
+
+    adapter = SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=args.rate)
+    out = Path(args.out or index_path("th"))
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    def progress(page: int, pages: int, laws: int) -> None:
+        print(f"  page {page}/{pages}: {laws} laws", file=sys.stderr)
+
+    # The walk checkpoints beside the index, so a failed rebuild leaves the last good one.
+    partial = out.with_name(f"{out.name}.partial")
+
+    async def run() -> dict[str, Any]:
+        acquirer = OcsAcquirer(adapter)
+        try:
+            return await build_index(
+                acquirer,
+                checkpoint=partial,
+                resume=args.resume,
+                on_progress=None if args.quiet else progress,
+            )
+        finally:
+            await acquirer._client.aclose()
+
+    payload = asyncio.run(run())
+    print(f"{out}: {payload['stats']}", file=sys.stderr)
+    if not payload["complete"]:
+        print(f"short of the catalogue's total; checkpoint kept at {partial}", file=sys.stderr)
+        return 1
+    write_index(out, payload)
+    partial.unlink(missing_ok=True)
+    return 0
+
+
+def _run_crawl_ocs(args: argparse.Namespace) -> int:
+    """Save the raw document of every timeline an OCS index lists, resumably."""
+    from codify.acquisition.adapters.th.ocs import TIMELINE_KINDS, OcsAcquirer, crawl
+    from codify.acquisition.index import index_path
+    from codify.jurisdictions import SourceAdapter
+
+    index = json.loads(Path(args.index or index_path("th")).read_text())
+    if index.get("complete") is not True:
+        print("the index is a checkpoint of a build still running", file=sys.stderr)
+        return 2
+    adapter = SourceAdapter(kind="json_portal", name="ocs", rate_limit_per_minute=args.rate)
+    kinds = frozenset(k.strip() for k in args.kinds.split(",") if k.strip())
+    unknown = sorted(kinds - set(TIMELINE_KINDS.values()))
+    if unknown:
+        print(f"unknown timeline kinds: {', '.join(unknown)}", file=sys.stderr)
+        return 2
+
+    def progress(done: int, total: int, tid: str) -> None:
+        if done % 50 == 0 or done == total:
+            print(f"  {done}/{total}", file=sys.stderr, flush=True)
+
+    async def run() -> dict[str, Any]:
+        acquirer = OcsAcquirer(adapter)
+        try:
+            return await crawl(
+                acquirer,
+                index,
+                Path(args.out),
+                kinds=kinds,
+                on_progress=None if args.quiet else progress,
+            )
+        finally:
+            await acquirer._client.aclose()
+
+    result = asyncio.run(run())
+    print(
+        f"{args.out}: {result['timelines']} timelines, {result['fetched']} fetched, "
+        f"{result['textless']} without text, {len(result['failures'])} failed",
+        file=sys.stderr,
+    )
+    return 1 if result["failures"] else 0
 
 
 def _run_scan_corpus(args: argparse.Namespace) -> int:
@@ -869,6 +954,14 @@ def main(argv: list[str] | None = None) -> int:
         "--principal-only", action="store_true", help="only index principal acts and codes"
     )
     ee_idx.add_argument("--max-files", type=int, default=None, help="stop after N members")
+    ee_idx.add_argument(
+        "--as-of", default=None, help="keep redactions in force on this ISO date (default: today)"
+    )
+    ee_idx.add_argument(
+        "--keep-ended",
+        action="store_true",
+        help="also list redactions ended before the as-of date, under their own section",
+    )
     ee_idx.add_argument("--quiet", action="store_true", help="suppress progress")
     ee_idx.set_defaults(func=_run_index_ee_archive)
 
@@ -892,6 +985,45 @@ def main(argv: list[str] | None = None) -> int:
         help="continue the build at --out (same types and years); otherwise --out is overwritten",
     )
     leg.set_defaults(func=_run_index_legislation_gov_uk)
+
+    ocs = sub.add_parser(
+        "index-ocs",
+        help="enumerate every law and subordinate law the Thai Council of State's search lists",
+    )
+    ocs.add_argument(
+        "--out",
+        default=None,
+        help="index JSON to write (default: <ACQUISITION_INDEX_DIR>/th/index.json)",
+    )
+    ocs.add_argument("--rate", type=int, default=30, help="requests per minute, one at a time")
+    ocs.add_argument("--quiet", action="store_true", help="suppress per-page progress")
+    ocs.add_argument(
+        "--resume", action="store_true", help="continue the build at --out if its total still holds"
+    )
+    ocs.set_defaults(func=_run_index_ocs)
+
+    crawl_ocs = sub.add_parser(
+        "crawl-ocs", help="save the raw document of every timeline an OCS index lists"
+    )
+    crawl_ocs.add_argument(
+        "--out",
+        required=True,
+        help="directory for raw documents; the configured acquirer reads "
+        "<ACQUISITION_INDEX_DIR>/th/raw",
+    )
+    crawl_ocs.add_argument(
+        "--index", default=None, help="index JSON (default: <ACQUISITION_INDEX_DIR>/th/index.json)"
+    )
+    crawl_ocs.add_argument(
+        "--kinds",
+        default="current",
+        help="timeline kinds to follow beyond those listed: original,amending,consolidated,current",
+    )
+    crawl_ocs.add_argument(
+        "--rate", type=int, default=30, help="requests per minute, one at a time"
+    )
+    crawl_ocs.add_argument("--quiet", action="store_true", help="suppress progress")
+    crawl_ocs.set_defaults(func=_run_crawl_ocs)
 
     from codify.cli_store import register as _register_store
 

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
 from types import EllipsisType
 from typing import Any
 
 from lxml import etree
-from sqlalchemy import ARRAY, bindparam, func, or_, select, text
+from pgvector.sqlalchemy import HALFVEC
+from sqlalchemy import ARRAY, TextClause, bindparam, func, or_, select, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,7 +118,9 @@ async def version_lineage(session: AsyncSession, version_id: uuid.UUID) -> list[
         import structlog
 
         structlog.get_logger().warning(
-            "version_lineage_truncated", version_id=str(version_id), cap=_VERSION_LINEAGE_DEPTH
+            "version_lineage_truncated",
+            version_id=str(version_id),
+            cap=_VERSION_LINEAGE_DEPTH,
         )
     return [Version(**dict(r)) for r in rows]
 
@@ -174,16 +178,18 @@ async def list_versions(
 # A requested language is a preference, not a filter: matching on it alone
 # returned nothing for an untranslated law rather than its original text. The
 # membership clause admits both and the DISTINCT ON below chooses.
-def _language_clause(language: str | None, prefix: str = "v.") -> str:
+def _latest_sql(language: str | None, joins: str, wheres: str) -> str:
+    """One version per law: the flagged current original, or with a `language`
+    the latest in it, falling back to the original. The flag is what the
+    language-free ordering below would choose (migration 0024)."""
     if not language:
-        return f"{prefix}parent_version_id IS NULL"
-    return f"({prefix}language = :language OR {prefix}parent_version_id IS NULL)"
-
-
-def _language_preference(language: str | None, prefix: str = "v.") -> str:
-    """DISTINCT ON tie-break: the requested language wins, the original answers
-    when it is absent. Empty when no language was asked for."""
-    return f"({prefix}language = :language) DESC," if language else ""
+        return f"SELECT v.id FROM versions v {joins} WHERE v.is_current {wheres}"  # noqa: S608
+    return f"""
+        SELECT DISTINCT ON (v.law_id) v.id FROM versions v {joins}
+        WHERE (v.language = :language OR v.parent_version_id IS NULL) {wheres}
+        ORDER BY v.law_id, (v.language = :language) DESC, v.expression_date DESC,
+                 v.ingested_at DESC, v.id ASC
+    """  # noqa: S608
 
 
 _VERSIONS_OF_DOCTYPE_SQL = text(
@@ -225,16 +231,11 @@ async def latest_versions_for_jurisdiction(
     doctype_clause = "AND l.doctype = :doctype" if doctype else ""
     result = await session.execute(
         text(
-            f"""
-            SELECT DISTINCT ON (v.law_id) v.id
-            FROM versions v
-            JOIN laws l ON l.id = v.law_id
-            JOIN jurisdictions j ON j.id = l.jurisdiction_id
-            WHERE j.code = :code AND {_language_clause(language)}
-            {doctype_clause}
-            ORDER BY v.law_id, {_language_preference(language)} v.expression_date DESC,
-                     v.ingested_at DESC, v.id ASC
-            """  # noqa: S608
+            _latest_sql(
+                language,
+                "JOIN laws l ON l.id = v.law_id JOIN jurisdictions j ON j.id = l.jurisdiction_id",
+                f"AND j.code = :code {doctype_clause}",
+            )
         ),
         {
             "code": jurisdiction_code,
@@ -245,50 +246,134 @@ async def latest_versions_for_jurisdiction(
     return [row[0] for row in result.all()]
 
 
-# Coverage needs one matching embedding per version, not every embedding in
-# the corpus. The embeddings carry their version and jurisdiction, so the
-# probe is one partition's version index, not a walk through provisions.
+@dataclass(frozen=True)
+class CurrentScope:
+    """Every law's current original version, narrowed by the law's own fields.
+
+    Search joins the `is_current` flag rather than binding the versions as an
+    array: the planner estimates `= ANY(array)` element by element against each
+    partition's statistics, which cost 1.8 s per query over the corpus.
+    `jurisdiction_ids=None` is every jurisdiction; `undated` admits a law
+    with no year into a year range.
+    """
+
+    jurisdiction_ids: tuple[uuid.UUID, ...] | None = None
+    from_year: int | None = None
+    to_year: int | None = None
+    doctype: str | None = None
+    undated: bool = True
+
+    def __bool__(self) -> bool:
+        """False when it names no jurisdiction, so `if not scope` reads as for a list."""
+        return self.jurisdiction_ids != ()
+
+
+VersionScope = Sequence[uuid.UUID] | CurrentScope
+
+
+async def current_scope(
+    session: AsyncSession,
+    *,
+    jurisdictions: Sequence[str] | None = None,
+    from_year: int | None = None,
+    to_year: int | None = None,
+    doctype: str | None = None,
+    undated: bool = True,
+) -> CurrentScope:
+    """A `CurrentScope` over jurisdiction codes; a code with no row matches nothing."""
+    ids = None
+    if jurisdictions is not None:
+        rows = await session.execute(
+            select(Jurisdiction.id).where(Jurisdiction.code.in_(list(jurisdictions)))
+        )
+        ids = tuple(rows.scalars())
+    return CurrentScope(ids, from_year, to_year, doctype, undated)
+
+
+def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[str, Any]]:
+    """(joins, predicate, params) holding `version_col` to the scope.
+
+    An id list binds as one array (`:version_ids`). A `CurrentScope` joins
+    `versions sv` and `laws sl`, so callers must not use those aliases.
+    """
+    if not isinstance(scope, CurrentScope):
+        return "", f"{version_col} = ANY(:version_ids)", {"version_ids": list(scope)}
+    preds = ["sv.is_current"]
+    params: dict[str, Any] = {}
+    if scope.jurisdiction_ids is not None:
+        preds.append("sl.jurisdiction_id = ANY(:scope_jurisdiction_ids)")
+        params["scope_jurisdiction_ids"] = list(scope.jurisdiction_ids)
+    undated = " OR sl.year IS NULL" if scope.undated else ""
+    if scope.from_year is not None:
+        preds.append(f"(sl.year >= :scope_from_year{undated})")
+        params["scope_from_year"] = scope.from_year
+    if scope.to_year is not None:
+        preds.append(f"(sl.year <= :scope_to_year{undated})")
+        params["scope_to_year"] = scope.to_year
+    if scope.doctype:
+        preds.append("sl.doctype = :scope_doctype")
+        params["scope_doctype"] = scope.doctype
+    joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
+    return joins, " AND ".join(preds), params
+
+
+def scoped_text(sql: str, params: dict[str, Any]) -> TextClause:
+    """`text(sql)` with the array and vector parameters `params` carries typed."""
+    types = {"query_vec": HALFVEC(768)}
+    binds = [
+        bindparam(name, type_=types.get(name, ARRAY(PG_UUID(as_uuid=True))))
+        for name in params
+        if name in types or name.endswith("_ids")
+    ]
+    return text(sql).bindparams(*binds)
+
+
+# Coverage reads the stamp `embed_and_stamp` writes, through the primary key.
+# Probing `provision_embeddings` instead joined on a column, so no partition was
+# pruned and every partition's model index was read.
 _COUNT_EMBEDDED_SQL = text(
     """
-    SELECT count(*)
-    FROM (SELECT DISTINCT unnest(:version_ids) AS id) scoped
-    JOIN versions v ON v.id = scoped.id
-    JOIN laws l ON l.id = v.law_id
-    WHERE EXISTS (
-      SELECT 1 FROM provision_embeddings e
-      WHERE e.jurisdiction_id = l.jurisdiction_id
-        AND e.version_id = scoped.id
-        AND (
-          e.model_id = :model_id
-          OR e.model_id = CAST(:fallback_model_id AS text)
-        )
-    )
+    SELECT count(*) FROM versions v
+    WHERE v.id = ANY(:version_ids) AND v.embedded_at IS NOT NULL
     """
 ).bindparams(bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))))
 
 
 async def count_embedded_versions(
     session: AsyncSession,
-    version_ids: Sequence[uuid.UUID],
-    model_id: str,
-    fallback_model_id: str | None = None,
+    version_ids: VersionScope,
 ) -> int:
-    """How many of these versions the dense arm can see. Counted against
-    `provision_embeddings` for the model in use, not `versions.embedded_at`, which
-    records that embedding finished without saying which model produced it. An
-    array parameter, because a corpus-wide IN list exceeds the bind limit.
+    """How many of these versions have finished embedding, each counted once.
+    An array parameter, because a corpus-wide IN list exceeds the bind limit.
+
+    The stamp names no model, so a version embedded only under a model the
+    reader no longer queries still counts. A model switch must re-embed.
     """
-    if not version_ids:
+    if not isinstance(version_ids, CurrentScope):
+        if not version_ids:
+            return 0
+        result = await session.execute(_COUNT_EMBEDDED_SQL, {"version_ids": list(version_ids)})
+        return int(result.scalar_one())
+    return await _count_current(session, version_ids, "AND sv.embedded_at IS NOT NULL")
+
+
+async def count_in_scope(session: AsyncSession, scope: VersionScope) -> int:
+    """How many versions the scope holds: one per law for a `CurrentScope`."""
+    if not isinstance(scope, CurrentScope):
+        return len(scope)
+    return await _count_current(session, scope, "")
+
+
+async def _count_current(session: AsyncSession, scope: CurrentScope, extra: str) -> int:
+    if not scope:
         return 0
-    result = await session.execute(
-        _COUNT_EMBEDDED_SQL,
-        {
-            "version_ids": list(version_ids),
-            "model_id": model_id,
-            "fallback_model_id": fallback_model_id,
-        },
+    # The scope's join puts `versions` under `sv`; the outer row is a law's.
+    joins, pred, params = scope_filter(scope, "v.id")
+    statement = scoped_text(
+        f"SELECT count(*) FROM versions v {joins} WHERE {pred} {extra}",  # noqa: S608
+        params,
     )
-    return int(result.scalar_one())
+    return int((await session.execute(statement, params)).scalar_one())
 
 
 async def latest_versions_global(
@@ -323,17 +408,7 @@ async def latest_versions_global(
         wheres.append("AND l.doctype = :doctype")
         params["doctype"] = doctype
     law_join = "JOIN laws l ON l.id = v.law_id JOIN jurisdictions j ON j.id = l.jurisdiction_id"
-    stmt = text(
-        f"""
-        SELECT DISTINCT ON (v.law_id) v.id
-        FROM versions v
-        {law_join}
-        WHERE {_language_clause(language, prefix="v.")}
-        {" ".join(wheres)}
-        ORDER BY v.law_id, {_language_preference(language)} v.expression_date DESC,
-                 v.ingested_at DESC, v.id ASC
-        """  # noqa: S608
-    )
+    stmt = text(_latest_sql(language, law_join, " ".join(wheres)))
     binds: list[Any] = [
         bindparam(name, expanding=True) for name in ("jurisdictions",) if name in params
     ]
@@ -574,8 +649,12 @@ async def get_version_source_text(session: AsyncSession, version_id: uuid.UUID) 
 
 
 __all__ = [
+    "CurrentScope",
+    "VersionScope",
     "amend_provision",
     "count_embedded_versions",
+    "count_in_scope",
+    "current_scope",
     "count_versions_for_law",
     "get_version",
     "get_version_akn_length",
@@ -588,6 +667,8 @@ __all__ = [
     "list_versions",
     "mark_version_acquis_chapter",
     "mark_version_embedded",
+    "scope_filter",
+    "scoped_text",
     "stale_translation_ids",
     "version_lineage",
 ]

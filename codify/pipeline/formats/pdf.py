@@ -160,6 +160,7 @@ async def ingest(
                 divert_reason=page.divert_reason,
                 finish_reason=page.finish_reason,
                 unreadable=unreadable_reason(page),
+                skipped=page.skipped,
             )
         if on_pages:
             on_pages(pages)
@@ -288,7 +289,9 @@ async def _ingest_pages(
     except Exception as exc:  # noqa: BLE001
         logger.warning("regions_unavailable", error=str(exc))
         regions = {}
-    structure_text = combine_text_for_structure(raw_text, regions, page_spans)
+    structure_text = combine_text_for_structure(
+        raw_text, regions, page_spans, country=jurisdiction_code
+    )
 
     # Stage 3, Structure. Bridge the structurer's callbacks through a queue
     # so the anchor outline streams immediately and each body-fill window

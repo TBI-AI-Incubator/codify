@@ -9,7 +9,9 @@ from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-MediaType = Literal["application/pdf", "application/xml", "text/html", "text/plain"]
+MediaType = Literal[
+    "application/pdf", "application/xml", "application/json", "text/html", "text/plain"
+]
 # "card" is an adapter-fetched wrapper retained for provenance and ranked
 # below "primary" when choosing the persisted source.
 BodyRole = Literal["primary", "alternate", "gazette", "translation", "signature", "card"]

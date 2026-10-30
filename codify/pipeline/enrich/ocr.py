@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import io
+import math
 import re
 import threading
 import unicodedata
@@ -21,6 +22,7 @@ from pypdf import PdfReader, PdfWriter
 from codify.core.llm import LLMClient, VisionText, content_filtered
 from codify.core.tracing import error_fields
 from codify.pipeline.enrich.scripts import ScriptPack
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.quality.legibility import lexicon_rate
 from codify.quality.lexicons import ARABIC_WORDS
 from codify.quality.page_read import BLANK_INK, PageVerdict, divergence, ink_ratio, score_page
@@ -31,6 +33,10 @@ PROMPTS_DIR = Path(__file__).parent / "prompts"
 OCR_SYSTEM_PROMPT = (PROMPTS_DIR / "ocr_system.txt").read_text()
 
 MIN_TEXT_LENGTH = 50
+# Share of a document a trailing section's heading must stand past, clear of its contents.
+TRAILING_SECTION_MIN_FRACTION = 0.25
+# `PageResult.skipped` for a page in that section.
+TRAILING_SECTION = "trailing_section"
 # Sized to Mistral OCR's 40 RPM budget. Bursts fire above steady-state, then
 # LiteLLM's 429 backoff levels flow to the target rate. Sole-tenant on the
 # endpoint means burst budget is ours; lower on shared deployments.
@@ -45,6 +51,12 @@ VISION_RENDER_WINDOW = 8
 # Pillow's bomb guard sits at ~89 Mpx per image. Eight A4 pages at 300dpi is
 # ~70 Mpx and ~1 GB resident.
 MAX_WINDOW_PIXELS = 70_000_000
+# Longest side of a page image sent to the vision model. Gemini shrinks any image
+# to fit 3072 px; 4096 leaves A4 at the default 300 dpi as rendered.
+MAX_VISION_EDGE_PX = 4096
+# A downscaled page goes as JPEG, a few MB where the PNG ran to tens. At 90 small
+# print stays legible.
+VISION_JPEG_QUALITY = 90
 # A page whose /MediaBox is missing: poppler defaults to US Letter.
 LETTER_AREA_SQ_IN = 8.5 * 11.0
 # A guard, not a tuning: no diverted page measured so far carries a text layer
@@ -140,6 +152,34 @@ def furniture_line_patterns(country: str) -> Sequence[str]:
 
     config = try_load_config(country)
     return tuple(config.furniture_line_patterns) if config else ()
+
+
+def trailing_section_patterns(country: str) -> Sequence[str]:
+    """Whole lines opening a trailing section the jurisdiction never ingests, or none."""
+    if not country:
+        return ()
+    from codify.jurisdictions import try_load_config
+
+    config = try_load_config(country)
+    if config is None or config.segmentation is None:
+        return ()
+    return tuple(config.segmentation.trailing_section_patterns)
+
+
+def trailing_section_start(reader: PdfReader, patterns: Sequence[str]) -> int | None:
+    """The first page whose text layer holds a whole line matching one of `patterns`,
+    past page one and `TRAILING_SECTION_MIN_FRACTION` of the document; None if none
+    does. Only the text layer is searched, so a marker on an image page cuts nothing."""
+    if not patterns:
+        return None
+    compiled = [re.compile(p) for p in patterns]
+    total = len(reader.pages)
+    for index in range(math.ceil(total * TRAILING_SECTION_MIN_FRACTION), total):
+        lines = (reader.pages[index].extract_text() or "").splitlines()
+        # A whole line: a contents entry carries a leader or a page number after it.
+        if any(c.fullmatch(line.strip()) for c in compiled for line in lines):
+            return index + 1
+    return None
 
 
 def _strip_furniture_lines(text: str, patterns: Sequence[str]) -> str:
@@ -305,6 +345,8 @@ class PageResult(BaseModel):
     # The vision route's finish reason. A content-filter refusal returns empty
     # text, which without this reads the same as a blank leaf.
     finish_reason: str = ""
+    # Why no engine read this page, which keeps only its text layer; empty when read.
+    skipped: str = ""
 
 
 # The classifier reads `blocks` and `dimensions`; the rest is bulk (`words`
@@ -611,6 +653,44 @@ async def render_block(
     return await asyncio.to_thread(_crop)
 
 
+def cap_vision_image(image_bytes: bytes, max_edge: int = MAX_VISION_EDGE_PX) -> bytes:
+    """The page image, downscaled to `max_edge` on its longest side and re-encoded
+    as JPEG. Bytes within the cap, or that will not decode, come back unchanged.
+
+    Synchronous and seconds long on a plan sheet: callers run it on the CPU pool.
+    """
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
+            # The header gives the size without decoding the page.
+            if max(image.size) <= max_edge:
+                return image_bytes
+            page: Image.Image
+            if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+                # Onto white: dropping alpha makes a transparent black ground opaque.
+                rgba = image.convert("RGBA")
+                page = Image.new("RGB", rgba.size, "white")
+                page.paste(rgba, mask=rgba.getchannel("A"))
+            elif image.mode in ("L", "RGB"):
+                page = image
+            else:
+                # Before the resize: Pillow resizes bilevel and palette images nearest-neighbour.
+                page = image.convert("L" if image.mode == "1" else "RGB")
+            page.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            page.save(buf, format="JPEG", quality=VISION_JPEG_QUALITY)
+    except (OSError, UnidentifiedImageError):
+        return image_bytes
+    return buf.getvalue()
+
+
+def _vision_page(image_bytes: bytes) -> tuple[bytes, float | None]:
+    """The capped image and its ink, in one pool call."""
+    capped = cap_vision_image(image_bytes)
+    return capped, ink_ratio(capped)
+
+
 def _is_ocr_only_model(model: str | None) -> TypeGuard[str]:
     return model is not None and model.startswith(OCR_ONLY_MODEL_PREFIXES)
 
@@ -845,7 +925,70 @@ async def extract_text_from_pdf(
     higher recovering more from faded scans at more pixels and cost.
     ``text_layer_max_divergence`` diverts a born-digital page when its embedded text
     disagrees with the rival read beyond that token-Jaccard threshold.
+    A trailing section the jurisdiction declares is not read: its pages keep their
+    text layer and say why in ``skipped``.
     """
+    patterns = trailing_section_patterns(country)
+    reader = PdfReader(io.BytesIO(pdf_bytes)) if patterns else None
+    cut = trailing_section_start(reader, patterns) if reader is not None else None
+    if reader is None or cut is None:
+        return await _read_pages(
+            pdf_bytes,
+            client,
+            on_progress,
+            title,
+            country,
+            ocr_model,
+            ocr_dpi,
+            text_layer_max_divergence,
+        )
+    total = len(reader.pages)
+    logger.info(
+        "trailing_section_skipped",
+        first_page=cut,
+        last_page=total,
+        pages=total - cut + 1,
+        reason=TRAILING_SECTION,
+    )
+    await _call(on_progress, f"Pages {cut}-{total}: trailing section, not read")
+    head = PdfWriter()
+    for page in reader.pages[: cut - 1]:
+        head.add_page(page)
+    buf = io.BytesIO()
+    head.write(buf)
+    pages = await _read_pages(
+        buf.getvalue(),
+        client,
+        on_progress,
+        title,
+        country,
+        ocr_model,
+        ocr_dpi,
+        text_layer_max_divergence,
+    )
+    furniture = furniture_inline_patterns(country)
+    return pages + [
+        PageResult(
+            furniture=furniture,
+            page_number=n,
+            text=(reader.pages[n - 1].extract_text() or "").strip(),
+            method="text_extraction",
+            skipped=TRAILING_SECTION,
+        )
+        for n in range(cut, total + 1)
+    ]
+
+
+async def _read_pages(
+    pdf_bytes: bytes,
+    client: LLMClient | None,
+    on_progress: Callable[[str], None] | None,
+    title: str,
+    country: str,
+    ocr_model: str | None,
+    ocr_dpi: int,
+    text_layer_max_divergence: float,
+) -> list[PageResult]:
     reader = PdfReader(io.BytesIO(pdf_bytes))
     total_pages = len(reader.pages)
     overlay_pages = {
@@ -1023,6 +1166,9 @@ async def extract_text_from_pdf(
 
         async def ocr_page(page_num: int, image_bytes: bytes | None) -> PageResult:
             async with gate:
+                ink: float | None = None
+                if image_bytes is not None:
+                    image_bytes, ink = await on_the_cpu_pool(_vision_page, image_bytes)
                 anchor = _vision_anchor(
                     divert_reasons.get(page_num, ""), ocr_fallback_text.get(page_num, "")
                 )
@@ -1059,7 +1205,7 @@ async def extract_text_from_pdf(
                     layout=layouts.get(page_num),
                     rival_text=rivals.get(page_num, ""),
                     divergence=divergence(text, rivals.get(page_num, "")),
-                    ink=ink_ratio(image_bytes) if image_bytes is not None else None,
+                    ink=ink,
                     finish_reason=finish_reason,
                 )
 
@@ -1129,6 +1275,8 @@ async def _ocr_page_with_context(
         # `combine_page_texts` drops it and the run reports success, which is
         # the silent loss this module keeps having to relearn.
         raise RuntimeError(f"page {page_number} could not be rendered for OCR")
+    # A no-op past the fan-out, which capped already; this covers the fallbacks above.
+    image_bytes = await on_the_cpu_pool(cap_vision_image, image_bytes)
 
     # Mistral OCR path is handled by the full-PDF fast path in
     # extract_text_from_pdf. This per-page fallback only runs for the chat

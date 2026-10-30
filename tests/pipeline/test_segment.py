@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import codify.jurisdictions as jurisdictions
 from codify.jurisdictions import JurisdictionConfig, load_config
 from codify.pipeline.enrich.ocr import PageSpan
 from codify.pipeline.segment import (
+    _LEADER_RE,
     PAGE_SEPARATOR,
     QUOTE_LOOKAHEAD,
     Issue,
@@ -32,8 +34,9 @@ from tests.config_fixtures import isolated_configs
 # A code no other test configures, so per-country caches cannot carry another shape.
 COUNTRY = "xg"
 CLOSING = "Given under the Seal of the Assembly"
+ACT_HEADING = r"(?P<type>ACT|CODE|CONVENTION) No\. (?P<number>\d+) OF \d{4}"
 SEGMENTATION = {
-    "act_heading_patterns": [r"(?P<type>ACT|CODE|CONVENTION) No\. (?P<number>\d+) OF \d{4}"],
+    "act_heading_patterns": [ACT_HEADING],
     "issue_heading_patterns": [r"ISSUE No\. (?P<number>\d+)"],
     "contents_keywords": ["Contents"],
     "printed_page_pattern": r"^- (\d+) -$",
@@ -227,6 +230,130 @@ def test_a_contents_page_number_that_disagrees_holds_the_region(
     assert result.outcome == "abstained"
     rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 5"]
     assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def _foot_of_page_issue(listed: list[tuple[str, int]]) -> list[list[str]]:
+    """Act 4's heading closes page 2; its formula and sections open page 3."""
+    act = _act(4, "THE PILOTS ACT", 3)
+    return [
+        _contents_page(listed),
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed(), *act[:2]],
+        ["- 3 -", "", *act[2:], *_signed()],
+    ]
+
+
+def test_a_heading_at_a_page_foot_matches_the_next_page_listed(
+    config: JurisdictionConfig,
+) -> None:
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)]
+    text, spans = _join(_foot_of_page_issue(listed))
+    result = segment(text, spans, config=config)
+    assert result.outcome == "decided"
+    assert [(s.key, s.first_page, s.last_page) for s in result.segments] == [
+        ("act 3", 2, 2),
+        ("act 4", 2, 3),
+    ]
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "matched"), ("heading", "matched")]
+    _conserved(result, text)
+
+
+def test_an_act_ending_before_the_listed_page_is_still_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 4 ends on page 2 and act 5 opens page 3, so page 3 holds none of act 4."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3), ("ACT No. 5 OF 2020", 3)]
+    pages = [
+        _contents_page(listed),
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+        + [*_act(4, "THE PILOTS ACT", 1), *_signed()],
+        ["- 3 -", "", *_act(5, "THE BUOYS ACT", 3), *_signed()],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert result.outcome == "abstained"
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def test_a_mention_mid_act_does_not_take_the_next_page_listing(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 3 names act 4 on page 2 and runs onto page 3; act 4 opens mid-page 4."""
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)])
+    first = _act(3, "THE HARBOUR DUES ACT", 4)
+    pages = [
+        contents,
+        ["- 2 -", "", *first[:7], "ACT No. 4 OF 2020 follows below.", "", *first[7:10]],
+        ["- 3 -", "", *first[10:]],
+        ["- 4 -", "", "Section 5. Duty 5", "", *_signed(), *_act(4, "THE PILOTS ACT", 3)],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert all(not s.text.startswith("ACT No. 4 OF 2020 follows") for s in result.segments)
+    assert not any(s.key == "act 4" and s.first_page == 2 for s in result.segments)
+
+
+def test_a_dot_run_without_a_page_number_is_read_in_linear_time(
+    config: JurisdictionConfig,
+) -> None:
+    contents = ["Contents", "", "ACT No. 3 OF 2020 The Act " + "." * 3000, ""]
+    text, spans = _join([contents, ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 2)]])
+    began = time.perf_counter()
+    segment(text, spans, config=config)
+    assert time.perf_counter() - began < 1.0
+    began = time.perf_counter()
+    assert _LEADER_RE.search("x" + "." * 20000 + "x") is None
+    assert time.perf_counter() - began < 0.5
+
+
+def test_a_listed_page_with_only_its_number_is_still_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Page 3 carries only its number; act 4 resumes on page 4."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)]
+    pages = _foot_of_page_issue(listed)
+    pages[2:] = [["- 3 -", ""], ["- 4 -", "", *pages[2][2:]]]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+def test_a_heading_at_a_page_foot_out_of_contents_order_is_a_mismatch(
+    config: JurisdictionConfig,
+) -> None:
+    """Act 5 is listed after act 4 but already stands before it."""
+    listed = [("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3), ("ACT No. 5 OF 2020", 2)]
+    pages = _foot_of_page_issue(listed)
+    pages[1][-2:-2] = [*_act(5, "THE BUOYS ACT", 2), *_signed()]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    assert result.outcome == "abstained"
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+@pytest.mark.parametrize("leader", ["\u2026\u2026.", ".\u2026", "..\u2026"])
+def test_an_entry_takes_its_own_leader_page_not_an_unread_entry_after_it(
+    config: JurisdictionConfig, leader: str
+) -> None:
+    """The notice's entry is no heading, so its page follows act 4's inside one entry."""
+    contents = ["THE ATLANTIS GAZETTE", "ISSUE No. 12", "", "Contents", ""]
+    contents += ["ACT No. 3 OF 2020 The Harbour Dues Act ......... 2"]
+    contents += [f"ACT No. 4 OF 2020 The Pilots Act{leader} 2"]
+    contents += ["9. Notice of the Harbour Board ......... 3", ""]
+    pages = [
+        contents,
+        ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+        + [*_act(4, "THE PILOTS ACT", 3), *_signed()],
+        ["- 3 -", "", "Notice of the Harbour Board", "The harbour closes at dusk."],
+    ]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=config)
+    listed = [(r.key, r.printed_page) for r in result.reconciliation if r.source == "contents"]
+    assert listed == [("act 3", 2), ("act 4", 2)]
+    assert [s.key for s in result.segments] == ["act 3", "act 4"]
 
 
 def test_a_heading_no_signal_agrees_with_is_a_citation(config: JurisdictionConfig) -> None:
@@ -1643,3 +1770,184 @@ def test_an_act_continuing_under_a_repeated_heading_is_held(config: Jurisdiction
     # No act opens before the repeat, so the contents page holds with page 2.
     assert [(h.first_page, h.last_page) for h in result.held] == [(1, 2), (3, 3)]
     assert all("and its repeat on PDF page 3" in h.reason for h in result.held)
+
+
+# Headings of regions kept apart: a notices section, and a second text of each act.
+KEPT_APART = [r"(?P<section>NOTICES)[ \t]*$", r"(?P<section>PARALLEL TEXT)[ \t]*$"]
+# A prefix heading, so a contents line carrying leaders and a page is an entry.
+NOTICES_HEADING = r"(?P<section>NOTICES)\b"
+
+
+def _kept_config(act_heading: str = ACT_HEADING, **overrides: object) -> dict[str, object]:
+    segmentation = {
+        **SEGMENTATION,
+        "act_heading_patterns": [act_heading, NOTICES_HEADING, *KEPT_APART],
+        "skip_heading_patterns": KEPT_APART,
+    }
+    return _config(segmentation=segmentation, **overrides)
+
+
+@pytest.fixture
+def kept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[JurisdictionConfig]:
+    with isolated_configs(monkeypatch, tmp_path / "jurisdictions", {COUNTRY: _kept_config()}):
+        yield load_config(COUNTRY)
+
+
+def _parallel(*extra: str) -> list[str]:
+    """An act's second text: no provisions, no closing phrase, no enacting formula."""
+    return ["PARALLEL TEXT", "The same act in the second text.", *extra, ""]
+
+
+def test_an_unlisted_kept_apart_heading_opens_a_region(kept: JurisdictionConfig) -> None:
+    pages = [*_three_act_issue(), ["- 4 -", "", "NOTICES", "", "A tender is open."]]
+    text, spans = _join(pages)
+    result = segment(text, spans, config=kept)
+    assert result.outcome == "decided"
+    assert [s.key for s in result.segments] == ["act 3", "act 4", "act 5", "notices"]
+    assert result.segments[3].signals == ("closing", "page_start", "skip_heading")
+    _conserved(result, text)
+
+
+def test_a_listed_kept_apart_section_is_no_missing_act(kept: JurisdictionConfig) -> None:
+    pages = _three_act_issue()
+    pages[0] += ["NOTICES ........................ 4", ""]
+    pages.append(["- 4 -", "", "NOTICES", "", "A tender is open."])
+    text, spans = _join(pages)
+    result = segment(text, spans, config=kept)
+    assert result.outcome == "decided"
+    assert [s.key for s in result.segments] == ["act 3", "act 4", "act 5", "notices"]
+    assert all(r.status != "contents_only" for r in result.reconciliation)
+
+
+def test_a_second_text_after_the_signature_is_kept_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second text carries no enacting formula, and is kept apart all the same."""
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 2)])
+    page = ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed(), *_parallel()]
+    page += [*_act(4, "THE PILOTS ACT", 3), *_signed()]
+    fields = _kept_config(enacting_formula_markers=["BE IT ENACTED"])
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([contents, page])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    assert result.outcome == "decided"
+    assert [s.key for s in result.segments] == ["act 3", "paralleltext", "act 4"]
+    assert result.segments[0].text.rstrip().endswith("Speaker of the Assembly")
+    assert result.segments[1].text.startswith("PARALLEL TEXT")
+    assert result.segments[2].text.startswith("ACT No. 4 OF 2020")
+    _conserved(result, text)
+
+
+def test_a_kept_apart_region_on_the_listed_page_is_not_the_act_running_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Act 4 ends on page 2; page 3, where the contents list it, is a second text."""
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 3)])
+    page = ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed()]
+    page += [*_act(4, "THE PILOTS ACT", 1), *_signed()]
+    fields = _kept_config(enacting_formula_markers=["BE IT ENACTED"])
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([contents, page, ["- 3 -", "", *_parallel()]])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    rows = [(r.source, r.status) for r in result.reconciliation if r.key == "act 4"]
+    assert rows == [("contents", "page_mismatch"), ("heading", "page_mismatch")]
+
+
+@pytest.mark.parametrize(
+    "act_heading", [ACT_HEADING, r"ACT No\. (?P<number>\d+) OF (?P<year>\d{4})"]
+)
+def test_the_next_act_after_kept_apart_text_opens_on_its_number(
+    act_heading: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Act 3 is unsigned and too short to restart from: only act 4's number, following
+    act 3's, opens it. A year captured beside the number changes nothing."""
+    act4 = [*_act(4, "THE PILOTS ACT", 2), "ACT No. 5 OF 2020 is repealed.", ""]
+    lines = [*_act(3, "THE HARBOUR DUES ACT", 2), *_parallel(), *act4]
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: _kept_config(act_heading)}):
+        text, spans = _join([lines])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    assert result.outcome == "decided"
+    assert [s.text.split("\n")[0] for s in result.segments] == [
+        "ACT No. 3 OF 2020",
+        "PARALLEL TEXT",
+        "ACT No. 4 OF 2020",
+    ]
+    assert result.segments[2].signals == ("next_number",)
+    # Once act 4 opens, the number after it is no longer read past kept-apart text.
+    act5 = next(r for r in result.reconciliation if r.label.startswith("ACT No. 5"))
+    assert act5.status == "citation"
+    _conserved(result, text)
+
+
+@pytest.mark.parametrize("enacting", [[], ["BE IT ENACTED"]])
+def test_the_next_act_inside_a_quote_from_kept_apart_text_is_held(
+    enacting: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second text opens a quotation that closes after act 4's enacting formula,
+    masking it: the number alone holds act 4, neither kept apart nor an act."""
+    act4 = _act(4, "THE PILOTS ACT", 2)
+    act4[act4.index("BE IT ENACTED by the Assembly:")] = "BE IT ENACTED by the Assembly” thus:"
+    lines = [*_act(3, "THE HARBOUR DUES ACT", 2), *_parallel("It cites “the dues"), *act4]
+    fields = _kept_config(enacting_formula_markers=enacting)
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([lines])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    assert result.outcome == "abstained"
+    assert [s.key for s in result.segments] == ["act 3"]
+    assert len(result.held) == 1 and "'ACT No. 4 OF 2020'" in result.held[0].reason
+    _conserved(result, text)
+
+
+def test_unlisted_acts_between_kept_apart_texts_are_held_not_kept_apart(
+    kept: JurisdictionConfig,
+) -> None:
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 2)])
+    page = ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 2), *_parallel()]
+    page += [*_act(4, "THE PILOTS ACT", 2), *_parallel(), *_act(5, "THE BUOYS ACT", 2)]
+    page += [*_parallel(), *_act(6, "THE BEACONS ACT", 2)]
+    text, spans = _join([contents, page])
+    result = segment(text, spans, config=kept)
+    assert result.outcome == "abstained"
+    assert [s.key for s in result.segments] == ["act 3", "paralleltext", "act 4"]
+    assert ["'ACT No. 5 OF 2020'" in h.reason for h in result.held] == [True, False]
+    assert ["'ACT No. 6 OF 2020'" in h.reason for h in result.held] == [False, True]
+    _conserved(result, text)
+
+
+def test_a_quoted_kept_apart_heading_is_not_a_boundary(kept: JurisdictionConfig) -> None:
+    lines = _act(3, "THE HARBOUR DUES ACT", 3)
+    lines += ["The notice reads: “", "NOTICES", "of the harbour”", "", *_signed()]
+    text, spans = _join([lines])
+    result = segment(text, spans, config=kept)
+    assert result.outcome == "single"
+    assert [r.veto for r in result.reconciliation if r.status == "vetoed"] == ["inside a quotation"]
+
+
+def test_a_kept_apart_heading_above_the_first_act_is_front_matter(
+    kept: JurisdictionConfig,
+) -> None:
+    pages = _three_act_issue()
+    pages[0].insert(1, "NOTICES")
+    text, spans = _join(pages)
+    result = segment(text, spans, config=kept)
+    assert result.outcome == "decided"
+    assert [s.key for s in result.segments] == ["act 3", "act 4", "act 5"]
+    _conserved(result, text)
+
+
+def test_without_kept_apart_patterns_a_second_text_is_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Declared only as an act heading, the second text stays in doubt as before."""
+    segmentation = {**SEGMENTATION, "act_heading_patterns": [ACT_HEADING, *KEPT_APART]}
+    contents = _contents_page([("ACT No. 3 OF 2020", 2), ("ACT No. 4 OF 2020", 2)])
+    page = ["- 2 -", "", *_act(3, "THE HARBOUR DUES ACT", 3), *_signed(), *_parallel()]
+    page += [*_act(4, "THE PILOTS ACT", 3), *_signed()]
+    fields = _config(segmentation=segmentation)
+    with isolated_configs(monkeypatch, tmp_path / "j", {COUNTRY: fields}):
+        text, spans = _join([contents, page])
+        result = segment(text, spans, config=load_config(COUNTRY))
+    assert result.outcome == "abstained"
+    assert [s.key for s in result.segments] == ["act 4"]
+    row = next(r for r in result.reconciliation if r.key == "paralleltext")
+    assert (row.status, row.signals) == ("heading_only", ("closing",))
