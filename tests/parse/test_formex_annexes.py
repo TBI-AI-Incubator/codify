@@ -178,3 +178,14 @@ def test_ingest_marks_an_untranscribed_scan_incomplete(tmp_path) -> None:  # typ
     out = asyncio.run(run())
     assert 'status="incomplete"' in out
     assert "page.tif" in out
+
+
+def test_each_line_of_a_cell_keeps_its_own_paragraph() -> None:
+    """Serialised inline, one line runs into the next: "widgets9999 20 00"."""
+    table = (
+        "<TBL COLS='1'><CORPUS><ROW TYPE='HEADER'><CELL COL='1' TYPE='HEADER'>CN code</CELL></ROW>"
+        "<ROW><CELL COL='1'><P>9999 10 00 – Widgets</P><P>9999 20 00 – Gadgets</P></CELL></ROW>"
+        "</CORPUS></TBL>"
+    )
+    out = formex_to_akn4eu(_with_annex(table))
+    assert "<td><p>9999 10 00 – Widgets</p><p>9999 20 00 – Gadgets</p></td>" in out

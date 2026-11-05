@@ -547,6 +547,10 @@ class GoodsCodeReference(SQLModel, table=True):
     # "ex" before a code restricts it to part of the heading, which changes
     # what the measure covers.
     partial: bool = Field(sa_column=Column(Boolean, nullable=False, server_default="false"))
+    # Listed after "Except": the measure names the code to carve it out (0028).
+    excluded: bool = Field(
+        default=False, sa_column=Column(Boolean, nullable=False, server_default="false")
+    )
     # `column` is a typed table column, `prose` an anchored mention. A mention
     # in a recital is not the same evidence as a listing.
     source: str = Field(sa_column=Column(Text, nullable=False))

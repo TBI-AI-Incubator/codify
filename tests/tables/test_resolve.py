@@ -350,3 +350,12 @@ def test_the_row_eid_helper_refuses_an_id_that_cites_nothing() -> None:
         table_row_eid("", 3)
     with pytest.raises(ValueError):
         table_row_eid("att_1__table_1__tbl", 0)
+
+
+def test_a_cell_of_several_paragraphs_reads_them_apart() -> None:
+    table = _table(
+        _tr("CN code", header=True, index=1)
+        + '<tr eId="t1__tr_2"><td><p>9999 10 00 – Widgets</p><p>9999 20 00 – Gadgets</p></td></tr>'
+    )
+    (row,) = resolve_tables(_doc(table))
+    assert row.cells[0].text == "9999 10 00 – Widgets 9999 20 00 – Gadgets"

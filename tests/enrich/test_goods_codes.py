@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from codify.pipeline.enrich.goods_codes import (
+    cell_codes,
     extract_goods_codes,
     normalise,
     system_for_header,
@@ -118,3 +119,49 @@ def test_a_code_beyond_the_anchor_window_is_not_claimed() -> None:
 def test_the_same_code_in_one_place_is_reported_once() -> None:
     doc = _doc("<p>CN code 84713000, CN code 84713000</p>")
     assert len(extract_goods_codes(doc)) == 1
+
+
+def test_a_cell_of_code_and_description_lines_yields_each_code() -> None:
+    assert [c[0] for c in cell_codes("99991000 – Widgets 99992000 – Gadgets")] == [
+        "99991000",
+        "99992000",
+    ]
+
+
+def test_codes_after_except_are_carved_out() -> None:
+    """A measure naming chapter 99 "except" a heading does not cover that heading."""
+    found = cell_codes("99 – Widgets of all kinds Except: 9901 2 – Spare widgets 9902 – Scrap")
+    assert [(c[0], c[2]) for c in found] == [("99", False), ("99012", True), ("9902", True)]
+    assert found[0][3] == "99 – Widgets of all kinds"
+
+
+def test_lines_run_together_in_stored_text_still_split() -> None:
+    found = cell_codes("99 –WidgetsExcept:9901 2 – Spare widgets99021000 – Scrap")
+    assert [(c[0], c[2]) for c in found] == [("99", False), ("99012", True), ("99021000", True)]
+
+
+def test_other_than_qualifies_a_description_and_carves_nothing_out() -> None:
+    found = cell_codes("99011000 – Widgets, other than blue 99012000 – Blue widgets")
+    assert [c[2] for c in found] == [False, False]
+
+
+@pytest.mark.parametrize("text", ["PM10 – particles", "Carbon dioxide", "Article 5 – scope"])
+def test_a_number_in_words_is_not_a_code(text: str) -> None:
+    assert cell_codes(text) == []
+
+
+def test_a_list_of_codes_yields_each() -> None:
+    assert [c[0] for c in cell_codes("9901, 9902 and 9904")] == ["9901", "9902", "9904"]
+
+
+def test_a_multi_line_cell_under_a_code_header_reaches_extraction() -> None:
+    doc = _doc(
+        '<table eId="t1"><tr eId="t1__tr_1"><th><p>CN code</p></th></tr>'
+        '<tr eId="t1__tr_2"><td><p>99 – Widgets</p><p>Except:</p>'
+        "<p>9901 – Spare widgets</p></td></tr></table>"
+    )
+    codes = extract_goods_codes(doc)
+    assert [(c.code, c.excluded, c.eid) for c in codes] == [
+        ("99", False, "t1__tr_2"),
+        ("9901", True, "t1__tr_2"),
+    ]

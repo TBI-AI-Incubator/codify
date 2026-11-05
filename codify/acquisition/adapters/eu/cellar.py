@@ -10,6 +10,7 @@ from typing import ClassVar, Literal
 import httpx
 import structlog
 
+from codify.acquisition.adapters.eu.datadump import assemble_formex
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
@@ -212,8 +213,9 @@ class EuCellarAcquirer(BaseAcquirer):
                 work_uri, headers={"accept": _XHTML, "accept-language": language}
             )
             media_type = "text/html"
+        annexes: list[bytes] = []
         if doc_resp.status_code == 300:
-            doc_resp = await self._follow_300(
+            doc_resp, annexes = await self._follow_300(
                 doc_resp, accept=_XHTML if media_type == "text/html" else _FORMEX
             )
         doc_resp.raise_for_status()
@@ -224,10 +226,17 @@ class EuCellarAcquirer(BaseAcquirer):
         for k in ("etag", "last-modified"):
             if not doc_resp.headers.get(k) and branch_resp.headers.get(k):
                 merged[k] = branch_resp.headers[k]
+        if annexes and media_type == "application/xml":
+            body = assemble_formex(doc_resp.content, [(a, "") for a in annexes])
+            logger.info("cellar_annexes_assembled", celex=celex, annexes=len(annexes))
+            return body.decode("utf-8"), merged, media_type
         return doc_resp.text, merged, media_type
 
-    async def _follow_300(self, response: httpx.Response, *, accept: str) -> httpx.Response:
-        """Pick the act-body stream from a Cellar 300 Multiple-Choice response.
+    async def _follow_300(
+        self, response: httpx.Response, *, accept: str
+    ) -> tuple[httpx.Response, list[bytes]]:
+        """The act-body stream of a Cellar 300 Multiple-Choice response, and the
+        FORMEX annexes published beside it, in stream order.
 
         Cellar publishes each act as a numbered set of streams `DOC_1 / DOC_2
         / ... / DOC_N`. The convention is:
@@ -235,9 +244,8 @@ class EuCellarAcquirer(BaseAcquirer):
           - `DOC_2` is the act body (`<ACT>` root, the legislative content)
           - `DOC_3..N` are annexes (`<ANNEX>` root)
 
-        Strategy: probe each stream in the format asked for, pick the first one
-        that looks like an act (a FORMEX act root, or an HTML document when XHTML
-        was asked for). Fall back to the largest stream.
+        Every stream is probed in the format asked for: stopping at the act would
+        drop the annexes after it. Falls back to the largest stream.
         """
         items = _parse_300_choices(response.text)
         await response.aclose()
@@ -246,6 +254,8 @@ class EuCellarAcquirer(BaseAcquirer):
 
         want_html = accept.startswith(_XHTML)
         candidates: list[tuple[httpx.Response, str]] = []
+        act: httpx.Response | None = None
+        annexes: list[bytes] = []
         for href, _name in items:
             try:
                 resp = await self._client.get(href, headers={"accept": accept})
@@ -255,23 +265,32 @@ class EuCellarAcquirer(BaseAcquirer):
             head = resp.text[:300]
             if want_html:
                 if re.search(r"<(!doctype\s+)?html", head, re.IGNORECASE):
-                    return resp
+                    for other, _ in candidates:
+                        await other.aclose()
+                    return resp, []
                 candidates.append((resp, "html?"))
                 continue
             m = re.search(r"<([A-Z][A-Z0-9._]*)", head.split(">", 1)[1] if ">" in head else head)
             root_name = m.group(1) if m else ""
-            if root_name in _ACT_ROOTS:
-                # First act-rooted stream wins.
-                return resp
-            candidates.append((resp, root_name))
+            if root_name in _ACT_ROOTS and act is None:
+                act = resp
+            elif root_name == "ANNEX":
+                annexes.append(resp.content)
+                await resp.aclose()
+            else:
+                candidates.append((resp, root_name))
 
+        if act is not None:
+            for other, _ in candidates:
+                await other.aclose()
+            return act, annexes
         # Nothing looked like an act body: return the largest stream, close the rest.
         if not candidates:
             raise RuntimeError("no usable streams in 300 Multiple-Choice response")
         candidates.sort(key=lambda r: len(r[0].text), reverse=True)
         for resp, _ in candidates[1:]:
             await resp.aclose()
-        return candidates[0][0]
+        return candidates[0][0], annexes
 
 
 def _media_type_of(response: httpx.Response) -> Literal["application/xml", "text/html"]:

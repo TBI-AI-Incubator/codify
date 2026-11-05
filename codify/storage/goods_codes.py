@@ -4,14 +4,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
+from typing import NamedTuple
 
 import structlog
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import col
 
 from codify.pipeline.enrich.goods_codes import GoodsCode, extract_goods_codes
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
-from codify.storage.models import GoodsCodeReference, Law, Version
+from codify.storage.models import GoodsCodeReference, Jurisdiction, Law, Version
 
 logger = structlog.get_logger()
 
@@ -52,6 +55,7 @@ async def index_version_goods_codes(
                 code=code.code,
                 surface=code.surface,
                 partial=code.partial,
+                excluded=code.excluded,
                 source=code.source,
                 lineage=list(code.lineage),
             )
@@ -59,18 +63,50 @@ async def index_version_goods_codes(
     return len(codes)
 
 
+class GoodsCodeMatch(NamedTuple):
+    """One stated code that answers a lookup, with the law it sits in."""
+
+    version_id: uuid.UUID
+    expression_uri: str
+    akn_eid: str
+    code: str
+    surface: str
+    partial: bool
+    lineage: list[str]
+    excluded: bool
+    system: str
+    source: str
+    law_id: uuid.UUID
+    frbr_work_uri: str
+    law_title: str
+    jurisdiction_code: str
+
+
 async def find_versions_by_goods_code(
     session: AsyncSession,
     code: str,
     *,
     include_narrower: bool = True,
+    include_broader: bool = True,
+    jurisdiction_codes: Sequence[str] | None = None,
+    current_only: bool = True,
     limit: int = 200,
-) -> list[tuple[uuid.UUID, str, str, str, str, bool, list[str]]]:
-    """Versions stating `code`: (version_id, uri, eid, code, surface, partial,
-    lineage). `include_narrower` reaches the subheadings that carry the measure."""
+    offset: int = 0,
+) -> list[GoodsCodeMatch]:
+    """Stated codes that answer `code`. Narrower reaches the subheadings that
+    carry a measure; broader reaches the heading or chapter a measure names
+    whole (a list naming chapter 72, not 7208). `excluded` rows say a measure
+    carves the code out, so a caller reads them as "not covered"."""
     digits = "".join(ch for ch in code if ch.isdigit())
     if not digits:
         return []
+    stated = col(GoodsCodeReference.code)
+    match: ColumnElement[bool] = stated == digits
+    if include_narrower:
+        match = or_(match, stated.startswith(digits))
+    if include_broader:
+        # The prefixes of the question, so the btree serves it.
+        match = or_(match, stated.in_([digits[:n] for n in range(2, len(digits))]))
     statement = (
         select(
             Version.id,
@@ -80,16 +116,47 @@ async def find_versions_by_goods_code(
             GoodsCodeReference.surface,
             GoodsCodeReference.partial,
             GoodsCodeReference.lineage,
+            GoodsCodeReference.excluded,
+            GoodsCodeReference.system,
+            GoodsCodeReference.source,
+            Law.id,
+            Law.frbr_work_uri,
+            Law.title,
+            Jurisdiction.code,
         )
         .join(GoodsCodeReference, GoodsCodeReference.version_id == Version.id)
+        .join(Law, Law.id == Version.law_id)
+        .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
+        .where(match)
+        .order_by(Law.frbr_work_uri, GoodsCodeReference.created_at, GoodsCodeReference.id)
         .limit(limit)
+        .offset(offset)
     )
-    if include_narrower:
-        statement = statement.where(GoodsCodeReference.code.startswith(digits))
-    else:
-        statement = statement.where(GoodsCodeReference.code == digits)
+    if jurisdiction_codes is not None:
+        statement = statement.where(Jurisdiction.code.in_(list(jurisdiction_codes)))
+    if current_only:
+        # `is_current` is kept by trigger and deliberately unmapped.
+        statement = statement.where(literal_column("versions.is_current"))
     rows = (await session.execute(statement)).all()
-    return [(r[0], r[1], r[2], r[3], r[4], r[5], list(r[6] or [])) for r in rows]
+    return [
+        GoodsCodeMatch(
+            version_id=r[0],
+            expression_uri=r[1],
+            akn_eid=r[2],
+            code=r[3],
+            surface=r[4],
+            partial=r[5],
+            lineage=list(r[6] or []),
+            excluded=r[7],
+            system=r[8],
+            source=r[9],
+            law_id=r[10],
+            frbr_work_uri=r[11],
+            law_title=r[12],
+            jurisdiction_code=r[13],
+        )
+        for r in rows
+    ]
 
 
 async def goods_codes_for_version(
@@ -127,6 +194,7 @@ async def count_goods_codes_for_law(session: AsyncSession, law_id: uuid.UUID) ->
 
 __all__ = [
     "count_goods_codes_for_law",
+    "GoodsCodeMatch",
     "find_versions_by_goods_code",
     "goods_codes_for_version",
     "index_version_goods_codes",

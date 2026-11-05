@@ -1436,7 +1436,14 @@ def _emit_table(
                 colspan=cell.get("COLSPAN"),
                 rowspan=cell.get("ROWSPAN"),
             )
-            _serialize_inline(cell, _akn(td, "p"))
+            paragraphs = [c for c in cell if isinstance(c.tag, str)]
+            loose = (cell.text or "").strip() or any((c.tail or "").strip() for c in paragraphs)
+            if len(paragraphs) > 1 and not loose and all(_localname(c) == "P" for c in paragraphs):
+                # One <p> per line: inline, "Ferro-silicon" runs into "72023000".
+                for paragraph in paragraphs:
+                    _serialize_inline(paragraph, _akn(td, "p"))
+            else:
+                _serialize_inline(cell, _akn(td, "p"))
             span = cell.get("COLSPAN")
             expected += int(span) if span and span.isdigit() else 1
     if provenance is not None and len(rows) >= _LARGE_TABLE_ROWS:

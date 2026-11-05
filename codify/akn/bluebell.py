@@ -126,6 +126,20 @@ def _direct_child_text(el: etree._Element, name: str) -> str:
     return _inline_text(c)
 
 
+def _annex_title(doc_el: etree._Element | None) -> str:
+    """An EU annex's number and heading, which sit in its preface, not on the attachment."""
+    preface = _direct_child(doc_el, "preface") if doc_el is not None else None
+    if preface is None:
+        return ""
+    parts = [
+        _inline_text(block)
+        for container in preface
+        for block in container
+        if _local(block) == "block" and block.get("name") in ("num", "heading")
+    ]
+    return ": ".join(p for p in parts if p)
+
+
 def _inline_text(el: etree._Element) -> str:
     """Concatenate text content; inline elements (term, ref, …) flatten to
     their textContent. Newlines collapsed so a `<p>` stays a single line."""
@@ -184,15 +198,15 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
         for idx, att in enumerate(attachments, start=1):
             if _local(att) != "attachment":
                 continue
-            heading = _direct_child_text(att, "heading")
+            # Attachments wrap their structural tree in <doc><mainBody>.
+            doc_el = _direct_child(att, "doc")
+            heading = _direct_child_text(att, "heading") or _annex_title(doc_el)
             out.append("")
             header = f"SCHEDULE {idx}"
             if heading:
                 header = f"{header} - {heading}"
             out.append(header)
             out.append("")
-            # Attachments wrap their structural tree in <doc><mainBody>.
-            doc_el = _direct_child(att, "doc")
             inner_body = None
             if doc_el is not None:
                 inner_body = _direct_child(doc_el, "mainBody")
@@ -210,6 +224,11 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
                         if text:
                             out.append(f"  {text}")
                             out.append("")
+                    elif cname == "table":
+                        _emit_table(child, depth=1, out=out)
+                    elif cname in _TRANSPARENT_CONTAINERS:
+                        # EU annexes are hcontainers, which `_emit_block` drops.
+                        _emit_text_run(child, depth=1, out=out)
                     else:
                         _emit_block(child, depth=1, out=out)
 

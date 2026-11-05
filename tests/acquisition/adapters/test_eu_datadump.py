@@ -17,7 +17,7 @@ from codify.acquisition.adapters.eu.datadump import (
     DatadumpIndexMissing,
     EuDatadumpAcquirer,
     ManifestMissing,
-    _assemble,
+    assemble_formex,
 )
 from codify.jurisdictions import SourceAdapter
 
@@ -438,7 +438,7 @@ def test_a_count_arising_in_an_annex_reaches_the_caller() -> None:
     """Every other count assertion passes no annexes, so an annex accumulator that
     went nowhere would still leave them green and a lost annex read as a clean act."""
     counts: Counter[str] = Counter()
-    _assemble(
+    assemble_formex(
         b"<ACT><TITLE>t</TITLE></ACT>",
         [(_ANNEX_WITH_REF, "u/annex.xml")],
         lambda _ref, _near: None,
@@ -491,7 +491,7 @@ async def test_a_damaged_member_costs_its_reference_and_not_the_act(tmp_path: Pa
         raise zlib.error("invalid distance too far back")
 
     counts: Counter[str] = Counter()
-    out = _assemble(_ANNEX_WITH_REF, [], _explode, include_counts=counts).decode()
+    out = assemble_formex(_ANNEX_WITH_REF, [], _explode, include_counts=counts).decode()
     assert "INCL.ELEMENT" in out
     assert counts["unresolved"] == 1
 
@@ -501,7 +501,7 @@ def test_a_nested_root_holding_only_a_comment_leaves_the_reference() -> None:
     a comment-only root reads as content and the reference would be dropped for
     nothing."""
     counts: Counter[str] = Counter()
-    out = _assemble(
+    out = assemble_formex(
         _ANNEX_WITH_REF,
         [],
         lambda _ref, _near: (b"<DOC><!-- nothing here --><?p i?></DOC>", "u/n.xml"),
@@ -648,7 +648,7 @@ def test_a_cycle_and_a_depth_cut_are_both_counted() -> None:
     """A cut that reports nothing reads as a clean act. Both bounds abandon
     references, so both have to say how many."""
     counts: Counter[str] = Counter()
-    _assemble(
+    assemble_formex(
         _ANNEX_WITH_REF,
         [],
         lambda _ref, _near: (
@@ -660,7 +660,7 @@ def test_a_cycle_and_a_depth_cut_are_both_counted() -> None:
     assert counts["cycle"] == 1
 
     deep: Counter[str] = Counter()
-    _assemble(
+    assemble_formex(
         _ANNEX_WITH_REF,
         [],
         lambda ref, _near: (
@@ -693,10 +693,10 @@ def test_an_act_with_nothing_to_add_is_returned_byte_identical() -> None:
     """The contract a resolver must not break: parsing and re-serialising an
     untouched act changes its bytes for no reason, and the index test that
     compares them is what caught it."""
-    from codify.acquisition.adapters.eu.datadump import _assemble
+    from codify.acquisition.adapters.eu.datadump import assemble_formex
 
     act = b"<ACT><TITLE>unchanged</TITLE></ACT>"
-    assert _assemble(act, [], lambda _ref, _near: (b"<DOC/>", "u/x.xml")) is act
+    assert assemble_formex(act, [], lambda _ref, _near: (b"<DOC/>", "u/x.xml")) is act
 
 
 _ANNEX_WITH_REF = (
@@ -705,7 +705,7 @@ _ANNEX_WITH_REF = (
 
 
 def _inlined(nested: bytes) -> str:
-    return _assemble(_ANNEX_WITH_REF, [], lambda _ref, _near: (nested, "u/n.xml")).decode()
+    return assemble_formex(_ANNEX_WITH_REF, [], lambda _ref, _near: (nested, "u/n.xml")).decode()
 
 
 def test_text_sitting_on_the_nested_root_is_not_dropped() -> None:
@@ -730,10 +730,10 @@ def test_the_outcome_of_every_reference_is_counted() -> None:
     """A resolver failing on everything degrades to the state before this change,
     which is invisible without a count."""
     counts: Counter[str] = Counter()
-    _assemble(_ANNEX_WITH_REF, [], lambda _ref, _near: None, include_counts=counts)
+    assemble_formex(_ANNEX_WITH_REF, [], lambda _ref, _near: None, include_counts=counts)
     assert counts["unresolved"] == 1
     counts.clear()
-    _assemble(
+    assemble_formex(
         _ANNEX_WITH_REF,
         [],
         lambda _ref, _near: (b"<DOC><P>x</P></DOC>", "u/n.xml"),

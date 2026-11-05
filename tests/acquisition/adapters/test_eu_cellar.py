@@ -414,3 +414,40 @@ async def test_a_300_listing_a_formex_notice_and_an_xhtml_body_yields_html() -> 
     assert probes and all(a.startswith("application/xml;type=fmx4") for a in probes)
     assert acquired.primary().media_type == "text/html"
     assert acquired.upstream_metadata["formats"] == {"eng": "html"}
+
+
+async def test_annexes_published_beside_the_act_are_kept_in_its_body() -> None:
+    """DOC_3 and DOC_4 are annexes: the body is the act with both, in stream order."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        if url.endswith("/cellar/celex/31978D0774"):
+            return httpx.Response(200, text=_BRANCH_NOTICE)
+        if url == "https://example.test/cellar/work-1234":
+            listing = "".join(
+                f'<choice href="https://example.test/cellar/work-1234/DOC_{n}" '
+                f'<value rdf:resource="stream_name">DOC_{n}.fmx<endvalue>'
+                for n in (1, 2, 3, 4)
+            )
+            return httpx.Response(300, text=listing)
+        bodies = {
+            "/DOC_1": "<?xml version='1.0'?><DOC><TI>OJ notice</TI></DOC>",
+            "/DOC_2": "<?xml version='1.0'?><ACT><TITLE>act</TITLE></ACT>",
+            "/DOC_3": "<?xml version='1.0'?><ANNEX><TITLE>Annex I</TITLE></ANNEX>",
+            "/DOC_4": "<?xml version='1.0'?><ANNEX><TITLE>Annex II</TITLE></ANNEX>",
+        }
+        for suffix, text in bodies.items():
+            if url.endswith(suffix):
+                return httpx.Response(200, text=text, headers={"content-type": "application/xml"})
+        return httpx.Response(404)
+
+    client, acquirer = _cellar_client(handler)
+    acquired = await acquirer.fetch(_OLD_REF)
+    await client.aclose()
+    body = acquired.primary().content
+    assert acquired.primary().media_type == "application/xml"
+    assert body.count(b"<ANNEX>") == 2
+    assert body.index(b"Annex I<") < body.index(b"Annex II<")
+    assert b"OJ notice" not in body

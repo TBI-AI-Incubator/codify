@@ -241,6 +241,21 @@ class VersionDocument(BaseModel):
     conclusions: list[InlineNode] = Field(default_factory=list)
     sections: list[DocumentSection] = Field(default_factory=list)
     provisions: list[DocumentProvision] = Field(default_factory=list)
+    # Tables no provision carries, in document order: an annex table is held
+    # as rows, not provisions, so the tree above never reaches it.
+    tables: list[DocumentPlacedTable] = Field(default_factory=list)
+
+
+class DocumentPlacedTable(BaseModel):
+    """A table outside every provision, with the eIds it sits under (outermost
+    first) so a reader can place it and a subtree read can keep it."""
+
+    ancestor_eids: list[str] = Field(default_factory=list)
+    heading: str | None = None
+    table: DocumentTable
+
+
+VersionDocument.model_rebuild()
 
 
 # AKN walker.
@@ -1033,10 +1048,37 @@ async def get_version_document(
         conclusions=conclusions_nodes,
         sections=root_sections,
         provisions=root_provisions,
+        tables=_unrowed_tables(root_xml, persisted_eids) if root_xml is not None else [],
     )
 
 
+def _unrowed_tables(
+    root: etree._Element, persisted_eids: frozenset[str]
+) -> list[DocumentPlacedTable]:
+    """Every table no persisted provision encloses: the walker renders the
+    rest inside their provision's blocks."""
+    out: list[DocumentPlacedTable] = []
+    for table in root.iter("{%s}table" % AKN_NS):
+        ancestors = [a for a in reversed(list(table.iterancestors())) if a.get("eId")]
+        if any(a.get("eId") in persisted_eids for a in ancestors):
+            continue
+        wrapper = table.getparent()
+        holder = wrapper.getparent() if wrapper is not None else None
+        heading = _direct_child(holder, "heading") if holder is not None else None
+        out.append(
+            DocumentPlacedTable(
+                ancestor_eids=[a.get("eId", "") for a in ancestors],
+                heading=" ".join("".join(heading.itertext()).split()) or None
+                if heading is not None
+                else None,
+                table=_walk_table(table),
+            )
+        )
+    return out
+
+
 __all__ = [
+    "DocumentPlacedTable",
     "DocumentProvision",
     "DocumentProvisionBlock",
     "DocumentSection",

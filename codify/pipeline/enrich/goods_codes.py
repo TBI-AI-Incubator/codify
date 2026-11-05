@@ -37,6 +37,20 @@ _PROSE_ANCHOR = re.compile(
     re.IGNORECASE,
 )
 _PROSE_CODE = re.compile(r"\b(ex\s+)?(\d{4}(?:[\s.]\d{2}){1,3}|\d{6}|\d{8}|\d{10})\b")
+# A line of a code column: "72 – Iron and steel", "7202 2 – Ferro-silicon",
+# "ex 7208 10 00 – Other". The dash and the word after it are what make the
+# digits a code rather than a quantity. Stored AKN can run one line into the
+# next ("Ferro-silicon72023000 –"), so a letter may precede a code.
+_ENTRY = re.compile(
+    r"(?<!\d)((?<![A-Za-z])ex[\s ]*)?(\d{2}(?:[\s. ]?\d{1,2}){0,4})"
+    r"[\s ]*[–—-](?=[\s ]*[^\W\d_])",
+)
+# Chapter, heading, one-dash subheading, subheading, CN, TARIC.
+_ENTRY_LENGTHS = frozenset({2, 4, 5, 6, 8, 10})
+# "Except:" opens the carve-out. "other than" is left alone: it qualifies a
+# description ("ores, other than roasted pyrites"), not the lines after it.
+_EXCEPT = re.compile(r"(?:\b|(?<=[a-z]))(?:[Ee]xcept|[Ee]xcluding)(?:\s*:|\s+(?=ex\s|\d))")
+_LIST_SPLIT = re.compile(r"\s*(?:[,;]|\band\b)\s*")
 # How far after the anchor a code still belongs to it.
 _PROSE_WINDOW = 120
 # A four-digit code is an HS heading, which CN and TARIC both extend.
@@ -57,6 +71,8 @@ class GoodsCode:
     source: Literal["column", "prose"]
     # Outermost first. Empty for a prose mention, which has no table above it.
     lineage: tuple[str, ...] = ()
+    # Listed after "Except": the measure names it to carve it out.
+    excluded: bool = False
 
 
 def _text(el: etree._Element) -> str:
@@ -95,6 +111,37 @@ def normalise(value: str) -> tuple[str, bool] | None:
     return digits, partial
 
 
+def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
+    """(digits, partial, excluded, surface) for each code a code-column cell
+    states: one bare code, a list of them, or lines of "code – description".
+    A line after "Except" is excluded, since the measure carves it out."""
+    single = normalise(text)
+    if single is not None:
+        return [(single[0], single[1], False, text.strip())]
+    pieces = [p for p in _LIST_SPLIT.split(text) if p.strip()]
+    listed = [normalise(p) for p in pieces]
+    if len(pieces) > 1 and all(listed):
+        return [(c[0], c[1], False, p.strip()) for c, p in zip(listed, pieces) if c]
+    cut = _EXCEPT.search(text)
+    entries = list(_ENTRY.finditer(text))
+    out: list[tuple[str, bool, bool, str]] = []
+    for index, match in enumerate(entries):
+        digits = re.sub(r"\D", "", match.group(2))
+        if len(digits) not in _ENTRY_LENGTHS:
+            continue
+        glued = match.start() > 0 and text[match.start() - 1].isalpha()
+        if glued and len(digits) < 4:
+            # "PM10 – particles": a short number fused to a word is a name, not a chapter.
+            continue
+        end = entries[index + 1].start() if index + 1 < len(entries) else len(text)
+        excluded = cut is not None and match.start() > cut.start()
+        if cut is not None and match.start() < cut.start() < end:
+            end = cut.start()
+        surface = text[match.start() : end].strip().rstrip(";,:").strip()
+        out.append((digits, bool(match.group(1)), excluded, surface))
+    return out
+
+
 def _from_rows(rows: list[ResolvedRow]) -> list[GoodsCode]:
     found: list[GoodsCode] = []
     for row in rows:
@@ -102,21 +149,19 @@ def _from_rows(rows: list[ResolvedRow]) -> list[GoodsCode]:
             system = system_for_header(cell.label)
             if system is None:
                 continue
-            parsed = normalise(cell.text)
-            if parsed is None:
-                continue
-            code, partial = parsed
-            found.append(
-                GoodsCode(
-                    system=system,
-                    code=code,
-                    surface=cell.text,
-                    partial=partial,
-                    eid=row.akn_eid,
-                    source="column",
-                    lineage=row.lineage,
+            for code, partial, excluded, surface in cell_codes(cell.text):
+                found.append(
+                    GoodsCode(
+                        system=system,
+                        code=code,
+                        surface=surface,
+                        partial=partial,
+                        eid=row.akn_eid,
+                        source="column",
+                        lineage=row.lineage,
+                        excluded=excluded,
+                    )
                 )
-            )
     return found
 
 
@@ -171,10 +216,10 @@ def _from_prose(root: etree._Element) -> list[GoodsCode]:
 def extract_goods_codes(akn: str | bytes) -> list[GoodsCode]:
     """Every HS, CN or TARIC code the document states, deduplicated."""
     root = parse_xml(akn)
-    seen: set[tuple[str, str, str, bool]] = set()
+    seen: set[tuple[str, str, str, bool, bool]] = set()
     out: list[GoodsCode] = []
     for code in _from_rows(resolve_tables(akn)) + _from_prose(root):
-        key = (code.system, code.code, code.eid, code.partial)
+        key = (code.system, code.code, code.eid, code.partial, code.excluded)
         if key in seen:
             continue
         seen.add(key)
@@ -182,4 +227,4 @@ def extract_goods_codes(akn: str | bytes) -> list[GoodsCode]:
     return out
 
 
-__all__ = ["GoodsCode", "extract_goods_codes", "normalise", "system_for_header"]
+__all__ = ["GoodsCode", "cell_codes", "extract_goods_codes", "normalise", "system_for_header"]
