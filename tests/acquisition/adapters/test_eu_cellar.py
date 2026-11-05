@@ -436,7 +436,8 @@ async def test_annexes_published_beside_the_act_are_kept_in_its_body() -> None:
             "/DOC_1": "<?xml version='1.0'?><DOC><TI>OJ notice</TI></DOC>",
             "/DOC_2": "<?xml version='1.0'?><ACT><TITLE>act</TITLE></ACT>",
             "/DOC_3": "<?xml version='1.0'?><ANNEX><TITLE>Annex I</TITLE></ANNEX>",
-            "/DOC_4": "<?xml version='1.0'?><ANNEX><TITLE>Annex II</TITLE></ANNEX>",
+            # No declaration: the root is still read as an annex.
+            "/DOC_4": "<ANNEX><TITLE>Annex II</TITLE></ANNEX>",
         }
         for suffix, text in bodies.items():
             if url.endswith(suffix):

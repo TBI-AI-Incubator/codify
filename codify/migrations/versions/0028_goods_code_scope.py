@@ -15,6 +15,19 @@ branch_labels: str | None = None
 depends_on: str | None = None
 
 
+def _digits_check(lengths: str) -> None:
+    op.execute(
+        "ALTER TABLE goods_code_references ADD CONSTRAINT goods_code_references_code_digits "
+        f"CHECK (code ~ '^[0-9]{lengths}$') NOT VALID"
+    )
+    # Commit the brief ACCESS EXCLUSIVE lock before the validation scan.
+    with op.get_context().autocommit_block():
+        op.execute(
+            "ALTER TABLE goods_code_references "
+            "VALIDATE CONSTRAINT goods_code_references_code_digits"
+        )
+
+
 def upgrade() -> None:
     op.execute(
         "ALTER TABLE goods_code_references "
@@ -24,10 +37,7 @@ def upgrade() -> None:
         "ALTER TABLE goods_code_references "
         "DROP CONSTRAINT IF EXISTS goods_code_references_code_digits"
     )
-    op.execute(
-        "ALTER TABLE goods_code_references ADD CONSTRAINT goods_code_references_code_digits "
-        "CHECK (code ~ '^[0-9]{2,10}$')"
-    )
+    _digits_check("{2,10}")
 
 
 def downgrade() -> None:
@@ -37,8 +47,5 @@ def downgrade() -> None:
         "ALTER TABLE goods_code_references "
         "DROP CONSTRAINT IF EXISTS goods_code_references_code_digits"
     )
-    op.execute(
-        "ALTER TABLE goods_code_references ADD CONSTRAINT goods_code_references_code_digits "
-        "CHECK (code ~ '^[0-9]{4,10}$')"
-    )
+    _digits_check("{4,10}")
     op.execute("ALTER TABLE goods_code_references DROP COLUMN IF EXISTS excluded")

@@ -44,7 +44,7 @@ _CODE_SHAPE = r"\d{4}(?:[.\s\u00a0]\d{2}){1,3}|\d{4}[\s\u00a0]\d|\d{10}|\d{8}|\d
 # A code-column line, "72 – Iron and steel": the dash and word make it a code.
 # Stored AKN can run lines together ("Ferro-silicon72023000 –").
 _ENTRY = re.compile(
-    rf"(?<![\d.])((?<![A-Za-z])[Ee]x[\s\u00a0]*)?({_CODE_SHAPE}|\d{{2}})(?![\d.])"
+    rf"(?<![\d.])((?<![A-Za-z])(?i:ex)[\s\u00a0]*)?({_CODE_SHAPE}|\d{{2}})(?![\d.])"
     r"[\s\u00a0]*[\u2013\u2014-](?=[\s\u00a0]*[^\W\d_])"
 )
 # "7208 to 7212 – Flat" has no single code to stand for it, so it yields none.
@@ -56,7 +56,7 @@ _RANGE_REACH = 32
 _ENTRY_LENGTHS = frozenset({2, 4, 5, 6, 8, 10})
 # "Except:" opens a carve-out. "other than" is left alone: it qualifies a
 # description ("ores, other than roasted pyrites"), not the lines after it.
-_EXCEPT = re.compile(r"(?:\b|(?<=[a-z]))(?:[Ee]xcept|[Ee]xcluding)(?:\s*:|\s+(?=ex\s|\d))")
+_EXCEPT = re.compile(r"(?:\b|(?<=[a-z]))(?:except|excluding)(?:\s*:|\s+(?=ex\s|\d))", re.IGNORECASE)
 _LIST_SPLIT = re.compile(r"\s*(?:[,;]|\band\b)\s*")
 # How far after the anchor a code still belongs to it.
 _PROSE_WINDOW = 120

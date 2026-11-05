@@ -229,3 +229,13 @@ def test_a_multi_line_cell_under_a_code_header_reaches_extraction() -> None:
         ("99", False, "t1__tr_2"),
         ("9901", True, "t1__tr_2"),
     ]
+
+
+@pytest.mark.parametrize("marker", ["EXCEPT:", "EXCLUDING"])
+def test_carve_out_markers_match_in_any_case(marker: str) -> None:
+    found = cell_codes(f"99 – Widgets {marker} 9901 – Spare widgets")
+    assert [(c[0], c[2]) for c in found] == [("99", False), ("9901", True)]
+
+
+def test_an_uppercase_ex_marks_an_entry_partial() -> None:
+    assert [(c[0], c[1]) for c in cell_codes("EX 9901 10 00 – Other")] == [("99011000", True)]

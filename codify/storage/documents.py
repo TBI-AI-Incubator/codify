@@ -1049,30 +1049,44 @@ async def get_version_document(
         conclusions=conclusions_nodes,
         sections=root_sections,
         provisions=root_provisions,
-        tables=_unrowed_tables(root_xml, persisted_eids)
+        tables=_unrowed_tables(root_xml, _rendered_tables(root_sections, root_provisions))
         if include_tables and root_xml is not None
         else [],
     )
 
 
-def _unrowed_tables(
-    root: etree._Element, persisted_eids: frozenset[str]
-) -> list[DocumentPlacedTable]:
-    """Every table no persisted provision encloses: the walker renders the
-    rest inside their provision's blocks."""
+def _rendered_tables(
+    sections: list[DocumentSection], provisions: list[DocumentProvision]
+) -> frozenset[str]:
+    """eIds of the tables the provision blocks already carry."""
+    out: set[str] = set()
+
+    def walk(blocks: list[DocumentProvisionBlock]) -> None:
+        for block in blocks:
+            if block.table is not None:
+                out.add(block.table.akn_eid)
+            walk(block.blocks)
+
+    pending = list(sections)
+    for provision in provisions:
+        walk(provision.blocks)
+    while pending:
+        section = pending.pop()
+        for provision in section.provisions:
+            walk(provision.blocks)
+        pending.extend(section.sections)
+    return frozenset(out)
+
+
+def _unrowed_tables(root: etree._Element, rendered: frozenset[str]) -> list[DocumentPlacedTable]:
+    """Every citable table the provision blocks do not already carry."""
     out: list[DocumentPlacedTable] = []
     for table in root.iter("{%s}table" % AKN_NS):
-        if not table.get("eId"):
-            # Uncitable, so not projected; `_walk_table` would refuse it.
+        eid = table.get("eId")
+        # Uncitable tables are not projected; `_walk_table` would refuse one.
+        if not eid or eid in rendered:
             continue
         ancestors = [a for a in reversed(list(table.iterancestors())) if a.get("eId")]
-        # The mapper stores an article's loose content as `<eId>__content`.
-        if any(
-            a.get("eId", "") + suffix in persisted_eids
-            for a in ancestors
-            for suffix in ("", "__content", "__intro")
-        ):
-            continue
         wrapper = table.getparent()
         holder = wrapper.getparent() if wrapper is not None else None
         heading = _direct_child(holder, "heading") if holder is not None else None

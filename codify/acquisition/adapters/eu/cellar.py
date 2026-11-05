@@ -274,7 +274,8 @@ class EuCellarAcquirer(BaseAcquirer):
                     return resp, []
                 candidates.append((resp, "html?"))
                 continue
-            m = re.search(r"<([A-Z][A-Z0-9._]*)", head.split(">", 1)[1] if ">" in head else head)
+            # The first element, past any declaration, comment or doctype.
+            m = re.search(r"<(?![?!/])([A-Z][A-Z0-9._]*)", head)
             root_name = m.group(1) if m else ""
             if root_name in _ACT_ROOTS and act is None:
                 act = resp

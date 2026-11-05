@@ -74,7 +74,7 @@ def _one(url: str, statement: str) -> tuple | None:
 def test_upgrade_admits_a_chapter_and_records_a_carve_out(temp_db: str) -> None:
     _run(temp_db, command.upgrade, _REVISION)
     check = _one(temp_db, _CHECK)
-    assert check is not None and "{2,10}" in check[0]
+    assert check is not None and "{2,10}" in check[0] and "NOT VALID" not in check[0]
     assert _one(temp_db, _COLUMN) == ("false", "NO")
 
 
