@@ -52,6 +52,20 @@ def parse_xml(xml: str | bytes, *, huge_tree: bool = False) -> etree._Element:
     return root
 
 
+def main_body(root: etree._Element) -> etree._Element | None:
+    """The outer document's own `<body>`, or the `<mainBody>` of a `doc` or `statement`,
+    never one inside an attachment."""
+    main = (
+        root
+        if etree.QName(root).localname != "akomaNtoso"
+        else next((c for c in root if isinstance(c.tag, str)), None)
+    )
+    if main is None:
+        return None
+    body: etree._Element | None = main.find("akn:body", NS)
+    return body if body is not None else main.find("akn:mainBody", NS)
+
+
 def akn_schema(strict: bool = False) -> etree.XMLSchema:
     return get_schema(AKN_NS, strict=strict)
 

@@ -87,13 +87,11 @@ _KIND_TO_DOMAIN: dict[str, type[ElementBase]] = {
 def _attachment_is_normative(doc: Document, heading: str | None) -> bool:
     """Whether an attachment carries norm. AKN cannot separate a Penjelasan
     from a Lampiran, so the jurisdiction declares which of its captions do."""
-    from codify.akn.frbr import country_of
-    from codify.jurisdictions import try_load_config
+    from codify.jurisdictions import config_for_work_uri
 
-    country = country_of(doc.frbr_work_uri)
     # Probed, not required: without a config every attachment is normative,
     # which is the same answer the declaration gives for most of them.
-    config = try_load_config(country) if country else None
+    config = config_for_work_uri(doc.frbr_work_uri)
     if config is None or not heading:
         return True
     # Anchored to the head of the heading: a substring match reads "LAMPIRAN II
@@ -162,6 +160,15 @@ def document_to_rows(
         section_pos[section_id] = pos + 1
         return pos
 
+    def _row_refs(element: BodyElement, provision_id: uuid.UUID) -> None:
+        for ref in element.references:
+            if _anchor_to_nothing(ref, known_ids):
+                dropped_anchors.append(str(getattr(ref, "target_eid", "")))
+                continue
+            row = _ref_to_row(ref, source_provision_id=provision_id)
+            if row is not None:
+                cross_refs.append(row)
+
     def _walk(
         element: BodyElement,
         parent_section_id: uuid.UUID | None,
@@ -220,6 +227,9 @@ def document_to_rows(
                         ),
                     )
                 )
+            if element.text.strip():
+                # The container's own text is that row's, and so are its citations.
+                _row_refs(element, provisions[-1].id)
             for child in element.children:
                 _walk(child, parent_section_id=section_row.id, normative=normative)
         elif element.kind in LEAF_KINDS:
@@ -245,13 +255,7 @@ def document_to_rows(
                     **_exclusion(own_text, element.akn_eid, markers, element.id in scoped),
                 )
                 provisions.append(provision_row)
-                for ref in element.references:
-                    if _anchor_to_nothing(ref, known_ids):
-                        dropped_anchors.append(str(getattr(ref, "target_eid", "")))
-                        continue
-                    row = _ref_to_row(ref, source_provision_id=provision_row.id)
-                    if row is not None:
-                        cross_refs.append(row)
+                _row_refs(element, provision_row.id)
             # Nested leaves (point > indent) collapse to siblings in v2 schema.
             for child in element.children:
                 _walk(child, parent_section_id=parent_section_id, normative=normative)

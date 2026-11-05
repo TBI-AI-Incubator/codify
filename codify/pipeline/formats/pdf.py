@@ -107,6 +107,8 @@ async def ingest(
     ocr_model: str | None = None,
     on_pages: Callable[[list[PageResult]], None] | None = None,
     on_scan: Callable[[ScanTrace], None] | None = None,
+    doctype: str | None = None,
+    locality: str | None = None,
 ) -> AsyncIterator[IngestionEvent]:
     """PDF → AKN. Caller supplies an LLMClient; defensive on every stage.
 
@@ -176,6 +178,8 @@ async def ingest(
             on_scan=on_scan,
             langfuse=langfuse,
             root=root,
+            doctype=doctype,
+            locality=locality,
         ):
             yield event
 
@@ -188,6 +192,8 @@ async def ingest_text(
     name: str = "source",
     model: str | None = None,
     on_scan: Callable[[ScanTrace], None] | None = None,
+    doctype: str | None = None,
+    locality: str | None = None,
 ) -> AsyncIterator[IngestionEvent]:
     """Already-extracted text → AKN, on the same stages a PDF runs after OCR.
 
@@ -222,6 +228,8 @@ async def ingest_text(
             on_scan=on_scan,
             langfuse=langfuse,
             root=root,
+            doctype=doctype,
+            locality=locality,
         ):
             yield event
 
@@ -248,6 +256,8 @@ async def _ingest_pages(
     on_scan: Callable[[ScanTrace], None] | None,
     langfuse: Any,
     root: Any,
+    doctype: str | None = None,
+    locality: str | None = None,
 ) -> AsyncIterator[IngestionEvent]:
     """Metadata through typed document: every stage after text extraction."""
     raw_text, page_spans = combine_page_texts_with_spans(pages)
@@ -272,7 +282,9 @@ async def _ingest_pages(
         jurisdiction_code=jurisdiction_code,
         source_bytes=source_bytes,
         fallback_stem=fallback_stem,
+        requested_doctype=doctype,
         classification_text=raw_text,
+        locality=locality,
     )
 
     # Regions gate the structurer: classify the layout blocks now (era vocab needs

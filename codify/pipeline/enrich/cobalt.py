@@ -4,12 +4,26 @@ from datetime import date
 from typing import cast
 
 import structlog
+from cobalt import StructuredDocument
 from cobalt.hierarchical import Act
 from lxml import etree
 
+from codify.akn._schema import parse_xml
 from codify.frbr import UncitableFrbrUri, build_frbr_work_uri
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS
 
 logger = structlog.get_logger()
+
+
+def _cobalt_document(akn_xml: str) -> StructuredDocument:
+    """Cobalt's class for the document's own element, since `Act` refuses a `doc`
+    or `statement`. Empty input stays an `Act`, which the callers guard against."""
+    root = parse_xml(akn_xml) if akn_xml.strip() else None
+    main = next((c for c in root if isinstance(c.tag, str)), None) if root is not None else None
+    name = etree.QName(main).localname if main is not None else "act"
+    return (StructuredDocument.for_document_type(name) if name in OPEN_STRUCTURE_ROOTS else Act)(
+        akn_xml
+    )
 
 
 def set_work_uri(
@@ -42,8 +56,8 @@ def set_work_uri(
             f"set_work_uri: expression {expression_uri!r} is not under work {work_uri!r}"
         )
 
-    before = cast(str, Act(akn_xml).to_xml(encoding="unicode"))
-    act = Act(akn_xml)
+    before = cast(str, _cobalt_document(akn_xml).to_xml(encoding="unicode"))
+    act = _cobalt_document(akn_xml)
     # Every `<identification>`, not just the root's: Cobalt's setter rewrites each
     # component's blocks from the generation-date-and-stale-language source this
     # exists to stop trusting. Correcting only the root left most multi-component
@@ -184,6 +198,7 @@ def enrich_akn(
     publication_date: date | None = None,
     publication_number: str | None = None,
     work_uri: str | None = None,
+    locality: str | None = None,
 ) -> str:
     """Enrich AKN XML with metadata using Cobalt: title, canonical work URI, the expression
     derived from it, and optional publication details. `work_uri` pins the identity, so a
@@ -191,7 +206,7 @@ def enrich_akn(
     `UncitableFrbrUri`, the one exception `run_enrich_passes` propagates rather than
     logging past, which would drop the pin and the title with it.
     """
-    act = Act(akn_xml)
+    act = _cobalt_document(akn_xml)
     act.title = title
 
     # Canonical work URI, doctype-keyed so a VKM never collides with a ligj. A
@@ -204,7 +219,7 @@ def enrich_akn(
         except ValueError as exc:
             raise UncitableFrbrUri(f"stored work URI {work_uri!r} is unusable: {exc}") from exc
     elif number:
-        act.frbr_uri = build_frbr_work_uri(country, doctype, year, number)
+        act.frbr_uri = build_frbr_work_uri(country, doctype, year, number, locality=locality)
 
     if publication_name:
         act.publication_name = publication_name

@@ -1600,10 +1600,16 @@ def placeholder_statuses_for(work_uri: str | None) -> tuple[tuple[str, str], ...
     """`(pattern, status)` for the platform placeholder marker and the jurisdiction's
     own, keyed by the work URI's country like the attachment rule, so ingest and
     every later pass agree. The platform marker stands for untranscribed content."""
+    return _placeholder_entries(config_for_work_uri(work_uri))
+
+
+def config_for_work_uri(work_uri: str | None) -> JurisdictionConfig | None:
+    """The config a work URI's place names; a locality (`/akn/xa-c01/`) reads its
+    country's."""
     from codify.akn.frbr import country_of
 
-    country = country_of(work_uri) if work_uri else None
-    return _placeholder_entries(try_load_config(country) if country else None)
+    place = country_of(work_uri) if work_uri else ""
+    return (try_load_config(place) or try_load_config(place.partition("-")[0])) if place else None
 
 
 def placeholder_statuses_for_code(jurisdiction_code: str) -> tuple[tuple[str, str], ...]:
@@ -1638,10 +1644,7 @@ def placeholder_markers_for(work_uri: str | None) -> tuple[str, ...]:
 def pool_excluded_refers_to_for(work_uri: str | None) -> frozenset[str]:
     """The jurisdiction's `pool_excluded_refers_to`, keyed by the work URI's country
     like the placeholder markers so every pass reads the same list."""
-    from codify.akn.frbr import country_of
-
-    country = country_of(work_uri) if work_uri else None
-    config = try_load_config(country) if country else None
+    config = config_for_work_uri(work_uri)
     if config is None:
         return frozenset()
     return frozenset(v.strip() for v in config.pool_excluded_refers_to if v.strip())
@@ -1682,7 +1685,25 @@ def work_uri_is_homed(work_uri: str, jurisdiction_code: str) -> bool:
     """
     from codify.akn.frbr import country_of
 
-    return country_of(work_uri, default="").strip().lower() == frbr_country(jurisdiction_code)
+    place = country_of(work_uri, default="").strip().lower()
+    country = frbr_country(jurisdiction_code)
+    return place == country or place.startswith(f"{country}-")
+
+
+#: Document elements for instruments other than legislation, which Bluebell
+#: parses from the same text as an act.
+OPEN_STRUCTURE_ROOTS = frozenset({"doc", "statement"})
+
+
+def open_structure_root(jurisdiction_code: str, doctype: str) -> str | None:
+    """`doc` or `statement` when `doctype` is one, or names a class declaring one
+    as its `akn_element`; None for legislation."""
+    if doctype in OPEN_STRUCTURE_ROOTS:
+        return doctype
+    cfg = try_load_config(jurisdiction_code.strip().lower())
+    doc_class = cfg.document_classes.get(doctype) if cfg is not None else None
+    element = doc_class.akn_element if doc_class is not None else None
+    return element if element in OPEN_STRUCTURE_ROOTS else None
 
 
 @lru_cache(maxsize=32)

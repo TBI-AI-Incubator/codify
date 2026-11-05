@@ -34,9 +34,33 @@ Breaks, in that the structurer's output changes for documents it already read:
    type `põhiseadus`, abbreviation `PS` or its exact title, takes
    `/akn/ee/act/1992/pohiseadus`. A title that merely contains `põhiseadus` no
    longer does.
+3. A document class whose `akn_element` is `doc` or `statement` parses to that
+   element, not `act`, and is enriched, read and stored with its `<mainBody>`.
+   Without a `uri_patterns` entry its work URI homes under the element,
+   `/akn/{country}/doc/{class}/{year}/{number}`. One shipped class declared `doc`
+   with no pattern, so its URIs move from `/act/{class}/` to `/doc/{class}/`.
 
 New, additive:
 
+- Guidance and administrative decisions ingest through the text and PDF lanes.
+  `ingest`, `ingest_text` and `resolve_descriptors` take a declared class
+  (`doctype`, `requested_doctype`) and an issuer's `locality`, which
+  `Descriptors.locality` carries to `build_frbr_work_uri(..., locality=)`:
+  `/akn/xa-c01/statement/resolution/2024/4`. A locality is lower-case letters and
+  digits; `work_uri_is_homed`, `config_for_work_uri` and `parse_source_ref` read
+  it as a place in its country. In a `doc` or `statement`, the preamble line an
+  `opening_material_terminators` phrase closes becomes the source's own enacting
+  formula and each line before it a recital (`recitals__rec_N`), so its citations
+  are non-normative rows apart from the operative body. Inline markup reads the
+  whole document; note, aside and attestation lifting, the numbering checks, the
+  repair length guard and `akn_xml_to_bluebell` read its `<mainBody>`
+  (`codify.akn._schema.main_body`). The fictional `xa` declares a `guidance`
+  (`doc`), a `resolution` and a `determination` (both `statement`).
+- A section or article whose text sits in its own `<content>` keeps that text's
+  references, rowed against its `__content` or `__intro` provision on save and by
+  `refresh_references_for_version`, which now reads attachments and recitals too.
+  A recital row keeps its references. A stored law gains these edges on its next
+  write or refresh.
 - Preamble recitals that carry an `eId` become provision rows with `akn_type='recital'`
   and `normative=false`, outside any section. `Document.recitals` holds them, and the
   version document wraps each recital in the preamble in an `anchor` node.

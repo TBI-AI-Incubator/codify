@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from lxml import etree
 
+from codify.akn._schema import main_body
 from codify.akn.vocabulary import provision_text
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap
 
@@ -28,7 +29,7 @@ def furniture_in_body(akn_xml: str, regions: dict[int, list[Region]]) -> dict[st
     counts = {"references": 0, "aside_text": 0}
 
     root = etree.fromstring(akn_xml.encode("utf-8"))
-    body = root.find(".//akn:body", NS)
+    body = main_body(root)
     if body is None:
         return counts
 

@@ -20,7 +20,7 @@ from codify.akn._schema import parse_xml
 from codify.akn.eid import eid_abbrev
 from codify.akn.references import DERIVED_REF_CLASS
 from codify.frbr import default_token, law_number_token, token_country, token_family
-from codify.jurisdictions import load_config, load_short_titles
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config, load_short_titles
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.eid import build_term_map, resolve_informal_reference
 
@@ -107,7 +107,11 @@ async def emit_inline_markup(
     """
     cfg = load_config(country)
     root = parse_xml(akn_xml)
-    body = root.find(".//akn:body", NS)
+    # A `doc` or `statement` is read whole: its recitals cite its legal basis.
+    body = next(
+        (el for tag in OPEN_STRUCTURE_ROOTS if (el := root.find(f"akn:{tag}", NS)) is not None),
+        root.find(".//akn:body", NS),
+    )
     if body is None:
         return akn_xml
 
@@ -234,17 +238,16 @@ def _mark_internal_refs(
         return publisher_key.get((unit, tuple(n.lower() for n in nums)))
 
     def _resolve_in_document(candidate: str, p: etree._Element) -> str | None:
-        """Map a candidate eId to one the document contains, or None: a dangling `<ref>` is
-        worse than plain text. Tries exact, suffix match under the calling element's
-        ancestors, global suffix, then walks the candidate's own path up
-        (``sec_5__subsec_2`` to ``sec_5``) so a sub-reference still links to the nearest
-        real unit.
-        """
-        if candidate in eid_set:
-            return candidate
-        published = _publisher_lookup(candidate)
-        if published is not None:
-            return published
+        """A candidate eId the document holds, or None: a dangling `<ref>` is worse than text.
+        Exact (after the ancestors inside an attachment), suffix under the ancestors, global
+        suffix, then up the candidate's own path (``sec_5__subsec_2`` to ``sec_5``)."""
+
+        def _exact() -> str | None:
+            return candidate if candidate in eid_set else _publisher_lookup(candidate)
+
+        attached = next(p.iterancestors(f"{{{AKN_NS}}}attachment"), None) is not None
+        if not attached and (exact := _exact()) is not None:
+            return exact
         ancestor_eids: list[str] = []
         node = p.getparent()
         while node is not None:
@@ -259,6 +262,8 @@ def _mark_internal_refs(
             for eid in eid_index:
                 if eid.startswith(prefix) and (eid == target or eid.endswith(suffix)):
                     return eid
+        if attached and (exact := _exact()) is not None:
+            return exact
         for eid in eid_index:
             if eid.endswith(suffix):
                 return eid

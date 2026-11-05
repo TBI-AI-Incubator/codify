@@ -85,6 +85,17 @@ fails loudly rather than quietly doing the wrong thing.
 doctype you will pass on the command line. `akn_element` is what it becomes in
 Akoma Ntoso, and it is normally `act` whatever the local name.
 
+Guidance and other non-legislative documents declare `doc`, and a public body's
+decision declares `statement`. Such a class parses to that element and, without a
+`uri_patterns` entry, mints `/akn/{country}/doc/{class}/{year}/{number}` or
+`/akn/{country}/statement/{class}/{year}/{number}`. A decision's resolving phrase
+belongs in `opening_material_terminators`, and the phrase opening its citations
+in `enacting_formula_markers`: the preamble starts at the marker, the terminator
+line becomes its enacting formula, and each line between is a recital. An issuer
+below the country passes `locality` at ingest, which makes the place
+`{country}-{locality}`. Atlantis (`xa`) declares a guidance class and two kinds
+of decision.
+
 **`hierarchy`** is ordered outside in. Each entry needs `local_term`,
 `akn_element` and `level`; `level` is one of `higher`, `basic`, `subdivision`,
 `grouping`, `presentational`, and exactly one entry should be `basic`.

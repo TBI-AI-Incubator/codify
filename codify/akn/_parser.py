@@ -78,7 +78,10 @@ def parse_document(xml: str | bytes, *, huge_tree: bool = False) -> Document:
         raise ValueError("akomaNtoso has no document child")
 
     meta = _akn_child(doc_root, "meta")
+    # A `doc` or `statement` holds `<mainBody>` where legislation holds `<body>`.
     body = _akn_child(doc_root, "body")
+    if body is None:
+        body = _akn_child(doc_root, "mainBody")
     if meta is None or body is None:
         raise ValueError("Document missing <meta> or <body>")
 
@@ -128,7 +131,7 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
         for child in list(prose):
             if isinstance(child.tag, str) and (_local(child) == "num" or is_lifted_note(child)):
                 prose.remove(child)
-        text, _refs = _extract_text_and_refs(prose)
+        text, refs = _extract_text_and_refs(prose)
         seen.add(eid)
         out.append(
             Paragraph(
@@ -138,6 +141,7 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
                 position=len(out),
                 number=num_el.text if num_el is not None and num_el.text else None,
                 text=text,
+                references=refs,
             )
         )
     return out

@@ -8,6 +8,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
+from codify.akn._schema import main_body
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, RegionVocabulary, overlap
 
 logger = structlog.get_logger()
@@ -46,7 +47,7 @@ def emit_authorial_notes(
         return akn_xml
 
     root = etree.fromstring(akn_xml.encode("utf-8"))
-    body = root.find(".//akn:body", NS)
+    body = main_body(root)
     if body is None:
         return akn_xml
 

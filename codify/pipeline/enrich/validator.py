@@ -17,7 +17,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
-from codify.akn._schema import parse_xml
+from codify.akn._schema import main_body, parse_xml
 from codify.akn.vocabulary import (
     QUOTED_AMENDMENT_ANCESTORS,
     count_provisions_by_kind,
@@ -841,7 +841,7 @@ _NUM_RE = re.compile(r"(\d+)")
 
 def _check_section_numbering(root: etree._Element) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    body = root.find(".//akn:body", NS)
+    body = main_body(root)
     if body is None:
         return issues
 
@@ -1057,7 +1057,7 @@ def _check_orphan_articles(root: etree._Element) -> list[dict[str, Any]]:
     sections and 9 chapters), stay ``error``. Fires only when containers and root
     articles coexist, since a document with none legitimately has articles at root.
     """
-    body = next(iter(root.iter(f"{{{AKN_NS}}}body")), None)
+    body = main_body(root)
     if body is None:
         return []
     direct_articles: list[etree._Element] = []

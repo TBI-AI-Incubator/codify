@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from codify.akn.io import parse_akn
+from codify.akn.vocabulary import RECITAL
 from codify.storage.mappers import _ref_to_row
 from codify.storage.models import CrossReference, Jurisdiction, Law, Provision, Version
 from codify.storage.resolve_refs import ResolveStats, resolve_references_for_version
@@ -63,16 +64,16 @@ async def refresh_references_for_version(
 
     # Parent locks conflict with FK checks for new provisions/references;
     # existing reference updates are covered by the subsequent row locks.
-    prov_by_eid: dict[str, uuid.UUID] = dict(
-        (
-            await session.execute(
-                select(Provision.akn_eid, Provision.id)
-                .where(Provision.version_id == version_id)
-                .order_by(Provision.id)
-                .with_for_update()
-            )
-        ).all()
-    )
+    held = (
+        await session.execute(
+            select(Provision.akn_eid, Provision.id, Provision.akn_type)
+            .where(Provision.version_id == version_id)
+            .order_by(Provision.id)
+            .with_for_update()
+        )
+    ).all()
+    prov_by_eid: dict[str, uuid.UUID] = {eid: pid for eid, pid, _ in held}
+    recital_eids = frozenset(eid for eid, _, kind in held if kind == RECITAL)
     existing = (
         (
             await session.execute(
@@ -100,7 +101,9 @@ async def refresh_references_for_version(
     ):
         raise LegacyReferenceEvidenceRequired(version_id)
 
-    rows, unmatched = await _extract_reference_rows(akn_xml, code, doctype, prov_by_eid, client)
+    rows, unmatched = await _extract_reference_rows(
+        akn_xml, code, doctype, prov_by_eid, client, recital_eids=recital_eids
+    )
 
     await session.execute(
         delete(CrossReference).where(
@@ -128,8 +131,11 @@ async def _extract_reference_rows(
     doctype: str,
     prov_by_eid: dict[str, uuid.UUID],
     client: "LLMClient | None" = None,
+    *,
+    recital_eids: frozenset[str] = frozenset(),
 ) -> tuple[list[CrossReference], int]:
-    """Extract candidate rows without changing stored references."""
+    """Extract candidate rows without changing stored references. A recital's citations
+    go only to its own recital row: the mapper skips one whose eId a body row holds."""
     from codify.pipeline.enrich.inline_markup import emit_inline_markup
     from codify.pipeline.enrich.references import emit_references
 
@@ -140,12 +146,21 @@ async def _extract_reference_rows(
     rows: list[CrossReference] = []
     unmatched = 0
 
-    def _walk(el: object) -> None:
+    def _walk(el: object, recital: bool = False) -> None:
         nonlocal unmatched
         eid = getattr(el, "akn_eid", None)
         refs = getattr(el, "references", None) or []
         if refs:
-            pid = prov_by_eid.get(eid or "")
+            # A container's own text is rowed under the mapper's suffixed eId.
+            keys = (eid,) if recital else (eid, f"{eid}__content", f"{eid}__intro")
+            pid = next(
+                (
+                    prov_by_eid[k]
+                    for k in keys
+                    if k in prov_by_eid and (not recital or k in recital_eids)
+                ),
+                None,
+            )
             if pid is None:
                 unmatched += len(refs)
             else:
@@ -156,7 +171,9 @@ async def _extract_reference_rows(
         for child in getattr(el, "children", []) or []:
             _walk(child)
 
-    for top in doc.body:
+    for top in (*doc.body, *doc.attachments):
         _walk(top)
+    for recital in doc.recitals:
+        _walk(recital, recital=True)
 
     return rows, unmatched
