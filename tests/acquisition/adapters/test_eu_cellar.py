@@ -453,8 +453,8 @@ async def test_annexes_published_beside_the_act_are_kept_in_its_body() -> None:
     assert b"OJ notice" not in body
 
 
-def _annex_handler(failures: dict[str, int]):  # type: ignore[no-untyped-def]
-    """The act plus one annex, whose stream fails the given number of times."""
+def _annex_handler(failures: dict[str, int], stream: str = "/DOC_2"):  # type: ignore[no-untyped-def]
+    """The act plus one annex; `stream` fails the given number of times."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
@@ -469,7 +469,7 @@ def _annex_handler(failures: dict[str, int]):  # type: ignore[no-untyped-def]
                 for n in (1, 2)
             )
             return httpx.Response(300, text=listing)
-        if url.endswith("/DOC_2") and failures["left"] > 0:
+        if url.endswith(stream) and failures["left"] > 0:
             failures["left"] -= 1
             return httpx.Response(503)
         bodies = {
@@ -491,8 +491,11 @@ async def test_a_stream_after_the_act_that_fails_once_is_fetched_again() -> None
     assert b"Annex I<" in acquired.primary().content
 
 
-async def test_an_annex_that_cannot_be_fetched_fails_the_act_rather_than_dropping() -> None:
-    client, acquirer = _cellar_client(_annex_handler({"left": 2}))
+@pytest.mark.parametrize("stream", ["/DOC_1", "/DOC_2"])
+async def test_a_stream_that_cannot_be_fetched_fails_the_act_rather_than_dropping(
+    stream: str,
+) -> None:
+    client, acquirer = _cellar_client(_annex_handler({"left": 2}, stream))
     with pytest.raises(httpx.HTTPStatusError):
         await acquirer.fetch(_OLD_REF)
     await client.aclose()

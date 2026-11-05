@@ -266,7 +266,9 @@ def _emit_block(el: etree._Element, *, depth: int, out: list[str]) -> None:
     """
     name = _local(el)
     if name not in _STRUCTURAL_TO_KEYWORD:
-        if name == "p":
+        if name == "crossHeading":
+            _emit_crossheading(el, depth=depth, out=out)
+        elif name == "p":
             # Preserve stray inline content rather than dropping it.
             text = _inline_text(el)
             if text:
@@ -304,12 +306,21 @@ def _emit_block(el: etree._Element, *, depth: int, out: list[str]) -> None:
             _emit_table(child, depth=inner, out=out)
         elif cname in _STRUCTURAL_TO_KEYWORD:
             _emit_block(child, depth=inner, out=out)
+        elif cname == "crossHeading":
+            _emit_crossheading(child, depth=inner, out=out)
         elif cname == "p":
             # Bare <p> directly under the block.
             text = _inline_text(child)
             if text:
                 out.append(f"{inner_indent}{text}")
                 out.append("")
+
+
+def _emit_crossheading(el: etree._Element, *, depth: int, out: list[str]) -> None:
+    text = _inline_text(el)
+    if text:
+        out.append(f"{'  ' * depth}CROSSHEADING {text}")
+        out.append("")
 
 
 def _emit_text_run(container: etree._Element, *, depth: int, out: list[str]) -> None:
@@ -340,6 +351,8 @@ def _emit_text_run(container: etree._Element, *, depth: int, out: list[str]) -> 
             _emit_text_run(child, depth=depth, out=out)
         elif cname in _STRUCTURAL_TO_KEYWORD:
             _emit_block(child, depth=depth, out=out)
+        elif cname == "crossHeading":
+            _emit_crossheading(child, depth=depth, out=out)
         else:
             text = _inline_text(child)
             if text:

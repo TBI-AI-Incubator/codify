@@ -261,10 +261,9 @@ class EuCellarAcquirer(BaseAcquirer):
                 resp = await self._client.get(href, headers={"accept": accept})
                 resp.raise_for_status()
             except Exception as exc:  # noqa: BLE001
-                if act is None or want_html:
-                    continue
-                # Past the act a lost stream may be an annex, and the act would read whole.
-                logger.warning("cellar_annex_stream_retry", href=href, error=type(exc).__name__)
+                # A lost stream may be the act or an annex; either way the body would
+                # read whole without it, so one retry, then the fetch fails.
+                logger.warning("cellar_stream_retry", href=href, error=type(exc).__name__)
                 resp = await self._client.get(href, headers={"accept": accept})
                 resp.raise_for_status()
             head = resp.text[:300]

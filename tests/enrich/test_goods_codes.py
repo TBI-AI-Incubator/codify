@@ -166,17 +166,22 @@ def test_neighbouring_numbers_never_merge_into_one_code(text: str, codes: list[s
     assert [c[0] for c in cell_codes(text)] == codes
 
 
-def test_codes_listed_before_a_description_share_it() -> None:
-    assert [c[0] for c in cell_codes("9901, 9902 – Widgets")] == ["9901", "9902"]
+def test_a_heading_named_in_a_description_is_not_a_listed_code() -> None:
+    found = cell_codes("9908 – Parts of the widgets of headings 9901 to 9905; 9909 – Trucks")
+    assert [c[0] for c in found] == ["9908", "9909"]
 
 
 def test_a_range_yields_no_code_rather_than_its_last_end() -> None:
     assert cell_codes("9901 to 9905 – Widgets") == []
 
 
-@pytest.mark.parametrize("text", ["Ex 9901 10 00 – Other", "Blue widgetsex 9901 10 00 – Other"])
-def test_ex_marks_an_entry_partial(text: str) -> None:
-    assert [(c[0], c[1]) for c in cell_codes(text)] == [("99011000", True)]
+def test_ex_marks_an_entry_partial() -> None:
+    assert [(c[0], c[1]) for c in cell_codes("Ex 9901 10 00 – Other")] == [("99011000", True)]
+
+
+def test_a_word_ending_in_ex_does_not_mark_the_next_code_partial() -> None:
+    found = cell_codes("99011000 – Latex99019000 – Other")
+    assert [(c[0], c[1]) for c in found] == [("99011000", False), ("99019000", False)]
 
 
 def test_a_carve_out_ends_at_a_code_outside_what_it_narrows() -> None:
@@ -187,6 +192,25 @@ def test_a_carve_out_ends_at_a_code_outside_what_it_narrows() -> None:
         ("9902", True),
         ("9801", False),
     ]
+
+
+def test_a_range_after_except_still_opens_the_carve_out() -> None:
+    found = cell_codes("99 – Widgets Except: 9902 to 9904 – Spare 9905 – Scrap")
+    assert [(c[0], c[2]) for c in found] == [("99", False), ("9905", True)]
+
+
+def test_a_carve_out_with_nothing_before_it_ends_at_another_chapter() -> None:
+    found = cell_codes("All of chapter 99, except: 9902 – Spare; 9904 – Waste 9801 – Gadgets")
+    assert [(c[0], c[2]) for c in found] == [("9902", True), ("9904", True), ("9801", False)]
+
+
+def test_a_long_run_together_cell_reads_in_linear_time() -> None:
+    import time
+
+    text = "99 –WidgetsExcept:" + "9901 2 – Spare widgets99021000 – Scrap" * 3000
+    began = time.perf_counter()
+    assert len(cell_codes(text)) == 6001
+    assert time.perf_counter() - began < 2
 
 
 def test_excluding_in_a_description_carves_nothing_out() -> None:

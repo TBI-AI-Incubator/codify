@@ -4,6 +4,7 @@ date. A column is typed by its header, a mention by its phrase; both English."""
 from __future__ import annotations
 
 import re
+from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Literal
 
@@ -43,20 +44,14 @@ _CODE_SHAPE = r"\d{4}(?:[.\s\u00a0]\d{2}){1,3}|\d{4}[\s\u00a0]\d|\d{10}|\d{8}|\d
 # A code-column line, "72 – Iron and steel": the dash and word make it a code.
 # Stored AKN can run lines together ("Ferro-silicon72023000 –").
 _ENTRY = re.compile(
-    rf"(?<![\d.])([Ee]x[\s\u00a0]*)?({_CODE_SHAPE}|\d{{2}})(?![\d.])"
+    rf"(?<![\d.])((?<![A-Za-z])[Ee]x[\s\u00a0]*)?({_CODE_SHAPE}|\d{{2}})(?![\d.])"
     r"[\s\u00a0]*[\u2013\u2014-](?=[\s\u00a0]*[^\W\d_])"
 )
-# Codes listed ahead of an entry share its description: "7208, 7209 – Flat".
-_LISTED = (
-    rf"(?<![\d.])(?:[Ee]x[\s\u00a0]*)?(?:{_CODE_SHAPE})(?![\d.])"
-    r"[\s\u00a0]*(?:[,;]|\band\b|\bor\b)[\s\u00a0]*"
-)
-_LIST_TAIL = re.compile(rf"(?:{_LISTED})+\Z")
-_LISTED_CODE = re.compile(rf"(?<![\d.])([Ee]x[\s\u00a0]*)?({_CODE_SHAPE})(?![\d.])")
-# A range has no single code to stand for it, so its entry is dropped.
+# "7208 to 7212 – Flat" has no single code to stand for it, so it yields none.
 _RANGE_TAIL = re.compile(
     rf"(?<![\d.])(?:{_CODE_SHAPE})[\s\u00a0]*(?:\bto\b|[\u2013\u2014-])[\s\u00a0]*\Z"
 )
+_RANGE_REACH = 32
 # Chapter, heading, one-dash subheading, subheading, CN, TARIC.
 _ENTRY_LENGTHS = frozenset({2, 4, 5, 6, 8, 10})
 # "Except:" opens a carve-out. "other than" is left alone: it qualifies a
@@ -134,7 +129,9 @@ def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
     listed = [normalise(p) for p in pieces]
     if len(pieces) > 1 and all(listed):
         return [(c[0], c[1], False, p.strip()) for c, p in zip(listed, pieces) if c]
-    entries: list[tuple[int, re.Match[str], list[tuple[str, bool]]]] = []
+    # (start, digits, partial); digits is None for a range, which still bounds lines.
+    entries: list[tuple[int, str | None, bool]] = []
+    previous_end = 0
     for match in _ENTRY.finditer(text):
         digits = re.sub(r"\D", "", match.group(2))
         if len(digits) not in _ENTRY_LENGTHS:
@@ -143,46 +140,49 @@ def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
         if glued and len(digits) < 4:
             # "PM10 – particles": a short number fused to a word is a name, not a chapter.
             continue
-        head = text[: match.start()]
-        start, codes = match.start(), list[tuple[str, bool]]()
-        tail = _LIST_TAIL.search(head)
-        if tail is not None:
-            start = tail.start()
-            for code in _LISTED_CODE.finditer(tail.group(0)):
-                codes.append((re.sub(r"\D", "", code.group(2)), bool(code.group(1))))
-        elif _RANGE_TAIL.search(head):
-            entries.append((match.start(), match, []))
-            continue
-        codes.append((digits, bool(match.group(1))))
-        entries.append((start, match, codes))
-    cuts = [c for c in _EXCEPT.finditer(text) if _opens_entry(text, c, entries)]
+        reach = max(previous_end, match.start() - _RANGE_REACH)
+        span = _RANGE_TAIL.search(text, reach, match.start())
+        if span is not None:
+            entries.append((span.start(), None, False))
+        else:
+            entries.append((match.start(), digits, bool(match.group(1))))
+        previous_end = match.end()
+    starts = [start for start, _, _ in entries]
+    cuts = [c.start() for c in _EXCEPT.finditer(text) if _opens_entry(text, c, starts)]
     out: list[tuple[str, bool, bool, str]] = []
-    covered: list[str] = []
-    excluding, anchors = False, []
-    for index, (start, match, codes) in enumerate(entries):
-        end = entries[index + 1][0] if index + 1 < len(entries) else len(text)
-        previous = entries[index - 1][0] if index else 0
-        if any(previous <= c.start() < start for c in cuts):
-            excluding, anchors = True, list(covered)
-        cut = next((c.start() for c in cuts if start < c.start() < end), None)
-        surface = text[start : cut if cut is not None else end].strip().rstrip(";,:").strip()
-        for digits, partial in codes:
-            if excluding and anchors and not any(digits.startswith(a) for a in anchors):
+    covered: set[str] = set()
+    excluding, chapter, at = False, "", 0
+    for index, (start, stated, partial) in enumerate(entries):
+        end = starts[index + 1] if index + 1 < len(entries) else len(text)
+        opened = False
+        while at < len(cuts) and cuts[at] < start:
+            opened, at = True, at + 1
+        if opened:
+            excluding, chapter = True, ""
+        cut = cuts[at] if at < len(cuts) and cuts[at] < end else end
+        if stated is None:
+            continue
+        digits = stated
+        if excluding:
+            # With nothing listed before the cut, the first carve-out names its chapter.
+            chapter = chapter or ("" if covered else digits[:2])
+            if not _narrows(digits, covered or {chapter}):
                 excluding = False
-            if not excluding:
-                covered.append(digits)
-            out.append((digits, partial, excluding, surface))
+        if not excluding:
+            covered.add(digits)
+        surface = text[start:cut].strip().rstrip(";,:").strip()
+        out.append((digits, partial, excluding, surface))
     return out
 
 
-def _opens_entry(
-    text: str,
-    cut: re.Match[str],
-    entries: list[tuple[int, re.Match[str], list[tuple[str, bool]]]],
-) -> bool:
+def _narrows(digits: str, prefixes: set[str]) -> bool:
+    return any(digits[:n] in prefixes for n in range(2, len(digits) + 1))
+
+
+def _opens_entry(text: str, cut: re.Match[str], starts: list[int]) -> bool:
     """Whether an entry follows "Except" directly: "excluding 10 % alloy" is prose."""
-    following = next((start for start, _, _ in entries if start >= cut.end()), None)
-    return following is not None and not text[cut.end() : following].strip(" :\u00a0")
+    index = bisect_left(starts, cut.end())
+    return index < len(starts) and not text[cut.end() : starts[index]].strip(" :\u00a0")
 
 
 def _from_rows(rows: list[ResolvedRow]) -> list[GoodsCode]:

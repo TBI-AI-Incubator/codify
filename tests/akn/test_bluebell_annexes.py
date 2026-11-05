@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from codify.akn.bluebell import akn_xml_to_bluebell
+from codify.akn.bluebell import akn_xml_to_bluebell, bluebell_to_akn
 
 _NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 _ACT = f"""<akomaNtoso xmlns="{_NS}"><act name="act">
@@ -35,3 +35,10 @@ def test_an_annex_of_hcontainers_keeps_its_title_prose_and_table() -> None:
 
 def test_an_annex_group_heading_survives_as_a_crossheading() -> None:
     assert "  CROSSHEADING Part A Widgets" in akn_xml_to_bluebell(_ACT)
+
+
+def test_a_crossheading_survives_a_second_round_trip() -> None:
+    first = akn_xml_to_bluebell(_ACT)
+    xml, _, errors = bluebell_to_akn(first, country="xa", language="eng")
+    assert errors == []
+    assert akn_xml_to_bluebell(xml).count("CROSSHEADING Part A Widgets") == 1
