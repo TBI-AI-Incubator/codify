@@ -174,6 +174,38 @@ def test_builder_refuses_a_uri_with_an_empty_segment() -> None:
         build_frbr_work_uri("", "act", "2009", "7")
 
 
+def test_a_class_declaring_doc_or_statement_homes_under_that_element() -> None:
+    assert build_frbr_work_uri("xa", "guidance", 2024, "2") == "/akn/xa/doc/guidance/2024/2"
+    assert build_frbr_work_uri("xa", "resolution", 2024, "4") == (
+        "/akn/xa/statement/resolution/2024/4"
+    )
+    assert build_frbr_work_uri("xa", "statement", 2024, "4") == "/akn/xa/statement/2024/4"
+    assert build_frbr_work_uri("xa", "code", 2024, "4") == "/akn/xa/act/code/2024/4"
+
+
+def test_a_locality_joins_the_place_on_a_pattern_and_on_the_default() -> None:
+    assert build_frbr_work_uri("xa", "resolution", 2024, "4", locality="c01") == (
+        "/akn/xa-c01/statement/resolution/2024/4"
+    )
+    assert build_frbr_work_uri("xa", "mint_circular", 2024, "4", locality="c01") == (
+        "/akn/xa-c01/act/mint-circular/2024/4"
+    )
+    for bad in ("C01", "c/01", "c-01"):
+        with pytest.raises(UncitableFrbrUri):
+            build_frbr_work_uri("xa", "resolution", 2024, "4", locality=bad)
+
+
+def test_a_locality_is_homed_in_its_country_and_reads_its_config() -> None:
+    from codify.jurisdictions import config_for_work_uri, work_uri_is_homed
+
+    uri = "/akn/xa-c01/statement/resolution/2024/4"
+    assert parse_source_ref(f"{uri}#sec_1") == (uri, "sec_1")
+    assert work_uri_is_homed(uri, "xa")
+    assert not work_uri_is_homed("/akn/xab/act/2024/4", "xa")
+    config = config_for_work_uri(uri)
+    assert config is not None and config.code == "xa"
+
+
 def test_number_token_rejects_an_office_routing_code() -> None:
     # The defect this closes: a model asked for a number returned the whole
     # parenthetical, and `( /11/11 ر.م.و/ إ.هـ)` was formatted into an FRBR path.

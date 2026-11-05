@@ -9,6 +9,8 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
+from codify.akn._schema import main_body
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS
 from codify.pipeline.enrich.closing import mentions_closing_phrase
 from codify.pipeline.enrich.regions import Region, RegionVocabulary
 
@@ -69,7 +71,7 @@ def find_displaced_attestation(
     if not closing_phrases:
         return None, None
     act = _act(root)
-    body = act.find("akn:body", NS) if act is not None else None
+    body = main_body(act) if act is not None else None
     if body is None:
         return None, None
     return _attestation_start(body, tuple(closing_phrases))
@@ -80,7 +82,7 @@ def lift_attestation(root: etree._Element, container: etree._Element, start: etr
     the body if absent), regroup the signatory, prune emptied wrappers. Returns
     the number of paragraphs moved."""
     act = _act(root)
-    body = act.find("akn:body", NS) if act is not None else None
+    body = main_body(act) if act is not None else None
     if body is None:
         return 0
     paragraphs = container.findall("akn:p", NS)
@@ -105,9 +107,18 @@ def lift_attestation(root: etree._Element, container: etree._Element, start: etr
 
 
 def _act(root: etree._Element) -> etree._Element | None:
+    """The act, or the `doc` or `statement` standing in its place."""
     if etree.QName(root).localname == "act":
         return root
-    return root.find("akn:act", NS)
+    return next(
+        (
+            el
+            for el in root
+            if isinstance(el.tag, str)
+            and etree.QName(el).localname in ("act", *OPEN_STRUCTURE_ROOTS)
+        ),
+        None,
+    )
 
 
 def _attestation_start(

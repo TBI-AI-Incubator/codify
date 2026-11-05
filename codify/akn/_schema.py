@@ -52,6 +52,12 @@ def parse_xml(xml: str | bytes, *, huge_tree: bool = False) -> etree._Element:
     return root
 
 
+def main_body(root: etree._Element) -> etree._Element | None:
+    """The first `<body>`, else the `<mainBody>` a `doc` or `statement` holds."""
+    body: etree._Element | None = root.find(".//akn:body", NS)
+    return body if body is not None else root.find(".//akn:mainBody", NS)
+
+
 def akn_schema(strict: bool = False) -> etree.XMLSchema:
     return get_schema(AKN_NS, strict=strict)
 

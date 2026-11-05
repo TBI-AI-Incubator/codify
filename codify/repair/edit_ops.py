@@ -27,6 +27,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS
+from codify.akn._schema import main_body
 from codify.akn._schema import validate_akn as schema_validate
 from codify.akn.eid import eid_abbrev
 from codify.akn.eids import ensure_unique_eids
@@ -193,7 +194,7 @@ def _body_text_len(xml: str) -> int:
     """Non-whitespace char count of body *prose*, excludes num/heading labels
     so removing a duplicate's number doesn't read as content loss."""
     root = etree.fromstring(xml.encode("utf-8"))
-    body = root.find(f".//{{{AKN_NS}}}body")
+    body = main_body(root)
     if body is None:
         return 0
     total = 0

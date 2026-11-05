@@ -14,7 +14,8 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
-from codify.jurisdictions import EnactingFormula, load_config
+from codify.akn._schema import main_body
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, EnactingFormula, load_config
 from codify.pipeline.enrich.akn_meta import FORMULA_PROVENANCE
 from codify.pipeline.enrich.anchors import cached_regex
 from codify.pipeline.enrich.arabic_normalise import (
@@ -124,6 +125,7 @@ def emit_enacting_formula(
     that era.
     """
     cfg = load_config(country)
+    akn_xml = _mark_open_preamble(akn_xml, cfg.opening_material_terminators)
     root = etree.fromstring(akn_xml.encode("utf-8"))
     if cfg.enacting_formula_markers:
         if _source_carries_formula(root, cfg.enacting_formula_markers):
@@ -164,6 +166,50 @@ def emit_enacting_formula(
         verified=getattr(formula, "verified", False),
     )
     return out
+
+
+def _mark_open_preamble(akn_xml: str, terminators: list[str]) -> str:
+    """In a `doc` or `statement`, the preamble line a terminator closes becomes the
+    source's own enacting formula, and each line before it a recital, so preamble,
+    formula and operative body stay apart and the recitals' citations are rows."""
+    root = etree.fromstring(akn_xml.encode("utf-8"))
+    main = next((c for c in root if isinstance(c.tag, str)), None)
+    if main is None or etree.QName(main).localname not in OPEN_STRUCTURE_ROOTS:
+        return akn_xml
+    preamble = main.find("akn:preamble", NS)
+    if preamble is None or preamble.find("akn:recitals", NS) is not None:
+        return akn_xml
+    lines = preamble.findall("akn:p", NS)
+    formula = preamble.find("akn:formula", NS)
+    folded = [fold_arabic_for_match(t) for t in terminators if t.strip()]
+    closing = next(
+        (
+            p
+            for p in reversed(lines)
+            if any(t in fold_arabic_for_match("".join(p.itertext())) for t in folded)
+        ),
+        None,
+    )
+    if formula is None and closing is not None:
+        formula = etree.Element(f"{{{AKN_NS}}}formula", name="enactingFormula")
+        closing.addprevious(formula)
+        closing.attrib.pop("eId", None)
+        formula.append(closing)
+    # Lines after the formula are no recitals, so a second run finds none to wrap.
+    recited = (
+        list(formula.itersiblings(f"{{{AKN_NS}}}p", preceding=True))[::-1]
+        if formula is not None
+        else lines
+    )
+    if recited:
+        recitals = etree.Element(f"{{{AKN_NS}}}recitals", eId="recitals")
+        recited[0].addprevious(recitals)
+        for index, line in enumerate(recited, start=1):
+            line.attrib.pop("eId", None)
+            etree.SubElement(recitals, f"{{{AKN_NS}}}recital", eId=f"recitals__rec_{index}").append(
+                line
+            )
+    return cast(str, etree.tostring(root, pretty_print=True, encoding="unicode"))
 
 
 # Generic Arabic preamble openers: citation clauses (having reviewed /
@@ -360,7 +406,7 @@ def _date_in_range(formula: EnactingFormula, target: date) -> bool:
 
 
 def _find_act_element(root: etree._Element) -> etree._Element | None:
-    for tag in ("act", "bill", "amendment", "doc"):
+    for tag in ("act", "bill", "amendment", "doc", "statement"):
         el = root.find(f"akn:{tag}", NS)
         if el is not None:
             return el
@@ -369,7 +415,7 @@ def _find_act_element(root: etree._Element) -> etree._Element | None:
 
 def _move_before_body(act: etree._Element, preamble: etree._Element) -> None:
     """Ensure <preamble> sits before <body> per AKN 3.0 element order."""
-    body = act.find("akn:body", NS)
+    body = main_body(act)
     if body is None:
         return
     act.remove(preamble)

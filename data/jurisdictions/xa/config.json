@@ -224,6 +224,84 @@
       ],
       "hcontainers": [],
       "note": "Joint-issuer circular: section numbering restarts within every Rule."
+    },
+    "guidance": {
+      "label": "Guidance Note",
+      "short_label": "Guidance",
+      "akn_element": "doc",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "search_rank": 0,
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "numbering": "arabic"
+        },
+        {
+          "local_term": "Section (Sec.)",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "Official guidance on applying an Act: numbered sections, optionally under parts."
+    },
+    "resolution": {
+      "label": "Council Resolution",
+      "short_label": "Resolution",
+      "akn_element": "statement",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "search_rank": 1,
+      "hierarchy": [
+        {
+          "local_term": "Section (Sec.)",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "numbering": "arabic_parenthesized"
+        }
+      ],
+      "hcontainers": [],
+      "note": "A council's decision: citations and recitals, the resolving formula, then operative sections."
+    },
+    "determination": {
+      "label": "Officer's Determination",
+      "short_label": "Determination",
+      "akn_element": "statement",
+      "bluebell_compatible": true,
+      "basic_unit": "section",
+      "search_rank": 1,
+      "hierarchy": [
+        {
+          "local_term": "Section (Sec.)",
+          "akn_element": "section",
+          "level": "basic",
+          "bluebell_keyword": "SECTION",
+          "numbering": "arabic_continuous"
+        }
+      ],
+      "hcontainers": [],
+      "note": "One officer's decision on a single matter, in the same shape as a resolution."
     }
   },
   "default_document_class": "act",
@@ -260,6 +338,8 @@
       "document_class": "act"
     }
   ],
+  "enacting_formula_markers": ["Having regard to", "HEREBY RESOLVES", "HEREBY DETERMINES"],
+  "opening_material_terminators": ["HEREBY RESOLVES", "HEREBY DETERMINES"],
   "amendments": {
     "style": "textual_commonwealth",
     "phrasing": "is amended as follows",

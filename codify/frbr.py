@@ -19,6 +19,7 @@ import structlog
 from codify.jurisdictions import (
     SLUG_DIGEST_CHARS,
     TitleIdentity,
+    open_structure_root,
     resolve_frbr_country,
     try_load_config,
 )
@@ -296,7 +297,7 @@ _LEG_GOV_UK_CLASS: dict[str, tuple[str, str]] = {
 _EU_KIND = {"directive": "directive", "regulation": "regulation", "decision": "decision"}
 _LEG_ID_RE = re.compile(r"/id/([a-z]+)/(\d{4})/(\d+)((?:/[^#?]+)?)")
 _EU_HREF_RE = re.compile(r"/european/(directive|regulation|decision)/(\d{4})/0*(\d+)")
-_AKN_URI_RE = re.compile(r"^(/akn/[a-z-]+/[^#]*?)(?:/main)?(?:#(.+))?$")
+_AKN_URI_RE = re.compile(r"^(/akn/[a-z0-9-]+/[^#]*?)(?:/main)?(?:#(.+))?$")
 
 
 # Reverse of _LEG_GOV_UK_CLASS for URL construction: (jurisdiction, doctype) →
@@ -405,7 +406,9 @@ def parse_source_ref(href: str) -> tuple[str, str | None] | None:
     return None
 
 
-def build_frbr_work_uri(country: str, doctype: str, year: int | str, number: str) -> str:
+def build_frbr_work_uri(
+    country: str, doctype: str, year: int | str, number: str, *, locality: str | None = None
+) -> str:
     """`("al", "vendim", 2021, "285")` → `/akn/al/act/vendim/2021/285`.
 
     Uses `config.frbr.uri_patterns[doctype]` when it needs only {year}/{number};
@@ -432,7 +435,7 @@ def build_frbr_work_uri(country: str, doctype: str, year: int | str, number: str
         if template:
             try:
                 return _assert_citable(
-                    template.format(year=year_for_uri, number=number),
+                    _placed(template.format(year=year_for_uri, number=number), locality),
                     country=country,
                     doctype=doctype,
                     number=number,
@@ -450,16 +453,30 @@ def build_frbr_work_uri(country: str, doctype: str, year: int | str, number: str
                 )
     # Canonical default: the doctype is the AKN subtype segment, except a plain
     # "act" (or none), which has no subtype → /akn/{country}/act/{year}/{number}.
-    base = (
-        f"/akn/{country_segment}/act/{doctype}"
-        if doctype and doctype != "act"
-        else f"/akn/{country_segment}/act"
-    )
+    # A class declaring `doc` or `statement` homes under that element instead.
+    root = open_structure_root(country, doctype) or "act"
+    base = f"/akn/{country_segment}/{root}"
+    if doctype and doctype not in ("act", root):
+        base += f"/{doctype}"
     # AKN requires a date segment, so a year we could not resolve gets the
     # unknown-date placeholder rather than a gap or an omission. Cobalt refuses
     # both `/akn/xz/act//draft-x` and `/akn/xz/act/draft-x`.
-    built = f"{base}/{year_for_uri}/{number}"
+    built = _placed(f"{base}/{year_for_uri}/{number}", locality)
     return _assert_citable(built, country=country, doctype=doctype, number=number)
+
+
+_LOCALITY = re.compile(r"[a-z0-9]+")
+
+
+def _placed(uri: str, locality: str | None) -> str:
+    """`/akn/xa/...` issued in `locality` → `/akn/xa-{locality}/...`, the AKN place
+    of a sub-national issuer."""
+    if not locality:
+        return uri
+    if _LOCALITY.fullmatch(locality) is None:
+        raise UncitableFrbrUri(f"locality {locality!r} is not a lower-case alphanumeric code")
+    _, prefix, place, rest = uri.split("/", 3)
+    return f"/{prefix}/{place}-{locality}/{rest}"
 
 
 def _assert_citable(uri: str, *, country: str, doctype: str, number: str) -> str:

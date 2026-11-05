@@ -20,7 +20,7 @@ from codify.akn._schema import parse_xml
 from codify.akn.eid import eid_abbrev
 from codify.akn.references import DERIVED_REF_CLASS
 from codify.frbr import default_token, law_number_token, token_country, token_family
-from codify.jurisdictions import load_config, load_short_titles
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config, load_short_titles
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.eid import build_term_map, resolve_informal_reference
 
@@ -108,6 +108,12 @@ async def emit_inline_markup(
     cfg = load_config(country)
     root = parse_xml(akn_xml)
     body = root.find(".//akn:body", NS)
+    if body is None:
+        # A `doc` or `statement` is read whole: its recitals cite its legal basis.
+        body = next(
+            (el for tag in OPEN_STRUCTURE_ROOTS if (el := root.find(f"akn:{tag}", NS)) is not None),
+            None,
+        )
     if body is None:
         return akn_xml
 

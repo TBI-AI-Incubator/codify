@@ -145,7 +145,15 @@ async def _extract_reference_rows(
         eid = getattr(el, "akn_eid", None)
         refs = getattr(el, "references", None) or []
         if refs:
-            pid = prov_by_eid.get(eid or "")
+            # A container's own text is rowed under the mapper's suffixed eId.
+            pid = next(
+                (
+                    prov_by_eid[k]
+                    for k in (eid, f"{eid}__content", f"{eid}__intro")
+                    if k in prov_by_eid
+                ),
+                None,
+            )
             if pid is None:
                 unmatched += len(refs)
             else:
@@ -156,7 +164,7 @@ async def _extract_reference_rows(
         for child in getattr(el, "children", []) or []:
             _walk(child)
 
-    for top in doc.body:
+    for top in (*doc.body, *doc.attachments, *doc.recitals):
         _walk(top)
 
     return rows, unmatched

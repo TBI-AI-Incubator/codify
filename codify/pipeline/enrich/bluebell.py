@@ -10,6 +10,7 @@ from cobalt.uri import FrbrUri
 from lxml import etree
 
 from codify.frbr import UNKNOWN_YEAR
+from codify.jurisdictions import open_structure_root
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.arabic_normalise import (
     ARABIC_JOINERS,
@@ -27,14 +28,16 @@ logger = structlog.get_logger()
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
-# Bluebell only accepts canonical AKN roots; localised names map to "act"
-# (Cobalt's StructuredDocument.for_document_type only resolves canonicals).
+# Bluebell only accepts canonical AKN roots; a localised name maps to its class's
+# `doc` or `statement` element, else "act" (Cobalt resolves only canonicals).
 # Derived from bluebell ≥ 3.0; revisit if the grammar grows new top-level roots.
 _BLUEBELL_ROOTS = frozenset({"act", "bill", "judgment", "debateReport", "doc"})
 
 
-def _bluebell_root(doctype: str) -> str:
-    return doctype if doctype in _BLUEBELL_ROOTS else "act"
+def _bluebell_root(country: str, doctype: str) -> str:
+    if doctype in _BLUEBELL_ROOTS:
+        return doctype
+    return open_structure_root(country, doctype) or "act"
 
 
 def parse_to_akn(
@@ -48,7 +51,7 @@ def parse_to_akn(
 ) -> str:
     """Parse Bluebell plain text to valid AKN XML string. The resulting FRBR URI
     uses the canonical AKN root; the localised label belongs in `laws.doctype`."""
-    canonical = _bluebell_root(doctype)
+    canonical = _bluebell_root(country, doctype)
     if canonical != doctype:
         logger.info("doctype_normalised", from_=doctype, to=canonical, country=country)
     # An empty date mints `/akn/{country}/act//{number}`, which Cobalt then

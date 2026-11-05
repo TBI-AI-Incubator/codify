@@ -160,7 +160,7 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
     payload = akn_xml.encode("utf-8") if isinstance(akn_xml, str) else akn_xml
     doc = etree.fromstring(payload)
     doc_root = next(
-        (c for c in doc if _local(c) in {"act", "bill", "doc", "judgment", "debate"}),
+        (c for c in doc if _local(c) in {"act", "bill", "doc", "statement", "judgment", "debate"}),
         None,
     )
     if doc_root is None:

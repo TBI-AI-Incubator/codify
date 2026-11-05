@@ -7,7 +7,7 @@ from collections import Counter
 from lxml import etree
 
 from codify.akn import AKN_NS
-from codify.akn._schema import parse_xml
+from codify.akn._schema import main_body, parse_xml
 from codify.frbr import parse_source_ref
 from codify.pipeline.enrich.inline_markup import _OP_CUES, _SCOPE_OPENER, _scope_container
 
@@ -22,7 +22,7 @@ def scoped_opener_evidence(xml: str) -> dict[tuple[str, str, str], tuple[str, st
         root = parse_xml(xml)
     except (ValueError, etree.XMLSyntaxError):
         return {}
-    body = root.find(f".//{{{AKN_NS}}}body")
+    body = main_body(root)
     if body is None:
         return {}
     counts = Counter(root.xpath("//@eId"))

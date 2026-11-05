@@ -120,6 +120,8 @@ class Descriptors:
     year: str
     language: str
     doctype: str
+    # The issuer's locality code, joined to the work URI's place: `/akn/xa-c01/`.
+    locality: str | None = None
 
 
 # The enacting formula and any recitals sit at the top of the source, so a
@@ -272,6 +274,7 @@ def resolve_descriptors(
     fallback_stem: str,
     requested_doctype: str | None = None,
     classification_text: str | None = None,
+    locality: str | None = None,
 ) -> Descriptors:
     model_title = str(metadata.get("title", "") or "")
     title = model_title or fallback_stem
@@ -345,6 +348,7 @@ def resolve_descriptors(
         year=year,
         language=language,
         doctype=doctype,
+        locality=locality,
     )
 
 
@@ -382,6 +386,7 @@ async def run_enrich_passes(
                 year=desc.year,
                 number=desc.number,
                 work_uri=work_uri,
+                locality=desc.locality,
             ),
         ),
         # After cobalt, which rewrites `FRBRWork/FRBRdate` from the year-only work URI
