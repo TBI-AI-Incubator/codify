@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.akn._schema import safe_parser
 from codify.akn.vocabulary import RECITAL, TAG_TO_KIND, is_lifted_note, table_row_eid
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
@@ -1036,6 +1037,11 @@ async def get_version_document(
         if p.akn_type != RECITAL
     ]
 
+    tables: list[DocumentPlacedTable] = []
+    if include_tables and root_xml is not None:
+        # A tariff annex takes a large part of a second to project: off the event loop.
+        rendered = _rendered_tables(root_sections, root_provisions)
+        tables = await on_the_cpu_pool(_unrowed_tables, root_xml, rendered)
     return VersionDocument(
         version_id=version.id,
         law_id=law.id,
@@ -1049,9 +1055,7 @@ async def get_version_document(
         conclusions=conclusions_nodes,
         sections=root_sections,
         provisions=root_provisions,
-        tables=_unrowed_tables(root_xml, _rendered_tables(root_sections, root_provisions))
-        if include_tables and root_xml is not None
-        else [],
+        tables=tables,
     )
 
 
