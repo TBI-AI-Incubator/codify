@@ -68,6 +68,16 @@ def _text(el: etree._Element) -> str:
     return " ".join("".join(el.itertext()).split())
 
 
+def _cell_text(cell: etree._Element) -> str:
+    """A cell of paragraphs only, one space apart: `_text` runs "Ferro-silicon"
+    into the "72023000" of the next line. Anything else reads whole."""
+    children = [c for c in cell if isinstance(c.tag, str)]
+    loose = (cell.text or "").strip() or any((c.tail or "").strip() for c in cell)
+    if not children or loose or any(_local(c) != "p" for c in children):
+        return _text(cell)
+    return " ".join(t for t in (_text(c) for c in children) if t)
+
+
 def _block_text(el: etree._Element) -> str:
     """Text of a block container. `itertext` would run its words together."""
     parts = [" ".join(t.split()) for t in el.itertext()]
@@ -149,7 +159,7 @@ def _logical_grid(rows: list[etree._Element]) -> list[list[str]]:
                     del carried[len(line) - 1]
                 else:
                     carried[len(line) - 1] = (text, left - 1)
-            value = _text(cell)
+            value = _cell_text(cell)
             span = cell.get("colspan")
             down = cell.get("rowspan")
             width = int(span) if span and span.isdigit() else 1

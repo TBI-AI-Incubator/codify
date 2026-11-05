@@ -849,6 +849,37 @@
         "title": "DocumentClass",
         "type": "object"
       },
+      "DocumentPlacedTable": {
+        "description": "A table outside every provision, with the eIds it sits under (outermost\nfirst) so a reader can place it and a subtree read can keep it.",
+        "properties": {
+          "ancestor_eids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ancestor Eids",
+            "type": "array"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "table": {
+            "$ref": "#/components/schemas/DocumentTable"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "title": "DocumentPlacedTable",
+        "type": "object"
+      },
       "DocumentProvision": {
         "description": "Leaf-level legal text, paragraph / subparagraph / point.\n\n`text` remains the plain-text shadow for search / fallback rendering;\n`blocks` is the rich AST built from the AKN sub-tree.",
         "properties": {
@@ -4498,6 +4529,13 @@
               "$ref": "#/components/schemas/DocumentSection"
             },
             "title": "Sections",
+            "type": "array"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentPlacedTable"
+            },
+            "title": "Tables",
             "type": "array"
           },
           "version_id": {

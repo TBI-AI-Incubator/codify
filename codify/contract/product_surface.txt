@@ -229,6 +229,9 @@ codify.storage.finding_notes:get_note
 codify.storage.finding_notes:get_notes_for_findings
 codify.storage.finding_notes:upsert_note
 codify.storage.findings:list_findings
+codify.storage.goods_codes:GoodsCodeMatch
+codify.storage.goods_codes:find_versions_by_goods_code
+codify.storage.goods_codes:goods_codes_for_version
 codify.storage.goods_codes:index_version_goods_codes
 codify.storage.laws:get_law_with_jurisdiction
 codify.storage.lens_runs:get_latest_lens_run

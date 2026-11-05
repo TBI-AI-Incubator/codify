@@ -1,7 +1,7 @@
 """Read EU FMX acts from the Publications Office bulk archive.
 
 One archive per language, so the index names the zip and its language. A
-publication splits across files, act body plus one per annex; `_assemble` puts
+publication splits across files, act body plus one per annex; `assemble_formex` puts
 them back into the single-file shape the parser reads. No rate limit: local.
 """
 
@@ -294,7 +294,7 @@ class EuDatadumpAcquirer(BaseAcquirer):
         # beside an annex rather than beside the act. This is the whole set.
         within = frozenset(m.split("/", 1)[0] for m in (path, *annexes))
         include_counts: Counter[str] = Counter()
-        content = _assemble(
+        content = assemble_formex(
             act_xml,
             [(archive.read(a), a) for a in annexes],
             lambda fileref, near: self._read_member(fileref, near, within),
@@ -338,7 +338,7 @@ class EuDatadumpAcquirer(BaseAcquirer):
 _MAX_INCLUDE_DEPTH = 4
 
 
-def _assemble(
+def assemble_formex(
     act_xml: bytes,
     annexes: list[tuple[bytes, str]],
     resolve: Callable[[str, str], tuple[bytes, str] | None] | None = None,

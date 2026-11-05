@@ -241,6 +241,21 @@ class VersionDocument(BaseModel):
     conclusions: list[InlineNode] = Field(default_factory=list)
     sections: list[DocumentSection] = Field(default_factory=list)
     provisions: list[DocumentProvision] = Field(default_factory=list)
+    # Tables no provision carries, in document order: an annex table is held
+    # as rows, not provisions, so the tree above never reaches it.
+    tables: list[DocumentPlacedTable] = Field(default_factory=list)
+
+
+class DocumentPlacedTable(BaseModel):
+    """A table outside every provision, with the eIds it sits under (outermost
+    first) so a reader can place it and a subtree read can keep it."""
+
+    ancestor_eids: list[str] = Field(default_factory=list)
+    heading: str | None = None
+    table: DocumentTable
+
+
+VersionDocument.model_rebuild()
 
 
 # AKN walker.
@@ -932,10 +947,11 @@ def _amendment_markers(jurisdiction_code: str | None) -> list[str]:
 
 
 async def get_version_document(
-    session: AsyncSession, version_id: uuid.UUID
+    session: AsyncSession, version_id: uuid.UUID, *, include_tables: bool = False
 ) -> VersionDocument | None:
     """Return the full body of `version_id` as a typed tree, or None if the
-    version doesn't exist."""
+    version doesn't exist. `include_tables` adds the tables no provision
+    carries; a tariff annex runs to megabytes, so it is asked for."""
     head = (
         await session.execute(
             select(Version, Law, Jurisdiction.code)
@@ -1033,10 +1049,61 @@ async def get_version_document(
         conclusions=conclusions_nodes,
         sections=root_sections,
         provisions=root_provisions,
+        tables=_unrowed_tables(root_xml, _rendered_tables(root_sections, root_provisions))
+        if include_tables and root_xml is not None
+        else [],
     )
 
 
+def _rendered_tables(
+    sections: list[DocumentSection], provisions: list[DocumentProvision]
+) -> frozenset[str]:
+    """eIds of the tables the provision blocks already carry."""
+    out: set[str] = set()
+
+    def walk(blocks: list[DocumentProvisionBlock]) -> None:
+        for block in blocks:
+            if block.table is not None:
+                out.add(block.table.akn_eid)
+            walk(block.blocks)
+
+    pending = list(sections)
+    for provision in provisions:
+        walk(provision.blocks)
+    while pending:
+        section = pending.pop()
+        for provision in section.provisions:
+            walk(provision.blocks)
+        pending.extend(section.sections)
+    return frozenset(out)
+
+
+def _unrowed_tables(root: etree._Element, rendered: frozenset[str]) -> list[DocumentPlacedTable]:
+    """Every citable table the provision blocks do not already carry."""
+    out: list[DocumentPlacedTable] = []
+    for table in root.iter("{%s}table" % AKN_NS):
+        eid = table.get("eId")
+        # Uncitable tables are not projected; `_walk_table` would refuse one.
+        if not eid or eid in rendered:
+            continue
+        ancestors = [a for a in reversed(list(table.iterancestors())) if a.get("eId")]
+        wrapper = table.getparent()
+        holder = wrapper.getparent() if wrapper is not None else None
+        heading = _direct_child(holder, "heading") if holder is not None else None
+        out.append(
+            DocumentPlacedTable(
+                ancestor_eids=[a.get("eId", "") for a in ancestors],
+                heading=" ".join("".join(heading.itertext()).split()) or None
+                if heading is not None
+                else None,
+                table=_walk_table(table),
+            )
+        )
+    return out
+
+
 __all__ = [
+    "DocumentPlacedTable",
     "DocumentProvision",
     "DocumentProvisionBlock",
     "DocumentSection",

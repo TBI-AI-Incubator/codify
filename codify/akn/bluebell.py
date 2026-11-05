@@ -126,6 +126,20 @@ def _direct_child_text(el: etree._Element, name: str) -> str:
     return _inline_text(c)
 
 
+def _annex_title(doc_el: etree._Element | None) -> str:
+    """An EU annex's number and heading, which sit in its preface, not on the attachment."""
+    preface = _direct_child(doc_el, "preface") if doc_el is not None else None
+    if preface is None:
+        return ""
+    parts = [
+        _inline_text(block)
+        for container in preface
+        for block in container
+        if _local(block) == "block" and block.get("name") in ("num", "heading")
+    ]
+    return ": ".join(p for p in parts if p)
+
+
 def _inline_text(el: etree._Element) -> str:
     """Concatenate text content; inline elements (term, ref, …) flatten to
     their textContent. Newlines collapsed so a `<p>` stays a single line."""
@@ -184,15 +198,15 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
         for idx, att in enumerate(attachments, start=1):
             if _local(att) != "attachment":
                 continue
-            heading = _direct_child_text(att, "heading")
+            # Attachments wrap their structural tree in <doc><mainBody>.
+            doc_el = _direct_child(att, "doc")
+            heading = _direct_child_text(att, "heading") or _annex_title(doc_el)
             out.append("")
             header = f"SCHEDULE {idx}"
             if heading:
                 header = f"{header} - {heading}"
             out.append(header)
             out.append("")
-            # Attachments wrap their structural tree in <doc><mainBody>.
-            doc_el = _direct_child(att, "doc")
             inner_body = None
             if doc_el is not None:
                 inner_body = _direct_child(doc_el, "mainBody")
@@ -210,6 +224,11 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
                         if text:
                             out.append(f"  {text}")
                             out.append("")
+                    elif cname == "table":
+                        _emit_table(child, depth=1, out=out)
+                    elif cname in _TRANSPARENT_CONTAINERS:
+                        # EU annexes are hcontainers, which `_emit_block` drops.
+                        _emit_text_run(child, depth=1, out=out)
                     else:
                         _emit_block(child, depth=1, out=out)
 
@@ -247,7 +266,9 @@ def _emit_block(el: etree._Element, *, depth: int, out: list[str]) -> None:
     """
     name = _local(el)
     if name not in _STRUCTURAL_TO_KEYWORD:
-        if name == "p":
+        if name == "crossHeading":
+            _emit_crossheading(el, depth=depth, out=out)
+        elif name == "p":
             # Preserve stray inline content rather than dropping it.
             text = _inline_text(el)
             if text:
@@ -285,6 +306,8 @@ def _emit_block(el: etree._Element, *, depth: int, out: list[str]) -> None:
             _emit_table(child, depth=inner, out=out)
         elif cname in _STRUCTURAL_TO_KEYWORD:
             _emit_block(child, depth=inner, out=out)
+        elif cname == "crossHeading":
+            _emit_crossheading(child, depth=inner, out=out)
         elif cname == "p":
             # Bare <p> directly under the block.
             text = _inline_text(child)
@@ -293,10 +316,24 @@ def _emit_block(el: etree._Element, *, depth: int, out: list[str]) -> None:
                 out.append("")
 
 
+def _emit_crossheading(el: etree._Element, *, depth: int, out: list[str]) -> None:
+    text = _inline_text(el)
+    if text:
+        out.append(f"{'  ' * depth}CROSSHEADING {text}")
+        out.append("")
+
+
 def _emit_text_run(container: etree._Element, *, depth: int, out: list[str]) -> None:
     """Emit `<p>` children of an intro/content/wrapUp wrapper at `depth*2`
     indent. Nested `<blockList>` recurses; unknown elements flatten to text."""
     indent = "  " * depth
+    if _local(container) == "hcontainer":
+        # Bluebell has no hcontainer heading; a crossheading keeps its words.
+        parts = (_direct_child_text(container, "num"), _direct_child_text(container, "heading"))
+        title = " ".join(p for p in parts if p)
+        if title:
+            out.append(f"{indent}CROSSHEADING {title}")
+            out.append("")
     for child in container:
         cname = _local(child)
         if cname in ("num", "heading"):
@@ -314,6 +351,8 @@ def _emit_text_run(container: etree._Element, *, depth: int, out: list[str]) -> 
             _emit_text_run(child, depth=depth, out=out)
         elif cname in _STRUCTURAL_TO_KEYWORD:
             _emit_block(child, depth=depth, out=out)
+        elif cname == "crossHeading":
+            _emit_crossheading(child, depth=depth, out=out)
         else:
             text = _inline_text(child)
             if text:

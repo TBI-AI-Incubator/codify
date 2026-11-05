@@ -680,6 +680,18 @@ export interface components {
             [key: string]: unknown;
         };
         /**
+         * DocumentPlacedTable
+         * @description A table outside every provision, with the eIds it sits under (outermost
+         *     first) so a reader can place it and a subtree read can keep it.
+         */
+        DocumentPlacedTable: {
+            /** Ancestor Eids */
+            ancestor_eids?: string[];
+            /** Heading */
+            heading?: string | null;
+            table: components["schemas"]["DocumentTable"];
+        };
+        /**
          * DocumentProvision
          * @description Leaf-level legal text, paragraph / subparagraph / point.
          *
@@ -1929,6 +1941,8 @@ export interface components {
             provisions?: components["schemas"]["DocumentProvision"][];
             /** Sections */
             sections?: components["schemas"]["DocumentSection"][];
+            /** Tables */
+            tables?: components["schemas"]["DocumentPlacedTable"][];
             /**
              * Version Id
              * Format: uuid
