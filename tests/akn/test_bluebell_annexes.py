@@ -15,7 +15,8 @@ _ACT = f"""<akomaNtoso xmlns="{_NS}"><act name="act">
 <mainBody>
 <hcontainer eId="att_1__paragraph_1" name="paragraph">
 <content><p>1. The goods are these.</p></content></hcontainer>
-<hcontainer eId="att_1__table_1" name="TAB"><content><table eId="att_1__table_1__tbl">
+<hcontainer eId="att_1__table_1" name="TAB"><num>Part A</num><heading>Widgets</heading>
+<content><table eId="att_1__table_1__tbl">
 <tr><th><p>CN code</p></th><th><p>Gas</p></th></tr>
 <tr><td><p>9999 10 00 – Example widgets</p></td><td><p>Carbon dioxide</p></td></tr>
 </table></content></hcontainer>
@@ -30,3 +31,7 @@ def test_an_annex_of_hcontainers_keeps_its_title_prose_and_table() -> None:
     assert "1. The goods are these." in schedule
     assert "TABLE" in schedule
     assert "9999 10 00 – Example widgets" in schedule
+
+
+def test_an_annex_group_heading_survives_as_a_crossheading() -> None:
+    assert "  CROSSHEADING Part A Widgets" in akn_xml_to_bluebell(_ACT)

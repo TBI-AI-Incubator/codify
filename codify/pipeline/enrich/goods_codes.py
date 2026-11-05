@@ -37,17 +37,29 @@ _PROSE_ANCHOR = re.compile(
     re.IGNORECASE,
 )
 _PROSE_CODE = re.compile(r"\b(ex\s+)?(\d{4}(?:[\s.]\d{2}){1,3}|\d{6}|\d{8}|\d{10})\b")
-# A line of a code column: "72 – Iron and steel", "7202 2 – Ferro-silicon",
-# "ex 7208 10 00 – Other". The dash and the word after it are what make the
-# digits a code rather than a quantity. Stored AKN can run one line into the
-# next ("Ferro-silicon72023000 –"), so a letter may precede a code.
+# Spaced or dotted pairs, a one-dash subheading ("7202 2"), or unbroken digits.
+# Separators never mix, so "7208 7209" cannot read as one code.
+_CODE_SHAPE = r"\d{4}(?:[.\s\u00a0]\d{2}){1,3}|\d{4}[\s\u00a0]\d|\d{10}|\d{8}|\d{6}|\d{4}"
+# A code-column line, "72 – Iron and steel": the dash and word make it a code.
+# Stored AKN can run lines together ("Ferro-silicon72023000 –").
 _ENTRY = re.compile(
-    r"(?<!\d)((?<![A-Za-z])ex[\s ]*)?(\d{2}(?:[\s. ]?\d{1,2}){0,4})"
-    r"[\s ]*[–—-](?=[\s ]*[^\W\d_])",
+    rf"(?<![\d.])([Ee]x[\s\u00a0]*)?({_CODE_SHAPE}|\d{{2}})(?![\d.])"
+    r"[\s\u00a0]*[\u2013\u2014-](?=[\s\u00a0]*[^\W\d_])"
+)
+# Codes listed ahead of an entry share its description: "7208, 7209 – Flat".
+_LISTED = (
+    rf"(?<![\d.])(?:[Ee]x[\s\u00a0]*)?(?:{_CODE_SHAPE})(?![\d.])"
+    r"[\s\u00a0]*(?:[,;]|\band\b|\bor\b)[\s\u00a0]*"
+)
+_LIST_TAIL = re.compile(rf"(?:{_LISTED})+\Z")
+_LISTED_CODE = re.compile(rf"(?<![\d.])([Ee]x[\s\u00a0]*)?({_CODE_SHAPE})(?![\d.])")
+# A range has no single code to stand for it, so its entry is dropped.
+_RANGE_TAIL = re.compile(
+    rf"(?<![\d.])(?:{_CODE_SHAPE})[\s\u00a0]*(?:\bto\b|[\u2013\u2014-])[\s\u00a0]*\Z"
 )
 # Chapter, heading, one-dash subheading, subheading, CN, TARIC.
 _ENTRY_LENGTHS = frozenset({2, 4, 5, 6, 8, 10})
-# "Except:" opens the carve-out. "other than" is left alone: it qualifies a
+# "Except:" opens a carve-out. "other than" is left alone: it qualifies a
 # description ("ores, other than roasted pyrites"), not the lines after it.
 _EXCEPT = re.compile(r"(?:\b|(?<=[a-z]))(?:[Ee]xcept|[Ee]xcluding)(?:\s*:|\s+(?=ex\s|\d))")
 _LIST_SPLIT = re.compile(r"\s*(?:[,;]|\band\b)\s*")
@@ -114,7 +126,7 @@ def normalise(value: str) -> tuple[str, bool] | None:
 def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
     """(digits, partial, excluded, surface) for each code a code-column cell
     states: one bare code, a list of them, or lines of "code – description".
-    A line after "Except" is excluded, since the measure carves it out."""
+    A carve-out runs from "Except" while its codes narrow one listed before it."""
     single = normalise(text)
     if single is not None:
         return [(single[0], single[1], False, text.strip())]
@@ -122,10 +134,8 @@ def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
     listed = [normalise(p) for p in pieces]
     if len(pieces) > 1 and all(listed):
         return [(c[0], c[1], False, p.strip()) for c, p in zip(listed, pieces) if c]
-    cut = _EXCEPT.search(text)
-    entries = list(_ENTRY.finditer(text))
-    out: list[tuple[str, bool, bool, str]] = []
-    for index, match in enumerate(entries):
+    entries: list[tuple[int, re.Match[str], list[tuple[str, bool]]]] = []
+    for match in _ENTRY.finditer(text):
         digits = re.sub(r"\D", "", match.group(2))
         if len(digits) not in _ENTRY_LENGTHS:
             continue
@@ -133,13 +143,46 @@ def cell_codes(text: str) -> list[tuple[str, bool, bool, str]]:
         if glued and len(digits) < 4:
             # "PM10 – particles": a short number fused to a word is a name, not a chapter.
             continue
-        end = entries[index + 1].start() if index + 1 < len(entries) else len(text)
-        excluded = cut is not None and match.start() > cut.start()
-        if cut is not None and match.start() < cut.start() < end:
-            end = cut.start()
-        surface = text[match.start() : end].strip().rstrip(";,:").strip()
-        out.append((digits, bool(match.group(1)), excluded, surface))
+        head = text[: match.start()]
+        start, codes = match.start(), list[tuple[str, bool]]()
+        tail = _LIST_TAIL.search(head)
+        if tail is not None:
+            start = tail.start()
+            for code in _LISTED_CODE.finditer(tail.group(0)):
+                codes.append((re.sub(r"\D", "", code.group(2)), bool(code.group(1))))
+        elif _RANGE_TAIL.search(head):
+            entries.append((match.start(), match, []))
+            continue
+        codes.append((digits, bool(match.group(1))))
+        entries.append((start, match, codes))
+    cuts = [c for c in _EXCEPT.finditer(text) if _opens_entry(text, c, entries)]
+    out: list[tuple[str, bool, bool, str]] = []
+    covered: list[str] = []
+    excluding, anchors = False, []
+    for index, (start, match, codes) in enumerate(entries):
+        end = entries[index + 1][0] if index + 1 < len(entries) else len(text)
+        previous = entries[index - 1][0] if index else 0
+        if any(previous <= c.start() < start for c in cuts):
+            excluding, anchors = True, list(covered)
+        cut = next((c.start() for c in cuts if start < c.start() < end), None)
+        surface = text[start : cut if cut is not None else end].strip().rstrip(";,:").strip()
+        for digits, partial in codes:
+            if excluding and anchors and not any(digits.startswith(a) for a in anchors):
+                excluding = False
+            if not excluding:
+                covered.append(digits)
+            out.append((digits, partial, excluding, surface))
     return out
+
+
+def _opens_entry(
+    text: str,
+    cut: re.Match[str],
+    entries: list[tuple[int, re.Match[str], list[tuple[str, bool]]]],
+) -> bool:
+    """Whether an entry follows "Except" directly: "excluding 10 % alloy" is prose."""
+    following = next((start for start, _, _ in entries if start >= cut.end()), None)
+    return following is not None and not text[cut.end() : following].strip(" :\u00a0")
 
 
 def _from_rows(rows: list[ResolvedRow]) -> list[GoodsCode]:

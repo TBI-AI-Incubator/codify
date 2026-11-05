@@ -84,3 +84,25 @@ def test_downgrade_restores_the_four_digit_floor(temp_db: str) -> None:
     check = _one(temp_db, _CHECK)
     assert check is not None and "{4,10}" in check[0]
     assert _one(temp_db, _COLUMN) is None
+
+
+def test_downgrade_drops_carve_outs_rather_than_reading_them_as_covered(temp_db: str) -> None:
+    _run(temp_db, command.upgrade, _REVISION)
+    engine = create_engine(_sync(temp_db), isolation_level="AUTOCOMMIT")
+    try:
+        with engine.connect() as conn:
+            # No version row to point at; replica mode skips the foreign key.
+            conn.execute(text("SET session_replication_role = replica"))
+            for code, excluded in (("9999", False), ("9998", True)):
+                conn.execute(
+                    text(
+                        "INSERT INTO goods_code_references "
+                        "(id, version_id, akn_eid, system, code, surface, source, excluded) "
+                        "VALUES (:id, :vid, 'tr_1', 'hs', :code, :code, 'column', :excluded)"
+                    ),
+                    {"id": uuid.uuid4(), "vid": uuid.uuid4(), "code": code, "excluded": excluded},
+                )
+    finally:
+        engine.dispose()
+    _run(temp_db, command.downgrade, _PREVIOUS)
+    assert _one(temp_db, "SELECT array_agg(code) FROM goods_code_references") == (["9999"],)

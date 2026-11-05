@@ -26,3 +26,16 @@ def test_an_annex_table_is_placed_and_a_rowed_one_is_left_to_its_provision() -> 
         "att_1__table_1__tbl__tr_1",
         "att_1__table_1__tbl__tr_2",
     ]
+
+
+def test_a_table_in_an_article_rowed_as_its_content_is_not_placed_twice() -> None:
+    root = _parse_version_xml(_XML)
+    assert root is not None
+    placed = _unrowed_tables(root, frozenset({"art_1__content"}))
+    assert [p.table.akn_eid for p in placed] == ["att_1__table_1__tbl"]
+
+
+def test_a_table_without_an_eid_is_skipped_rather_than_failing_the_read() -> None:
+    root = _parse_version_xml(_XML.replace(' eId="att_1__table_1__tbl"', ""))
+    assert root is not None
+    assert _unrowed_tables(root, frozenset({"art_1"})) == []

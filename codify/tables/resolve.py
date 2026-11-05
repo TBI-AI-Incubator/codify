@@ -69,12 +69,13 @@ def _text(el: etree._Element) -> str:
 
 
 def _cell_text(cell: etree._Element) -> str:
-    """A cell's paragraphs, one space apart: `_text` runs "Ferro-silicon" into
-    the "72023000" of the next line."""
-    paragraphs = [_text(c) for c in cell if _local(c) == "p"]
-    if not paragraphs:
+    """A cell of paragraphs only, one space apart: `_text` runs "Ferro-silicon"
+    into the "72023000" of the next line. Anything else reads whole."""
+    children = [c for c in cell if isinstance(c.tag, str)]
+    loose = (cell.text or "").strip() or any((c.tail or "").strip() for c in cell)
+    if not children or loose or any(_local(c) != "p" for c in children):
         return _text(cell)
-    return " ".join(p for p in paragraphs if p)
+    return " ".join(t for t in (_text(c) for c in children) if t)
 
 
 def _block_text(el: etree._Element) -> str:

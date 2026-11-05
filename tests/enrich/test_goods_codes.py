@@ -154,6 +154,46 @@ def test_a_list_of_codes_yields_each() -> None:
     assert [c[0] for c in cell_codes("9901, 9902 and 9904")] == ["9901", "9902", "9904"]
 
 
+@pytest.mark.parametrize(
+    ("text", "codes"),
+    [
+        ("9901 00 00 9902 10 00 – Widgets", ["99021000"]),
+        ("9901 9902 – Widgets", ["9902"]),
+        ("31.12.2025 – Expiry", []),
+    ],
+)
+def test_neighbouring_numbers_never_merge_into_one_code(text: str, codes: list[str]) -> None:
+    assert [c[0] for c in cell_codes(text)] == codes
+
+
+def test_codes_listed_before_a_description_share_it() -> None:
+    assert [c[0] for c in cell_codes("9901, 9902 – Widgets")] == ["9901", "9902"]
+
+
+def test_a_range_yields_no_code_rather_than_its_last_end() -> None:
+    assert cell_codes("9901 to 9905 – Widgets") == []
+
+
+@pytest.mark.parametrize("text", ["Ex 9901 10 00 – Other", "Blue widgetsex 9901 10 00 – Other"])
+def test_ex_marks_an_entry_partial(text: str) -> None:
+    assert [(c[0], c[1]) for c in cell_codes(text)] == [("99011000", True)]
+
+
+def test_a_carve_out_ends_at_a_code_outside_what_it_narrows() -> None:
+    found = cell_codes("99 – Widgets Except: 9901 – Spare; 9902 – Scrap 9801 – Gadgets")
+    assert [(c[0], c[2]) for c in found] == [
+        ("99", False),
+        ("9901", True),
+        ("9902", True),
+        ("9801", False),
+    ]
+
+
+def test_excluding_in_a_description_carves_nothing_out() -> None:
+    found = cell_codes("9901 – Alloy excluding 10 % copper 9902 – Scrap")
+    assert [c[2] for c in found] == [False, False]
+
+
 def test_a_multi_line_cell_under_a_code_header_reaches_extraction() -> None:
     doc = _doc(
         '<table eId="t1"><tr eId="t1__tr_1"><th><p>CN code</p></th></tr>'

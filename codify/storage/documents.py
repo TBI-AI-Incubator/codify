@@ -947,10 +947,11 @@ def _amendment_markers(jurisdiction_code: str | None) -> list[str]:
 
 
 async def get_version_document(
-    session: AsyncSession, version_id: uuid.UUID
+    session: AsyncSession, version_id: uuid.UUID, *, include_tables: bool = False
 ) -> VersionDocument | None:
     """Return the full body of `version_id` as a typed tree, or None if the
-    version doesn't exist."""
+    version doesn't exist. `include_tables` adds the tables no provision
+    carries; a tariff annex runs to megabytes, so it is asked for."""
     head = (
         await session.execute(
             select(Version, Law, Jurisdiction.code)
@@ -1048,7 +1049,9 @@ async def get_version_document(
         conclusions=conclusions_nodes,
         sections=root_sections,
         provisions=root_provisions,
-        tables=_unrowed_tables(root_xml, persisted_eids) if root_xml is not None else [],
+        tables=_unrowed_tables(root_xml, persisted_eids)
+        if include_tables and root_xml is not None
+        else [],
     )
 
 
@@ -1059,8 +1062,16 @@ def _unrowed_tables(
     rest inside their provision's blocks."""
     out: list[DocumentPlacedTable] = []
     for table in root.iter("{%s}table" % AKN_NS):
+        if not table.get("eId"):
+            # Uncitable, so not projected; `_walk_table` would refuse it.
+            continue
         ancestors = [a for a in reversed(list(table.iterancestors())) if a.get("eId")]
-        if any(a.get("eId") in persisted_eids for a in ancestors):
+        # The mapper stores an article's loose content as `<eId>__content`.
+        if any(
+            a.get("eId", "") + suffix in persisted_eids
+            for a in ancestors
+            for suffix in ("", "__content", "__intro")
+        ):
             continue
         wrapper = table.getparent()
         holder = wrapper.getparent() if wrapper is not None else None

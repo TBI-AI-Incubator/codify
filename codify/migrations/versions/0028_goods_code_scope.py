@@ -31,7 +31,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM goods_code_references WHERE length(code) < 4")
+    # The old schema has no carve-outs: a kept excluded row would read as covered.
+    op.execute("DELETE FROM goods_code_references WHERE length(code) < 4 OR excluded")
     op.execute(
         "ALTER TABLE goods_code_references "
         "DROP CONSTRAINT IF EXISTS goods_code_references_code_digits"

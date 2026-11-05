@@ -359,3 +359,13 @@ def test_a_cell_of_several_paragraphs_reads_them_apart() -> None:
     )
     (row,) = resolve_tables(_doc(table))
     assert row.cells[0].text == "9999 10 00 – Widgets 9999 20 00 – Gadgets"
+
+
+def test_a_cell_mixing_paragraphs_with_a_list_keeps_the_list() -> None:
+    table = _table(
+        _tr("Goods", header=True, index=1) + '<tr eId="t1__tr_2"><td><p>Intro:</p>'
+        "<blockList><item><p>(a) hot-rolled widgets</p></item></blockList></td></tr>"
+    )
+    (row,) = resolve_tables(_doc(table))
+    assert row.cells[0].text.startswith("Intro:")
+    assert row.cells[0].text.endswith("(a) hot-rolled widgets")

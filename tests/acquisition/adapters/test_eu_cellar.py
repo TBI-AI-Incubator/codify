@@ -451,3 +451,48 @@ async def test_annexes_published_beside_the_act_are_kept_in_its_body() -> None:
     assert body.count(b"<ANNEX>") == 2
     assert body.index(b"Annex I<") < body.index(b"Annex II<")
     assert b"OJ notice" not in body
+
+
+def _annex_handler(failures: dict[str, int]):  # type: ignore[no-untyped-def]
+    """The act plus one annex, whose stream fails the given number of times."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        if url.endswith("/cellar/celex/31978D0774"):
+            return httpx.Response(200, text=_BRANCH_NOTICE)
+        if url == "https://example.test/cellar/work-1234":
+            listing = "".join(
+                f'<choice href="https://example.test/cellar/work-1234/DOC_{n}" '
+                f'<value rdf:resource="stream_name">DOC_{n}.fmx<endvalue>'
+                for n in (1, 2)
+            )
+            return httpx.Response(300, text=listing)
+        if url.endswith("/DOC_2") and failures["left"] > 0:
+            failures["left"] -= 1
+            return httpx.Response(503)
+        bodies = {
+            "/DOC_1": "<?xml version='1.0'?><ACT><TITLE>act</TITLE></ACT>",
+            "/DOC_2": "<?xml version='1.0'?><ANNEX><TITLE>Annex I</TITLE></ANNEX>",
+        }
+        for suffix, text in bodies.items():
+            if url.endswith(suffix):
+                return httpx.Response(200, text=text, headers={"content-type": "application/xml"})
+        return httpx.Response(404)
+
+    return handler
+
+
+async def test_a_stream_after_the_act_that_fails_once_is_fetched_again() -> None:
+    client, acquirer = _cellar_client(_annex_handler({"left": 1}))
+    acquired = await acquirer.fetch(_OLD_REF)
+    await client.aclose()
+    assert b"Annex I<" in acquired.primary().content
+
+
+async def test_an_annex_that_cannot_be_fetched_fails_the_act_rather_than_dropping() -> None:
+    client, acquirer = _cellar_client(_annex_handler({"left": 2}))
+    with pytest.raises(httpx.HTTPStatusError):
+        await acquirer.fetch(_OLD_REF)
+    await client.aclose()

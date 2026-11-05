@@ -316,6 +316,13 @@ def _emit_text_run(container: etree._Element, *, depth: int, out: list[str]) -> 
     """Emit `<p>` children of an intro/content/wrapUp wrapper at `depth*2`
     indent. Nested `<blockList>` recurses; unknown elements flatten to text."""
     indent = "  " * depth
+    if _local(container) == "hcontainer":
+        # Bluebell has no hcontainer heading; a crossheading keeps its words.
+        parts = (_direct_child_text(container, "num"), _direct_child_text(container, "heading"))
+        title = " ".join(p for p in parts if p)
+        if title:
+            out.append(f"{indent}CROSSHEADING {title}")
+            out.append("")
     for child in container:
         cname = _local(child)
         if cname in ("num", "heading"):
