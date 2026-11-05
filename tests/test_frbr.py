@@ -193,6 +193,8 @@ def test_a_locality_joins_the_place_on_a_pattern_and_on_the_default() -> None:
     for bad in ("C01", "c/01", "c-01"):
         with pytest.raises(UncitableFrbrUri):
             build_frbr_work_uri("xa", "resolution", 2024, "4", locality=bad)
+    with pytest.raises(UncitableFrbrUri):
+        build_frbr_work_uri("", "act", 2024, "4", locality="c01")
 
 
 def test_a_locality_is_homed_in_its_country_and_reads_its_config() -> None:

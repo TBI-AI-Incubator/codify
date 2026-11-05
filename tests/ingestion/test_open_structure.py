@@ -251,3 +251,41 @@ async def test_an_attached_act_is_not_the_decisions_body() -> None:
     marked = await emit_inline_markup(etree.tostring(root, encoding="unicode"), "xa", "resolution")
     preamble = _main(marked).find("akn:preamble", NS)
     assert preamble is not None and _hrefs(preamble) == ["/akn/xa/act/0001/3"]
+
+
+def test_a_table_in_the_preamble_keeps_its_place_among_the_recitals() -> None:
+    akn = _resolution(
+        "PREAMBLE\n\n  Having regard to the Act,\n\n  TABLE\n    TR\n      TC\n        Fee\n\n"
+        "  Whereas fees apply,\n\n  HEREBY RESOLVES:\n\nBODY\n\nSECTION 1\n\n  A.\n"
+    )
+    out = emit_enacting_formula(akn, "xa", "resolution", None)
+    validate_akn(out, strict=True)
+    recitals = _main(out).find("akn:preamble/akn:recitals", NS)
+    assert recitals is not None
+    assert [etree.QName(r[0]).localname for r in recitals] == ["p", "table", "p"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("schedule", "target"),
+    [
+        (
+            "  SECTION 1\n\n    Form A.\n\n  SECTION 2\n\n    As section 1 requires.\n",
+            "#att_1__sec_1",
+        ),
+        ("  SECTION 2\n\n    As section 1 requires.\n", "#sec_1"),
+    ],
+    ids=["its own section", "the document's, when it has none"],
+)
+async def test_a_reference_inside_a_schedule_names_its_nearest_section(
+    schedule: str, target: str
+) -> None:
+    akn = parse_to_akn(
+        f"BODY\n\nSECTION 1\n\n  Outer.\n\nSCHEDULE - Forms\n\n{schedule}",
+        "xa",
+        doctype="guidance",
+        date="2024-06-01",
+        number="2",
+    )
+    marked = await emit_inline_markup(akn, "xa", "guidance")
+    assert _hrefs(_main(marked)) == [target]

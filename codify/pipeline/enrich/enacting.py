@@ -195,12 +195,9 @@ def _mark_open_preamble(akn_xml: str, terminators: list[str]) -> str:
         closing.addprevious(formula)
         closing.attrib.pop("eId", None)
         formula.append(closing)
-    # Lines after the formula are no recitals, so a second run finds none to wrap.
-    recited = (
-        list(formula.itersiblings(f"{{{AKN_NS}}}p", preceding=True))[::-1]
-        if formula is not None
-        else lines
-    )
+    # Every block before the formula, in source order; none after it, so a rerun wraps none.
+    blocks = formula.itersiblings(preceding=True) if formula is not None else reversed(preamble)
+    recited = [b for b in blocks if isinstance(b.tag, str)][::-1]
     if recited:
         recitals = etree.Element(f"{{{AKN_NS}}}recitals", eId="recitals")
         recited[0].addprevious(recitals)

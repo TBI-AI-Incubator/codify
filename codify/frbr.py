@@ -476,7 +476,8 @@ def _placed(uri: str, locality: str | None) -> str:
     if _LOCALITY.fullmatch(locality) is None:
         raise UncitableFrbrUri(f"locality {locality!r} is not a lower-case alphanumeric code")
     _, prefix, place, rest = uri.split("/", 3)
-    return f"/{prefix}/{place}-{locality}/{rest}"
+    # An empty place stays empty, for `_assert_citable` to refuse.
+    return f"/{prefix}/{place}-{locality}/{rest}" if place else uri
 
 
 def _assert_citable(uri: str, *, country: str, doctype: str, number: str) -> str:
