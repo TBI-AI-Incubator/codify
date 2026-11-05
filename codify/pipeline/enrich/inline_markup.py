@@ -107,13 +107,11 @@ async def emit_inline_markup(
     """
     cfg = load_config(country)
     root = parse_xml(akn_xml)
-    body = root.find(".//akn:body", NS)
-    if body is None:
-        # A `doc` or `statement` is read whole: its recitals cite its legal basis.
-        body = next(
-            (el for tag in OPEN_STRUCTURE_ROOTS if (el := root.find(f"akn:{tag}", NS)) is not None),
-            None,
-        )
+    # A `doc` or `statement` is read whole: its recitals cite its legal basis.
+    body = next(
+        (el for tag in OPEN_STRUCTURE_ROOTS if (el := root.find(f"akn:{tag}", NS)) is not None),
+        root.find(".//akn:body", NS),
+    )
     if body is None:
         return akn_xml
 

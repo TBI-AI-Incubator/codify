@@ -14,6 +14,7 @@ from codify.akn.document import Document
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.pipeline.enrich.conclusions import find_displaced_attestation, lift_attestation
 from codify.pipeline.enrich.enacting import emit_enacting_formula
+from codify.pipeline.enrich.inline_markup import emit_inline_markup
 from codify.pipeline.enrich.metadata import ExtractedMetadata
 from codify.pipeline.enrich.scaffold import BodyBlock, BodyFillResponse
 from codify.pipeline.events import Complete
@@ -228,3 +229,25 @@ def test_the_main_body_is_the_body_before_any_attachment() -> None:
     )
     body = main_body(act)
     assert body is not None and body.getparent() is act[0]
+
+
+def _q(tag: str) -> str:
+    return f"{{{NS['akn']}}}{tag}"
+
+
+@pytest.mark.asyncio
+async def test_an_attached_act_is_not_the_decisions_body() -> None:
+    root = etree.fromstring(
+        _resolution(
+            "PREAMBLE\n\n  Having regard to Assembly Act No. 3,\n\nBODY\n\nSECTION 1\n\n  A.\n"
+        ).encode()
+    )
+    attachment = etree.SubElement(etree.SubElement(root[0], _q("attachments")), _q("attachment"))
+    attached = etree.SubElement(etree.SubElement(attachment, _q("act")), _q("body"))
+    etree.SubElement(attached, _q("p")).text = "Attached."
+
+    body = main_body(root)
+    assert body is not None and body.getparent() is root[0]
+    marked = await emit_inline_markup(etree.tostring(root, encoding="unicode"), "xa", "resolution")
+    preamble = _main(marked).find("akn:preamble", NS)
+    assert preamble is not None and _hrefs(preamble) == ["/akn/xa/act/0001/3"]
