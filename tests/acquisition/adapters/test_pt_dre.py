@@ -14,10 +14,14 @@ from lxml import etree
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef
 from codify.acquisition.adapters.pt.dre import (
+    DATA,
+    DETAIL,
+    FRAG,
     USER_AGENT,
     DiarioAcquirer,
     DrItemMissing,
     SiteChanged,
+    api_version,
     number_and_year,
 )
 from codify.acquisition.adapters.pt.dre_akn import (
@@ -164,6 +168,21 @@ LANDINGS = {
 }
 
 
+VIEWS = {view for _, _, view in (DETAIL, FRAG, DATA)}
+
+
+def _script(view: str, apis: dict[str, str]) -> str:
+    """A screen script trimmed to the calls that name its actions' apiVersions."""
+    calls = "".join(
+        f'return controller.callDataAction("{path.rsplit("/", 1)[1]}", '
+        f'"00000000-0000-4000-8000-000000000000", "screenservices/dr/{path}", "{api}", '
+        "function (b) {});\n"
+        for path, api in apis.items()
+        if path.startswith(view.replace(".", "/") + "/")
+    )
+    return f'define("dr.{view}.mvc$controller", [], function () {{\n{calls}}});\n'
+
+
 class Gazette:
     """The site's answers, and every request it was asked."""
 
@@ -173,10 +192,16 @@ class Gazette:
         *,
         changed: bool = False,
         last: str = "2043-03-01",
+        answer: dict[str, Any] | str | None = None,
     ):
         self.frags = CONSOLIDATED if frags is None else frags
         self.changed = changed
         self.last = last
+        # What every screen call answers instead, when set.
+        self.answer = answer
+        self.module = "mv-1"
+        self.apis = {path: api for path, api, _ in (DETAIL, FRAG, DATA)}
+        self.manifest = {f"/dr/scripts/dr.{view}.mvc.js": "?h1" for view in VIEWS}
         self.seen: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
@@ -191,11 +216,26 @@ class Gazette:
             target = LANDINGS.get(request.url.params["search"], "/dr/error")
             return httpx.Response(301, headers={"location": SITE + target})
         if path == "/dr/moduleservices/moduleversioninfo":
-            return httpx.Response(200, json={"versionToken": "mv-1"})
+            return httpx.Response(200, json={"versionToken": self.module})
+        if path == "/dr/moduleservices/moduleinfo":
+            manifest = {"versionToken": self.module, "urlVersions": self.manifest}
+            return httpx.Response(200, json={"manifest": manifest})
+        if path.startswith("/dr/scripts/dr."):
+            view = path.removeprefix("/dr/scripts/dr.").removesuffix(".mvc.js")
+            return httpx.Response(200, text=_script(view, self.apis))
         if path.startswith("/dr/screenservices/dr/"):
             body = json.loads(request.content)
             v = body["screenData"]["variables"]
-            info = {"hasApiVersionChanged": self.changed}
+            sent = body["versionInfo"]
+            info = {
+                "hasModuleVersionChanged": sent["moduleVersion"] != self.module,
+                "hasApiVersionChanged": self.changed
+                or sent["apiVersion"] != self.apis.get(path.removeprefix("/dr/screenservices/dr/")),
+            }
+            if isinstance(self.answer, str):
+                return httpx.Response(200, text=self.answer)
+            if self.answer is not None:
+                return httpx.Response(200, json={"versionInfo": info, **self.answer})
             if path.endswith("DataActionGetAllConteudoDetalheData"):
                 data: dict[str, Any] = {"DetalheConteudo": DETAILS.get(f"{v['Tipo']}/{v['Key']}")}
             elif path.endswith("DataActionGetDiplomaFragByIdAndApplicationSetting"):
@@ -441,9 +481,83 @@ async def test_a_fragment_outside_the_tree_is_refused() -> None:
         await _fetch(Gazette(stray), _ref("7", 2042))
 
 
-async def test_a_changed_site_api_stops_the_fetch() -> None:
-    with pytest.raises(SiteChanged):
-        await _fetch(Gazette(changed=True), _ref("7", 2042))
+SCREEN_SCRIPT = (
+    'return controller.callDataAction("DataActionGetX", "00000000-0000-4000-8000-000000000000", '
+    '"screenservices/dr/Mod/Screen/DataActionGetX", "Ab+c/D_e-F==", function (b) {\n'
+    'return controller.callServerAction("GetY", "screenservices/dr/Mod/Screen/ActionGetY", '
+    '"Yy9_zz", inputs, controller.callContext(callContext), undefined, undefined, false);\n'
+)
+
+
+def test_a_screen_script_names_each_actions_api_version() -> None:
+    assert api_version(SCREEN_SCRIPT, "Mod/Screen/DataActionGetX") == "Ab+c/D_e-F=="
+    assert api_version(SCREEN_SCRIPT, "Mod/Screen/ActionGetY") == "Yy9_zz"
+    # A prefix of an action, or the same action on another screen, is not named.
+    assert api_version(SCREEN_SCRIPT, "Mod/Screen/DataActionGet") is None
+    assert api_version(SCREEN_SCRIPT, "Mod/Other/DataActionGetX") is None
+
+
+async def test_a_redeployed_site_is_rediscovered_once_and_the_call_retried() -> None:
+    gazette = Gazette()
+    client = httpx.AsyncClient(transport=httpx.MockTransport(gazette))
+    acquirer = DiarioAcquirer(SourceAdapter(kind="json_portal", name="dre"), client=client)
+    await acquirer.fetch(_ref("7", 2042))
+    gazette.module, gazette.apis[DATA[0]] = "mv-2", "Fresh+Api/Version=="
+    for _ in range(2):
+        doc = await acquirer.fetch(_ref("7", 2042))
+    await client.aclose()
+
+    assert doc.upstream_metadata["text_source"] == "consolidated"
+    found = [r.url for r in gazette.seen if r.url.path.startswith("/dr/scripts/")]
+    assert [(u.path, u.query) for u in found] == [
+        ("/dr/scripts/dr.LegislacaoConsolidada.LegCons_Detalhe.mvc.js", b"h1")
+    ]
+    assert sum(r.url.path == "/dr/moduleservices/moduleinfo" for r in gazette.seen) == 1
+    sent = [
+        json.loads(r.content)["versionInfo"] for r in gazette.seen if r.url.path.endswith(DATA[0])
+    ]
+    pinned = {"moduleVersion": "mv-1", "apiVersion": DATA[1]}
+    fresh = {"moduleVersion": "mv-2", "apiVersion": "Fresh+Api/Version=="}
+    assert sent == [pinned, pinned, fresh, fresh]
+
+
+async def test_a_site_still_reporting_a_new_version_after_rediscovery_stops_the_fetch() -> None:
+    gazette = Gazette(changed=True)
+    with pytest.raises(SiteChanged, match="still reports a new API version"):
+        await _fetch(gazette, _ref("7", 2042))
+    assert sum(r.url.path == "/dr/moduleservices/moduleinfo" for r in gazette.seen) == 1
+    assert sum(r.url.path.endswith(FRAG[0]) for r in gazette.seen) == 2
+
+
+@pytest.mark.parametrize(
+    ("unlisted", "match"),
+    [(True, "manifest no longer lists"), (False, "script no longer names this action")],
+)
+async def test_an_action_the_site_no_longer_names_stops_the_fetch(
+    unlisted: bool, match: str
+) -> None:
+    gazette = Gazette()
+    del gazette.apis[DATA[0]]
+    if unlisted:
+        gazette.manifest.clear()
+    with pytest.raises(SiteChanged, match=match):
+        await _fetch(gazette, _ref("7", 2042))
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        {"exception": {"name": "ServerException"}},
+        {"data": None},
+        {"exception": {"name": "ServerException"}, "data": {}},
+        "<html>",
+    ],
+)
+async def test_an_answer_of_another_shape_is_refused_not_rediscovered(answer: Any) -> None:
+    gazette = Gazette(answer=answer)
+    with pytest.raises(DrItemMissing):
+        await _fetch(gazette, _ref("7", 2042))
+    assert not any(r.url.path == "/dr/moduleservices/moduleinfo" for r in gazette.seen)
 
 
 async def test_saved_answers_are_read_before_the_network(tmp_path: Path) -> None:
