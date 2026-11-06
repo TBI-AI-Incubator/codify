@@ -353,16 +353,22 @@ class TestCoverageCanFail:
         scan = scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source)
         assert _find(scan, "anchor_coverage").detail.get("reason") == reason
 
-    def test_a_containers_only_source_fails_as_the_structurer_refuses_it(self) -> None:
+    @pytest.mark.parametrize(
+        ("floor", "verdict"),
+        [(0.8, (True, "containers_only")), (0.0, (None, "no_threshold_declared"))],
+    )
+    def test_a_containers_only_source_fails_where_the_structurer_refuses_it(
+        self, floor: float, verdict: tuple[bool | None, str]
+    ) -> None:
         """Parts and chapters anchored and no section: the body text lands in no
-        provision, which is a loss, not a source with nothing to count."""
+        provision. The structurer refuses it only under a declared floor."""
         source = "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n"
-        gb = load_config("gb")
+        gb = load_config("gb").model_copy(update={"min_anchor_coverage": floor})
         finding = _find(
             scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source),
             "anchor_coverage",
         )
-        assert (finding.failed, finding.detail["reason"]) == (True, "containers_only")
+        assert (finding.failed, finding.detail["reason"]) == verdict
 
 
 class TestEras:

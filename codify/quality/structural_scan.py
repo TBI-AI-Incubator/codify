@@ -295,7 +295,9 @@ def _check_anchor_coverage(
         if coverage.state == "captured_unmeasured":
             return Finding("anchor_coverage", None, {**detail, "reason": "captured_unmeasured"})
         if coverage.containers:
-            return Finding("anchor_coverage", True, {**detail, "reason": "containers_only"})
+            # The ingest halt runs only with a declared floor; agree with it.
+            reason = "containers_only" if threshold > 0 else "no_threshold_declared"
+            return Finding("anchor_coverage", threshold > 0 or None, {**detail, "reason": reason})
         return Finding("anchor_coverage", None, {**detail, "reason": "no_markers_in_source"})
     detail["ratio"] = round(coverage.ratio, 4)
     if threshold <= 0:
