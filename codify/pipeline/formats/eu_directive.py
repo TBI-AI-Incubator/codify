@@ -1394,9 +1394,12 @@ def _build_conclusions(src: etree._Element) -> etree._Element | None:
     """
     final = src.find("FINAL")
     signature = final.find("SIGNATURE") if final is not None else src.find("SIGNATURE")
-    if signature is None:
-        return None
     conclusions = etree.Element("{%s}conclusions" % AKN_NS)
+    # The closing formula ("shall be binding"), which a consolidation keeps without a signature.
+    for src_p in final.findall("P") if final is not None else []:
+        _serialize_inline(src_p, _akn(conclusions, "p"))
+    if signature is None:
+        return conclusions if len(conclusions) else None
 
     # AKN <conclusions> takes (formula | blockContainer | p)*; only valid
     # @name values for <formula> are 'enactingFormula' and 'promulgation'.

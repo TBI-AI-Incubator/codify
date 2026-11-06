@@ -109,6 +109,27 @@ def test_the_publication_is_the_consolidation_not_a_missing_journal_issue() -> N
     assert events == [("2042-01-15", "generation"), ("2045-03-01", "amendment")]
 
 
+def test_the_closing_formula_is_kept_without_a_signature() -> None:
+    conclusions = _convert().find(".//a:conclusions", NS)
+    assert "".join(conclusions.itertext()) == "This Regulation shall be binding in its entirety."
+
+
+def test_an_adopted_acts_closing_formula_comes_before_its_signature() -> None:
+    adopted = (
+        "<ACT><BIB.INSTANCE><DATE ISO='20420115'>20420115</DATE></BIB.INSTANCE>"
+        "<ENACTING.TERMS><ARTICLE><TI.ART>Article 1</TI.ART>"
+        "<PARAG><TXT>Text.</TXT></PARAG></ARTICLE></ENACTING.TERMS>"
+        "<FINAL><P>This Regulation shall be binding.</P><SIGNATURE><PL.DATE><P>Done at Brussels."
+        "</P></PL.DATE><SIGNATORY><P>For the Council</P></SIGNATORY></SIGNATURE></FINAL></ACT>"
+    )
+    conclusions = _convert(adopted).find(".//a:conclusions", NS)
+    assert ["".join(c.itertext()) for c in conclusions] == [
+        "This Regulation shall be binding.",
+        "Done at Brussels.",
+        "For the Council",
+    ]
+
+
 def test_the_consolidated_annex_is_an_attachment() -> None:
     root = _convert()
     attachments = root.findall(".//a:attachments/a:attachment", NS)

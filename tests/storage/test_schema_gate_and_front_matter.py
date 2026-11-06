@@ -118,3 +118,21 @@ class TestFrontMatterSurvivesTheRoundTrip:
         names = [etree.QName(c).localname for c in act]
         assert names[-2:] == ["conclusions", "attachments"]
         gate_akn(out, where="test")
+
+
+def test_a_consolidated_texts_version_status_survives_the_round_trip() -> None:
+    """The model holds neither field, so a correction would otherwise read as the
+    authentic original."""
+    source = _act().replace('<act name="act">', '<act name="act" contains="singleVersion">')
+    source = source.replace(
+        '<FRBRlanguage language="eng"/>',
+        '<FRBRauthoritative value="false"/><FRBRlanguage language="eng"/>',
+    )
+    out = _restore_non_body(source, to_akn(parse_akn(source)))
+    act = next(iter(etree.fromstring(out.encode())))
+    assert act.get("contains") == "singleVersion"
+    flag = act.find(
+        f"{{{NS}}}meta/{{{NS}}}identification/{{{NS}}}FRBRExpression/{{{NS}}}FRBRauthoritative"
+    )
+    assert flag.get("value") == "false"
+    gate_akn(out, where="test")

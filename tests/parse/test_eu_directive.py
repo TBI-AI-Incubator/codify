@@ -1200,9 +1200,9 @@ class TestTheBodyWalkCountsWhatItDiscards:
         assert "Done at the seat" in out
         assert "body_discarded_text" not in provenance
 
-    def test_a_closer_the_conclusions_drop_is_still_a_loss(self) -> None:
-        """The other half of the same question: no signature, nothing emitted, so
-        exempting the tag by name would have hidden a real drop."""
+    def test_an_unsigned_closer_the_conclusions_emit_is_not_a_loss(self) -> None:
+        """A consolidated text keeps the closing formula and drops the signature,
+        so the conclusions carry the closer alone."""
         provenance: dict = {}
         out = formex_to_akn4eu(
             "<DOCUMENT><DATE.OF.DOCUMENT ISO='2024-01-01'>1 Jan 2024</DATE.OF.DOCUMENT>"
@@ -1210,7 +1210,18 @@ class TestTheBodyWalkCountsWhatItDiscards:
             "<FINAL><P>An unsigned closer.</P></FINAL></DOCUMENT>",
             provenance=provenance,
         )
-        assert "unsigned closer" not in out
+        assert "unsigned closer" in out
+        assert "body_discarded_text" not in provenance
+
+    def test_a_closer_the_conclusions_do_not_emit_is_still_a_loss(self) -> None:
+        provenance: dict = {}
+        out = formex_to_akn4eu(
+            "<DOCUMENT><DATE.OF.DOCUMENT ISO='2024-01-01'>1 Jan 2024</DATE.OF.DOCUMENT>"
+            "<ARTICLE IDENTIFIER='001'><PARAG><TXT>One.</TXT></PARAG></ARTICLE>"
+            "<FINAL><NOTE>A note.</NOTE></FINAL></DOCUMENT>",
+            provenance=provenance,
+        )
+        assert "<conclusions" not in out
         assert provenance.get("body_discarded_text") == 1
 
     @pytest.mark.parametrize("tag", ["ANNEX", "APPENDIX"])

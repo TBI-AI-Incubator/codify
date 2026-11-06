@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from codify.akn._schema import AKN_NS
 from codify.akn.elements import ElementBase
 from codify.storage.models import Jurisdiction, Law, Version
 from codify.storage.schema_gate import gate_akn
@@ -418,6 +420,22 @@ async def latest_versions_global(
     return [row[0] for row in result.all()]
 
 
+def _carry_version_status(src_doc: Any, out_doc: Any) -> bool:
+    """Copy a non-original `contains` and a `FRBRauthoritative` the model does not hold,
+    so a correction to a consolidated text still says it is not the authentic act."""
+    ns = {"a": AKN_NS}
+    carried = False
+    if src_doc.get("contains", "originalVersion") != "originalVersion":
+        out_doc.set("contains", src_doc.get("contains"))
+        carried = True
+    expression = "a:meta/a:identification/a:FRBRExpression"
+    flag = src_doc.find(f"{expression}/a:FRBRauthoritative", ns)
+    if flag is not None:
+        out_doc.find(f"{expression}/a:FRBRlanguage", ns).addprevious(copy.deepcopy(flag))
+        carried = True
+    return carried
+
+
 def _restore_non_body(source_xml: str, emitted_xml: str) -> str:
     """Put back the document children `to_akn` does not model: `<preface>`,
     `<preamble>`, `<conclusions>` and `<coverPage>`, which are absent from the
@@ -436,7 +454,8 @@ def _restore_non_body(source_xml: str, emitted_xml: str) -> str:
 
     emitted = set(_names(out_doc))
     missing = [c for c in src_doc if etree.QName(c).localname not in emitted | {"meta"}]
-    if not missing:
+    carried = _carry_version_status(src_doc, out_doc)
+    if not missing and not carried:
         # Nothing to put back, so do not re-serialise: the round-trip would
         # drop the XML declaration and change bytes for no reason.
         return emitted_xml
