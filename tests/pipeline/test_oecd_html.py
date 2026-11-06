@@ -1240,3 +1240,47 @@ def test_an_instrument_without_lettered_parts_keeps_its_eids() -> None:
         "sec_II__para_1__point_ii", "sec_II__para_2", "sec_III", "sec_III__para_3",
         "sec_IV", "sec_V", "sec_V__para_4",
     ]  # fmt: skip
+
+
+def test_a_lettered_annex_does_not_turn_later_roman_letters_into_sections() -> None:
+    letters = "".join(f"<p>{c}. Part {c}</p><p>1. Keep lantern {c} lit.</p>" for c in "ABCDEFGHIJ")
+    body = (
+        "<p>THE COUNCIL,</p><p>I. RECOMMENDS that Adherents keep lanterns lit.</p>"
+        "<p>Annex I: Good Practice Guidance on Lanterns</p>"
+        f"<p>Keepers should note this.</p>{letters}"
+    )
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    sections = [e for e in _eids(root, "section") if e.startswith("att_1__")]
+    assert sections[1:] == [f"att_1__sec_{c}" for c in "ABCDEFGHIJ"]
+    assert not _eids(root, "subsection")
+
+
+def test_an_annex_mention_in_running_text_is_not_a_caption() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents keep lanterns lit.</p>
+<p>Annex I: sets out the guidance that keepers should follow when lighting a lantern at dusk</p>
+<p>II. RECOMMENDS that Adherents keep registers.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert not root.findall(".//a:attachment", NS)
+    assert "sec_II" in _eids(root, "section")
+
+
+def test_an_unpunctuated_lettered_item_stays_text_not_a_heading() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>A. light every lantern at dusk</p>
+<p>1. Check the wick.</p>
+<p>B. Registers</p>
+<p>1. Keep a register.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    a, b = root.findall(".//a:subsection", NS)
+    assert a.find("a:heading", NS) is None
+    assert "light every lantern at dusk" in "".join(a.itertext())
+    assert b.findtext("a:heading", namespaces=NS) == "Registers"

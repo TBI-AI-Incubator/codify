@@ -72,7 +72,8 @@ _NUM_PAREN = re.compile(r"^(\d{1,3})\)\s+(.*)$", re.DOTALL)
 _LETTER_PARA = re.compile(r"^([a-z]|[ivxl]{2,6})\.\s+(.*)$", re.DOTALL)
 _SUBPART = re.compile(r"^([A-Z])\.\s+(.*)$", re.DOTALL)
 _ANNEX_TITLED = re.compile(
-    rf"^(?:ANNEXE?|Annexe?|APPENDI(?:X|CE)|Appendi(?:x|ce))\s+(?:{_ROMAN}|\d+|[A-Z])\s*[:.]\s*\S"
+    rf"^(?:ANNEXE?|Annexe?|APPENDI(?:X|CE)|Appendi(?:x|ce))\s+(?:{_ROMAN}|\d+|[A-Z])"
+    r"\s*[:.]\s*[A-Z0-9“\"«]"
 )
 _SUBPART_WORDS = 25
 _POINT = re.compile(r"^([ivxl]{1,6}|[a-z])\)\s+(.*)$", re.DOTALL)
@@ -430,7 +431,10 @@ class _Builder:
             return True
         if _operative(rest) is not None:
             return True
-        part = next((n for n in reversed(self.stack) if n.kind == "subsection"), None)
+        part = next(
+            (n for n in reversed(self.stack) if n.kind == "subsection" or n.eid in self.lettered),
+            None,
+        )
         if part is not None and _follows(part.key.lower(), numeral.lower()):
             return False
         return _roman_value(numeral.lower()) <= self.last_roman + 1
@@ -439,14 +443,20 @@ class _Builder:
         """Open `A. Heading` as a sub-part of the open section or article, or as an
         annex's own top-level section; false when the line is not heading-like."""
         rest = rest.strip()
-        titled = len(rest.split()) <= _SUBPART_WORDS and not rest.endswith((".", ";", ",", ":"))
+        titled = (
+            len(rest.split()) <= _SUBPART_WORDS
+            and rest[:1].isupper()
+            and not rest.endswith((".", ";", ",", ":"))
+        )
         parent = next((n for n in reversed(self.stack) if n.kind in ("section", "article")), None)
         if (parent is None and not self.scope) or (parent is None and not titled):
             return False
         if parent is not None and parent.eid in self.lettered:
             parent = None
         kind = "subsection" if parent is not None else "section"
+        last_roman = self.last_roman
         node = self._open(kind, f"{letter}.", letter, heading=rest if titled else None)
+        self.last_roman = last_roman
         if not titled:
             node.text.append(rest)
         if parent is None:
@@ -789,7 +799,11 @@ def _annex_caption(block: str) -> bool:
     m = _ANNEX.match(block)
     if m is None:
         return False
-    if _ANNEX_TITLED.match(block) and len(block.split()) <= _SUBPART_WORDS * 2:
+    if (
+        _ANNEX_TITLED.match(block)
+        and len(block.split()) <= _SUBPART_WORDS * 2
+        and not block.rstrip().endswith((".", ";", ","))
+    ):
         return True
     # `Annex I to Annex A:` is a caption whose colon opens the annex.
     return not m.group(2) or _is_heading(block.rstrip().rstrip(":"))
