@@ -7,6 +7,7 @@ rubric. _ScanCollector harvests orphaned_drops + container from the scan trace
 
 from __future__ import annotations
 
+from codify.pipeline.enrich.anchors import AnchorCoverage
 from codify.pipeline.enrich.structure import AmbiguitySpan, ScanTrace
 from codify.pipeline.formats.pdf import _ScanCollector
 
@@ -68,3 +69,16 @@ def test_accumulates_across_multiple_traces() -> None:
     )
     assert collector.orphaned_drops == [{"a": 1, "start": 1}, {"b": 2, "start": 5}]
     assert collector.container == {"x": 1}  # last trace's container wins
+
+
+def test_collects_the_coverage_state_the_validator_marks() -> None:
+    collector = _ScanCollector(forward=None)
+    cov = AnchorCoverage(
+        kind="section", ratio=None, captured=frozenset({"1", "2"}), expected=frozenset()
+    )
+    collector(ScanTrace(anchors=(), coverage=cov))
+    assert collector.anchor_coverage == {
+        "kind": "section",
+        "state": "captured_unmeasured",
+        "captured": 2,
+    }

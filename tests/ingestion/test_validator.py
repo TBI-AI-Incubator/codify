@@ -1410,6 +1410,28 @@ class TestUnreadablePagesAndBodyFill:
         ]
 
 
+class TestAnchorCoverageUnmeasured:
+    """Units the scan captured with no marker to count them against land, marked."""
+
+    def test_captured_and_unmeasured_warns(self):
+        cov = {"kind": "section", "state": "captured_unmeasured", "captured": 2}
+        found = [
+            (i["severity"], i["count"])
+            for i in validate_akn(_numbered(1, 2), anchor_coverage=cov)
+            if i["check"] == "anchor_coverage_unmeasured"
+        ]
+        assert found == [("warning", 2)]
+
+    @pytest.mark.parametrize("state", ["measured", "empty"])
+    def test_a_measured_or_empty_coverage_is_silent(self, state):
+        cov = {"kind": "section", "state": state, "captured": 2}
+        assert not [
+            i
+            for i in validate_akn(_numbered(1, 2), anchor_coverage=cov)
+            if i["check"] == "anchor_coverage_unmeasured"
+        ]
+
+
 class TestRuleNumbering:
     """Rules are a basic unit too, so their numbering is checked like the others."""
 
