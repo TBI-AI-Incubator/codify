@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import re
+import zipfile
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import ClassVar, Literal
 
 import httpx
@@ -30,12 +32,18 @@ DEFAULT_LICENCE = "EU-RU/2011/833"
 logger = structlog.get_logger()
 
 _FORMEX = "application/xml;type=fmx4"
+# Cellar serves a consolidated text's FORMEX only as a zip.
+_FORMEX_ZIP = "application/zip;mtype=fmx4"
+_MAX_CONSOLIDATED_BYTES = 256 * 1024 * 1024
 # Old acts have an html manifestation, not xhtml; one header asks for either.
 _XHTML = "application/xhtml+xml, text/html"
 
 # CELEX, sector? + year + descriptor + number, optional corrigendum / suffix.
 # Corrigenda resolve to the same FRBR work, distinct-expression handling deferred.
 _CELEX_RE = re.compile(r"^(\d)?(\d{4})([A-Z]+)(\d+)(?:R\(\d+\)|[A-Z]\d{2})?$")
+# A consolidated text: sector 0, the base act, and the date it is consolidated to.
+_CONSOLIDATED_RE = re.compile(r"^0(\d{4}[A-Z]+\d+)-(\d{4})(\d{2})(\d{2})$")
+_BASE_CELEX_RE = re.compile(r"3\d{4}[A-Z]+\d+")
 _DESCRIPTOR_TO_DOCTYPE = {
     "L": "directive",
     "R": "regulation",
@@ -44,14 +52,24 @@ _DESCRIPTOR_TO_DOCTYPE = {
 
 
 def celex_to_frbr(celex: str) -> tuple[str, str]:
-    """Return (frbr_work_uri, doctype) for a CELEX. Raises on unknown shape."""
-    m = _CELEX_RE.match(celex)
+    """Return (frbr_work_uri, doctype) for a CELEX. Raises on unknown shape.
+
+    A consolidated text maps to its base act's work."""
+    consolidated = _CONSOLIDATED_RE.match(celex)
+    m = _CELEX_RE.match(consolidated[1] if consolidated else celex)
     if not m:
         raise ValueError(f"unrecognised CELEX: {celex!r}")
     _sector, year, descriptor, num = m.groups()
     doctype = _DESCRIPTOR_TO_DOCTYPE.get(descriptor, descriptor.lower())
     number = num.lstrip("0") or "0"
     return build_frbr_work_uri("eu", doctype, int(year), number), doctype
+
+
+def consolidation_date(celex: str) -> str | None:
+    """The ISO date a consolidated-text CELEX (`02023R0956-20251020`) is consolidated
+    to; None for any other CELEX. Raises on an impossible date."""
+    m = _CONSOLIDATED_RE.match(celex)
+    return date(int(m[2]), int(m[3]), int(m[4])).isoformat() if m else None
 
 
 class EuCellarAcquirer(BaseAcquirer):
@@ -75,6 +93,8 @@ class EuCellarAcquirer(BaseAcquirer):
         if not celex:
             raise ValueError("EU fetch requires DocumentRef.extra['celex']")
         languages = ref.languages or ["eng"]
+        as_of = consolidation_date(celex)
+        fetch_one = self._fetch_consolidated if as_of else self._fetch_lang
 
         bodies: list[Body] = []
         etag: str | None = None
@@ -82,7 +102,7 @@ class EuCellarAcquirer(BaseAcquirer):
 
         formats: dict[str, str] = {}
         for lang in languages:
-            xml, headers, media_type = await self._fetch_lang(celex, lang)
+            xml, headers, media_type = await fetch_one(celex, lang)
             formats[lang] = "html" if media_type == "text/html" else "formex"
             bodies.append(
                 Body(
@@ -99,14 +119,19 @@ class EuCellarAcquirer(BaseAcquirer):
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=frbr_work_uri,
-            expression_uri=f"{frbr_work_uri}/{languages[0]}@",
+            expression_uri=f"{frbr_work_uri}/{languages[0]}@{as_of or ''}",
             bodies=bodies,
             source_url=f"{CELLAR_BASE}/{celex}",
             fetched_at=datetime.now(UTC),
             etag=etag,
             last_modified=last_modified,
             licence=DEFAULT_LICENCE,
-            upstream_metadata={"celex": celex, "languages": languages, "formats": formats},
+            upstream_metadata={
+                "celex": celex,
+                "languages": languages,
+                "formats": formats,
+                **({"consolidated": as_of} if as_of else {}),
+            },
         )
 
     async def discover(self, query: DiscoveryQuery) -> AsyncIterator[DocumentRef]:
@@ -180,6 +205,57 @@ class EuCellarAcquirer(BaseAcquirer):
             )
             out.append((ref, codes))
         return out
+
+    async def discover_consolidations(
+        self, celex: str, *, language: str = "eng"
+    ) -> list[DocumentRef]:
+        """The consolidated texts of base act `celex` with FORMEX in `language`, oldest
+        first. Consolidations held only as XHTML or PDF are left out: they do not convert."""
+        resp = await self._client.post(
+            SPARQL_ENDPOINT,
+            data={
+                "query": _build_consolidations_sparql(celex, language),
+                "format": "application/sparql-results+json",
+            },
+            headers={"accept": "application/sparql-results+json"},
+        )
+        resp.raise_for_status()
+        refs: list[DocumentRef] = []
+        for binding in resp.json().get("results", {}).get("bindings", []):
+            consolidated = binding.get("celex", {}).get("value", "")
+            try:
+                as_of = consolidation_date(consolidated)
+                work_uri, doctype = celex_to_frbr(consolidated)
+            except ValueError:
+                as_of = None
+            if as_of is None:
+                logger.warning("cellar_consolidation_skipped", base=celex, celex=consolidated)
+                continue
+            year, number = work_uri.rsplit("/", 2)[1:]
+            refs.append(
+                DocumentRef(
+                    jurisdiction_code="eu",
+                    doctype=doctype,
+                    year=int(year),
+                    number=number,
+                    languages=[language],
+                    as_of=date.fromisoformat(as_of),
+                    extra={"celex": consolidated},
+                )
+            )
+        return refs
+
+    async def _fetch_consolidated(
+        self, celex: str, language: str
+    ) -> tuple[str, dict[str, str], Literal["application/xml", "text/html"]]:
+        """A consolidated text's FORMEX. There is no XHTML fallback: consolidated
+        XHTML does not convert, so a text without FORMEX in `language` fails."""
+        resp = await self._client.get(
+            f"{CELLAR_BASE}/{celex}",
+            headers={"accept": _FORMEX_ZIP, "accept-language": language},
+        )
+        resp.raise_for_status()
+        return _consolidated_text(resp.content), dict(resp.headers), "application/xml"
 
     async def _fetch_lang(
         self, celex: str, language: str
@@ -298,6 +374,27 @@ class EuCellarAcquirer(BaseAcquirer):
         return candidates[0][0], annexes
 
 
+def _consolidated_text(archive: bytes) -> str:
+    """The one CONS.ACT document in a consolidated text's FORMEX zip, which also
+    carries the OJ notice and the images the text includes."""
+    with zipfile.ZipFile(io.BytesIO(archive)) as zf:
+        found: list[zipfile.ZipInfo] = []
+        for info in zf.infolist():
+            if not info.filename.lower().endswith(".xml"):
+                continue
+            if info.file_size > _MAX_CONSOLIDATED_BYTES:
+                raise ValueError(f"{info.filename} is {info.file_size} bytes unpacked")
+            with zf.open(info) as member:
+                if b"<CONS.ACT" in member.read(1024):
+                    found.append(info)
+        if len(found) != 1:
+            names = [i.filename for i in zf.infolist()]
+            raise RuntimeError(
+                f"expected one CONS.ACT document in the zip, found {len(found)}: {names}"
+            )
+        return zf.read(found[0]).decode("utf-8")
+
+
 def _media_type_of(response: httpx.Response) -> Literal["application/xml", "text/html"]:
     """HTML by the content-type, or by the body when Cellar labels it generically."""
     ctype = response.headers.get("content-type", "").lower()
@@ -394,6 +491,31 @@ def _build_sparql(query: DiscoveryQuery) -> str | None:
     )
 
 
+def _build_consolidations_sparql(celex: str, language: str) -> str:
+    """SPARQL: a base act's consolidated texts with a FORMEX manifestation in a language."""
+    if not _BASE_CELEX_RE.fullmatch(celex):
+        raise ValueError(f"not a sector-3 CELEX of a base act: {celex!r}")
+    if not re.fullmatch(r"[a-z]{3}", language):
+        raise ValueError(f"not an ISO 639-3 language code: {language!r}")
+    return (
+        "PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>\n"
+        "SELECT DISTINCT ?celex ?date WHERE {\n"
+        "  ?base cdm:resource_legal_id_celex ?baseCelex .\n"
+        f'  FILTER(STR(?baseCelex) = "{celex}")\n'
+        "  ?cons cdm:act_consolidated_based_on_resource_legal ?base ;\n"
+        "        cdm:resource_legal_id_celex ?celex ;\n"
+        "        cdm:act_consolidated_date ?date .\n"
+        "  ?expr cdm:expression_belongs_to_work ?cons ;\n"
+        "        cdm:expression_uses_language "
+        f"<http://publications.europa.eu/resource/authority/language/{language.upper()}> .\n"
+        "  ?manif cdm:manifestation_manifests_expression ?expr ;\n"
+        "         cdm:manifestation_type ?type .\n"
+        '  FILTER(STR(?type) = "fmx4")\n'
+        "}\n"
+        "ORDER BY ?date\n"
+    )
+
+
 def _build_directives_sparql(
     *,
     year_from: int | None,
@@ -435,4 +557,4 @@ def _build_directives_sparql(
     )
 
 
-__all__ = ["EuCellarAcquirer", "celex_to_frbr"]
+__all__ = ["EuCellarAcquirer", "celex_to_frbr", "consolidation_date"]

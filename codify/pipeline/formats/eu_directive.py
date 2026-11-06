@@ -19,6 +19,7 @@ from lxml import etree
 from codify.acquisition.adapters.eu.cellar import celex_to_frbr as _celex_to_frbr_tuple
 from codify.akn import Document
 from codify.akn._schema import parse_xml
+from codify.akn.eids import ensure_unique_eids
 from codify.akn.io import parse_akn
 from codify.akn.vocabulary import table_row_eid
 from codify.core.tracing import attach_trace_attribution, langfuse_trace_context
@@ -144,8 +145,7 @@ def _detect_format(xml: str | bytes) -> Literal["akn4eu", "formex"]:
         "REG",
         "DIR",
         "DEC",
-        "CONS_TEXT",
-        "CONS_ACT",
+        "CONS.ACT",
         "ACT",
         "DOC",
         "GENERAL",
@@ -238,6 +238,72 @@ def _unwrap_general(src: etree._Element) -> None:
     for child in list(contents):
         contents.addprevious(child)
     src.remove(contents)
+
+
+def _compact_iso(raw: str | None) -> str | None:
+    raw = (raw or "").strip()
+    return f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" if _FORMEX_COMPACT_DATE.match(raw) else None
+
+
+def _unwrap_consolidated(src: etree._Element) -> dict[str, str] | None:
+    """Lift a consolidated text's CONS.DOC to the root, the shape of an ACT.
+
+    Returns the consolidation's date, number and base-act date; None for an adopted act.
+    """
+    if etree.QName(src).localname != "CONS.ACT":
+        return None
+    info, doc = src.find("INFO.CONSLEG"), src.find("CONS.DOC")
+    if info is None or doc is None:
+        raise FormexNotAnActError("<CONS.ACT> without INFO.CONSLEG and CONS.DOC")
+    date = _compact_iso(info.get("START.DATE"))
+    if date is None:
+        raise FormexDateMissingError("consolidated text without INFO.CONSLEG/@START.DATE")
+    base = doc.find("FAM.COMP/BIB.DATA/DATE")
+    work_date = _compact_iso(base.get("ISO") if base is not None else None) or date
+    for child in list(doc):
+        doc.addprevious(child)
+    for child in list(src):
+        if child.tag in {"INFO.CONSLEG", "INFO.PROD", "CONS.DOC"}:
+            src.remove(child)
+    for annex in src.iter("CONS.ANNEX"):
+        annex.tag = "ANNEX"
+    number = f"{info.get('CONSLEG.REF', '')}/{info.get('START.DATE')}"
+    return {"date": date, "work_date": work_date, "number": number}
+
+
+def _mark_consolidated(
+    act: etree._Element, consolidation: dict[str, str], provenance: dict[str, object] | None
+) -> None:
+    """Say the text is the publisher's documentary consolidation, not the authentic
+    act, and keep the work's own date on every work block."""
+    for expr in act.iter("{%s}FRBRExpression" % AKN_NS):
+        flag = etree.Element("{%s}FRBRauthoritative" % AKN_NS, value="false")
+        expr.find("{%s}FRBRlanguage" % AKN_NS).addprevious(flag)
+    for work_date in act.iterfind(".//{%s}FRBRWork/{%s}FRBRdate" % (AKN_NS, AKN_NS)):
+        work_date.set("date", consolidation["work_date"])
+    meta = act.find("{%s}meta" % AKN_NS)
+    meta.find("{%s}publication" % AKN_NS).attrib.update(
+        {
+            "name": "Publications Office of the European Union",
+            "showAs": f"Consolidated text {consolidation['number']}",
+            "number": consolidation["number"],
+            "date": consolidation["date"],
+        }
+    )
+    # A consolidation has no Official Journal issue to be missing.
+    if provenance is not None:
+        provenance.pop("publication_missing", None)
+    # The act's own generation, then the amendment the consolidation is dated to.
+    lifecycle = meta.find("{%s}lifecycle" % AKN_NS)
+    lifecycle.find("{%s}eventRef" % AKN_NS).set("date", consolidation["work_date"])
+    _akn(
+        lifecycle,
+        "eventRef",
+        eId="evt_consolidation",
+        date=consolidation["date"],
+        type="amendment",
+        source="#publication",
+    )
 
 
 def _require_act_with_articles(src: etree._Element) -> None:
@@ -923,7 +989,10 @@ def _emit_paragraph(
     """PARAG → <paragraph>; NO.PARAG → <num>; ALINEA + LIST → <content>."""
     no = formex.find("NO.PARAG")
     if no is not None and (no.text or "").strip():
-        ident = re.sub(r"[^\d]", "", no.text) or str(index)
+        # An inserted paragraph (3a) keeps its letter, read from the language-neutral identifier.
+        inserted = re.search(r"\d([A-Z]+)$", formex.get("IDENTIFIER") or "")
+        letter = inserted[1].lower() if inserted else ""
+        ident = (re.sub(r"[^\d]", "", no.text) + letter) or str(index)
     else:
         ident = str(index)
     leaf = f"para_{ident}"
@@ -1383,6 +1452,7 @@ _SIGNAL_SEVERITY = {
     "annex_unmapped_elements": "warning",
     "body_discarded_text": "warning",
     "html_images": "warning",
+    "deduped_eids": "warning",
 }
 
 
@@ -1739,9 +1809,10 @@ def formex_to_akn4eu(
     """
     src = parse_xml(xml)
     _unwrap_general(src)
+    consolidation = _unwrap_consolidated(src)
     _require_act_with_articles(src)
 
-    expr_date = _formex_date(src)
+    expr_date = consolidation["date"] if consolidation else _formex_date(src)
     if expr_date is None:
         raise FormexDateMissingError(
             "no act-level date in BIB.INSTANCE, PREAMBLE.FINAL, or FINAL/SIGNATURE"
@@ -1749,7 +1820,8 @@ def formex_to_akn4eu(
 
     root = etree.Element("{%s}akomaNtoso" % AKN_NS, nsmap={None: AKN_NS})
     act_name = _doctype_from_frbr(frbr_work_uri)
-    act = etree.SubElement(root, "{%s}act" % AKN_NS, contains="originalVersion", name=act_name)
+    contains = "singleVersion" if consolidation else "originalVersion"
+    act = etree.SubElement(root, "{%s}act" % AKN_NS, contains=contains, name=act_name)
     act.append(
         _stub_meta(
             frbr_work_uri=frbr_work_uri,
@@ -1790,6 +1862,8 @@ def formex_to_akn4eu(
     )
     if attachments is not None:
         act.append(attachments)
+    if consolidation:
+        _mark_consolidated(act, consolidation, provenance)
 
     # Post-walk counts, rather than plumbed through every emitter: text the body
     # walk had no branch for, and anchors we could not resolve.
@@ -1818,8 +1892,11 @@ def formex_to_akn4eu(
         if unresolved:
             provenance["unresolved_refs"] = int(unresolved)
 
-    serialised: bytes = etree.tostring(root, xml_declaration=True, encoding="UTF-8")
-    return serialised.decode("utf-8")
+    # A number the publisher repeats (two paragraphs 11) would repeat its eId.
+    unique, renamed = ensure_unique_eids(etree.tostring(root, encoding="UTF-8"))
+    if renamed and provenance is not None:
+        provenance["deduped_eids"] = renamed
+    return unique
 
 
 async def ingest(
@@ -1910,6 +1987,7 @@ async def ingest(
                 "large_tables",
                 "html_source",
                 "html_images",
+                "deduped_eids",
             ):
                 if provenance.get(signal):
                     yield ValidationIssued(issue=signal_finding(signal, provenance[signal]))
