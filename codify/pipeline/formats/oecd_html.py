@@ -297,7 +297,7 @@ def _is_heading(block: str) -> bool:
 def _is_unit(block: str) -> bool:
     """Whether the block opens a unit of its own: a container, article, section,
     numbered or lettered paragraph, point or indent, never a caption."""
-    units = (_NUM_PARA, _NUM_PAREN, _LETTER_PARA, _POINT, _INDENT)
+    units = (_NUM_PARA, _NUM_PAREN, _LETTER_PARA, _POINT, _INDENT, _SUBPART)
     return _starts_body(block) or any(p.match(block) for p in units)
 
 
@@ -712,6 +712,9 @@ def _mark_non_adherent_duties(
     Adherents should:`), an item's verb is the Adherents' own act and stays."""
     for node in nodes:
         text = node.text[0] if node.text else ""
+        if node.kind == "subsection":
+            _mark_non_adherent_duties(node.children, speaking, adherents)
+            continue
         if node.kind == "section" and node.heading in NON_ADHERENT_VERBS:
             _decide(node, text)
             continue

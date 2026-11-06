@@ -1284,3 +1284,33 @@ def test_an_unpunctuated_lettered_item_stays_text_not_a_heading() -> None:
     assert a.find("a:heading", NS) is None
     assert "light every lantern at dusk" in "".join(a.itertext())
     assert b.findtext("a:heading", namespaces=NS) == "Registers"
+
+
+def test_a_lettered_part_keeps_the_declarants_voice_for_its_items() -> None:
+    body = """
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>DECLARE that we:</p>
+<p>A. Coordination</p>
+<p>1. Call on the Harbour Committee to count every keeper.</p>
+<p>2. ENCOURAGE green investment in harbour lighting.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert "sec_I__subsec_A__para_1" in _eids(root, "paragraph")
+    assert _marked(root) == {"sec_I__subsec_A__para_1"}
+
+
+def test_an_annex_caption_followed_by_a_lettered_heading_keeps_the_heading() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents keep lanterns lit.</p>
+<p>Annex I: Good Practice Guidance on Lanterns</p>
+<p>A. Quay lanterns</p>
+<p>1. Keep lamps.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert "att_1__sec_A__para_1" in _eids(root, "paragraph")
+    assert root.xpath("//a:attachment//a:section/a:heading/text()", namespaces=NS) == [
+        "Quay lanterns"
+    ]
