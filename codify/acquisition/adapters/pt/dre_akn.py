@@ -9,10 +9,11 @@ from collections import defaultdict
 from typing import Any, cast
 
 from lxml import etree
+from lxml import html as lxml_html
 
 from codify.acquisition.adapters.th.ocs_akn import escape
 from codify.akn._schema import AKN_NS, parse_xml
-from codify.akn.bluebell import bluebell_to_akn
+from codify.akn.bluebell import _emit_table, bluebell_to_akn
 from codify.pipeline.enrich.cobalt import set_work_uri
 
 REPEALED = 4
@@ -42,6 +43,26 @@ TITLE_LINE = re.compile(
 FORMULA = re.compile(r"seguinte\s*:\s*$")
 SUMMARY = re.compile(r"^Sumário:\s*")
 OPEN_QUOTE = {"«", '"', "“"}
+# Consolidated fragments can carry HTML; plain ones keep their newline split. Attributes
+# must be name=value, so "0<i≤5" or "<a fixar>" in plain text is no tag.
+HTML_TAG = re.compile(
+    r"<(?:br|p|div|span|a|sup|sub|table|t[rdh]|li|b|i|u|em|strong)"
+    r"""(?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]+))*\s*/?>""",
+    re.IGNORECASE,
+)
+# A `<` that opens no tag-shaped markup is text, also in a fragment that has tags.
+NOT_A_TAG = re.compile(
+    r"""<(?![!?]|/?[a-z][\w:-]*(?:\s+[\w:-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]+))?)*\s*/?>)""",
+    re.IGNORECASE,
+)
+# Control characters, raw or as references, which lxml refuses in text.
+CONTROL = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f]|&#0*(?:[0-8]|1[124-9]|2\d|3[01]);|&#x0*(?:[0-8bcef]|1[\da-f]);",
+    re.IGNORECASE,
+)
+BLOCKS = "p div li h1 h2 h3 h4 h5 h6 blockquote table caption tr td th".split()
+# Unicode noncharacters, reserved for internal use, carry markup past `escape`.
+SUP_OPEN, SUP_CLOSE, SEALED_TABLE, LT = "\ufdd0", "\ufdd1", "\ufdd2", "\ufdd3"
 
 
 class UnmappedFragment(ValueError):
@@ -49,7 +70,55 @@ class UnmappedFragment(ValueError):
 
 
 def lines(text: str | None) -> list[str]:
-    return [x.strip() for x in re.split(r"[\r\n]+", text or "") if x.strip()]
+    text = text or ""
+    if HTML_TAG.search(text):
+        text = _html_text(text)
+    return [x.strip() for x in re.split(r"[\r\n]+", text) if x.strip()]
+
+
+def _html_text(text: str) -> str:
+    """HTML as text lines: breaks and blocks end a line, inline markup keeps its words,
+    and each table becomes one sealed line that `to_bluebell` opens."""
+    # A control character, such as a vertical tab, is a manual line break.
+    text = NOT_A_TAG.sub("&lt;", CONTROL.sub("\n", text))
+    root = lxml_html.fragment_fromstring(text, create_parent="div")
+    for sup in list(root.iter("sup")):
+        words = " ".join(sup.text_content().split())
+        sup.clear(keep_tail=True)
+        sup.text = f"{SUP_OPEN}{words}{SUP_CLOSE}" if words else ""
+    for el in root.iter("br", *BLOCKS):
+        el.tail = "\n" + (el.tail or "")
+        if el.tag != "br":
+            el.text = "\n" + (el.text or "")
+    for table in root.xpath("//table"):
+        grid = etree.Element("table")
+        for cells in filter(None, (tr.xpath("td | th") for tr in table.xpath("tr | */tr"))):
+            row = etree.SubElement(grid, "tr")
+            for cell in cells:
+                spans = {k: v for k in ("colspan", "rowspan") if (v := cell.get(k, "")).isdigit()}
+                words = " ".join(cell.text_content().split())
+                etree.SubElement(etree.SubElement(row, cell.tag, spans), "p").text = escape(words)
+        if len(grid):
+            # A caption, or text stray outside the cells, reads after the table: before it,
+            # `from_printed` would take it for the heading of the unit above.
+            loose = "".join(table.xpath(".//text()[not(ancestor::td or ancestor::th)]"))
+            out: list[str] = []
+            _emit_table(grid, depth=0, out=out)
+            seal = SEALED_TABLE + "\n".join(out).encode().hex()
+            table.tail = "\n".join(["", seal, " ".join(loose.split()), table.tail or ""])
+            table.drop_tree()
+    # A decoded `<` stays text when `from_printed` text is read again.
+    return cast(str, root.text_content()).replace("<", LT)
+
+
+def _unseal(doc: list[str]) -> str:
+    """Sealed tables at their line's indent, and superscripts, as Bluebell."""
+    out: list[str] = []
+    for line in doc:
+        pad, sealed, data = line.partition(SEALED_TABLE)
+        out += [pad + x for x in bytes.fromhex(data).decode().split("\n")] if sealed else [line]
+    text = "\n".join(out).replace(SUP_OPEN, "{{^").replace(SUP_CLOSE, "}}")
+    return text.replace(LT, "<")
 
 
 def word(label: str) -> str:
@@ -86,6 +155,8 @@ def _head(keyword: str, num: str, heading: str, pad: str) -> str:
 
 def quote_depth(depth: int, line: str) -> int:
     """Quotes open after `line`. Guillemets nest; straight quotes close only at line end."""
+    if line.startswith(SEALED_TABLE):
+        line = bytes.fromhex(line[1:]).decode()
     depth += line.count("«") + line.count("“") - line.count("»") - line.count("”")
     if '"' in line and re.search(r'"[.;,]?\s*$', line) and not (depth == 0 and line[:1] == '"'):
         return 0
@@ -269,7 +340,7 @@ def to_bluebell(
     doc += ["BODY"] + body
     if concl:
         doc += ["CONCLUSIONS"] + [f"  {escape(x)}" for x in concl]
-    return "\n".join(doc + schedules) + "\n"
+    return _unseal(doc + schedules) + "\n"
 
 
 DIVISIONS = [
@@ -297,6 +368,7 @@ SIGN_LINE = re.compile(
 def _is_epigrafe(line: str) -> bool:
     return (
         len(line) < 200
+        and not line.startswith(SEALED_TABLE)
         and not (PARA.match(line) or POINT.match(line))
         and not line.endswith((".", ":", ";"))
     )

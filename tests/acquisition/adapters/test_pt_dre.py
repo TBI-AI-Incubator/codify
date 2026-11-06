@@ -714,3 +714,119 @@ def test_a_writable_index_dir_keeps_the_cache(
     monkeypatch.setenv("ACQUISITION_INDEX_DIR", str(tmp_path))
     acquirer = DiarioAcquirer.from_config("pt", SourceAdapter(kind="json_portal", name="dre"))
     assert acquirer._cache == tmp_path / "pt" / "raw"
+
+
+def _article(text: str) -> Any:
+    root = {"id": "1", "parent": "0", "label": "Diploma", "heading": "", "text": ""}
+    art = {"id": "2", "parent": "1", "label": "Artigo 1.º", "heading": "Regime", "text": text}
+    xml = to_akn(
+        to_bluebell([root, art]),
+        number="1",
+        work="/akn/pt/act/2042/1",
+        published="2042-01-01",
+        expression="/akn/pt/act/2042/1/por@2042-01-01",
+        as_of="2042-01-01",
+    )
+    return etree.fromstring(xml.encode()).xpath("//a:article", namespaces=NS)[0]
+
+
+def _words(el: Any) -> str:
+    return " ".join("".join(el.itertext()).split())
+
+
+def test_html_breaks_separate_numbered_paragraphs_and_alineas() -> None:
+    art = _article(
+        "1 - O pedido é apresentado:<br/>a) Por via eletrónica;<br />b) Presencialmente."
+        "\r\n2 - O prazo é de dez dias."
+    )
+    paras = art.xpath("a:paragraph", namespaces=NS)
+    assert [p.findtext("a:num", namespaces=NS) for p in paras] == ["1", "2"]
+    points = paras[0].xpath("a:point", namespaces=NS)
+    assert [p.findtext("a:num", namespaces=NS) for p in points] == ["a)", "b)"]
+    assert [_words(p.find("a:content", namespaces=NS)) for p in points] == [
+        "Por via eletrónica;",
+        "Presencialmente.",
+    ]
+    assert _words(paras[1].find("a:content", namespaces=NS)) == "O prazo é de dez dias."
+
+
+def test_mixed_fragments_keep_raw_text_and_breaks() -> None:
+    art = _article("1 - Se P<Pmin, vale 0<i≤5.<BR>2 - Dois.\x0b3 - Três.&#12;4 - Quatro.")
+    paras = art.xpath("a:paragraph", namespaces=NS)
+    assert [p.findtext("a:num", namespaces=NS) for p in paras] == ["1", "2", "3", "4"]
+    assert _words(paras[0].find("a:content", namespaces=NS)) == "Se P<Pmin, vale 0<i≤5."
+
+
+def test_html_links_and_superscripts_keep_their_text_and_entities_decode_once() -> None:
+    art = _article(
+        '<p>1 - Nos termos do <a href="https://example.invalid/a">artigo 3.º</a>, o limite é '
+        "10<sup><b>3</b>\n</sup> unidades<sup></sup>.</p>"
+        "<p>2 - Lei &amp; regulamento &amp;lt;exemplo&amp;gt; *sem* ênfase.</p>"
+    )
+    first, second = art.xpath("a:paragraph/a:content/a:p", namespaces=NS)
+    assert first.xpath("a:sup/text()", namespaces=NS) == ["3"]
+    assert _words(first) == "Nos termos do artigo 3.º, o limite é 103 unidades."
+    assert _words(second) == "Lei & regulamento &lt;exemplo&gt; *sem* ênfase."
+
+
+def test_an_html_table_is_an_akn_table_in_its_paragraph() -> None:
+    art = _article(
+        "1 - As taxas são as seguintes:"
+        "<table><caption>Quadro <b>1</b></caption>Valores<thead>"
+        '<tr><th>Escalão</th><th colspan="2">Taxa</th></tr></thead><tr></tr>'
+        '<tr><td rowspan="2">A<br/>(geral)<table><tr><td>nota</td></tr></table></td>'
+        '<td colspan="dois"></td><td>(**) 5 % (**)</td></tr><tr><td>6 %</td></tr>'
+        "</table><table></table>2 - As taxas são revistas."
+    )
+    paras = art.xpath("a:paragraph", namespaces=NS)
+    assert [p.findtext("a:num", namespaces=NS) for p in paras] == ["1", "2"]
+    content = paras[0].find("a:content", namespaces=NS)
+    assert [etree.QName(c).localname for c in content] == ["p", "table", "p"]
+    assert [_words(p) for p in content.xpath("a:p", namespaces=NS)] == [
+        "As taxas são as seguintes:",
+        "Quadro 1 Valores",
+    ]
+    (table,) = content.xpath(".//a:table", namespaces=NS)
+    rows = [
+        [(etree.QName(c).localname, dict(c.attrib), _words(c)) for c in tr]
+        for tr in table.xpath("a:tr", namespaces=NS)
+    ]
+    assert rows == [
+        [("th", {}, "Escalão"), ("th", {"colspan": "2"}, "Taxa")],
+        [("td", {"rowspan": "2"}, "A (geral) nota"), ("td", {}, ""), ("td", {}, "(**) 5 % (**)")],
+        [("td", {}, "6 %")],
+    ]
+
+
+def test_a_quote_closed_in_a_table_cell_ends_the_quote() -> None:
+    art = _article(
+        "1 - O quadro passa a ter a seguinte redação:<br/>«Quadro"
+        "<table><tr><td>A</td><td>5 %»</td></tr></table>2 - O prazo é de dez dias."
+    )
+    assert [
+        p.findtext("a:num", namespaces=NS) for p in art.xpath("a:paragraph", namespaces=NS)
+    ] == [
+        "1",
+        "2",
+    ]
+
+
+def test_plain_fragments_read_as_before() -> None:
+    text = "1 - Se 0<i≤5 e b > a, vale &amp; conta.\r2 - O valor <a fixar> é anual."
+    assert article_body(text, "") == [
+        "  PARA 1",
+        "    Se 0<i≤5 e b > a, vale &amp; conta.",
+        "  PARA 2",
+        "    O valor <a fixar> é anual.",
+    ]
+
+
+def test_printed_html_is_decoded_once_and_a_table_is_no_heading() -> None:
+    printed = (
+        "<p>Lei n.º 1/2042</p><p>A Assembleia decreta o seguinte:</p><p>Artigo 1.º</p>"
+        "<table><caption>Quadro I</caption><tr><td>A</td><td>5 %</td></tr></table>"
+        "<p>1 - O sinal &lt;b&gt; separa.</p><p>2 - Fim.</p>"
+    )
+    text = to_bluebell(from_printed(printed))
+    assert "  ARTICLE 1\n    TABLE\n" in text
+    assert "      O sinal <b> separa.\n" in text
