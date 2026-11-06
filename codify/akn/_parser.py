@@ -38,6 +38,7 @@ from codify.akn.vocabulary import (
     PRESENTATION_CONTAINER_NAMES,
     TAG_TO_KIND,
     is_lifted_note,
+    provision_text,
 )
 
 # Map AKN tags to model kinds; preserve the original tag for emission.
@@ -305,9 +306,23 @@ def _parse_element(el: etree._Element, position: int) -> ElementBase | None:
         text = " ".join(_akn_text(e) for e in (num_el, heading_el, subheading_el) if _akn_text(e))
     elif content_el is not None:
         text, references = _extract_text_and_refs(content_el)
+    elif tag == "item":
+        # An item holds its prose directly, beside any nested list.
+        prose = copy.deepcopy(el)
+        for child in list(prose):
+            if isinstance(child.tag, str) and (
+                _local(child) in TAG_TO_KIND or _local(child) == "num" or is_lifted_note(child)
+            ):
+                prose.remove(child)
+        text, references = _extract_text_and_refs(prose)
 
     intro = _extract_plain(intro_el) if intro_el is not None else ""
     wrap_up = _extract_plain(wrap_up_el) if wrap_up_el is not None else ""
+    if tag == "blockList":
+        # A list's lead-in and tail are inline runs, not blocks.
+        list_intro, list_wrap = _akn_child(el, "listIntroduction"), _akn_child(el, "listWrapUp")
+        intro = provision_text(list_intro) if list_intro is not None else ""
+        wrap_up = provision_text(list_wrap) if list_wrap is not None else ""
 
     children = _structural_children(el)
 

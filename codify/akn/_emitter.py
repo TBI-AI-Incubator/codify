@@ -79,7 +79,11 @@ def _emit_element(element: ElementBase) -> etree._Element:
     if element.heading:
         etree.SubElement(el, _q("heading")).text = element.heading
     eid = element.akn_eid
-    if element.intro:
+    # A list's lead-in and tail are inline runs in their own tags.
+    is_list = tag == "blockList"
+    if element.intro and is_list:
+        etree.SubElement(el, _q("listIntroduction")).text = element.intro
+    elif element.intro:
         intro = etree.SubElement(el, _q("intro"))
         intro_p = etree.SubElement(intro, _q("p"))
         intro_p.text = element.intro
@@ -93,7 +97,9 @@ def _emit_element(element: ElementBase) -> etree._Element:
         _render_text(content, element.text, element.references, eid)
     for child in element.children:
         el.append(_emit_element(child))
-    if element.wrap_up:
+    if element.wrap_up and is_list:
+        etree.SubElement(el, _q("listWrapUp")).text = element.wrap_up
+    elif element.wrap_up:
         wrap = etree.SubElement(el, _q("wrapUp"))
         wrap_p = etree.SubElement(wrap, _q("p"))
         wrap_p.text = element.wrap_up

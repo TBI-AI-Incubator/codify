@@ -7,6 +7,7 @@ from codify.akn.io import parse_akn
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.translate.anchors import (
     build_translation_scaffold,
+    walk_source,
     walk_source_units,
 )
 
@@ -191,3 +192,19 @@ class TestBarePAttachment:
         units, _ = walk_source(parse_akn(xml), xml)
         eids = [u.akn_eid for u in units]
         assert len(eids) == len(set(eids))
+
+
+def test_list_prose_outside_body_wrappers_is_not_sent() -> None:
+    """The writer cannot place an item's own <p>s, so translating them would be wasted."""
+    xml = parse_to_akn(
+        "Fees:\n\nBLOCKLIST\n  ITEM (a)\n    for a licence;\n  ITEM (b)\n    for a renewal.\n",
+        country="xa",
+        doctype="doc",
+        number="0002",
+    )
+    units, _ = walk_source(parse_akn(xml), xml)
+    assert [(u.akn_eid, u.body_text) for u in units] == [
+        ("list_1", ""),
+        ("list_1__item_a", ""),
+        ("list_1__item_b", ""),
+    ]
