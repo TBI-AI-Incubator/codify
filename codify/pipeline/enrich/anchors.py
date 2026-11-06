@@ -4897,9 +4897,6 @@ class AnchorCoverage:
     then reads 1.0 on a document that lost most of its provisions."""
     unclosed: int = 0
     """How many such spans there were, which the marker count alone cannot say."""
-    containers: int = 0
-    """Grouping anchors. With nothing captured, the body text has no provision
-    to land in."""
 
     @property
     def missing(self) -> frozenset[str]:
@@ -4971,7 +4968,6 @@ def anchor_coverage(
         expected=frozenset(expected),
         masked=_masked_marker_count(text, config, doctype) if with_masked else 0,
         unclosed=_unclosed_quote_spans(text, config.code if config else "") if with_masked else 0,
-        containers=sum(1 for a in anchors if a.kind in CONTAINER_KINDS),
     )
 
 
@@ -4996,6 +4992,18 @@ def anchor_summary(anchors: Iterable[StructuralAnchor]) -> dict[str, int]:
 # "schedule" is top-level so trailing annex material gets its own window
 # instead of being swallowed into the last article's body.
 _TOP_LEVEL_KINDS = frozenset({"article", "section", "paragraph", "schedule"})
+
+
+def unfilled_anchors(anchors: Iterable[StructuralAnchor]) -> int:
+    """Anchors heading text no body-fill window reaches, when no article, section or
+    paragraph opens one: the skeleton then ships as the document. Text after the
+    first schedule is that schedule's window, so only anchors before it count."""
+    anchors = list(anchors)
+    windowed = [a for a in anchors if a.kind in _TOP_LEVEL_KINDS and not a.quoted_amendment]
+    if any(a.kind != "schedule" for a in windowed):
+        return 0
+    first = min((a.char_offset for a in windowed), default=None)
+    return sum(1 for a in anchors if a not in windowed and (first is None or a.char_offset < first))
 
 
 def windows_from_anchors(
@@ -5113,5 +5121,6 @@ __all__ = [
     "build_anchor_regex",
     "cached_regex",
     "scan_anchors",
+    "unfilled_anchors",
     "windows_from_anchors",
 ]

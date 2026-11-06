@@ -15,6 +15,7 @@ from codify.quality.corpus_scan import (
     scan_corpus,
     scan_text,
 )
+from tests.parse.test_scan_trace import GB_COVERAGE_ROWS, XU_SECTIONED
 
 _TWO_ARTICLES = "مادة (1)\nنص الأولى.\n\nمادة (2)\nنص الثانية.\n"
 
@@ -300,3 +301,19 @@ class TestPassAccounting:
         scan = scan_text(text, config=load_config("gb"), country="gb", doctype="act")
         assert scan.fires["regex"] == scan.by_pass["regex"] == 1
         assert scan.fires["scan_uk_provisions"] == scan.by_pass["uk_provisions"] == 2
+
+
+class TestCoverageState:
+    """The sweep names the documents the structurer refuses, and no others."""
+
+    @pytest.mark.parametrize(("floor", "state"), [(0.8, "containers_only"), (0.0, "empty")])
+    def test_containers_with_no_provision_read_as_refused(self, floor: float, state: str) -> None:
+        """Only under a declared floor, as the structurer refuses it."""
+        gb = load_config("gb").model_copy(update={"min_anchor_coverage": floor})
+        scan = scan_text(GB_COVERAGE_ROWS[1][0], config=gb, country="gb", doctype="act")
+        assert scan.coverage_state == state
+
+    @pytest.mark.parametrize("text", XU_SECTIONED)
+    def test_sections_above_articles_are_not_refused(self, text: str) -> None:
+        scan = scan_text(text, config=load_config("xu"), country="xu", doctype="regulation")
+        assert scan.coverage_state == "empty"

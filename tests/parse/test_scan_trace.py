@@ -16,7 +16,13 @@ import pytest
 from structlog.testing import capture_logs
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import anchor_coverage, cached_regex, scan_anchors
+from codify.pipeline.enrich.anchors import (
+    StructuralAnchor,
+    anchor_coverage,
+    cached_regex,
+    scan_anchors,
+    unfilled_anchors,
+)
 from codify.pipeline.enrich.structure import (
     ContainersOnlyError,
     ScanTrace,
@@ -625,3 +631,58 @@ async def test_a_none_ratio_names_which_absence_it_is(
     assert [h.gate for h in seen[-1].halts] == gates
     unmeasured = [r["captured"] for r in logs if r["event"] == "anchor_coverage_unmeasured"]
     assert unmeasured == ([2] if state == "captured_unmeasured" else [])
+
+
+# Sections a class ranks above its articles, with no article, then the same under a
+# chapter. Body-fill writes into the sections, so nothing is lost and nothing halts.
+XU_SECTIONED = [
+    "Section 1\nScope\n\nThis regulation applies to ports.\n\n"
+    "Section 2\nReports\n\nThe office must report.\n",
+    "CHAPTER I\nGeneral\n\nSection 1\nScope\n\nThis regulation applies to ports.\n\n"
+    "Section 2\nReports\n\nThe office must report.\n",
+]
+
+
+@pytest.mark.parametrize("text", XU_SECTIONED)
+async def test_a_heading_kind_alone_does_not_refuse_a_filled_body(text: str) -> None:
+    seen: list[ScanTrace] = []
+    await text_to_bluebell_scaffolded(
+        text,
+        client=_EmptyBodies(),  # type: ignore[arg-type]
+        country="xu",
+        doctype="regulation",
+        on_scan=seen.append,
+    )
+    assert seen[-1].halts == () and seen[-1].body_fill is not None
+
+
+def _anchor(kind: str, offset: int, *, quoted: bool = False) -> StructuralAnchor:
+    return StructuralAnchor(
+        kind=kind,
+        keyword=kind.upper(),
+        number="1",
+        char_offset=offset,
+        line=offset,
+        matched_text=kind.upper(),
+        quoted_amendment=quoted,
+    )
+
+
+@pytest.mark.parametrize(
+    ("anchors", "unfilled"),
+    [
+        ([], 0),
+        ([_anchor("part", 0)], 1),
+        ([_anchor("part", 0), _anchor("section", 10)], 0),
+        ([_anchor("part", 0), _anchor("schedule", 10)], 1),
+        ([_anchor("schedule", 0), _anchor("part", 10)], 0),
+        ([_anchor("schedule", 0)], 0),
+        ([_anchor("part", 0), _anchor("section", 10, quoted=True)], 2),
+    ],
+)
+def test_unfilled_anchors_are_those_no_body_window_reaches(
+    anchors: list[StructuralAnchor], unfilled: int
+) -> None:
+    """A part before a schedule heads text no window reaches; one after it is in
+    the schedule's window. A quoted section opens no window of the host's."""
+    assert unfilled_anchors(anchors) == unfilled

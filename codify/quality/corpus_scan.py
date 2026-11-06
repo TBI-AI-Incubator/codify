@@ -15,6 +15,7 @@ from codify.pipeline.enrich.anchors import (
     cached_regex,
     keyword_aliases,
     scan_anchors_with_ambiguity,
+    unfilled_anchors,
 )
 from codify.pipeline.enrich.container_coverage import (
     _census_aliases,
@@ -103,8 +104,8 @@ class DocumentScan:
     verdict: str | None = None
     # Declared era containing the document year, or ``unknown``.
     era: str = "unknown"
-    # `AnchorCoverage.state`, with `containers_only` split from `empty` because the
-    # structurer refuses it. None when the class declares no basic unit.
+    # `AnchorCoverage.state`, or `containers_only` where the structurer refuses the
+    # document. None when the class declares no basic unit.
     coverage_state: str | None = None
 
     @property
@@ -160,7 +161,7 @@ def scan_text(
         anchor_coverage(normalised, anchors, config, doctype, basic) if basic is not None else None
     )
     state: str | None = coverage.state if coverage else None
-    if coverage and state == "empty" and coverage.containers:
+    if state and config and config.min_anchor_coverage > 0 and unfilled_anchors(anchors):
         state = "containers_only"
 
     return DocumentScan(

@@ -7,7 +7,7 @@ import pytest
 
 from codify.jurisdictions import JurisdictionConfig, LegalEra, load_config
 from codify.quality.structural_scan import CHECKS, era_of, scan_version
-from tests.parse.test_scan_trace import GB_COVERAGE_ROWS
+from tests.parse.test_scan_trace import GB_COVERAGE_ROWS, XU_SECTIONED
 
 NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
@@ -355,7 +355,7 @@ class TestCoverageCanFail:
 
     @pytest.mark.parametrize(
         ("floor", "verdict"),
-        [(0.8, (True, "containers_only")), (0.0, (None, "no_threshold_declared"))],
+        [(0.8, (True, "containers_only")), (0.0, (None, "no_markers_in_source"))],
     )
     def test_a_containers_only_source_fails_where_the_structurer_refuses_it(
         self, floor: float, verdict: tuple[bool | None, str]
@@ -369,6 +369,15 @@ class TestCoverageCanFail:
             "anchor_coverage",
         )
         assert (finding.failed, finding.detail["reason"]) == verdict
+
+    @pytest.mark.parametrize("source", XU_SECTIONED)
+    def test_sections_above_articles_are_not_containers_only(self, source: str) -> None:
+        xu = load_config("xu")
+        finding = _find(
+            scan_version(_doc(_BLOB), config=xu, doctype="regulation", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == (None, "no_markers_in_source")
 
 
 class TestEras:

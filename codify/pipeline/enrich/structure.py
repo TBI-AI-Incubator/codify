@@ -25,6 +25,7 @@ from codify.pipeline.enrich.anchors import (
     markers_outside_boundary,
     scan_anchors_with_ambiguity,
     uk_layout_held,
+    unfilled_anchors,
     windows_from_anchors,
 )
 from codify.pipeline.enrich.arabic_normalise import JOINER_STRIP_TABLE
@@ -425,17 +426,16 @@ class SourceTruncationError(RuntimeError):
 
 
 class ContainersOnlyError(RuntimeError):
-    """Grouping containers anchored and no basic unit did, so the skeleton would
-    ship as the document with its body text in no provision."""
+    """No article, section or paragraph anchored in the body, so the skeleton would
+    ship as the document with the text under its other anchors in no provision."""
 
-    def __init__(self, *, kind: str, containers: int) -> None:
+    def __init__(self, *, unfilled: int) -> None:
         super().__init__(
-            f"{containers} container anchor(s) and no {kind}: the scan recognised no "
-            f"provision, so the body text has nowhere to go. Check the {kind} markers "
-            f"this document uses against the jurisdiction config."
+            f"no article, section or paragraph was recognised in the body, so the text "
+            f"under its {unfilled} other anchor(s) would ship as an empty skeleton. "
+            f"Check the provision markers this document uses."
         )
-        self.kind = kind
-        self.containers = containers
+        self.unfilled = unfilled
 
 
 class AnchorCoverageError(RuntimeError):
@@ -774,29 +774,29 @@ async def text_to_bluebell_scaffolded(
                 ratio=0.0,
                 threshold=threshold,
             )
-        if coverage.state == "empty" and coverage.containers:
-            # The skeleton would ship as the document, its body text in no provision.
+        if unfilled := unfilled_anchors(anchors):
             logger.warning(
                 "anchor_coverage_containers_only",
                 country=country,
                 doctype=doctype,
                 kind=kind,
-                containers=coverage.containers,
+                unfilled=unfilled,
             )
             if halt_policy == "land":
                 halts.append(
                     StructureHalt(
                         gate="containers_only",
                         kind=kind,
-                        spans=coverage.containers,
-                        detail=f"{coverage.containers} container anchor(s) and no {kind}",
-                        captured=0,
-                        expected=0,
+                        spans=unfilled,
+                        detail=(
+                            f"no article, section or paragraph in the body; the text "
+                            f"under {unfilled} other anchor(s) is in no provision"
+                        ),
                     )
                 )
             else:
                 _trace(fallback="coverage_gate")
-                raise ContainersOnlyError(kind=kind, containers=coverage.containers)
+                raise ContainersOnlyError(unfilled=unfilled)
         elif coverage.state == "captured_unmeasured":
             logger.warning(
                 "anchor_coverage_unmeasured",
