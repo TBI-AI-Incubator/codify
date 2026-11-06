@@ -11,9 +11,11 @@ from typing import Any
 from codify.jurisdictions import JurisdictionConfig, load_config
 from codify.pipeline.enrich.anchors import (
     _number_first,
+    anchor_coverage,
     cached_regex,
     keyword_aliases,
     scan_anchors_with_ambiguity,
+    unfilled_anchors,
 )
 from codify.pipeline.enrich.container_coverage import (
     _census_aliases,
@@ -102,6 +104,9 @@ class DocumentScan:
     verdict: str | None = None
     # Declared era containing the document year, or ``unknown``.
     era: str = "unknown"
+    # `AnchorCoverage.state`, or `containers_only` where the structurer refuses the
+    # document. None when the class declares no basic unit.
+    coverage_state: str | None = None
 
     @property
     def has_container(self) -> bool:
@@ -152,6 +157,12 @@ def scan_text(
     # from the same source scan. Shared with the ingest probe and the per-version
     # structural scan; see `pipeline.enrich.container_coverage`.
     cov = container_coverage(normalised, result, config, country, doctype)
+    coverage = (
+        anchor_coverage(normalised, anchors, config, doctype, basic) if basic is not None else None
+    )
+    state: str | None = coverage.state if coverage else None
+    if state and config and config.min_anchor_coverage > 0 and unfilled_anchors(anchors):
+        state = "containers_only"
 
     return DocumentScan(
         path=path,
@@ -184,6 +195,7 @@ def scan_text(
         legibility=function_word_rate(normalised, words),
         verdict=text_verdict(normalised, words),
         era=era,
+        coverage_state=state,
     )
 
 
@@ -407,6 +419,9 @@ def aggregate(sweep: CorpusSweep | list[DocumentScan]) -> dict[str, Any]:
         # and both denominators exclude them. Reported so a rate over either is
         # read against what it actually measured.
         "documents_unjudged": sum(1 for s in scans if s.verdict is None),
+        "coverage_states": dict(
+            sorted(Counter(s.coverage_state for s in scans if s.coverage_state).items())
+        ),
     }
 
 

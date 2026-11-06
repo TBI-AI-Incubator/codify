@@ -73,6 +73,7 @@ class _ScanCollector:
         self.container: dict[str, Any] | None = None
         self.halts: list[dict[str, Any]] = []
         self.body_fill: dict[str, Any] | None = None
+        self.anchor_coverage: dict[str, Any] | None = None
 
     def __call__(self, trace: ScanTrace) -> None:
         self.orphaned_drops.extend(
@@ -84,6 +85,12 @@ class _ScanCollector:
         self.halts.extend(asdict(h) for h in trace.halts)
         if trace.body_fill is not None:
             self.body_fill = asdict(trace.body_fill)
+        if (cov := trace.coverage) is not None:
+            self.anchor_coverage = {
+                "kind": cov.kind,
+                "state": cov.state,
+                "captured": len(cov.captured),
+            }
         if self._forward is not None:
             self._forward(trace)
 
@@ -408,6 +415,7 @@ async def _ingest_pages(
                 provenance="extracted",
                 unreadable_pages=unreadable_pages(pages) or None,
                 body_fill=scan.body_fill,
+                anchor_coverage=scan.anchor_coverage,
             ):
                 yield ValidationIssued(issue=issue)
             yield Enriched(pass_name="validator")  # noqa: S106

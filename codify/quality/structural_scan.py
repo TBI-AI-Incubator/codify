@@ -267,6 +267,7 @@ def _check_anchor_coverage(
         anchor_coverage,
         cached_regex,
         scan_anchors_with_ambiguity,
+        unfilled_anchors,
     )
 
     kind = _basic_unit(config, doctype)
@@ -289,9 +290,16 @@ def _check_anchor_coverage(
         "masked_markers": coverage.masked,
         "threshold": threshold,
     }
+    # Agrees with the structurer, which refuses this only under a declared floor.
+    if threshold > 0 and (unfilled := unfilled_anchors(scan.anchors)):
+        return Finding(
+            "anchor_coverage", True, {**detail, "reason": "containers_only", "unfilled": unfilled}
+        )
     if coverage.ratio is None:
         if unclaimed:
             return Finding("anchor_coverage", True, {**detail, "reason": "all_markers_unclaimed"})
+        if coverage.state == "captured_unmeasured":
+            return Finding("anchor_coverage", None, {**detail, "reason": "captured_unmeasured"})
         return Finding("anchor_coverage", None, {**detail, "reason": "no_markers_in_source"})
     detail["ratio"] = round(coverage.ratio, 4)
     if threshold <= 0:

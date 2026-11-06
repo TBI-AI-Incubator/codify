@@ -526,5 +526,10 @@
       1
     ]
   },
-  "documents_unjudged": 3
+  "documents_unjudged": 3,
+  "coverage_states": {
+    "containers_only": 1,
+    "empty": 1,
+    "measured": 3
+  }
 }

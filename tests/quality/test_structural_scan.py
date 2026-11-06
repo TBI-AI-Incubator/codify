@@ -3,8 +3,15 @@ that reads as a pass, or a deliberate transformation that reads as a defect."""
 
 from __future__ import annotations
 
+import pytest
+
 from codify.jurisdictions import JurisdictionConfig, LegalEra, load_config
 from codify.quality.structural_scan import CHECKS, era_of, scan_version
+from tests.parse.test_scan_trace import (
+    GB_COVERAGE_ROWS,
+    PART_BEFORE_SCHEDULE,
+    XU_SECTIONED,
+)
 
 NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
@@ -339,6 +346,50 @@ class TestCoverageCanFail:
         finding = _find(_scan(_doc(body), source_text=bidi), "anchor_coverage")
         assert finding.failed is False
         assert finding.detail["captured"] == 2
+
+    @pytest.mark.parametrize(("source", "_state", "reason", "_gates"), GB_COVERAGE_ROWS)
+    def test_units_with_nothing_to_count_against_are_not_an_empty_document(
+        self, source: str, _state: str, reason: str | None, _gates: list[str]
+    ) -> None:
+        """Bare numbered headings anchor as sections while no marker counts them;
+        reported as no markers, that reads the same as a page of prose."""
+        gb = load_config("gb")
+        scan = scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source)
+        assert _find(scan, "anchor_coverage").detail.get("reason") == reason
+
+    @pytest.mark.parametrize(
+        ("floor", "verdict"),
+        [(0.8, (True, "containers_only")), (0.0, (None, "no_markers_in_source"))],
+    )
+    def test_a_containers_only_source_fails_where_the_structurer_refuses_it(
+        self, floor: float, verdict: tuple[bool | None, str]
+    ) -> None:
+        """Parts and chapters anchored and no section: the body text lands in no
+        provision. The structurer refuses it only under a declared floor."""
+        source = "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n"
+        gb = load_config("gb").model_copy(update={"min_anchor_coverage": floor})
+        finding = _find(
+            scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == verdict
+
+    @pytest.mark.parametrize("source", PART_BEFORE_SCHEDULE)
+    def test_a_part_before_a_schedule_is_containers_only(self, source: str) -> None:
+        finding = _find(
+            scan_version(_doc(_BLOB), config=load_config("xu"), doctype="act", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == (True, "containers_only")
+
+    @pytest.mark.parametrize("source", XU_SECTIONED)
+    def test_sections_above_articles_are_not_containers_only(self, source: str) -> None:
+        xu = load_config("xu")
+        finding = _find(
+            scan_version(_doc(_BLOB), config=xu, doctype="regulation", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == (None, "no_markers_in_source")
 
 
 class TestEras:

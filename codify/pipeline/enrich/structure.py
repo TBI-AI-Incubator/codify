@@ -25,6 +25,7 @@ from codify.pipeline.enrich.anchors import (
     markers_outside_boundary,
     scan_anchors_with_ambiguity,
     uk_layout_held,
+    unfilled_anchors,
     windows_from_anchors,
 )
 from codify.pipeline.enrich.arabic_normalise import JOINER_STRIP_TABLE
@@ -424,6 +425,19 @@ class SourceTruncationError(RuntimeError):
         self.threshold = threshold
 
 
+class ContainersOnlyError(RuntimeError):
+    """No article, section or paragraph anchored in the body, so the skeleton would
+    ship as the document with the text under its other anchors in no provision."""
+
+    def __init__(self, *, unfilled: int) -> None:
+        super().__init__(
+            f"no article, section or paragraph was recognised in the body, so the text "
+            f"under its {unfilled} other anchor(s) would ship as an empty skeleton. "
+            f"Check the provision markers this document uses."
+        )
+        self.unfilled = unfilled
+
+
 class AnchorCoverageError(RuntimeError):
     """Scanner captured too few structural anchors against the source's marker count.
     Raised before the structurer LLM sees a partial document, and carries the observed
@@ -760,7 +774,38 @@ async def text_to_bluebell_scaffolded(
                 ratio=0.0,
                 threshold=threshold,
             )
-        if expected == 0 and len(text) > 5000:
+        if unfilled := unfilled_anchors(anchors):
+            logger.warning(
+                "anchor_coverage_containers_only",
+                country=country,
+                doctype=doctype,
+                kind=kind,
+                unfilled=unfilled,
+            )
+            if halt_policy == "land":
+                halts.append(
+                    StructureHalt(
+                        gate="containers_only",
+                        kind=kind,
+                        spans=unfilled,
+                        detail=(
+                            f"no article, section or paragraph in the body; the text "
+                            f"under {unfilled} other anchor(s) is in no provision"
+                        ),
+                    )
+                )
+            else:
+                _trace(fallback="coverage_gate")
+                raise ContainersOnlyError(unfilled=unfilled)
+        elif coverage.state == "captured_unmeasured":
+            logger.warning(
+                "anchor_coverage_unmeasured",
+                country=country,
+                doctype=doctype,
+                kind=kind,
+                captured=captured,
+            )
+        elif expected == 0 and len(text) > 5000:
             # A non-trivial document with no markers of the basic kind is usually
             # a doctype mismatch (regulation against an act hierarchy), which would
             # otherwise no-op the gate silently.
@@ -839,7 +884,12 @@ async def text_to_bluebell_scaffolded(
     windows = windows_from_anchors(text, anchors)
     if not windows:
         # Containers only: nothing to fill, and the skeleton ships as the document.
-        logger.warning("body_fill_skipped", reason="no_basic_unit_anchors", anchors=len(anchors))
+        logger.warning(
+            "body_fill_skipped",
+            reason="no_basic_unit_anchors",
+            anchors=len(anchors),
+            coverage=coverage.state if coverage else None,
+        )
         _trace(scaffold=scaffold)
         return _remarks_under_containers(scaffold, eid_to_anchor, unreadable, text)
 
@@ -1049,6 +1099,7 @@ __all__ = [
     "BodyFillError",
     "BODY_FILL_PROMPT",
     "BodyFillTrace",
+    "ContainersOnlyError",
     "ScanTrace",
     "basic_unit_kind",
     "normalise_rtl_extract",

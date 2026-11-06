@@ -177,3 +177,29 @@ async def test_an_absent_config_fails_before_any_extraction_or_model_call(
     )
     events = [e async for e in stream]
     assert [(type(e).__name__, getattr(e, "stage", "")) for e in events] == [("Failed", "config")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("text", "flagged"),
+    [
+        (
+            "1 Duty to publish\nThe office must publish a notice.\n\n2 Reports\n"
+            "It must report annually.\n",
+            [("anchor_coverage_unmeasured", "warning")],
+        ),
+        (
+            "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n",
+            [("structure_halted", "error")],
+        ),
+    ],
+)
+async def test_unmeasured_units_warn_and_a_containers_only_skeleton_blocks(
+    text: str, flagged: list[tuple[str, str]]
+) -> None:
+    """Both land; only the skeleton, whose body text is in no provision, blocks."""
+    events = [e async for e in pdf_mod.ingest_text(text, "gb", llm=_BodyFillOnly())]  # type: ignore[arg-type]
+    checks = ("anchor_coverage_unmeasured", "structure_halted")
+    issues = [e.issue for e in events if isinstance(e, ValidationIssued)]
+    assert [(i["check"], i["severity"]) for i in issues if i["check"] in checks] == flagged
+    assert [e for e in events if isinstance(e, Complete)]

@@ -10,6 +10,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
+from typing import Literal
 
 import structlog
 
@@ -4901,6 +4902,14 @@ class AnchorCoverage:
     def missing(self) -> frozenset[str]:
         return self.expected - self.captured
 
+    @property
+    def state(self) -> Literal["measured", "captured_unmeasured", "empty"]:
+        """Which None ``ratio`` is: units found with no marker to count them
+        against, or neither units nor markers."""
+        if self.ratio is not None:
+            return "measured"
+        return "captured_unmeasured" if self.captured else "empty"
+
 
 def _marker_line_start(text: str, offset: int) -> int:
     """Line start of the marker an anchor opens on.
@@ -4983,6 +4992,22 @@ def anchor_summary(anchors: Iterable[StructuralAnchor]) -> dict[str, int]:
 # "schedule" is top-level so trailing annex material gets its own window
 # instead of being swallowed into the last article's body.
 _TOP_LEVEL_KINDS = frozenset({"article", "section", "paragraph", "schedule"})
+
+
+def unfilled_anchors(anchors: Iterable[StructuralAnchor]) -> int:
+    """Anchors heading text no body-fill window reaches, when no article, section or
+    paragraph opens one before the first schedule: the skeleton then ships as the
+    document. Text after that schedule is in its window, so only anchors before count."""
+    anchors = list(anchors)
+    windowed = [a for a in anchors if a.kind in _TOP_LEVEL_KINDS and not a.quoted_amendment]
+    first = min(windowed, key=lambda a: a.char_offset, default=None)
+    if first is not None and first.kind != "schedule":
+        return 0
+    return sum(
+        1
+        for a in anchors
+        if a not in windowed and (first is None or a.char_offset < first.char_offset)
+    )
 
 
 def windows_from_anchors(
@@ -5100,5 +5125,6 @@ __all__ = [
     "build_anchor_regex",
     "cached_regex",
     "scan_anchors",
+    "unfilled_anchors",
     "windows_from_anchors",
 ]

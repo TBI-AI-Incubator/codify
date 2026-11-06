@@ -842,7 +842,7 @@ async def test_a_containers_only_document_keeps_its_remark():
 
     text = "PART I\nPRELIMINARY\n\n⟦page 2 unreadable⟧\n\nPART II\nTHE KEEPER\n"
     result = await text_to_bluebell_scaffolded(
-        text, client=_EchoUnless(), country="xa", doctype="act"
+        text, client=_EchoUnless(), country="xa", doctype="act", halt_policy="land"
     )
     akn = parse_to_akn(result, "xa", doctype="act", date="2015", number="9")
     part_1 = akn.split('eId="part_I"', 1)[1].split('eId="part_II"', 1)[0]
@@ -908,7 +908,7 @@ async def test_a_preface_line_shaped_like_a_heading_is_not_a_container():
         "⟦page 2 unreadable⟧\n\nPART II\nTHE KEEPER\n"
     )
     result = await text_to_bluebell_scaffolded(
-        text, client=_EchoUnless(), country="xa", doctype="act"
+        text, client=_EchoUnless(), country="xa", doctype="act", halt_policy="land"
     )
     body = result.split("BODY", 1)[1]
     part_1 = body.split("PART II", 1)[0]

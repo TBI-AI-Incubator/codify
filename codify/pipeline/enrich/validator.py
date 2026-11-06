@@ -57,6 +57,7 @@ def validate_akn(
     provenance: Literal["native", "extracted"] | None = None,
     unreadable_pages: dict[int, str] | None = None,
     body_fill: dict[str, Any] | None = None,
+    anchor_coverage: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Run all checks, returning issue dicts. The optional arguments are evidence only the
     scan or extractor can see, so each enables a check that cannot be derived from the
@@ -80,7 +81,9 @@ def validate_akn(
     ``extracted`` (OCR, vision, a text layer), where a numbering gap is likely lost
     content. None keeps the checks provenance-neutral. ``unreadable_pages`` page number
     to reason for pages that came back without text. ``body_fill`` the structurer's
-    `BodyFillTrace` as a dict, naming bodies the model never wrote.
+    `BodyFillTrace` as a dict, naming bodies the model never wrote. ``anchor_coverage``
+    the structurer's basic-unit coverage ({kind, state, captured}), which warns when units
+    were captured with no source marker to count them against.
     """
     root = parse_xml(akn_xml, huge_tree=huge_tree)
     issues: list[dict[str, Any]] = []
@@ -136,6 +139,8 @@ def validate_akn(
         issues.extend(_check_unreadable_pages(unreadable_pages))
     if body_fill:
         issues.extend(_check_body_fill(body_fill))
+    if anchor_coverage:
+        issues.extend(_check_anchor_coverage_unmeasured(anchor_coverage))
 
     if issues:
         logger.info("validation_issues_found", count=len(issues))
@@ -1839,6 +1844,27 @@ def _check_body_fill(trace: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return issues
+
+
+def _check_anchor_coverage_unmeasured(coverage: dict[str, Any]) -> list[dict[str, Any]]:
+    """Units captured with nothing in the source to count them against, so the coverage
+    gate measured nothing. Warning, not error: the bodies were filled."""
+    if coverage.get("state") != "captured_unmeasured":
+        return []
+    kind = coverage.get("kind")
+    captured = int(coverage.get("captured") or 0)
+    return [
+        {
+            "check": "anchor_coverage_unmeasured",
+            "severity": "warning",
+            "count": captured,
+            "message": (
+                f"{captured} {kind} unit(s) were found with no marker in the source to "
+                f"count them against, so coverage was not measured and a missed {kind} "
+                "would not show."
+            ),
+        }
+    ]
 
 
 def _check_container_coverage(probe: dict[str, Any]) -> list[dict[str, Any]]:
