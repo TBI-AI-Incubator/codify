@@ -43,18 +43,16 @@ TITLE_LINE = re.compile(
 FORMULA = re.compile(r"seguinte\s*:\s*$")
 SUMMARY = re.compile(r"^Sumário:\s*")
 OPEN_QUOTE = {"«", '"', "“"}
-# Consolidated fragments can carry HTML; plain ones keep their newline split. Attributes
-# must be name=value, so "0<i≤5" or "<a fixar>" in plain text is no tag.
+# Attributes are name=value or a known flag, so "0<i≤5" or "<a fixar>" is no tag.
+ATTR = r"""\s+(?:[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]+)|nowrap|noshade|compact)"""
+# Consolidated fragments can carry HTML; plain ones keep their newline split.
 HTML_TAG = re.compile(
-    r"<(?:br|p|div|span|a|sup|sub|table|t[rdh]|li|b|i|u|em|strong)"
-    r"""(?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]+))*\s*/?>""",
+    rf"<(?:br|p|div|span|a|sup|sub|table|caption|t[rdh]|ul|ol|li|h[1-6]|blockquote|b|i|u|em"
+    rf"|strong)(?:{ATTR})*\s*/?>",
     re.IGNORECASE,
 )
 # A `<` that opens no tag-shaped markup is text, also in a fragment that has tags.
-NOT_A_TAG = re.compile(
-    r"""<(?![!?]|/?[a-z][\w:-]*(?:\s+[\w:-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]+))?)*\s*/?>)""",
-    re.IGNORECASE,
-)
+NOT_A_TAG = re.compile(rf"<(?![!?]|/?[a-z][\w:-]*(?:{ATTR})*\s*/?>)", re.IGNORECASE)
 # Control characters, raw or as references, which lxml refuses in text.
 CONTROL = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f]|&#0*(?:[0-8]|1[124-9]|2\d|3[01]);|&#x0*(?:[0-8bcef]|1[\da-f]);",

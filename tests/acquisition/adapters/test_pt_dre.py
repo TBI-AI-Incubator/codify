@@ -751,10 +751,12 @@ def test_html_breaks_separate_numbered_paragraphs_and_alineas() -> None:
 
 
 def test_mixed_fragments_keep_raw_text_and_breaks() -> None:
-    art = _article("1 - Se P<Pmin, vale 0<i≤5.<BR>2 - Dois.\x0b3 - Três.&#12;4 - Quatro.")
+    art = _article("1 - Se P<Pmin, vale 0<i≤5 <a fixar>.<BR>2 - Dois.\x0b3 - Três.&#12;4 - Quatro.")
     paras = art.xpath("a:paragraph", namespaces=NS)
     assert [p.findtext("a:num", namespaces=NS) for p in paras] == ["1", "2", "3", "4"]
-    assert _words(paras[0].find("a:content", namespaces=NS)) == "Se P<Pmin, vale 0<i≤5."
+    assert _words(paras[0].find("a:content", namespaces=NS)) == "Se P<Pmin, vale 0<i≤5 <a fixar>."
+    quoted = article_body("<blockquote>1 - Um.</blockquote><h3>2 - Dois.</h3>", "")
+    assert [x.strip() for x in quoted if x.strip().startswith("PARA")] == ["PARA 1", "PARA 2"]
 
 
 def test_html_links_and_superscripts_keep_their_text_and_entities_decode_once() -> None:
@@ -775,7 +777,7 @@ def test_an_html_table_is_an_akn_table_in_its_paragraph() -> None:
         "<table><caption>Quadro <b>1</b></caption>Valores<thead>"
         '<tr><th>Escalão</th><th colspan="2">Taxa</th></tr></thead><tr></tr>'
         '<tr><td rowspan="2">A<br/>(geral)<table><tr><td>nota</td></tr></table></td>'
-        '<td colspan="dois"></td><td>(**) 5 % (**)</td></tr><tr><td>6 %</td></tr>'
+        '<td colspan="dois"></td><td nowrap>(**) 5 % (**)</td></tr><tr><td>6 %</td></tr>'
         "</table><table></table>2 - As taxas são revistas."
     )
     paras = art.xpath("a:paragraph", namespaces=NS)
