@@ -169,6 +169,28 @@ def document_to_rows(
             if row is not None:
                 cross_refs.append(row)
 
+    def _own_row(
+        element: BodyElement,
+        section_id: uuid.UUID | None,
+        suffix: str,
+        akn_type: str,
+        text: str,
+        normative: bool,
+    ) -> ProvisionRow:
+        row = ProvisionRow(
+            version_id=version.id,
+            section_id=section_id,
+            akn_eid=f"{element.akn_eid}{suffix}",
+            akn_wid=f"{element.akn_wid}{suffix}",
+            akn_type=akn_type,
+            text=_normalise(text),
+            position=_next_pos(section_id),
+            normative=normative,
+            **_exclusion(text, element.akn_eid, markers, element.id in scoped),
+        )
+        provisions.append(row)
+        return row
+
     def _walk(
         element: BodyElement,
         parent_section_id: uuid.UUID | None,
@@ -185,61 +207,30 @@ def document_to_rows(
                 position=element.position,
             )
             sections.append(section_row)
-            # AKN allows containers (e.g. <article>) to carry body text directly
-            # via `<content><p>...</p></content>` without an enclosing
-            # paragraph element. The parser flattens that into `element.text`.
-            # Materialise it as a synthetic Provision child so the row split
-            # captures the body, otherwise articles render as empty headings
-            # in /laws/:id and the comparator has nothing to align against.
+            # A container's own words need a row, or search never sees them. An
+            # `<intro>` joins the `<content>` text after it; alone it is typed `intro`.
             has_leaf_children = any(c.kind in LEAF_KINDS for c in element.children)
-            if element.text.strip() and not has_leaf_children:
-                provisions.append(
-                    ProvisionRow(
-                        version_id=version.id,
-                        section_id=section_row.id,
-                        akn_eid=f"{element.akn_eid}__content",
-                        akn_wid=f"{element.akn_wid}__content",
-                        akn_type="paragraph",
-                        text=_normalise(element.text),
-                        position=_next_pos(section_row.id),
-                        normative=normative,
-                        **_exclusion(
-                            element.text, f"{element.akn_eid}", markers, element.id in scoped
-                        ),
-                    )
-                )
-            elif element.text.strip():
-                # Container has both inline lead-in text AND leaf children
-                # (e.g. "The Authority shall: (a)… (b)…"). Keep the lead-in as a
-                # position-0 provision so it isn't dropped ahead of the points.
-                provisions.append(
-                    ProvisionRow(
-                        version_id=version.id,
-                        section_id=section_row.id,
-                        akn_eid=f"{element.akn_eid}__intro",
-                        akn_wid=f"{element.akn_wid}__intro",
-                        akn_type="paragraph",
-                        text=_normalise(element.text),
-                        position=_next_pos(section_row.id),
-                        normative=normative,
-                        **_exclusion(
-                            element.text, f"{element.akn_eid}", markers, element.id in scoped
-                        ),
-                    )
-                )
             if element.text.strip():
+                lead = "\n".join(p for p in (element.intro, element.text) if p.strip())
+                suffix = "__intro" if has_leaf_children else "__content"
+                row = _own_row(element, section_row.id, suffix, "paragraph", lead, normative)
                 # The container's own text is that row's, and so are its citations.
-                _row_refs(element, provisions[-1].id)
+                _row_refs(element, row.id)
+            elif element.intro.strip():
+                _own_row(element, section_row.id, "__intro", "intro", element.intro, normative)
             for child in element.children:
                 _walk(child, parent_section_id=section_row.id, normative=normative)
+            if element.wrap_up.strip():
+                _own_row(element, section_row.id, "__wrapup", "wrapUp", element.wrap_up, normative)
         elif element.kind in LEAF_KINDS:
             # A grouping point carries its lead-in in `intro` (and any tail in
             # `wrap_up`) with an empty `text`; fold both in so the lead-in isn't
             # dropped, otherwise a first sub-point the body-fill merged into the
             # lead-in (e.g. "أ- …التالية:- ١- …") would vanish entirely.
-            own_text = "\n".join(
-                p for p in (element.intro, element.text, element.wrap_up) if p.strip()
-            )
+            # A list's wrap-up closes its items, so it is rowed after them.
+            tail = element.wrap_up if element.akn_type == "blockList" else ""
+            parts = (element.intro, element.text, "" if tail else element.wrap_up)
+            own_text = "\n".join(p for p in parts if p.strip())
             # Skip a truly empty point (a bare marker grouping sub-points, or a
             # mis-detected enumerator), its children still reparent below.
             if own_text.strip():
@@ -259,6 +250,8 @@ def document_to_rows(
             # Nested leaves (point > indent) collapse to siblings in v2 schema.
             for child in element.children:
                 _walk(child, parent_section_id=parent_section_id, normative=normative)
+            if tail.strip():
+                _own_row(element, parent_section_id, "__wrapup", "wrapUp", tail, normative)
         else:
             raise ValueError(f"unknown element kind: {element.kind}")
 
@@ -409,7 +402,9 @@ def rows_to_document(
 
     provisions_by_section: dict[uuid.UUID | None, list[ProvisionRow]] = {}
     for p in provisions:
-        provisions_by_section.setdefault(p.section_id, []).append(p)
+        # The comparator reads this document, and would take these rows for units of their own.
+        if p.akn_type not in ("intro", "wrapUp", "blockList", "item"):
+            provisions_by_section.setdefault(p.section_id, []).append(p)
     for prov_kids in provisions_by_section.values():
         prov_kids.sort(key=lambda p: p.position)
 

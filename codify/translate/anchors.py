@@ -169,7 +169,8 @@ def walk_source(
         lines = eid_to_lines.get(el.akn_eid)
         if lines:
             return "\n".join(lines)
-        return _joined_body(el)
+        # The writer patches only <p>s inside intro, content and wrapUp, never list prose.
+        return "" if el.akn_type in ("item", "blockList") else _joined_body(el)
 
     def visit(elements: list[BodyElement], depth: int) -> None:
         nonlocal skipped
