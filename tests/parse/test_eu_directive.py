@@ -1213,6 +1213,17 @@ class TestTheBodyWalkCountsWhatItDiscards:
         assert "unsigned closer" in out
         assert "body_discarded_text" not in provenance
 
+    def test_a_note_beside_a_kept_closer_is_still_a_loss(self) -> None:
+        provenance: dict = {}
+        out = formex_to_akn4eu(
+            "<DOCUMENT><DATE.OF.DOCUMENT ISO='2024-01-01'>1 Jan 2024</DATE.OF.DOCUMENT>"
+            "<ARTICLE IDENTIFIER='001'><PARAG><TXT>One.</TXT></PARAG></ARTICLE>"
+            "<FINAL><P>A closer.</P><NOTE>A note.</NOTE></FINAL></DOCUMENT>",
+            provenance=provenance,
+        )
+        assert "A closer." in out
+        assert provenance.get("body_discarded_text") == 1
+
     def test_a_closer_the_conclusions_do_not_emit_is_still_a_loss(self) -> None:
         provenance: dict = {}
         out = formex_to_akn4eu(

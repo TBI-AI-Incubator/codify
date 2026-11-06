@@ -1878,6 +1878,12 @@ def formex_to_akn4eu(
             for node in (src.find(tag) for tag in tags)
             if node is not None
         }
+        final = src.find("FINAL")
+        # The conclusions read only FINAL's paragraphs and signature; anything else is lost.
+        if final is not None and any(
+            _localname(c) not in {"P", "SIGNATURE"} for c in final if isinstance(c.tag, str)
+        ):
+            emitted_apart.discard(final)
         if attachments is not None:
             emitted_apart.update(_attachment_sources(src))
         if preface is not None:
