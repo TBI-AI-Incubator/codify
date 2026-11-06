@@ -17,6 +17,7 @@ from typing import NamedTuple
 import structlog
 
 from codify.jurisdictions import (
+    LOCALITY,
     SLUG_DIGEST_CHARS,
     TitleIdentity,
     open_structure_root,
@@ -465,15 +466,12 @@ def build_frbr_work_uri(
     return _assert_citable(built, country=country, doctype=doctype, number=number)
 
 
-_LOCALITY = re.compile(r"[a-z0-9]+")
-
-
 def _placed(uri: str, locality: str | None) -> str:
     """`/akn/xa/...` issued in `locality` → `/akn/xa-{locality}/...`, the AKN place
     of a sub-national issuer."""
     if not locality:
         return uri
-    if _LOCALITY.fullmatch(locality) is None:
+    if LOCALITY.fullmatch(locality) is None:
         raise UncitableFrbrUri(f"locality {locality!r} is not a lower-case alphanumeric code")
     _, prefix, place, rest = uri.split("/", 3)
     # An empty place stays empty, for `_assert_citable` to refuse.

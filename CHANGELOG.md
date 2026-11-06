@@ -258,6 +258,12 @@ New, additive:
 
 Fixed:
 
+- `work_uri_is_homed` and `config_for_work_uri` read a `{country}-{locality}` place
+  as a locality only when no configured jurisdiction has it as its code or FRBR
+  place, so a jurisdiction can no longer home a work URI in another's namespace:
+  where `gb-eng` (published under `gb`) and `gb-sct` are configured, `gb-eng`
+  homes neither `/akn/gb-eng/...` nor `/akn/gb-sct/...`. A tree with no configs
+  reads no locality, and an unreadable config refuses every locality.
 - `codify.core.pricing` prices `gemini-3.6-flash` at its intro rate to 2026-12-31,
   $0.75 in and $3.75 out per million tokens, which it had at double.
 - `oecd_html` reads declarations, ministerial conclusions, arrangements and
