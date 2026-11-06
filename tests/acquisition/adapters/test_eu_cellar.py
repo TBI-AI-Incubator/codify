@@ -500,3 +500,157 @@ async def test_a_stream_that_cannot_be_fetched_fails_the_act_rather_than_droppin
     with pytest.raises(httpx.HTTPStatusError):
         await acquirer.fetch(_OLD_REF)
     await client.aclose()
+
+
+# --- Consolidated texts ------------------------------------------------------
+
+_CONS_CELEX = "02042R0001-20450301"
+_CONS_REF = DocumentRef(
+    jurisdiction_code="eu",
+    doctype="regulation",
+    year=2042,
+    number="1",
+    languages=["eng"],
+    extra={"celex": _CONS_CELEX},
+)
+
+
+def _formex_zip(*members: tuple[str, bytes]) -> bytes:
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name, data in members:
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+_NOTICE = ("CL2042R0001EN0010010.0001.doc.xml", b"<?xml version='1.0'?><DOC><FMX/></DOC>")
+_CONS_ACT = (
+    "CL2042R0001EN0010010.0001.xml",
+    b"<?xml version='1.0' encoding='utf-8'?><CONS.ACT><INFO.CONSLEG/></CONS.ACT>",
+)
+_IMAGE = ("L_204400007EN.000101.fmx.tif", b"II*\x00")
+
+
+def test_a_consolidated_celex_maps_to_its_base_act_work() -> None:
+    from codify.acquisition.adapters.eu.cellar import consolidation_date
+
+    assert celex_to_frbr(_CONS_CELEX) == celex_to_frbr("32042R0001")
+    assert consolidation_date(_CONS_CELEX) == "2045-03-01"
+    assert consolidation_date("32042R0001") is None
+    with pytest.raises(ValueError):
+        consolidation_date("02042R0001-20451399")
+
+
+def _zip_handler(seen: list[tuple[str, str]], body: bytes, status: int = 200):  # type: ignore[no-untyped-def]
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        seen.append((url, request.headers.get("accept", "")))
+        if url.endswith(f"/cellar/celex/{_CONS_CELEX}") and "zip" in request.headers["accept"]:
+            return httpx.Response(status, content=body, headers={"etag": '"cons-1"'})
+        return httpx.Response(404)
+
+    return handler
+
+
+async def test_a_consolidated_text_is_read_out_of_its_formex_zip() -> None:
+    seen: list[tuple[str, str]] = []
+    client, acquirer = _cellar_client(_zip_handler(seen, _formex_zip(_NOTICE, _CONS_ACT, _IMAGE)))
+    acquired = await acquirer.fetch(_CONS_REF)
+    await client.aclose()
+    assert seen == [
+        (f"https://example.test/cellar/celex/{_CONS_CELEX}", "application/zip;mtype=fmx4")
+    ]
+    assert acquired.primary().media_type == "application/xml"
+    assert acquired.primary().content == _CONS_ACT[1]
+    assert acquired.frbr_work_uri == celex_to_frbr("32042R0001")[0]
+    assert acquired.expression_uri == f"{acquired.frbr_work_uri}/eng@2045-03-01"
+    assert acquired.upstream_metadata["consolidated"] == "2045-03-01"
+    assert acquired.etag == '"cons-1"'
+
+
+async def test_a_consolidated_text_without_formex_fails_rather_than_taking_xhtml() -> None:
+    seen: list[tuple[str, str]] = []
+    client, acquirer = _cellar_client(_zip_handler(seen, b"", status=404))
+    with pytest.raises(httpx.HTTPStatusError):
+        await acquirer.fetch(_CONS_REF)
+    await client.aclose()
+    assert not [accept for _, accept in seen if "html" in accept]
+
+
+async def test_a_zip_member_too_large_to_unpack_is_refused(monkeypatch) -> None:
+    import codify.acquisition.adapters.eu.cellar as cellar_mod
+
+    monkeypatch.setattr(cellar_mod, "_MAX_CONSOLIDATED_BYTES", len(_CONS_ACT[1]) - 1)
+    client, acquirer = _cellar_client(_zip_handler([], _formex_zip(_NOTICE, _CONS_ACT)))
+    with pytest.raises(ValueError, match="bytes unpacked"):
+        await acquirer.fetch(_CONS_REF)
+    await client.aclose()
+
+
+@pytest.mark.parametrize(
+    "members", [(_NOTICE, _IMAGE), (_NOTICE, _CONS_ACT, ("second.xml", _CONS_ACT[1]))]
+)
+async def test_a_zip_without_exactly_one_consolidated_act_is_refused(
+    members: tuple[tuple[str, bytes], ...],
+) -> None:
+    client, acquirer = _cellar_client(_zip_handler([], _formex_zip(*members)))
+    with pytest.raises(RuntimeError, match="CONS.ACT"):
+        await acquirer.fetch(_CONS_REF)
+    await client.aclose()
+
+
+async def test_discover_consolidations_lists_a_base_acts_texts_oldest_first() -> None:
+    from datetime import date
+    from urllib.parse import parse_qs
+
+    queries: list[str] = []
+    bindings = [
+        {"celex": {"value": "02042R0001-20430601"}, "date": {"value": "2043-06-01"}},
+        # Neither is a consolidated text, so neither is listed.
+        {"celex": {"value": "32042R0001"}, "date": {"value": "2044-01-01"}},
+        {"celex": {"value": "not-a-celex"}, "date": {"value": "2044-06-01"}},
+        {"celex": {"value": "02042R0001-20450301"}, "date": {"value": "2045-03-01"}},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith("robots.txt"):
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        queries.append(parse_qs(request.content.decode())["query"][0])
+        return httpx.Response(200, json={"results": {"bindings": bindings}})
+
+    client, acquirer = _cellar_client(handler)
+    refs = await acquirer.discover_consolidations("32042R0001")
+    await client.aclose()
+    assert [(r.extra["celex"], r.as_of) for r in refs] == [
+        ("02042R0001-20430601", date(2043, 6, 1)),
+        ("02042R0001-20450301", date(2045, 3, 1)),
+    ]
+    assert {(r.doctype, r.year, r.number) for r in refs} == {("regulation", 2042, "1")}
+    (query,) = queries
+    assert 'FILTER(STR(?baseCelex) = "32042R0001")' in query
+    assert "act_consolidated_based_on_resource_legal" in query
+    assert "/language/ENG>" in query
+    assert '"fmx4"' in query
+
+
+@pytest.mark.parametrize(
+    "celex, language",
+    [
+        ('32042R0001") } #', "eng"),
+        (_CONS_CELEX, "eng"),
+        ("32042R0001\n", "eng"),
+        ("32042R0001", "en> ."),
+    ],
+)
+async def test_discover_consolidations_refuses_what_it_would_quote_into_the_query(
+    celex: str, language: str
+) -> None:
+    client, acquirer = _cellar_client(lambda request: httpx.Response(500))
+    with pytest.raises(ValueError):
+        await acquirer.discover_consolidations(celex, language=language)
+    await client.aclose()
