@@ -10,6 +10,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
+from typing import Literal
 
 import structlog
 
@@ -4900,6 +4901,14 @@ class AnchorCoverage:
     @property
     def missing(self) -> frozenset[str]:
         return self.expected - self.captured
+
+    @property
+    def state(self) -> Literal["measured", "captured_unmeasured", "empty"]:
+        """Which None ``ratio`` is: units found with no marker to count them
+        against, or neither units nor markers."""
+        if self.ratio is not None:
+            return "measured"
+        return "captured_unmeasured" if self.captured else "empty"
 
 
 def _marker_line_start(text: str, offset: int) -> int:

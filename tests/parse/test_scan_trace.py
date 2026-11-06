@@ -540,3 +540,44 @@ async def test_a_scan_with_no_basic_unit_says_the_body_was_never_filled() -> Non
     skipped = [r for r in logs if r["event"] == "body_fill_skipped"]
     assert skipped and skipped[0]["reason"] == "no_basic_unit_anchors"
     assert "PART I" in out and "This Act may be cited" not in out
+    assert skipped[0]["coverage"] == "empty"
+
+
+# Unnumbered prose, containers only, bare numbered headings and keyworded sections
+# against the `gb` act hierarchy: the coverage state and scan reason each reports.
+GB_COVERAGE_ROWS = [
+    ("An unnumbered notice.\nPermission is granted.\n", "empty", "no_markers_in_source"),
+    (
+        "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n",
+        "empty",
+        "no_markers_in_source",
+    ),
+    (
+        "1 Duty to publish\nThe office must publish a notice.\n\n2 Reports\n"
+        "It must report annually.\n",
+        "captured_unmeasured",
+        "captured_unmeasured",
+    ),
+    (
+        "Section 1\nThe office must publish a notice.\n\nSection 2\nIt must report annually.\n",
+        "measured",
+        None,
+    ),
+]
+
+
+@pytest.mark.parametrize(("text", "state", "_reason"), GB_COVERAGE_ROWS)
+async def test_a_none_ratio_names_which_absence_it_is(text: str, state: str, _reason: str) -> None:
+    """Units found with no marker to count them against must not pass in silence,
+    nor read as the document that has no units at all."""
+    seen: list[ScanTrace] = []
+    with capture_logs() as logs:
+        await text_to_bluebell_scaffolded(
+            text,
+            client=_EmptyBodies(),  # type: ignore[arg-type]
+            country="gb",
+            on_scan=seen.append,
+        )
+    assert seen[0].coverage is not None and seen[0].coverage.state == state
+    unmeasured = [r["captured"] for r in logs if r["event"] == "anchor_coverage_unmeasured"]
+    assert unmeasured == ([2] if state == "captured_unmeasured" else [])

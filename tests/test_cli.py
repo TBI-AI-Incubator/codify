@@ -28,6 +28,7 @@ def test_an_unmeasurable_ratio_serialises_rather_than_raising() -> None:
     cov = AnchorCoverage(kind="article", ratio=None, captured=frozenset(), expected=frozenset())
     assert _coverage_json(_trace(cov)) == {
         "kind": "article",
+        "state": "empty",
         "ratio": None,
         "anchor_ratio": None,
         "captured": [],

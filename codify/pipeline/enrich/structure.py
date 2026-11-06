@@ -760,7 +760,15 @@ async def text_to_bluebell_scaffolded(
                 ratio=0.0,
                 threshold=threshold,
             )
-        if expected == 0 and len(text) > 5000:
+        if coverage.state == "captured_unmeasured":
+            logger.warning(
+                "anchor_coverage_unmeasured",
+                country=country,
+                doctype=doctype,
+                kind=kind,
+                captured=captured,
+            )
+        elif expected == 0 and len(text) > 5000:
             # A non-trivial document with no markers of the basic kind is usually
             # a doctype mismatch (regulation against an act hierarchy), which would
             # otherwise no-op the gate silently.
@@ -839,7 +847,12 @@ async def text_to_bluebell_scaffolded(
     windows = windows_from_anchors(text, anchors)
     if not windows:
         # Containers only: nothing to fill, and the skeleton ships as the document.
-        logger.warning("body_fill_skipped", reason="no_basic_unit_anchors", anchors=len(anchors))
+        logger.warning(
+            "body_fill_skipped",
+            reason="no_basic_unit_anchors",
+            anchors=len(anchors),
+            coverage=coverage.state if coverage else None,
+        )
         _trace(scaffold=scaffold)
         return _remarks_under_containers(scaffold, eid_to_anchor, unreadable, text)
 

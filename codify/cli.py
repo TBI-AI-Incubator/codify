@@ -122,6 +122,7 @@ def _coverage_json(
         out.update(
             {
                 "kind": cov.kind,
+                "state": cov.state,
                 "ratio": anchor_ratio,
                 "anchor_ratio": anchor_ratio,
                 "captured": sorted(cov.captured),

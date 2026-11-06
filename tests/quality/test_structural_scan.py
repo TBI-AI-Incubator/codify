@@ -3,8 +3,11 @@ that reads as a pass, or a deliberate transformation that reads as a defect."""
 
 from __future__ import annotations
 
+import pytest
+
 from codify.jurisdictions import JurisdictionConfig, LegalEra, load_config
 from codify.quality.structural_scan import CHECKS, era_of, scan_version
+from tests.parse.test_scan_trace import GB_COVERAGE_ROWS
 
 NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
@@ -339,6 +342,16 @@ class TestCoverageCanFail:
         finding = _find(_scan(_doc(body), source_text=bidi), "anchor_coverage")
         assert finding.failed is False
         assert finding.detail["captured"] == 2
+
+    @pytest.mark.parametrize(("source", "_state", "reason"), GB_COVERAGE_ROWS)
+    def test_units_with_nothing_to_count_against_are_not_an_empty_document(
+        self, source: str, _state: str, reason: str | None
+    ) -> None:
+        """Bare numbered headings anchor as sections while no marker counts them;
+        reported as no markers, that reads the same as a page of prose."""
+        gb = load_config("gb")
+        scan = scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source)
+        assert _find(scan, "anchor_coverage").detail.get("reason") == reason
 
 
 class TestEras:
