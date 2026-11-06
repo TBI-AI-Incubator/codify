@@ -59,6 +59,10 @@ _REMEDIES = {
         "Landed rather than refused; no model call wrote a body, so the route is "
         "a re-run once the model answers, not repair."
     ),
+    "containers_only": (
+        "Landed rather than refused; no provision was recognised, so the route is "
+        "the provision markers the configuration declares, not repair."
+    ),
 }
 
 

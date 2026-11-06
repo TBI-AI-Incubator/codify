@@ -17,7 +17,11 @@ from structlog.testing import capture_logs
 
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import anchor_coverage, cached_regex, scan_anchors
-from codify.pipeline.enrich.structure import ScanTrace, text_to_bluebell_scaffolded
+from codify.pipeline.enrich.structure import (
+    ContainersOnlyError,
+    ScanTrace,
+    text_to_bluebell_scaffolded,
+)
 
 # A descriptive rubric, then an Arabic-Indic numeral, then a dash, all on one
 # line and with no مادة keyword. The regex anchor pass finds nothing in it,
@@ -532,42 +536,80 @@ There is established an Authority.
 """
 
 
-async def test_a_scan_with_no_basic_unit_says_the_body_was_never_filled() -> None:
+async def test_a_scan_with_no_basic_unit_refuses_rather_than_ship_the_skeleton() -> None:
     """Unnumbered sections anchor their parts and nothing below; the skeleton
-    then ships as the document, which must not read as a clean run."""
+    would ship as the document with the law's text in no provision."""
+    seen: list[ScanTrace] = []
+    with pytest.raises(ContainersOnlyError):
+        await text_to_bluebell_scaffolded(
+            _PARTS_ONLY,
+            client=_NeverCalled(),  # type: ignore[arg-type]
+            country="xa",
+            on_scan=seen.append,
+        )
+    assert seen and seen[-1].fallback == "coverage_gate"
+
+
+async def test_a_landed_skeleton_carries_a_blocking_halt() -> None:
     with capture_logs() as logs:
-        out = await text_to_bluebell_scaffolded(_PARTS_ONLY, client=_NeverCalled(), country="xa")  # type: ignore[arg-type]
+        out = await text_to_bluebell_scaffolded(
+            _PARTS_ONLY,
+            client=_NeverCalled(),  # type: ignore[arg-type]
+            country="xa",
+            halt_policy="land",
+        )
     skipped = [r for r in logs if r["event"] == "body_fill_skipped"]
     assert skipped and skipped[0]["reason"] == "no_basic_unit_anchors"
-    assert "PART I" in out and "This Act may be cited" not in out
     assert skipped[0]["coverage"] == "empty"
+    assert "PART I" in out and "This Act may be cited" not in out
+
+
+async def test_containers_beside_a_schedule_still_halt() -> None:
+    """The schedule gives body-fill a window, so keying on an empty fill would
+    let the part's body text go missing in silence."""
+    seen: list[ScanTrace] = []
+    text = "PART 1\nAdministration\n\nThe office has powers.\n\nSCHEDULE 1\nForms\n\nForm A.\n"
+    await text_to_bluebell_scaffolded(
+        text,
+        client=_EmptyBodies(),  # type: ignore[arg-type]
+        country="xu",
+        on_scan=seen.append,
+        halt_policy="land",
+    )
+    assert seen[-1].body_fill is not None
+    assert [h.gate for h in seen[-1].halts] == ["containers_only"]
 
 
 # Unnumbered prose, containers only, bare numbered headings and keyworded sections
-# against the `gb` act hierarchy: the coverage state and scan reason each reports.
+# against the `gb` act hierarchy: the coverage state, scan reason and halts of each.
 GB_COVERAGE_ROWS = [
-    ("An unnumbered notice.\nPermission is granted.\n", "empty", "no_markers_in_source"),
+    ("An unnumbered notice.\nPermission is granted.\n", "empty", "no_markers_in_source", []),
     (
         "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n",
         "empty",
         "no_markers_in_source",
+        ["containers_only"],
     ),
     (
         "1 Duty to publish\nThe office must publish a notice.\n\n2 Reports\n"
         "It must report annually.\n",
         "captured_unmeasured",
         "captured_unmeasured",
+        [],
     ),
     (
         "Section 1\nThe office must publish a notice.\n\nSection 2\nIt must report annually.\n",
         "measured",
         None,
+        [],
     ),
 ]
 
 
-@pytest.mark.parametrize(("text", "state", "_reason"), GB_COVERAGE_ROWS)
-async def test_a_none_ratio_names_which_absence_it_is(text: str, state: str, _reason: str) -> None:
+@pytest.mark.parametrize(("text", "state", "_reason", "gates"), GB_COVERAGE_ROWS)
+async def test_a_none_ratio_names_which_absence_it_is(
+    text: str, state: str, _reason: str, gates: list[str]
+) -> None:
     """Units found with no marker to count them against must not pass in silence,
     nor read as the document that has no units at all."""
     seen: list[ScanTrace] = []
@@ -577,7 +619,9 @@ async def test_a_none_ratio_names_which_absence_it_is(text: str, state: str, _re
             client=_EmptyBodies(),  # type: ignore[arg-type]
             country="gb",
             on_scan=seen.append,
+            halt_policy="land",
         )
-    assert seen[0].coverage is not None and seen[0].coverage.state == state
+    assert seen[-1].coverage is not None and seen[-1].coverage.state == state
+    assert [h.gate for h in seen[-1].halts] == gates
     unmeasured = [r["captured"] for r in logs if r["event"] == "anchor_coverage_unmeasured"]
     assert unmeasured == ([2] if state == "captured_unmeasured" else [])

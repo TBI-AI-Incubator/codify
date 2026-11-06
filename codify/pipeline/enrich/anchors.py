@@ -4897,6 +4897,9 @@ class AnchorCoverage:
     then reads 1.0 on a document that lost most of its provisions."""
     unclosed: int = 0
     """How many such spans there were, which the marker count alone cannot say."""
+    containers: int = 0
+    """Grouping anchors. With nothing captured, the body text has no provision
+    to land in."""
 
     @property
     def missing(self) -> frozenset[str]:
@@ -4968,6 +4971,7 @@ def anchor_coverage(
         expected=frozenset(expected),
         masked=_masked_marker_count(text, config, doctype) if with_masked else 0,
         unclosed=_unclosed_quote_spans(text, config.code if config else "") if with_masked else 0,
+        containers=sum(1 for a in anchors if a.kind in CONTAINER_KINDS),
     )
 
 

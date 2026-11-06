@@ -424,6 +424,20 @@ class SourceTruncationError(RuntimeError):
         self.threshold = threshold
 
 
+class ContainersOnlyError(RuntimeError):
+    """Grouping containers anchored and no basic unit did, so the skeleton would
+    ship as the document with its body text in no provision."""
+
+    def __init__(self, *, kind: str, containers: int) -> None:
+        super().__init__(
+            f"{containers} container anchor(s) and no {kind}: the scan recognised no "
+            f"provision, so the body text has nowhere to go. Check the {kind} markers "
+            f"this document uses against the jurisdiction config."
+        )
+        self.kind = kind
+        self.containers = containers
+
+
 class AnchorCoverageError(RuntimeError):
     """Scanner captured too few structural anchors against the source's marker count.
     Raised before the structurer LLM sees a partial document, and carries the observed
@@ -760,7 +774,30 @@ async def text_to_bluebell_scaffolded(
                 ratio=0.0,
                 threshold=threshold,
             )
-        if coverage.state == "captured_unmeasured":
+        if coverage.state == "empty" and coverage.containers:
+            # The skeleton would ship as the document, its body text in no provision.
+            logger.warning(
+                "anchor_coverage_containers_only",
+                country=country,
+                doctype=doctype,
+                kind=kind,
+                containers=coverage.containers,
+            )
+            if halt_policy == "land":
+                halts.append(
+                    StructureHalt(
+                        gate="containers_only",
+                        kind=kind,
+                        spans=coverage.containers,
+                        detail=f"{coverage.containers} container anchor(s) and no {kind}",
+                        captured=0,
+                        expected=0,
+                    )
+                )
+            else:
+                _trace(fallback="coverage_gate")
+                raise ContainersOnlyError(kind=kind, containers=coverage.containers)
+        elif coverage.state == "captured_unmeasured":
             logger.warning(
                 "anchor_coverage_unmeasured",
                 country=country,
@@ -1062,6 +1099,7 @@ __all__ = [
     "BodyFillError",
     "BODY_FILL_PROMPT",
     "BodyFillTrace",
+    "ContainersOnlyError",
     "ScanTrace",
     "basic_unit_kind",
     "normalise_rtl_extract",

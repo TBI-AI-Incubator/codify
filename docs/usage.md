@@ -27,9 +27,9 @@ within the detected sections and articles.
 
 **Inspection order.** Inspect `anchors.jsonl` before `final.akn.xml`. The model only
 populates text inside anchored basic units (e.g., sections, articles). If a pass
-identifies higher-level containers but no basic units, it logs `body_fill_skipped` and
-exports only the skeleton. If no anchors are found, it logs `scaffold_no_anchors` and
-preserves the source text unparsed.
+identifies higher-level containers but no basic units, it records a blocking
+`containers_only` halt and exports only the skeleton. If no anchors are found, it logs
+`scaffold_no_anchors` and preserves the source text unparsed.
 
 **Dry runs.** To inspect detected anchors across `.txt` and text-layer `.pdf` files
 without making model calls or requiring a database, run the anchor scan directly:

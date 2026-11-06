@@ -343,9 +343,9 @@ class TestCoverageCanFail:
         assert finding.failed is False
         assert finding.detail["captured"] == 2
 
-    @pytest.mark.parametrize(("source", "_state", "reason"), GB_COVERAGE_ROWS)
+    @pytest.mark.parametrize(("source", "_state", "reason", "_gates"), GB_COVERAGE_ROWS)
     def test_units_with_nothing_to_count_against_are_not_an_empty_document(
-        self, source: str, _state: str, reason: str | None
+        self, source: str, _state: str, reason: str | None, _gates: list[str]
     ) -> None:
         """Bare numbered headings anchor as sections while no marker counts them;
         reported as no markers, that reads the same as a page of prose."""
