@@ -1,5 +1,5 @@
 {
-  "_comment": "// GENERATED — do not edit by hand. Run `uv run python scripts/build_registry.py` after modifying per-jurisdiction configs.",
+  "_comment": "// GENERATED: do not edit by hand. Regenerate from a Core checkout with `uv run python scripts/build_registry.py`, setting CODIFY_DATA_ROOT when the data directory is not Core's own.",
   "jurisdictions": [
     {
       "code": "ae",

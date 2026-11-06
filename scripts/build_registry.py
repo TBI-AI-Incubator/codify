@@ -21,8 +21,9 @@ _DRIFT = 2  # --check found drift, as distinct from the script failing
 REGISTRY_PATH = JURISDICTIONS_DIR / "registry.json"
 
 REGISTRY_BANNER = (
-    "// GENERATED — do not edit by hand. "
-    "Run `uv run python scripts/build_registry.py` after modifying per-jurisdiction configs."
+    "// GENERATED: do not edit by hand. Regenerate from a Core checkout with "
+    "`uv run python scripts/build_registry.py`, setting CODIFY_DATA_ROOT when the "
+    "data directory is not Core's own."
 )
 
 
