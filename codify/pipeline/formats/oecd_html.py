@@ -69,7 +69,12 @@ _ANNEX = re.compile(
 )
 _NUM_PARA = re.compile(r"^(\d{1,3})\.\s+(.*)$", re.DOTALL)
 _NUM_PAREN = re.compile(r"^(\d{1,3})\)\s+(.*)$", re.DOTALL)
-_LETTER_PARA = re.compile(r"^([a-z])\.\s+(.*)$", re.DOTALL)
+_LETTER_PARA = re.compile(r"^([a-z]|[ivxl]{2,6})\.\s+(.*)$", re.DOTALL)
+_SUBPART = re.compile(r"^([A-Z])\.\s+(.*)$", re.DOTALL)
+_ANNEX_TITLED = re.compile(
+    rf"^(?:ANNEXE?|Annexe?|APPENDI(?:X|CE)|Appendi(?:x|ce))\s+(?:{_ROMAN}|\d+|[A-Z])\s*[:.]\s*\S"
+)
+_SUBPART_WORDS = 25
 _POINT = re.compile(r"^([ivxl]{1,6}|[a-z])\)\s+(.*)$", re.DOTALL)
 _INDENT = re.compile(r"^[-–—•●]\s*(.*)$", re.DOTALL)
 _FORMULA = re.compile(
@@ -167,7 +172,7 @@ _CONTAINER_KIND = {
 }
 _RANK = {
     "part": 0, "title": 1, "chapter": 2, "article": 3, "section": 3,
-    "paragraph": 4, "point": 5, "indent": 6,
+    "subsection": 4, "paragraph": 5, "point": 6, "indent": 7,
 }  # fmt: skip
 _HEADED = frozenset({"part", "title", "chapter", "article"})
 _EID_PREFIX = {
@@ -176,6 +181,7 @@ _EID_PREFIX = {
     "chapter": "chp",
     "article": "art",
     "section": "sec",
+    "subsection": "subsec",
     "paragraph": "para",
     "point": "point",
     "indent": "indent",
@@ -360,6 +366,8 @@ class _Builder:
         self.pending_headings: list[str] = []
         self.seen: dict[tuple[str, str], int] = {}
         self.prose_count = 0
+        self.last_roman = 0
+        self.lettered: set[str] = set()
 
     def _close_to(self, rank: int) -> None:
         while self.stack and _RANK[self.stack[-1].kind] >= rank:
@@ -373,6 +381,8 @@ class _Builder:
         self.seen[(scope, f"{kind}:{key}")] = n
         # A repeated number keeps a unique eId, as a repeated article does.
         node = _Node(kind, num, key if n == 1 else f"{key}_dup{n}", heading=heading)
+        if kind == "section" and re.fullmatch(_ROMAN, key):
+            self.last_roman = _roman_value(key.lower())
         leaf = f"{_EID_PREFIX[kind]}_{node.key}"
         node.eid = f"{scope}__{leaf}" if scope else leaf
         if parent is not None:
@@ -413,6 +423,36 @@ class _Builder:
             return number == int(inner.num[:-1]) + 1
         return number == 1 and outer is not None and outer.num[:-1].isdigit() and _lead_in(outer)
 
+    def _continues_sections(self, numeral: str, rest: str) -> bool:
+        """Whether a single-letter Roman numeral is a section: after `XIX`, `C.`
+        skips ahead and is a lettered sub-part. With no section open, any opens one."""
+        if not any(n.kind in ("section", "article") for n in self.stack):
+            return True
+        if _operative(rest) is not None:
+            return True
+        part = next((n for n in reversed(self.stack) if n.kind == "subsection"), None)
+        if part is not None and _follows(part.key.lower(), numeral.lower()):
+            return False
+        return _roman_value(numeral.lower()) <= self.last_roman + 1
+
+    def _lettered_part(self, letter: str, rest: str) -> bool:
+        """Open `A. Heading` as a sub-part of the open section or article, or as an
+        annex's own top-level section; false when the line is not heading-like."""
+        rest = rest.strip()
+        titled = len(rest.split()) <= _SUBPART_WORDS and not rest.endswith((".", ";", ",", ":"))
+        parent = next((n for n in reversed(self.stack) if n.kind in ("section", "article")), None)
+        if (parent is None and not self.scope) or (parent is None and not titled):
+            return False
+        if parent is not None and parent.eid in self.lettered:
+            parent = None
+        kind = "subsection" if parent is not None else "section"
+        node = self._open(kind, f"{letter}.", letter, heading=rest if titled else None)
+        if not titled:
+            node.text.append(rest)
+        if parent is None:
+            self.lettered.add(node.eid)
+        return True
+
     def feed_prose(self, block: str) -> None:
         """Keep `block` as a paragraph of its own, whatever it looks like."""
         self.flush()
@@ -452,6 +492,8 @@ class _Builder:
             )
             return
         m = _SECTION.match(block)
+        if m and len(m.group(1)) == 1 and not self._continues_sections(*m.groups()):
+            m = None  # a lettered sub-part (`C. Heading`), not the next Roman section
         if m:
             numeral, rest = m.groups()
             op = _operative(rest)
@@ -459,6 +501,9 @@ class _Builder:
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
             if tail:
                 node.text.append(tail)
+            return
+        m = _SUBPART.match(block)
+        if m and self._lettered_part(m.group(1), m.group(2)):
             return
         op = _operative(block)
         if op and self._verb_may_open_section():
@@ -481,7 +526,17 @@ class _Builder:
             # `a.` under an open `1.` is a point of it; straight under an article it
             # is the article's own paragraph.
             numbered = any(_numbered(n) for n in self.stack)
-            kind = "point" if numbered and not self.pending_headings else "paragraph"
+            item = next((n for n in reversed(self.stack) if n.kind == "paragraph"), None)
+            roman_item = (
+                item is not None
+                and item.num.endswith(".")
+                and re.fullmatch(r"[ivxl]+", item.key)
+                and not _follows(item.key, m.group(1))
+                and len(m.group(1)) == 1
+            )
+            kind = (
+                "point" if (numbered or roman_item) and not self.pending_headings else "paragraph"
+            )
             self._open(kind, f"{m.group(1)}.", m.group(1)).text.append(m.group(2))
             return
         m = _NUM_PAREN.match(block)
@@ -734,6 +789,8 @@ def _annex_caption(block: str) -> bool:
     m = _ANNEX.match(block)
     if m is None:
         return False
+    if _ANNEX_TITLED.match(block) and len(block.split()) <= _SUBPART_WORDS * 2:
+        return True
     # `Annex I to Annex A:` is a caption whose colon opens the annex.
     return not m.group(2) or _is_heading(block.rstrip().rstrip(":"))
 

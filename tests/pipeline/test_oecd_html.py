@@ -1160,3 +1160,83 @@ def test_paragraph_one_may_hold_a_numbered_list() -> None:
     _clean(xml)
     assert _eids(root, "paragraph") == ["sec_1__para_1", "sec_1__para_2"]
     assert _eids(root, "point") == ["sec_1__para_1__point_1", "sec_1__para_1__point_2"]
+
+
+_LETTERED_PARTS = """
+<p>THE COUNCIL,</p>
+<p>On the proposal of the Harbour Committee:</p>
+<p>I. RECOMMENDS that Adherents keep lanterns lit.</p>
+<p>II. RECOMMENDS that Adherents:</p>
+<p>i. review their lantern registers each year;</p>
+<p>ii. publish the outcome of the review;</p>
+<p>iii. consult keepers.</p>
+<p>III. RECOMMENDS that Adherents:</p>
+<p>i. record every keeper;</p>
+<p>ii. train each keeper, including:</p>
+<p>a. night watch duties;</p>
+<p>b. weather duties;</p>
+<p>iii. publish the register.</p>
+<p>IV. RECOMMENDS that Adherents cooperate across harbours.</p>
+<p>A. Shared registers</p>
+<p>i. exchange register extracts;</p>
+<p>ii. agree common formats.</p>
+<p>B. Joint inspection</p>
+<p>i. inspect lanterns in pairs;</p>
+<p>ii. report faults promptly.</p>
+<p>C. Cross-harbour cases</p>
+<p>i. coordinate where two harbours share a channel;</p>
+<p>ii. name a lead harbour.</p>
+<p>V. INVITES the Secretary-General to disseminate this Recommendation.</p>
+<p>Annex I: Good Practice Guidance on Keeping Specific
+Lanterns Lit in Every Harbour of the Realm</p>
+<p>Having regard to the findings of the Harbour Committee,</p>
+<p>A. Lanterns on the quay: Duty to Light</p>
+<p>1. Quay lanterns should be lit at dusk.</p>
+<p>2. Keepers should be trained. Training should cover:</p>
+<p>a. wicks;</p>
+<p>b. oil.</p>
+<p>B. Lanterns on the pier: Liability of Keepers</p>
+<p>1. Keepers should be answerable for faults.</p>
+<p>2. Faults should be reported. This should cover:</p>
+<p>a. date;</p>
+<p>b. place.</p>
+<p>Annex II: Good Practice Guidance on Registers</p>
+<p>Introduction</p>
+<p>This guidance is addressed to keepers and harbour associations.</p>
+<p>A. Good Practice Guidance for Keepers</p>
+<p>1. Keep a register, including:</p>
+<p>i. names;</p>
+<p>ii. dates.</p>
+<p>B. Actions by Harbour Associations</p>
+<p>1. Share registers.</p>
+"""
+
+
+def test_lettered_parts_nest_roman_items_split_and_annexes_stay_attachments() -> None:
+    xml, _, root = _convert(_LETTERED_PARTS, type="recommendation")
+    _clean(xml)
+    eids = _eids(root, "section", "subsection", "paragraph", "point")
+    assert not [e for e in eids if "_dup" in e]
+    assert [e for e in eids if e.startswith("sec_") and "__" not in e] == [
+        "sec_I", "sec_II", "sec_III", "sec_IV", "sec_V",
+    ]  # fmt: skip
+    assert _eids(root, "subsection")[:3] == [
+        "sec_IV__subsec_A", "sec_IV__subsec_B", "sec_IV__subsec_C",
+    ]  # fmt: skip
+    assert "sec_IV__subsec_C__para_ii" in eids
+    assert "sec_II__para_iii" in eids
+    assert "sec_III__para_ii__point_a" in eids
+    assert "sec_III__para_iii" in eids
+    assert "att_1__sec_B__para_2__point_b" in eids
+    assert "att_1__sec_A__para_2__point_a" in eids
+    assert "att_2__sec_A__para_1__point_ii" in eids
+    assert "att_2__sec_B__para_1" in eids
+
+
+def test_an_instrument_without_lettered_parts_keeps_its_eids() -> None:
+    _, _, root = _convert(_COUNCIL_ACT)
+    assert _eids(root, "section", "paragraph", "point") == [
+        "sec_I", "sec_II", "sec_II__para_1", "sec_II__para_1__point_i",
+        "sec_II__para_1__point_ii", "sec_II__para_2", "sec_III", "sec_III__para_3",
+        "sec_IV", "sec_V", "sec_V__para_4",
+    ]  # fmt: skip
