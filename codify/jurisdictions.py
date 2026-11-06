@@ -11,6 +11,7 @@ import unicodedata
 from datetime import date
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal, NamedTuple, cast
 
 import structlog
@@ -1608,8 +1609,44 @@ def config_for_work_uri(work_uri: str | None) -> JurisdictionConfig | None:
     country's."""
     from codify.akn.frbr import country_of
 
-    place = country_of(work_uri) if work_uri else ""
-    return (try_load_config(place) or try_load_config(place.partition("-")[0])) if place else None
+    if not work_uri:
+        return None
+    place = country_of(work_uri)
+    config = try_load_config(place)
+    if config is not None:
+        return config
+    country = _locality_country(place)
+    return try_load_config(country) if country else None
+
+
+#: The `{locality}` of a sub-national issuer's `/akn/{country}-{locality}/` place.
+LOCALITY = re.compile(r"[a-z0-9]+")
+
+
+@lru_cache(maxsize=4)
+def _jurisdiction_places(root: Path) -> frozenset[str]:
+    """Every jurisdiction code under `root` and every FRBR place its configs declare,
+    read straight from JSON like `ordinal_word_folds`."""
+    places: set[str] = set()
+    for entry in root.glob("*/config.json"):
+        try:
+            frbr = json.loads(entry.read_text(encoding="utf-8")).get("frbr") or {}
+            place = str(frbr.get("country_code") or "")
+        except (OSError, ValueError, AttributeError) as exc:
+            raise JurisdictionConfigError(f"jurisdiction config {entry} could not be read") from exc
+        places.update((entry.parent.name, place.strip().lower()))
+    places.discard("")
+    return frozenset(places)
+
+
+def _locality_country(place: str) -> str | None:
+    """The country of a `{country}-{locality}` place, or None when the place names a
+    jurisdiction. A tree with no configs cannot tell, so it reads no locality."""
+    country, _, locality = place.rpartition("-")
+    if not country or LOCALITY.fullmatch(locality) is None:
+        return None
+    places = _jurisdiction_places(JURISDICTIONS_DIR)
+    return country if places and place not in places else None
 
 
 def placeholder_statuses_for_code(jurisdiction_code: str) -> tuple[tuple[str, str], ...]:
@@ -1687,7 +1724,7 @@ def work_uri_is_homed(work_uri: str, jurisdiction_code: str) -> bool:
 
     place = country_of(work_uri, default="").strip().lower()
     country = frbr_country(jurisdiction_code)
-    return place == country or place.startswith(f"{country}-")
+    return place == country or _locality_country(place) == country
 
 
 #: Document elements for instruments other than legislation, which Bluebell

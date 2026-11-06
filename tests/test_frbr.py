@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -208,6 +209,71 @@ def test_a_locality_is_homed_in_its_country_and_reads_its_config() -> None:
     assert config is not None and config.code == "xa"
 
 
+def test_a_place_naming_a_jurisdiction_is_no_locality_of_its_country() -> None:
+    """A jurisdiction sharing a country prefix must not write into another's place."""
+    from codify.jurisdictions import config_for_work_uri, work_uri_is_homed
+
+    assert work_uri_is_homed("/akn/gb/act/2024/1", "gb-eng")
+    assert work_uri_is_homed("/akn/aa-eac/act/2024/1", "eac")
+    assert not work_uri_is_homed("/akn/gb-eng/act/2024/1", "gb-eng")
+    assert not work_uri_is_homed("/akn/xy/act/2024/1", "xz")
+    assert not work_uri_is_homed("/akn/act/2024/1", "xx")
+
+    assert work_uri_is_homed("/akn/xa-c01/act/2024/1", "xa")
+    assert not work_uri_is_homed("/akn/xa-/act/2024/1", "xa")
+    assert not work_uri_is_homed("/akn/xa-c_1/act/2024/1", "xa")
+    assert not work_uri_is_homed("/akn/zq/act/2024/1", "")
+    # `xa-c02` is a jurisdiction code, `xa-c03` the FRBR place of `xb`.
+    assert not work_uri_is_homed("/akn/xa-c02/act/2024/1", "xa")
+    assert not work_uri_is_homed("/akn/xa-c03/act/2024/1", "xa")
+    assert work_uri_is_homed("/akn/xa-c03/act/2024/1", "xb")
+    assert work_uri_is_homed("/akn/xa-c03-c01/act/2024/1", "xb")
+    assert not work_uri_is_homed("/akn/xa-c03-c01/act/2024/1", "xa")
+
+    named = config_for_work_uri("/akn/xa-c02/act/2024/1")
+    assert named is not None and named.code == "xa-c02"
+    foreign = config_for_work_uri("/akn/xa-c03/act/2024/1")
+    assert foreign is None or foreign.code != "xa"
+
+
+@pytest.mark.parametrize("broken", ["{", '{"frbr": "xa"}'])
+def test_an_unreadable_config_refuses_localities_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, broken: str
+) -> None:
+    import codify.jurisdictions as j
+
+    root = tmp_path / "broken"
+    valid = '{"code": "%s", "name": "X", "tradition": ["civil_law"], "languages": ["eng"]}'
+    for code, text in {"xa": valid % "xa", "xa-c02": valid % "xa-c02", "xq": broken}.items():
+        (root / code).mkdir(parents=True)
+        (root / code / "config.json").write_text(text, encoding="utf-8")
+    with monkeypatch.context() as patch:
+        patch.setattr(j, "JURISDICTIONS_DIR", root)
+        j.try_load_config.cache_clear()
+        assert j.work_uri_is_homed("/akn/xa/act/2024/1", "xa")
+        assert not j.work_uri_is_homed("/akn/zq/act/2024/1", "xa")
+        assert j.config_for_work_uri("/akn/zq/act/2024/1") is None
+        for place in ("xa", "xa-c02"):
+            config = j.config_for_work_uri(f"/akn/{place}/act/2024/1")
+            assert config is not None and config.code == place
+        with pytest.raises(j.JurisdictionConfigError):
+            j.work_uri_is_homed("/akn/xa-c01/act/2024/1", "xa")
+    j.try_load_config.cache_clear()
+
+
+def test_a_tree_without_configs_homes_no_locality(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import codify.jurisdictions as j
+
+    with monkeypatch.context() as patch:
+        patch.setattr(j, "JURISDICTIONS_DIR", tmp_path / "empty")
+        j.try_load_config.cache_clear()
+        assert j.work_uri_is_homed("/akn/xa/act/2024/1", "xa")
+        assert not j.work_uri_is_homed("/akn/xa-c01/act/2024/1", "xa")
+    j.try_load_config.cache_clear()
+
+
 def test_number_token_rejects_an_office_routing_code() -> None:
     # The defect this closes: a model asked for a number returned the whole
     # parenthetical, and `( /11/11 ر.م.و/ إ.هـ)` was formatted into an FRBR path.
@@ -329,6 +395,8 @@ def route_configs(tmp_path, monkeypatch):
     configs = {
         "gb-eng": {"frbr": {"country_code": "gb"}},
         "eac": {"frbr": {"country_code": "aa-eac"}},
+        "xa-c02": {},
+        "xb": {"frbr": {"country_code": "xa-c03"}},
         "eu": {
             "frbr": {
                 "country_code": "eu",
