@@ -587,7 +587,7 @@ GB_COVERAGE_ROWS = [
     (
         "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n",
         "empty",
-        "no_markers_in_source",
+        "containers_only",
         ["containers_only"],
     ),
     (

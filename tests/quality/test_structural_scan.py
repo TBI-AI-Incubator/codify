@@ -353,6 +353,17 @@ class TestCoverageCanFail:
         scan = scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source)
         assert _find(scan, "anchor_coverage").detail.get("reason") == reason
 
+    def test_a_containers_only_source_fails_as_the_structurer_refuses_it(self) -> None:
+        """Parts and chapters anchored and no section: the body text lands in no
+        provision, which is a loss, not a source with nothing to count."""
+        source = "PART 1\nAdministration\n\nCHAPTER 1\nFunctions\n\nThe office has powers.\n"
+        gb = load_config("gb")
+        finding = _find(
+            scan_version(_doc(_BLOB), config=gb, doctype="act", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == (True, "containers_only")
+
 
 class TestEras:
     def test_a_year_lands_in_its_declared_era(self) -> None:

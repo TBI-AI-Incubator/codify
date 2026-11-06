@@ -294,6 +294,8 @@ def _check_anchor_coverage(
             return Finding("anchor_coverage", True, {**detail, "reason": "all_markers_unclaimed"})
         if coverage.state == "captured_unmeasured":
             return Finding("anchor_coverage", None, {**detail, "reason": "captured_unmeasured"})
+        if coverage.containers:
+            return Finding("anchor_coverage", True, {**detail, "reason": "containers_only"})
         return Finding("anchor_coverage", None, {**detail, "reason": "no_markers_in_source"})
     detail["ratio"] = round(coverage.ratio, 4)
     if threshold <= 0:
