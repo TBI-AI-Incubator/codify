@@ -800,10 +800,12 @@ def test_an_html_table_is_an_akn_table_in_its_paragraph() -> None:
     ]
 
 
-def test_a_quote_closed_in_a_table_cell_ends_the_quote() -> None:
+@pytest.mark.parametrize(("opens", "closes"), [("«", "»"), ('"', '"')])
+def test_a_quote_closed_in_a_table_cell_ends_the_quote(opens: str, closes: str) -> None:
     art = _article(
-        "1 - O quadro passa a ter a seguinte redação:<br/>«Quadro"
-        "<table><tr><td>A</td><td>5 %»</td></tr></table>2 - O prazo é de dez dias."
+        f"1 - O quadro passa a ter a seguinte redação:<br/>{opens}Quadro"
+        f"<table><tr><td>A</td><td>5 %{closes}</td><td></td></tr></table>"
+        "2 - O prazo é de dez dias."
     )
     assert [
         p.findtext("a:num", namespaces=NS) for p in art.xpath("a:paragraph", namespaces=NS)

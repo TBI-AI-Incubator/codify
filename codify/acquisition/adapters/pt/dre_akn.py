@@ -154,7 +154,9 @@ def _head(keyword: str, num: str, heading: str, pad: str) -> str:
 def quote_depth(depth: int, line: str) -> int:
     """Quotes open after `line`. Guillemets nest; straight quotes close only at line end."""
     if line.startswith(SEALED_TABLE):
-        line = bytes.fromhex(line[1:]).decode()
+        for x in bytes.fromhex(line[1:]).decode().split("\n"):
+            depth = quote_depth(depth, x.strip())
+        return depth
     depth += line.count("«") + line.count("“") - line.count("»") - line.count("”")
     if '"' in line and re.search(r'"[.;,]?\s*$', line) and not (depth == 0 and line[:1] == '"'):
         return 0
