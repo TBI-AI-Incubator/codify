@@ -11,7 +11,13 @@ from lxml import etree
 from codify.akn._schema import AKN_NS
 from codify.akn.io import parse_akn
 from codify.pipeline.formats.riigi_teataja import riigi_teataja_to_akn
-from codify.storage.documents import DocumentProvisionBlock, InlineText, _eid_index, _to_provision
+from codify.storage.documents import (
+    DocumentProvisionBlock,
+    InlineRef,
+    InlineText,
+    _eid_index,
+    _to_provision,
+)
 from codify.storage.mappers import document_to_rows
 
 _A = f"{{{AKN_NS}}}"
@@ -263,3 +269,66 @@ def test_compact_closing_text_keeps_its_table_boundaries() -> None:
     _, _, rows, _, _, _ = document_to_rows(parse_akn(compact.decode()), law_id=uuid.uuid4())
     closing = next(r.text for r in rows if r.akn_eid == "point_1__wrapup")
     assert closing == "Lõpetus. A 10 B 20 eurot"
+
+
+def test_named_blocks_in_a_lead_in_or_wrap_up_keep_their_words() -> None:
+    _, rendered = _rows_and_reader(
+        _akn(
+            """<article eId="art_1"><num>Article 1</num>
+<intro><block name="lead">The <ref href="#art_2">Board</ref> shall:</block></intro>
+<point eId="art_1__point_a"><num>(a)</num><content><p>meet;</p></content></point>
+<wrapUp><block name="closing">Closing words.</block></wrapUp></article>""",
+            "xz",
+        )
+    )
+    (lead,) = rendered["art_1__intro"]
+    assert any(isinstance(n, InlineRef) and n.text == "Board" for n in lead.intro)
+    assert _inline(rendered["art_1__wrapup"][0].intro) == "Closing words."
+
+
+def test_a_numbered_group_with_no_row_above_it_keeps_its_closing_words() -> None:
+    # Nothing before the points would show the group's number, so its row stays:
+    # directly under an article, or as an indent the paragraph's block does not walk.
+    reading, rendered = _rows_and_reader(
+        _akn(
+            """<article eId="art_1"><num>Article 1</num>
+<paragraph eId="art_1__para_1"><num>1.</num>
+<point eId="art_1__para_1__point_a"><num>(a)</num><content><p>ships,</p></content></point>
+<wrapUp><p>unless excluded.</p></wrapUp></paragraph></article>
+<article eId="art_2"><num>Article 2</num>
+<paragraph eId="art_2__para_1"><num>1.</num><intro><p>Lead:</p></intro>
+<indent eId="art_2__para_1__indent_1"><num>-</num>
+<point eId="art_2__para_1__indent_1__point_a"><num>(a)</num><content><p>one;</p></content></point>
+<wrapUp><p>closing.</p></wrapUp></indent></paragraph></article>""",
+            "xz",
+        )
+    )
+    assert reading == [
+        ("art_1__para_1", "unless excluded."),
+        ("art_1__para_1__point_a", "ships,"),
+        ("art_2__para_1", "Lead:"),
+        ("art_2__para_1__indent_1", "closing."),
+        ("art_2__para_1__indent_1__point_a", "one;"),
+    ]
+    assert rendered["art_1__para_1"][0].num == "1."
+    assert rendered["art_2__para_1__indent_1"][0].num == "-"
+
+
+def test_content_beside_a_lead_in_or_wrap_up_renders_once() -> None:
+    # Schema-invalid, but native AKN is stored as the publisher serves it.
+    _, rendered = _rows_and_reader(
+        _akn(
+            """<article eId="art_1"><num>Article 1</num>
+<intro><p>The Board shall:</p></intro><content><p>Meetings are public.</p></content>
+<point eId="art_1__point_a"><num>(a)</num><content><p>meet;</p></content></point></article>
+<article eId="art_2"><num>Article 2</num><content><p>Body.</p></content>
+<wrapUp><p>Closing words.</p></wrapUp></article>""",
+            "xz",
+        )
+    )
+    assert [_inline(b.intro) for b in rendered["art_1__intro"]] == [
+        "The Board shall:",
+        "Meetings are public.",
+    ]
+    assert [(_inline(b.intro), b.wrap_up) for b in rendered["art_2__content"]] == [("Body.", [])]
+    assert _inline(rendered["art_2__wrapup"][0].intro) == "Closing words."

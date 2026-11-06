@@ -22,20 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from codify.akn._schema import safe_parser
 from codify.akn.vocabulary import RECITAL, TAG_TO_KIND, is_lifted_note, table_row_eid
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
-from codify.storage.mappers import INTRO_SUFFIX, WRAP_UP_SUFFIX
+from codify.storage.mappers import INTRO_SUFFIX, NESTED_BLOCK_TAGS, WRAP_UP_SUFFIX
 from codify.storage.models import Jurisdiction, Law, Provision, Section, Version
 
 AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
-# AKN inline element names we map to typed nodes; anything else
-# passes through as its children's content.
-_NESTED_BLOCK_TAGS = frozenset(
-    {"paragraph", "subparagraph", "point", "item", "subpoint", "subitem"}
-)
-
 # Inside a quote the walker is the only reader: a quoted structure is not split
 # into `Section` rows, so its containers have nowhere else to be found.
-_QUOTED_BLOCK_TAGS = _NESTED_BLOCK_TAGS | frozenset(TAG_TO_KIND)
+_QUOTED_BLOCK_TAGS = NESTED_BLOCK_TAGS | frozenset(TAG_TO_KIND)
 
 # What `absorb` has a branch for. Anything else is dropped, which is right for a
 # document whose text is elsewhere and wrong inside a quote.
@@ -549,7 +543,7 @@ def _is_phrase(quoted: etree._Element) -> bool:
 def _walk_block(
     el: etree._Element,
     stop_at_eids: frozenset[str] = frozenset(),
-    nested_tags: frozenset[str] = _NESTED_BLOCK_TAGS,
+    nested_tags: frozenset[str] = NESTED_BLOCK_TAGS,
     keep_unknown: bool = False,
     skip_wrap_up: bool = False,
 ) -> DocumentProvisionBlock:
@@ -868,12 +862,13 @@ def _eid_index(root: etree._Element) -> dict[str, etree._Element]:
 _SYNTHETIC_CONTENT_SUFFIX = "__content"
 
 
-def _wrapper_of(eid: str, xml_index: dict[str, etree._Element]) -> etree._Element | None:
-    """The ``<intro>`` or ``<wrapUp>`` a split-off ``__intro``/``__wrapup`` row names."""
-    for suffix, tag in ((INTRO_SUFFIX, "intro"), (WRAP_UP_SUFFIX, "wrapUp")):
+def _wrappers_of(eid: str, xml_index: dict[str, etree._Element]) -> list[etree._Element]:
+    """What a split-off ``__intro``/``__wrapup`` row holds: the owner's ``<intro>``
+    and any ``<content>`` the mapper joined to it, or its ``<wrapUp>``."""
+    for suffix, tags in ((INTRO_SUFFIX, ("intro", "content")), (WRAP_UP_SUFFIX, ("wrapUp",))):
         if eid.endswith(suffix) and (owner := xml_index.get(eid[: -len(suffix)])) is not None:
-            return _direct_child(owner, tag)
-    return None
+            return [w for tag in tags if (w := _direct_child(owner, tag)) is not None]
+    return []
 
 
 def _to_provision(
@@ -883,10 +878,15 @@ def _to_provision(
 ) -> DocumentProvision:
     el = xml_index.get(row.akn_eid)
     is_synthetic_content = False
-    wrapper = None if el is not None else _wrapper_of(row.akn_eid, xml_index)
-    if wrapper is not None:
-        # A lead-in or wrap-up row the mapper split off: read its own subtree.
-        block = _walk_block(wrapper).model_copy(update={"akn_eid": ""})
+    blocks: list[DocumentProvisionBlock] = []
+    for wrapper in [] if el is not None else _wrappers_of(row.akn_eid, xml_index):
+        # A lead-in or wrap-up row the mapper split off: read its own subtree,
+        # inline where the walker models none of it, as the owner's block did.
+        block = _walk_block(wrapper)
+        if not (block.intro or block.blocks):
+            block = block.model_copy(update={"intro": _walk_inline(wrapper)})
+        blocks.append(block.model_copy(update={"akn_eid": ""}))
+    if blocks:
         return DocumentProvision(
             id=row.id,
             akn_eid=row.akn_eid,
@@ -894,7 +894,7 @@ def _to_provision(
             text=row.text,
             position=row.position,
             normative=row.normative,
-            blocks=[block],
+            blocks=blocks,
         )
     if el is None and row.akn_eid.endswith(_SYNTHETIC_CONTENT_SUFFIX):
         # Mapper-synthesised `<eid>__content` row: walk the parent so
@@ -902,14 +902,13 @@ def _to_provision(
         parent_eid = row.akn_eid[: -len(_SYNTHETIC_CONTENT_SUFFIX)]
         el = xml_index.get(parent_eid)
         is_synthetic_content = el is not None
-    blocks: list[DocumentProvisionBlock] = []
     num: str | None = None
     if el is not None:
         # Never stop at self: excluding own eId lets a leaf that shares
         # its eId with the persisted set still emit its own content.
         stop = stop_at_eids - {row.akn_eid} if stop_at_eids else stop_at_eids
         # A wrap-up with its own row closes rows rendered after this one.
-        moved = f"{row.akn_eid}{WRAP_UP_SUFFIX}" in stop_at_eids
+        moved = f"{el.get('eId', '')}{WRAP_UP_SUFFIX}" in stop_at_eids
         block = _walk_block(el, stop_at_eids=stop, skip_wrap_up=moved)
         if is_synthetic_content:
             # Section header already shows the container's num/heading

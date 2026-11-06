@@ -118,6 +118,9 @@ def _exclusion(
 INTRO_SUFFIX = "__intro"
 WRAP_UP_SUFFIX = "__wrapup"
 
+# What the reader walks into, inside an enclosing row's block, when it has no row.
+NESTED_BLOCK_TAGS = frozenset({"paragraph", "subparagraph", "point", "item", "subpoint", "subitem"})
+
 
 def _joined(*runs: str) -> str:
     return "\n".join(r for r in runs if r.strip())
@@ -199,6 +202,7 @@ def document_to_rows(
         element: BodyElement,
         parent_section_id: uuid.UUID | None,
         normative: bool = True,
+        enclosed: bool = False,
     ) -> None:
         if element.kind in ROW_SECTION_KINDS:
             section_row = SectionRow(
@@ -267,11 +271,14 @@ def document_to_rows(
             # `wrap_up`) with an empty `text`; fold both in so the lead-in isn't
             # dropped, otherwise a first sub-point the body-fill merged into the
             # lead-in (e.g. "أ- …التالية:- ١- …") would vanish entirely.
-            # A wrap-up after rowed children is its own row after them, in reading order.
-            closes_children = bool(element.children) and bool(element.wrap_up.strip())
-            own_text = _joined(
-                element.intro, element.text, "" if closes_children else element.wrap_up
+            # A wrap-up after rowed children is its own row after them, in reading order,
+            # once a row before them shows this element's number: its own, or an enclosing one.
+            lead = _joined(element.intro, element.text)
+            walked = enclosed and element.akn_type in NESTED_BLOCK_TAGS
+            closes_children = (
+                bool(element.children) and bool(element.wrap_up.strip()) and bool(lead or walked)
             )
+            own_text = _joined(lead, "" if closes_children else element.wrap_up)
             # Skip a truly empty point (a bare marker grouping sub-points, or a
             # mis-detected enumerator), its children still reparent below.
             if own_text.strip():
@@ -290,7 +297,12 @@ def document_to_rows(
                 _row_refs(element, provision_row.id)
             # Nested leaves (point > indent) collapse to siblings in v2 schema.
             for child in element.children:
-                _walk(child, parent_section_id=parent_section_id, normative=normative)
+                _walk(
+                    child,
+                    parent_section_id=parent_section_id,
+                    normative=normative,
+                    enclosed=walked or bool(own_text.strip()),
+                )
             if closes_children:
                 _append_wrap_up(element, parent_section_id, normative)
         else:
