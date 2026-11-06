@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 
 from codify.akn._parser import parse_document
+from codify.akn.io import to_akn
+from codify.storage.documents import _eid_index, _parse_version_xml, _to_provision
 from codify.storage.mappers import document_to_rows, rows_to_document
 
 _META = """<meta><identification source="#codify">
@@ -76,6 +78,16 @@ NOTICE = f"""<akomaNtoso {_NS}><doc name="notice">{_META}<mainBody>
   <item eId="list_1__item_b"><num>(b)</num><p>for a renewal, 25 units, or</p>
     <blockList eId="list_1__item_b__list_1">
       <item eId="list_1__item_b__list_1__item_i"><num>(i)</num><p>half that when late,</p></item>
+    </blockList>
+  </item>
+  <item eId="list_1__item_c"><num>(c)</num>
+    <blockList eId="list_1__item_c__list_1">
+      <item eId="list_1__item_c__list_1__item_i"><num>(i)</num>
+        <blockList eId="list_1__item_c__list_1__item_i__list_1">
+          <item eId="list_1__item_c__list_1__item_i__list_1__item_a"><num>(A)</num>
+            <p>double for a second late renewal;</p></item>
+        </blockList>
+      </item>
     </blockList>
   </item>
   <listWrapUp>and are due on application.</listWrapUp>
@@ -158,8 +170,34 @@ def test_a_block_list_outside_content_rows_its_introduction_and_items() -> None:
         ("list_1__item_a", "item", "for a new licence, 40 units;", 1),
         ("list_1__item_b", "item", "for a renewal, 25 units, or", 2),
         ("list_1__item_b__list_1__item_i", "item", "half that when late,", 3),
-        ("list_1__wrapup", "wrapUp", "and are due on application.", 4),
+        (
+            "list_1__item_c__list_1__item_i__list_1__item_a",
+            "item",
+            "double for a second late renewal;",
+            4,
+        ),
+        ("list_1__wrapup", "wrapUp", "and are due on application.", 5),
     ]
+
+
+def test_a_list_keeps_its_introduction_and_wrap_up_through_a_round_trip() -> None:
+    assert _rows(to_akn(parse_document(NOTICE))) == _rows(NOTICE)
+
+
+def test_the_reader_renders_a_persisted_list_item_once() -> None:
+    _, _, provisions, *_ = document_to_rows(parse_document(NOTICE), law_id=uuid.uuid4())
+    index = _eid_index(_parse_version_xml(NOTICE))
+    persisted = frozenset(p.akn_eid for p in provisions)
+
+    def nested(blocks: list) -> list[str]:
+        return [e for b in blocks for e in (b.akn_eid, *nested(b.blocks))]
+
+    assert [
+        (p.akn_eid, e)
+        for p in provisions
+        for e in nested(_to_provision(p, index, persisted).blocks)
+        if e in persisted and e != p.akn_eid
+    ] == []
 
 
 def _rebuilt_eids(akn: str) -> list[str]:

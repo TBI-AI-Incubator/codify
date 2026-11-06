@@ -738,7 +738,10 @@ def _walk_block(
                     if sname == "listIntroduction":
                         push(pending_intro, inline_of(sub))
                     elif sname == "item":
-                        pending_children.append(_walk_block(sub))
+                        # An item persisted as its own row renders there, not here.
+                        sub_eid = sub.get("eId")
+                        if not (sub_eid and sub_eid in stop_at_eids):
+                            pending_children.append(_walk_block(sub, stop_at_eids))
                     elif sname == "listWrapUp":
                         push(pending_wrap_up, inline_of(sub))
             elif cname == "listIntroduction":
