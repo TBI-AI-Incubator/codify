@@ -277,13 +277,45 @@ def test_named_blocks_in_a_lead_in_or_wrap_up_keep_their_words() -> None:
             """<article eId="art_1"><num>Article 1</num>
 <intro><block name="lead">The <ref href="#art_2">Board</ref> shall:</block></intro>
 <point eId="art_1__point_a"><num>(a)</num><content><p>meet;</p></content></point>
-<wrapUp><block name="closing">Closing words.</block></wrapUp></article>""",
+<wrapUp><block name="closing">Closing words:</block><blockList eId="art_1__wrapup__list_1">
+<item eId="art_1__wrapup__list_1__item_1"><p>first;</p></item></blockList></wrapUp></article>
+<article eId="art_2"><num>Article 2</num>
+<point eId="art_2__point_a"><num>(a)</num><content><p>meet;</p></content></point>
+<wrapUp eId="art_2__wrapup"><block name="closing">Closing words.</block></wrapUp></article>""",
             "xz",
         )
     )
     (lead,) = rendered["art_1__intro"]
     assert any(isinstance(n, InlineRef) and n.text == "Board" for n in lead.intro)
-    assert _inline(rendered["art_1__wrapup"][0].intro) == "Closing words."
+    (closing,) = rendered["art_1__wrapup"]
+    assert (_inline(closing.intro), [_inline(b.intro) for b in closing.blocks]) == (
+        "Closing words:",
+        ["first;"],
+    )
+    # A wrapper may carry its row's name as its own eId.
+    assert _inline(rendered["art_2__wrapup"][0].intro) == "Closing words."
+
+
+def test_a_group_after_a_rowed_sibling_keeps_its_number_in_place() -> None:
+    reading, rendered = _rows_and_reader(
+        _akn(
+            """<article eId="art_1"><num>Article 1</num>
+<paragraph eId="art_1__para_1"><num>1.</num><intro><p>Lead:</p></intro>
+<point eId="art_1__para_1__point_a"><num>(a)</num><content><p>First</p></content></point>
+<point eId="art_1__para_1__point_b"><num>(b)</num>
+<point eId="art_1__para_1__point_b__point_i"><num>(i)</num><content><p>Second</p></content></point>
+<wrapUp><p>closing.</p></wrapUp></point></paragraph></article>""",
+            "xz",
+        )
+    )
+    assert [eid for eid, _ in reading] == [
+        "art_1__para_1",
+        "art_1__para_1__point_a",
+        "art_1__para_1__point_b",
+        "art_1__para_1__point_b__point_i",
+    ]
+    assert rendered["art_1__para_1"][0].blocks == []
+    assert rendered["art_1__para_1__point_b"][0].num == "(b)"
 
 
 def test_a_numbered_group_with_no_row_above_it_keeps_its_closing_words() -> None:

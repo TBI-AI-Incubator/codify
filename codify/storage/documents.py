@@ -649,7 +649,7 @@ def _walk_block(
                 absorb(child)
             elif cname == "wrapUp":
                 push(wrap_up, inline_of(child))
-            elif cname == "p":
+            elif cname == "p" or (keep_unknown and cname == "block"):
                 segments = _paragraph_segments(child)
                 fresh = not pending_active or pending_children
                 if fresh:
@@ -747,8 +747,8 @@ def _walk_block(
                     pending_active = True
                 push(pending_intro, inline_of(child))
             elif keep_unknown and cname not in _MODELLED_TAGS and cname not in nested_tags:
-                # Inside a quote nothing else carries these words, so an element
-                # this walker does not model keeps its text, in its own place.
+                # Inside a quote or a split-off row nothing else carries these words,
+                # so an element this walker does not model keeps its text, in its place.
                 text = " ".join("".join(child.itertext()).split())
                 if text:
                     if not pending_active:
@@ -879,12 +879,11 @@ def _to_provision(
     el = xml_index.get(row.akn_eid)
     is_synthetic_content = False
     blocks: list[DocumentProvisionBlock] = []
-    for wrapper in [] if el is not None else _wrappers_of(row.akn_eid, xml_index):
-        # A lead-in or wrap-up row the mapper split off: read its own subtree,
-        # inline where the walker models none of it, as the owner's block did.
-        block = _walk_block(wrapper)
-        if not (block.intro or block.blocks):
-            block = block.model_copy(update={"intro": _walk_inline(wrapper)})
+    # A lead-in or wrap-up row the mapper split off, also where the wrapper carries
+    # the row's name as its eId. Nothing else renders its words, so none are dropped.
+    split_off = el is None or _local_name(el) in ("intro", "wrapUp")
+    for wrapper in _wrappers_of(row.akn_eid, xml_index) if split_off else []:
+        block = _walk_block(wrapper, keep_unknown=True)
         blocks.append(block.model_copy(update={"akn_eid": ""}))
     if blocks:
         return DocumentProvision(
