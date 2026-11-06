@@ -570,11 +570,19 @@ async def test_a_landed_skeleton_carries_a_blocking_halt() -> None:
     assert "PART I" in out and "This Act may be cited" not in out
 
 
-async def test_containers_beside_a_schedule_still_halt() -> None:
-    """The schedule gives body-fill a window, so keying on an empty fill would
-    let the part's body text go missing in silence."""
+# A part's prose, then a schedule; the second holds an article of its own.
+PART_BEFORE_SCHEDULE = [
+    "PART 1\nAdministration\n\nThe office has powers.\n\nSCHEDULE 1\nForms\n\nForm A.\n",
+    "PART 1\nAdministration\n\nThe office has powers.\n\nSCHEDULE 1\nForms\n\n"
+    "Article 1\nForm A is the notice form.\n",
+]
+
+
+@pytest.mark.parametrize("text", PART_BEFORE_SCHEDULE)
+async def test_containers_beside_a_schedule_still_halt(text: str) -> None:
+    """Every window starts at the schedule, so the part's prose has none, whatever
+    the schedule holds."""
     seen: list[ScanTrace] = []
-    text = "PART 1\nAdministration\n\nThe office has powers.\n\nSCHEDULE 1\nForms\n\nForm A.\n"
     await text_to_bluebell_scaffolded(
         text,
         client=_EmptyBodies(),  # type: ignore[arg-type]
@@ -675,6 +683,7 @@ def _anchor(kind: str, offset: int, *, quoted: bool = False) -> StructuralAnchor
         ([_anchor("part", 0)], 1),
         ([_anchor("part", 0), _anchor("section", 10)], 0),
         ([_anchor("part", 0), _anchor("schedule", 10)], 1),
+        ([_anchor("part", 0), _anchor("schedule", 10), _anchor("article", 20)], 1),
         ([_anchor("schedule", 0), _anchor("part", 10)], 0),
         ([_anchor("schedule", 0)], 0),
         ([_anchor("part", 0), _anchor("section", 10, quoted=True)], 2),

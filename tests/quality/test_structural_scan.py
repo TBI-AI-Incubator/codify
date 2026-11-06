@@ -7,7 +7,11 @@ import pytest
 
 from codify.jurisdictions import JurisdictionConfig, LegalEra, load_config
 from codify.quality.structural_scan import CHECKS, era_of, scan_version
-from tests.parse.test_scan_trace import GB_COVERAGE_ROWS, XU_SECTIONED
+from tests.parse.test_scan_trace import (
+    GB_COVERAGE_ROWS,
+    PART_BEFORE_SCHEDULE,
+    XU_SECTIONED,
+)
 
 NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 
@@ -369,6 +373,14 @@ class TestCoverageCanFail:
             "anchor_coverage",
         )
         assert (finding.failed, finding.detail["reason"]) == verdict
+
+    @pytest.mark.parametrize("source", PART_BEFORE_SCHEDULE)
+    def test_a_part_before_a_schedule_is_containers_only(self, source: str) -> None:
+        finding = _find(
+            scan_version(_doc(_BLOB), config=load_config("xu"), doctype="act", source_text=source),
+            "anchor_coverage",
+        )
+        assert (finding.failed, finding.detail["reason"]) == (True, "containers_only")
 
     @pytest.mark.parametrize("source", XU_SECTIONED)
     def test_sections_above_articles_are_not_containers_only(self, source: str) -> None:

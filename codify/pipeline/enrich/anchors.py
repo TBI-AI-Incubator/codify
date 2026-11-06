@@ -4996,14 +4996,18 @@ _TOP_LEVEL_KINDS = frozenset({"article", "section", "paragraph", "schedule"})
 
 def unfilled_anchors(anchors: Iterable[StructuralAnchor]) -> int:
     """Anchors heading text no body-fill window reaches, when no article, section or
-    paragraph opens one: the skeleton then ships as the document. Text after the
-    first schedule is that schedule's window, so only anchors before it count."""
+    paragraph opens one before the first schedule: the skeleton then ships as the
+    document. Text after that schedule is in its window, so only anchors before count."""
     anchors = list(anchors)
     windowed = [a for a in anchors if a.kind in _TOP_LEVEL_KINDS and not a.quoted_amendment]
-    if any(a.kind != "schedule" for a in windowed):
+    first = min(windowed, key=lambda a: a.char_offset, default=None)
+    if first is not None and first.kind != "schedule":
         return 0
-    first = min((a.char_offset for a in windowed), default=None)
-    return sum(1 for a in anchors if a not in windowed and (first is None or a.char_offset < first))
+    return sum(
+        1
+        for a in anchors
+        if a not in windowed and (first is None or a.char_offset < first.char_offset)
+    )
 
 
 def windows_from_anchors(

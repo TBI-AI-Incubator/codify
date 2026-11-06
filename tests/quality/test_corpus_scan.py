@@ -15,7 +15,11 @@ from codify.quality.corpus_scan import (
     scan_corpus,
     scan_text,
 )
-from tests.parse.test_scan_trace import GB_COVERAGE_ROWS, XU_SECTIONED
+from tests.parse.test_scan_trace import (
+    GB_COVERAGE_ROWS,
+    PART_BEFORE_SCHEDULE,
+    XU_SECTIONED,
+)
 
 _TWO_ARTICLES = "مادة (1)\nنص الأولى.\n\nمادة (2)\nنص الثانية.\n"
 
@@ -312,6 +316,11 @@ class TestCoverageState:
         gb = load_config("gb").model_copy(update={"min_anchor_coverage": floor})
         scan = scan_text(GB_COVERAGE_ROWS[1][0], config=gb, country="gb", doctype="act")
         assert scan.coverage_state == state
+
+    @pytest.mark.parametrize("text", PART_BEFORE_SCHEDULE)
+    def test_a_part_before_a_schedule_reads_as_refused(self, text: str) -> None:
+        scan = scan_text(text, config=load_config("xu"), country="xu", doctype="act")
+        assert scan.coverage_state == "containers_only"
 
     @pytest.mark.parametrize("text", XU_SECTIONED)
     def test_sections_above_articles_are_not_refused(self, text: str) -> None:
