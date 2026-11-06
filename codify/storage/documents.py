@@ -550,8 +550,10 @@ def _walk_block(
     stop_at_eids: frozenset[str] = frozenset(),
     nested_tags: frozenset[str] = _NESTED_BLOCK_TAGS,
     keep_unknown: bool = False,
+    skip_wrap_up: bool = False,
 ) -> DocumentProvisionBlock:
-    """Build a nested provision block.
+    """Build a nested provision block; ``skip_wrap_up`` leaves out a wrap-up
+    persisted as its own row.
 
     Each `<p>...<blockList>?` pair under `<content>` becomes a "group". A
     new `<p>` after items closes the current group and opens the next.
@@ -641,6 +643,8 @@ def _walk_block(
                 continue
             follows_phrase = after_phrase and cname == "p"
             after_phrase = False
+            if cname == "wrapUp" and skip_wrap_up:
+                continue
             if cname in ("intro", "wrapUp") and _direct_child(child, "table") is not None:
                 # Read like content, so its prose and tables keep their order.
                 absorb(child)
@@ -650,7 +654,7 @@ def _walk_block(
                 absorb(child)
             elif cname == "wrapUp":
                 push(wrap_up, inline_of(child))
-            elif cname == "p":
+            elif cname == "p" or (keep_unknown and cname == "block"):
                 segments = _paragraph_segments(child)
                 fresh = not pending_active or pending_children
                 if fresh:
@@ -751,8 +755,8 @@ def _walk_block(
                     pending_active = True
                 push(pending_intro, inline_of(child))
             elif keep_unknown and cname not in _MODELLED_TAGS and cname not in nested_tags:
-                # Inside a quote nothing else carries these words, so an element
-                # this walker does not model keeps its text, in its own place.
+                # Inside a quote or a split-off row nothing else carries these words,
+                # so an element this walker does not model keeps its text, in its place.
                 text = " ".join("".join(child.itertext()).split())
                 if text:
                     if not pending_active:
@@ -861,6 +865,17 @@ def _eid_index(root: etree._Element) -> dict[str, etree._Element]:
 
 
 _SYNTHETIC_CONTENT_SUFFIX = "__content"
+_INTRO_SUFFIX = "__intro"
+_WRAP_UP_SUFFIX = "__wrapup"
+
+
+def _wrappers_of(eid: str, xml_index: dict[str, etree._Element]) -> list[etree._Element]:
+    """What a split-off ``__intro``/``__wrapup`` row holds: the owner's ``<intro>``
+    and any ``<content>`` the mapper joined to it, or its ``<wrapUp>``."""
+    for suffix, tags in ((_INTRO_SUFFIX, ("intro", "content")), (_WRAP_UP_SUFFIX, ("wrapUp",))):
+        if eid.endswith(suffix) and (owner := xml_index.get(eid[: -len(suffix)])) is not None:
+            return [w for tag in tags if (w := _direct_child(owner, tag)) is not None]
+    return []
 
 
 def _to_provision(
@@ -870,6 +885,23 @@ def _to_provision(
 ) -> DocumentProvision:
     el = xml_index.get(row.akn_eid)
     is_synthetic_content = False
+    # A lead-in or wrap-up row the mapper split off, also where the wrapper carries
+    # the row's name as its eId. Nothing else renders its words, so none are dropped.
+    split_off = el is None or _local_name(el) in ("intro", "wrapUp")
+    wrappers = _wrappers_of(row.akn_eid, xml_index) if split_off else []
+    if wrappers:
+        return DocumentProvision(
+            id=row.id,
+            akn_eid=row.akn_eid,
+            akn_type=row.akn_type,
+            text=row.text,
+            position=row.position,
+            normative=row.normative,
+            blocks=[
+                _walk_block(w, keep_unknown=True).model_copy(update={"akn_eid": ""})
+                for w in wrappers
+            ],
+        )
     if el is None and row.akn_eid.endswith(_SYNTHETIC_CONTENT_SUFFIX):
         # Mapper-synthesised `<eid>__content` row: walk the parent so
         # blockList items lift into nested blocks.
@@ -882,7 +914,9 @@ def _to_provision(
         # Never stop at self: excluding own eId lets a leaf that shares
         # its eId with the persisted set still emit its own content.
         stop = stop_at_eids - {row.akn_eid} if stop_at_eids else stop_at_eids
-        block = _walk_block(el, stop_at_eids=stop)
+        # A wrap-up with its own row renders there, not here.
+        moved = f"{el.get('eId', '')}{_WRAP_UP_SUFFIX}" in stop_at_eids
+        block = _walk_block(el, stop_at_eids=stop, skip_wrap_up=moved)
         if is_synthetic_content:
             # Section header already shows the container's num/heading
             # and owns the article's eId; drop both on the bridged block.

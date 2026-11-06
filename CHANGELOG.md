@@ -285,6 +285,9 @@ Fixed:
   API version changed, then retries once. It raises `SiteChanged` only when the
   retry still reports a change or the script no longer names the action, and keeps
   what it read for the acquirer's lifetime. The pinned versions are the current ones.
+- The reader renders an `__intro` or `__wrapup` row from its own subtree, tables,
+  references and named blocks included, and leaves a rowed wrap-up out of the
+  container's own block; an anchor inside closing text lands on its row.
 - `work_uri_is_homed` and `config_for_work_uri` read a `{country}-{locality}` place
   as a locality only when no configured jurisdiction has it as its code or FRBR
   place, so a jurisdiction can no longer home a work URI in another's namespace:

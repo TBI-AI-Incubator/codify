@@ -6,8 +6,15 @@ import uuid
 
 from codify.akn._parser import parse_document
 from codify.akn.io import to_akn
-from codify.storage.documents import _eid_index, _parse_version_xml, _to_provision
+from codify.storage.documents import (
+    InlineRef,
+    InlineText,
+    _eid_index,
+    _parse_version_xml,
+    _to_provision,
+)
 from codify.storage.mappers import document_to_rows, rows_to_document
+from codify.storage.resolve_refs import element_index, nearest_stored_row
 
 _META = """<meta><identification source="#codify">
   <FRBRWork><FRBRthis value="/akn/xa/act/2004/9/!main"/><FRBRuri value="/akn/xa/act/2004/9"/>
@@ -233,3 +240,76 @@ def test_the_rebuilt_document_leaves_the_new_rows_out() -> None:
         "art_6",
         "art_6__content",
     ]
+
+
+SPLIT = _act("""
+<article eId="art_7"><num>7</num>
+  <intro><block name="lead">The <ref href="#art_4">registrar</ref> shall:</block></intro>
+  <point eId="art_7__point_a"><num>(a)</num><content><p>keep the register;</p></content></point>
+  <wrapUp eId="art_7__closing"><block name="closing">and publish it at:</block>
+    <blockList eId="art_7__wrapup__list_1">
+      <item eId="art_7__wrapup__list_1__item_1"><p>the registry office;</p></item>
+    </blockList>
+    <table eId="art_7__table_1"><tr><td><p>Fee</p></td><td><p>10</p></td></tr></table>
+  </wrapUp>
+</article>
+<article eId="art_8"><num>8</num>
+  <point eId="art_8__point_a"><num>(a)</num><content><p>a fee is due;</p></content></point>
+  <wrapUp eId="art_8__wrapup"><block name="closing">unless waived.</block></wrapUp>
+</article>
+<article eId="art_9"><num>9</num><content><p>A licence lasts one year.</p></content>
+  <wrapUp><p>Renewal is free.</p></wrapUp>
+</article>""")
+
+
+def _rendered(akn: str) -> dict[str, list]:
+    _, _, provisions, *_ = document_to_rows(parse_document(akn), law_id=uuid.uuid4())
+    index = _eid_index(_parse_version_xml(akn))
+    persisted = frozenset(p.akn_eid for p in provisions)
+    return {p.akn_eid: _to_provision(p, index, persisted).blocks for p in provisions}
+
+
+def _words(nodes: list) -> str:
+    return "".join(n.text for n in nodes if isinstance(n, InlineText)).strip()
+
+
+def test_a_split_off_row_renders_its_own_subtree() -> None:
+    rendered = _rendered(SPLIT)
+    (lead,) = rendered["art_7__intro"]
+    assert any(isinstance(n, InlineRef) and n.text == "registrar" for n in lead.intro)
+    # A named block keeps its words beside the list and table that follow it.
+    (closing,) = rendered["art_7__wrapup"]
+    assert (_words(closing.intro), [b.akn_type for b in closing.blocks]) == (
+        "and publish it at:",
+        ["item", "table"],
+    )
+    # A wrapper may carry its row's name as its own eId.
+    assert _words(rendered["art_8__wrapup"][0].intro) == "unless waived."
+    # Content beside a lead-in renders with it, as the row's text joins them.
+    assert [_words(b.intro) for b in _rendered(ACT)["art_5__intro"]] == [
+        "Subject to article 4,",
+        "the registrar may refuse an application under  where:",
+    ]
+
+
+def test_closing_words_render_once() -> None:
+    rendered = _rendered(SPLIT)
+    assert [(_words(b.intro), b.wrap_up) for b in rendered["art_9__content"]] == [
+        ("A licence lasts one year.", [])
+    ]
+    assert _words(rendered["art_9__wrapup"][0].intro) == "Renewal is free."
+
+
+def test_an_anchor_in_closing_words_lands_on_the_wrap_up_row() -> None:
+    _, sections, provisions, *_ = document_to_rows(parse_document(SPLIT), law_id=uuid.uuid4())
+    index = element_index(_parse_version_xml(SPLIT))
+    rows = {p.akn_eid for p in provisions}
+    named = {s.akn_eid for s in sections}
+    assert nearest_stored_row(index, "art_7__table_1", rows, named) == (
+        "art_7__wrapup",
+        "enclosing",
+    )
+    assert nearest_stored_row(index, "art_7__closing", rows, named) == (
+        "art_7__wrapup",
+        "container",
+    )
