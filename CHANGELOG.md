@@ -280,6 +280,11 @@ New, additive:
 
 Fixed:
 
+- `DiarioAcquirer` rereads a screen action's `apiVersion` and the module version
+  from the site's module manifest and screen script when a call answers that the
+  API version changed, then retries once. It raises `SiteChanged` only when the
+  retry still reports a change or the script no longer names the action, and keeps
+  what it read for the acquirer's lifetime. The pinned versions are the current ones.
 - `work_uri_is_homed` and `config_for_work_uri` read a `{country}-{locality}` place
   as a locality only when no configured jurisdiction has it as its code or FRBR
   place, so a jurisdiction can no longer home a work URI in another's namespace:

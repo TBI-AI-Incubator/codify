@@ -60,7 +60,7 @@ FRAG = (
 )
 DATA = (
     "LegislacaoConsolidada/LegCons_Detalhe/DataActionGetData",
-    "0J5toCe4aZFDi88AoH0G0Q",
+    "aIkfghOz+V3p7wVTZszP0g",
     "LegislacaoConsolidada.LegCons_Detalhe",
 )
 DOCTYPES = {"Lei": "lei", "Decreto-Lei": "dl", "Lei Orgânica": "lo", "Portaria": "portaria"}
@@ -90,10 +90,16 @@ class DrItemMissing(LookupError):
 
 
 class SiteChanged(RuntimeError):
-    """The site's calls changed version; the tokens above need refreshing."""
+    """The site's calls changed version and its own scripts no longer name them."""
 
 
 Action = tuple[str, str, str]
+
+
+def api_version(script: str, path: str) -> str | None:
+    """The apiVersion a screen script sends with the action at `path`, if it names it."""
+    m = re.search(rf'"screenservices/dr/{re.escape(path)}",\s*"([^"]+)"', script)
+    return m.group(1) if m else None
 
 
 def number_and_year(numero: str, published: str) -> tuple[str, str]:
@@ -137,6 +143,8 @@ class DiarioAcquirer(BaseAcquirer):
         self._licence = adapter.licence
         self._cache = cache_dir
         self._module_version: str | None = None
+        # apiVersions read from the site's scripts, by action path.
+        self._apis: dict[str, str] = {}
         # When each answer read from the cache was saved.
         self._read_at: dict[str, datetime] = {}
 
@@ -205,6 +213,24 @@ class DiarioAcquirer(BaseAcquirer):
             self._module_version = str(resp.json()["versionToken"])
         return self._module_version
 
+    async def _rediscover(self, action: Action) -> None:
+        """Reread the module version and this action's apiVersion from the site's own scripts."""
+        path, _, view = action
+        script = f"/dr/scripts/dr.{view}.mvc.js"
+        resp = await self._client.get(f"{self._base}/dr/moduleservices/moduleinfo")
+        resp.raise_for_status()
+        try:
+            manifest = resp.json()["manifest"]
+            module, suffix = str(manifest["versionToken"]), str(manifest["urlVersions"][script])
+        except (ValueError, KeyError, TypeError) as exc:
+            raise SiteChanged(f"{path}: the site's manifest no longer lists {script}") from exc
+        resp = await self._client.get(f"{self._base}{script}{suffix}")
+        resp.raise_for_status()
+        api = api_version(resp.text, path)
+        if api is None:
+            raise SiteChanged(f"{path}: the site's script no longer names this action")
+        self._module_version, self._apis[path] = module, api
+
     async def _call(
         self,
         action: Action,
@@ -212,26 +238,31 @@ class DiarioAcquirer(BaseAcquirer):
         key: str,
         keep: Callable[[dict[str, Any]], bool] = lambda _: True,
     ) -> dict[str, Any]:
-        path, api, view = action
+        path, pinned, view = action
 
         async def go() -> dict[str, Any]:
-            body = {
-                "versionInfo": {"moduleVersion": await self._version(), "apiVersion": api},
-                "viewName": view,
-                "screenData": {"variables": variables},
-            }
-            resp = await self._client.post(
-                f"{self._base}/dr/screenservices/dr/{path}",
-                json=body,
-                headers={"X-CSRFToken": CSRF_TOKEN},
-            )
-            resp.raise_for_status()
-            try:
-                out = resp.json()
-            except ValueError as exc:
-                raise DrItemMissing(f"{path} answered no JSON") from exc
-            if (out.get("versionInfo") or {}).get("hasApiVersionChanged"):
-                raise SiteChanged(f"{path}: the site reports a new API version")
+            for retry in (False, True):
+                api = self._apis.get(path, pinned)
+                body = {
+                    "versionInfo": {"moduleVersion": await self._version(), "apiVersion": api},
+                    "viewName": view,
+                    "screenData": {"variables": variables},
+                }
+                resp = await self._client.post(
+                    f"{self._base}/dr/screenservices/dr/{path}",
+                    json=body,
+                    headers={"X-CSRFToken": CSRF_TOKEN},
+                )
+                resp.raise_for_status()
+                try:
+                    out = resp.json()
+                except ValueError as exc:
+                    raise DrItemMissing(f"{path} answered no JSON") from exc
+                if not (out.get("versionInfo") or {}).get("hasApiVersionChanged"):
+                    break
+                if retry:
+                    raise SiteChanged(f"{path}: the site still reports a new API version")
+                await self._rediscover(action)
             if out.get("exception") or not isinstance(out.get("data"), dict):
                 raise DrItemMissing(f"{path}: {out.get('exception')!r}")
             return dict(out["data"])
@@ -447,6 +478,7 @@ __all__ = [
     "GAZETTE_NAME",
     "SiteChanged",
     "USER_AGENT",
+    "api_version",
     "number_and_year",
     "work_eli",
 ]
