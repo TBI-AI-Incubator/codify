@@ -39,8 +39,30 @@ Breaks, in that the structurer's output changes for documents it already read:
    Without a `uri_patterns` entry its work URI homes under the element,
    `/akn/{country}/doc/{class}/{year}/{number}`. One shipped class declared `doc`
    with no pattern, so its URIs move from `/act/{class}/` to `/doc/{class}/`.
+4. A document whose scan anchors headings but no article, section or paragraph in
+   the body, so the text under them would ship as an empty skeleton, is refused
+   with `ContainersOnlyError` under `halt_policy="fail"` and lands under `"land"`
+   with a blocking `containers_only` halt. Text after a schedule's heading is that
+   schedule's window and is not counted lost; a document with no anchors still
+   lands verbatim. Like the coverage gate, it runs only where
+   `min_anchor_coverage` is above 0 and the class declares a basic unit.
+5. A version whose scan captured basic units with no marker in the source to count
+   them against grades `warning`, not `clean`: `validate_akn` raises
+   `anchor_coverage_unmeasured` from the structurer's coverage, which the
+   in-process lane passes. The structural scan's `anchor_coverage` finding reports
+   that document as `captured_unmeasured` and a refused skeleton as a failing
+   `containers_only`, where both read `no_markers_in_source` before.
 
 New, additive:
+
+- `AnchorCoverage.state` says which kind of coverage a scan has: `measured`,
+  `captured_unmeasured` (units found, no marker to count them against) or `empty`.
+  `unfilled_anchors` counts the anchors heading text no body-fill window reaches,
+  and `validate_akn` takes the structurer's coverage as `anchor_coverage`. `codify
+  ingest-one` writes `state` in its coverage block (`coverage.json` and the
+  manifest); `codify scan-corpus` writes each document's `coverage_state` and a
+  `coverage_states` count, naming `containers_only` the documents the structurer
+  refuses.
 
 - Guidance and administrative decisions ingest through the text and PDF lanes.
   `ingest`, `ingest_text` and `resolve_descriptors` take a declared class
