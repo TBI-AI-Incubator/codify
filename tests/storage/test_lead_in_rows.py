@@ -14,7 +14,7 @@ from codify.storage.documents import (
     _to_provision,
 )
 from codify.storage.mappers import document_to_rows, rows_to_document
-from codify.storage.resolve_refs import element_index, nearest_stored_row
+from codify.storage.resolve_refs import RESOLVER_VERSION, element_index, nearest_stored_row
 
 _META = """<meta><identification source="#codify">
   <FRBRWork><FRBRthis value="/akn/xa/act/2004/9/!main"/><FRBRuri value="/akn/xa/act/2004/9"/>
@@ -341,3 +341,37 @@ def test_a_content_lead_in_row_renders_its_content() -> None:
     assert [_words(b.intro) for b in rendered["art_10__intro"]] == [
         "The registrar may refuse where:"
     ]
+
+
+def test_a_named_block_in_a_split_off_list_item_keeps_its_words() -> None:
+    (closing,) = _rendered(
+        _act("""<article eId="art_14"><num>14</num>
+  <point eId="art_14__point_a"><num>(a)</num><content><p>a fee is due;</p></content></point>
+  <wrapUp><blockList eId="art_14__wrapup__list_1">
+    <item eId="art_14__wrapup__list_1__item_1"><block name="duty">Pay the fee.</block></item>
+  </blockList></wrapUp>
+</article>""")
+    )["art_14__wrapup"]
+    assert [_words(b.intro) for b in closing.blocks] == ["Pay the fee."]
+
+
+def test_an_anchor_in_a_list_s_closing_words_lands_on_its_wrap_up_row() -> None:
+    lists = f"""<akomaNtoso {_NS}><doc name="notice">{_META}<mainBody>
+<blockList eId="list_3"><listIntroduction>Fees fall due:</listIntroduction>
+  <item eId="list_3__item_a"><num>(a)</num><p>on application,</p></item>
+  <listWrapUp eId="closing">unless waived.</listWrapUp></blockList>
+<blockList eId="list_4"><listIntroduction>Fees are paid:</listIntroduction>
+  <item eId="list_4__item_a"><num>(a)</num><p>in cash,</p></item>
+  <listWrapUp>or <span eId="list_4__card">by card</span>.</listWrapUp></blockList>
+</mainBody></doc></akomaNtoso>"""
+    _, sections, provisions, *_ = document_to_rows(parse_document(lists), law_id=uuid.uuid4())
+    index = element_index(_parse_version_xml(lists))
+    rows = {p.akn_eid for p in provisions}
+    named = {s.akn_eid for s in sections}
+    assert nearest_stored_row(index, "closing", rows, named) == ("list_3__wrapup", "container")
+    assert nearest_stored_row(index, "list_4__card", rows, named) == (
+        "list_4__wrapup",
+        "enclosing",
+    )
+    # Version 2 landed these on the list's lead-in, so its stamps are re-examined.
+    assert RESOLVER_VERSION >= 3

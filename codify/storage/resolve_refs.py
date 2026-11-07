@@ -31,8 +31,9 @@ logger = structlog.get_logger()
 # The selector then re-examines every row below it, clearing its ids first, so a
 # rule found wrong can be corrected rather than lived with. 2: refuse a
 # placeholder provision as a target, and require a law citation to name its
-# instrument.
-RESOLVER_VERSION = 2
+# instrument. 3: an anchor in a container's or list's closing words lands on its
+# `__wrapup` row, not the lead-in.
+RESOLVER_VERSION = 3
 
 
 @dataclass
@@ -707,8 +708,9 @@ def element_index(root: etree._Element) -> dict[str, etree._Element]:
 
 
 def _closing_row(el: etree._Element, provisions: Container[str]) -> str | None:
-    """The row the mapper split a ``wrapUp`` into, which its closing text lands on."""
-    owner = el.getparent() if etree.QName(el).localname == "wrapUp" else None
+    """The row the mapper split a ``wrapUp`` or ``listWrapUp`` into, which its
+    closing text lands on."""
+    owner = el.getparent() if etree.QName(el).localname in ("wrapUp", "listWrapUp") else None
     closing = f"{owner.get('eId')}__wrapup" if owner is not None else ""
     return closing if closing in provisions else None
 
