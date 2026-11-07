@@ -904,6 +904,11 @@ def _to_provision(
     split_off = el is None or _local_name(el) in ("intro", "wrapUp", "listWrapUp")
     wrappers = _wrappers_of(row.akn_eid, xml_index) if split_off else []
     if wrappers:
+        try:
+            split = [_split_off_block(w) for w in wrappers]
+        except ValueError:
+            # A table with no eId refuses projection; the row's text keeps its words.
+            split = []
         return DocumentProvision(
             id=row.id,
             akn_eid=row.akn_eid,
@@ -911,7 +916,7 @@ def _to_provision(
             text=row.text,
             position=row.position,
             normative=row.normative,
-            blocks=[_split_off_block(w) for w in wrappers],
+            blocks=split,
         )
     if el is None and row.akn_eid.endswith(_SYNTHETIC_CONTENT_SUFFIX):
         # Mapper-synthesised `<eid>__content` row: walk the parent so

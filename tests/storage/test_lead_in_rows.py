@@ -375,3 +375,22 @@ def test_an_anchor_in_a_list_s_closing_words_lands_on_its_wrap_up_row() -> None:
     )
     # Version 2 landed these on the list's lead-in, so its stamps are re-examined.
     assert RESOLVER_VERSION >= 3
+
+
+def test_a_split_off_row_holding_a_table_with_no_eid_reads_as_its_text() -> None:
+    table = "<table><tr><td><p>Licence</p></td><td><p>40</p></td></tr></table>"
+    point = '<point eId="{0}__point_a"><num>(a)</num><content><p>a fee;</p></content></point>'
+    akn = _act(f"""
+<article eId="art_15"><num>15</num>{point.format("art_15")}
+  <wrapUp><p>Payable:</p>{table}</wrapUp></article>
+<article eId="art_16"><num>16</num><intro><p>Fees:</p>{table}</intro>{point.format("art_16")}
+</article>
+<article eId="art_17"><num>17</num><intro><p>Fees:</p></intro>
+  <content><p>as follows:</p>{table}</content>{point.format("art_17")}</article>
+<article eId="art_18"><num>18</num>{point.format("art_18")}
+  <wrapUp><blockList eId="art_18__wrapup__list_1">
+    <item eId="art_18__wrapup__list_1__item_1">{table}</item></blockList></wrapUp></article>""")
+    text = {r[1]: r[3] for r in _rows(akn)}
+    rendered = _rendered(akn)
+    for eid in ("art_15__wrapup", "art_16__intro", "art_17__intro", "art_18__wrapup"):
+        assert (eid, rendered[eid], "Licence 40" in text[eid]) == (eid, [], True)
