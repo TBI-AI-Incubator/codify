@@ -55,6 +55,18 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- `PoliteTransport` keeps a circuit per host, shared across the process. Five
+  requests in a row that end in a refusal (429, 436, 503), a gateway failure
+  (502, 504) or a connection that never answered, each counted once after its
+  own retries, open it: every request to that host then raises
+  `HostCircuitOpen`, an `httpx.TransportError`, unsent, for 60 seconds. One
+  probe then goes through; an answer closes the circuit, a failure reopens it.
+  A robots refusal counts as neither. `host_circuit_state` reports a host's
+  circuit.
+- `PoliteTransport` retries a bodyless request on a 502 or 504, and on a
+  connect or read timeout, a dropped connection or a protocol error, with
+  exponential full jitter and without widening the host's pace. A request
+  with a body is not replayed.
 - `AnchorCoverage.state` says which kind of coverage a scan has: `measured`,
   `captured_unmeasured` (units found, no marker to count them against) or `empty`.
   `unfilled_anchors` counts the anchors heading text no body-fill window reaches,

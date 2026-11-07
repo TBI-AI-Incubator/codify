@@ -1,4 +1,4 @@
-"""PoliteTransport, rate-limit, robots, etag injection, retry on 429/503."""
+"""PoliteTransport, rate-limit, robots, etag injection, retries and host circuits."""
 
 from __future__ import annotations
 
@@ -7,13 +7,20 @@ import time
 import httpx
 import pytest
 
+from codify.acquisition import politeness
 from codify.acquisition.base import PolitenessProfile
 from codify.acquisition.politeness import (
+    _CIRCUIT_COOLDOWN_S,
+    _CIRCUIT_FAILURES,
     _MAX_RETRIES,
     _ROBOTS_FAIL_TTL_S,
     _ROBOTS_OK_TTL_S,
+    HostCircuitOpen,
     PoliteTransport,
     host_bucket,
+    host_bucket_state,
+    host_circuit,
+    host_circuit_state,
     reset_host_buckets,
 )
 
@@ -484,3 +491,186 @@ async def test_a_refusal_during_another_waiter_sleep_delays_that_waiter() -> Non
     bucket.record_backoff(1.0)  # a refusal on another slot: the deadline moves out
     elapsed = await task
     assert elapsed >= 0.95
+
+
+@pytest.fixture
+def no_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Full jitter draws from [0, 2**attempt); zero keeps the retries instant.
+    monkeypatch.setattr(politeness.random, "uniform", lambda _a, _b: 0.0)
+
+
+def _quiet_transport(handler) -> PoliteTransport:  # type: ignore[no-untyped-def]
+    profile = PolitenessProfile(robots_respect=False)
+    return PoliteTransport(profile=profile, inner=_make_inner(handler), resolver=_public)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [502, 504])
+async def test_a_gateway_failure_is_retried_without_widening_the_pace(
+    status: int, no_jitter: None
+) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(status) if attempts < 3 else _ok()
+
+    profile = PolitenessProfile(rate_limit_per_minute=6000, robots_respect=False)
+    transport = PoliteTransport(profile=profile, inner=_make_inner(handler), resolver=_public)
+    async with httpx.AsyncClient(transport=transport) as c:
+        resp = await c.get("https://gateway.test/x")
+    assert resp.status_code == 200
+    assert attempts == 3
+    state = host_bucket_state("gateway.test")
+    assert state is not None and state["backoffs"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error", [httpx.ReadTimeout, httpx.ConnectError, httpx.RemoteProtocolError]
+)
+async def test_a_transient_transport_error_on_a_get_is_retried(
+    error: type[httpx.TransportError], no_jitter: None
+) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise error("dropped", request=request)
+        return _ok()
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        resp = await c.get("https://flaky.test/x")
+    assert resp.status_code == 200
+    assert attempts == 2
+
+
+@pytest.mark.asyncio
+async def test_a_request_with_a_body_is_not_replayed_after_a_transport_error(
+    no_jitter: None,
+) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        raise httpx.ReadTimeout("dropped", request=request)
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        with pytest.raises(httpx.ReadTimeout):
+            await c.post("https://flaky.test/sparql", content=b"query=1")
+    assert attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_retries_exhausted_on_a_transport_error_raise_it(no_jitter: None) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        raise httpx.ConnectTimeout("no answer", request=request)
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        with pytest.raises(httpx.ConnectTimeout):
+            await c.get("https://down.test/x")
+    assert attempts == _MAX_RETRIES
+    # One request, however many attempts, is one failure.
+    assert host_circuit_state("down.test") == {"failures": 1, "open": False, "trips": 0}
+
+
+@pytest.mark.asyncio
+async def test_consecutive_failed_requests_open_the_circuit() -> None:
+    sent = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal sent
+        sent += 1
+        return httpx.Response(503, headers={"retry-after": "0"})
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        for n in range(_CIRCUIT_FAILURES):
+            assert (await c.get(f"https://down.test/{n}")).status_code == 503
+        assert sent == _CIRCUIT_FAILURES * _MAX_RETRIES
+        with pytest.raises(HostCircuitOpen):
+            await c.get("https://down.test/next")
+    # Refused unsent, and another host keeps its own circuit.
+    assert sent == _CIRCUIT_FAILURES * _MAX_RETRIES
+    assert host_circuit_state("other.test") is None
+
+
+@pytest.mark.asyncio
+async def test_an_answer_resets_the_failure_count(no_jitter: None) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/missing":
+            return httpx.Response(404)
+        return httpx.Response(502)
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        for _ in range(_CIRCUIT_FAILURES - 1):
+            await c.get("https://half.test/x")
+        # A 404 is the host answering: it is up, whatever the document's fate.
+        assert (await c.get("https://half.test/missing")).status_code == 404
+        await c.get("https://half.test/x")
+    assert host_circuit_state("half.test") == {"failures": 1, "open": False, "trips": 0}
+
+
+@pytest.mark.asyncio
+async def test_after_the_cooldown_one_probe_closes_or_reopens_the_circuit(
+    no_jitter: None,
+) -> None:
+    healthy = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ok() if healthy else httpx.Response(502)
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        for _ in range(_CIRCUIT_FAILURES):
+            await c.get("https://probe.test/x")
+        circuit = host_circuit("probe.test")
+        assert circuit.opened_at is not None
+
+        # A failed probe reopens it at once, without another full run of failures.
+        circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+        assert (await c.get("https://probe.test/x")).status_code == 502
+        assert circuit.trips == 2
+        with pytest.raises(HostCircuitOpen):
+            await c.get("https://probe.test/x")
+
+        healthy = True
+        circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+        assert (await c.get("https://probe.test/x")).status_code == 200
+        assert (await c.get("https://probe.test/y")).status_code == 200
+    assert host_circuit_state("probe.test") == {"failures": 0, "open": False, "trips": 2}
+
+
+def test_only_one_probe_is_admitted_while_the_circuit_is_half_open() -> None:
+    circuit = host_circuit("busy.test")
+    for _ in range(_CIRCUIT_FAILURES):
+        circuit.record_failure()
+    assert circuit.admit() is False
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    assert circuit.admit() is True
+    assert circuit.admit() is False
+    # A probe that ends without an outcome (robots refusal, cancellation) frees the slot.
+    circuit.release()
+    assert circuit.admit() is True
+
+
+@pytest.mark.asyncio
+async def test_a_robots_refusal_neither_counts_nor_clears_a_failure() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nDisallow: /private/\n")
+        return _ok()
+
+    profile = PolitenessProfile(robots_respect=True)
+    transport = PoliteTransport(profile=profile, inner=_make_inner(handler), resolver=_public)
+    host_circuit("robots.test").record_failure()
+    async with httpx.AsyncClient(transport=transport) as c:
+        assert (await c.get("https://robots.test/private/x")).status_code == 451
+    assert host_circuit_state("robots.test") == {"failures": 1, "open": False, "trips": 0}

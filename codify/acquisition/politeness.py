@@ -1,4 +1,4 @@
-"""httpx transport with rate limits, robots, ETags and retry backoff."""
+"""httpx transport with rate limits, robots, ETags, retry backoff and host circuits."""
 
 from __future__ import annotations
 
@@ -32,6 +32,17 @@ _ROBOTS_FAIL_TTL_S = 5 * 60
 
 
 _BACKOFF_STATUSES = frozenset({429, 436, 503})
+# A gateway's failure says nothing about our pace: retried with jitter, interval untouched.
+_TRANSIENT_STATUSES = frozenset({502, 504})
+_FAILED_STATUSES = _BACKOFF_STATUSES | _TRANSIENT_STATUSES
+# Failures before the request was answered; replayed only for a bodyless request.
+_TRANSIENT_ERRORS: tuple[type[httpx.TransportError], ...] = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadError,
+    httpx.ReadTimeout,
+    httpx.RemoteProtocolError,
+)
 _BACKOFF_FACTOR = 2.0
 _RECOVERY_FACTOR = 0.95
 _MAX_INTERVAL_S = 300.0
@@ -119,6 +130,91 @@ def host_bucket_state(host: str) -> dict[str, float | int] | None:
 def reset_host_buckets() -> None:
     """Tests only: forget every host's pace."""
     _BUCKETS.clear()
+
+
+_CIRCUIT_FAILURES = 5
+_CIRCUIT_COOLDOWN_S = 60.0
+
+
+class HostCircuitOpen(httpx.TransportError):
+    """A host failed enough requests in a row that this one was refused unsent."""
+
+
+@dataclass
+class _HostCircuit:
+    """Consecutive failed requests per host, shared by every client in the process.
+
+    A request counts once, after its own retries, so one bad document cannot
+    trip it alone. Open, it refuses every request for the cooldown; then one
+    probe goes through while the others are still refused, and its outcome
+    closes or reopens the circuit."""
+
+    failures: int = 0
+    opened_at: float | None = None
+    probing: bool = False
+    trips: int = 0
+
+    def admit(self) -> bool:
+        if self.opened_at is None:
+            return True
+        if self.probing or time.monotonic() - self.opened_at < _CIRCUIT_COOLDOWN_S:
+            return False
+        self.probing = True
+        return True
+
+    def record_success(self) -> None:
+        self.failures, self.opened_at, self.probing = 0, None, False
+
+    def record_failure(self) -> bool:
+        """Count a failed request; True when it opened (or reopened) the circuit."""
+        self.failures += 1
+        opens = self.probing or (self.opened_at is None and self.failures >= _CIRCUIT_FAILURES)
+        if self.opened_at is not None or opens:
+            # A straggler admitted before the trip restarts the cooldown too.
+            self.opened_at = time.monotonic()
+        if opens:
+            self.trips += 1
+        self.probing = False
+        return opens
+
+    def release(self) -> None:
+        """Neither outcome (robots or guard refusal, cancellation): free the probe."""
+        self.probing = False
+
+    def snapshot(self) -> dict[str, int | bool]:
+        return {
+            "failures": self.failures,
+            "open": self.opened_at is not None,
+            "trips": self.trips,
+        }
+
+
+_CIRCUITS: dict[str, _HostCircuit] = {}
+
+
+def host_circuit(host: str) -> _HostCircuit:
+    """The process-wide circuit for a host."""
+    circuit = _CIRCUITS.get(host)
+    if circuit is None:
+        circuit = _CIRCUITS[host] = _HostCircuit()
+    return circuit
+
+
+def host_circuit_state(host: str) -> dict[str, int | bool] | None:
+    circuit = _CIRCUITS.get(host)
+    return circuit.snapshot() if circuit is not None else None
+
+
+def reset_host_circuits() -> None:
+    """Tests only: close every host's circuit."""
+    _CIRCUITS.clear()
+
+
+def _jitter_wait(attempt: int, retry_after: float | None) -> float:
+    """Retry-After when the host gave one, else exponential with full jitter."""
+    if retry_after is not None:
+        return min(retry_after, _MAX_BACKOFF_S)
+    return min(random.uniform(0, 2**attempt), _MAX_BACKOFF_S)  # noqa: S311
 
 
 @dataclass
@@ -373,84 +469,111 @@ class PoliteTransport(httpx.AsyncBaseTransport):
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         async with self._sem:
             host = request.url.host
-            url_str = str(request.url)
+            circuit = host_circuit(host)
+            if not circuit.admit():
+                logger.warning("polite_circuit_refused", host=host, **circuit.snapshot())
+                raise HostCircuitOpen(
+                    f"{host} failed {circuit.failures} requests in a row; refusing "
+                    f"requests for {_CIRCUIT_COOLDOWN_S:.0f}s from the last failure",
+                    request=request,
+                )
+            answered: bool | None = None
+            try:
+                response = await self._send(request, host)
+                # A robots refusal is ours, not the host's answer.
+                if "x-codify-blocked-by" not in response.headers:
+                    answered = response.status_code not in _FAILED_STATUSES
+                return response
+            except _TRANSIENT_ERRORS:
+                answered = False
+                raise
+            finally:
+                if answered is None:
+                    circuit.release()
+                elif answered:
+                    circuit.record_success()
+                elif circuit.record_failure():
+                    logger.warning("polite_circuit_opened", host=host, **circuit.snapshot())
 
-            bucket = self._bucket(host)
-            if self.profile.robots_respect:
-                # The robots probe is a request to the host too, so it takes
-                # its turn in the bucket rather than riding ahead of the fetch.
-                if bucket is not None and not self._robots.is_fresh(host):
-                    await bucket.acquire()
-                allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
-                if not allowed:
-                    # Explicit reason: a bare sentinel reads as a remote error.
-                    entry = self._robots.entries.get(urlparse(url_str).netloc)
-                    if entry is not None and entry.fetch_failed:
-                        why = entry.failure
-                        return httpx.Response(
-                            status_code=451,
-                            headers={"x-codify-blocked-by": "robots.txt-unavailable"},
-                            extensions={
-                                "reason_phrase": f"robots.txt unavailable ({why})".encode()
-                            },
-                            text=(
-                                f"robots.txt for {host} could not be read ({why}); "
-                                f"requests to {host} are held for up to "
-                                f"{int(_ROBOTS_FAIL_TTL_S // 60)} minutes"
-                            ),
-                            request=request,
-                        )
+    async def _send(self, request: httpx.Request, host: str) -> httpx.Response:
+        url_str = str(request.url)
+
+        bucket = self._bucket(host)
+        if self.profile.robots_respect:
+            # The robots probe is a request to the host too, so it takes
+            # its turn in the bucket rather than riding ahead of the fetch.
+            if bucket is not None and not self._robots.is_fresh(host):
+                await bucket.acquire()
+            allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
+            if not allowed:
+                # Explicit reason: a bare sentinel reads as a remote error.
+                entry = self._robots.entries.get(urlparse(url_str).netloc)
+                if entry is not None and entry.fetch_failed:
+                    why = entry.failure
                     return httpx.Response(
                         status_code=451,
-                        headers={"x-codify-blocked-by": "robots.txt"},
-                        extensions={"reason_phrase": b"Blocked by robots.txt"},
+                        headers={"x-codify-blocked-by": "robots.txt-unavailable"},
+                        extensions={"reason_phrase": f"robots.txt unavailable ({why})".encode()},
                         text=(
-                            f"blocked by {host}/robots.txt for "
-                            f"user-agent {self.profile.user_agent!r} "
-                            "(set robots_respect=false on the source to override)"
+                            f"robots.txt for {host} could not be read ({why}); "
+                            f"requests to {host} are held for up to "
+                            f"{int(_ROBOTS_FAIL_TTL_S // 60)} minutes"
                         ),
                         request=request,
                     )
+                return httpx.Response(
+                    status_code=451,
+                    headers={"x-codify-blocked-by": "robots.txt"},
+                    extensions={"reason_phrase": b"Blocked by robots.txt"},
+                    text=(
+                        f"blocked by {host}/robots.txt for "
+                        f"user-agent {self.profile.user_agent!r} "
+                        "(set robots_respect=false on the source to override)"
+                    ),
+                    request=request,
+                )
 
-            if self.etag_lookup is not None and "if-none-match" not in request.headers:
-                etag, last_modified = await self.etag_lookup(url_str)
-                if etag:
-                    request.headers["if-none-match"] = etag
-                if last_modified:
-                    request.headers["if-modified-since"] = last_modified
+        if self.etag_lookup is not None and "if-none-match" not in request.headers:
+            etag, last_modified = await self.etag_lookup(url_str)
+            if etag:
+                request.headers["if-none-match"] = etag
+            if last_modified:
+                request.headers["if-modified-since"] = last_modified
 
-            request.headers["user-agent"] = self.profile.user_agent
+        request.headers["user-agent"] = self.profile.user_agent
 
-            response: httpx.Response | None = None
-            for attempt in range(_MAX_RETRIES):
-                if bucket is not None:
-                    await bucket.acquire()
+        replayable = _replayable(request)
+        response: httpx.Response | None = None
+        for attempt in range(_MAX_RETRIES):
+            last = attempt == _MAX_RETRIES - 1
+            if bucket is not None:
+                await bucket.acquire()
+            try:
                 response = await self._inner.handle_async_request(request)
-                if response.status_code not in _BACKOFF_STATUSES:
-                    if bucket is not None and bucket.record_answer():
-                        logger.info("polite_recovered", host=host, **bucket.snapshot())
-                    return response
-                retry_after = _parse_retry_after(response.headers.get("retry-after"))
-                if bucket is None:
-                    # No configured pace to adapt: exponential with full jitter.
-                    jitter = random.uniform(0, 2**attempt)  # noqa: S311
-                    wait = min(
-                        retry_after if retry_after is not None else jitter,
-                        _MAX_BACKOFF_S,
+            except _TRANSIENT_ERRORS as exc:
+                if not replayable:
+                    raise
+                if last:
+                    logger.warning(
+                        "polite_retry_exhausted",
+                        host=host,
+                        attempts=_MAX_RETRIES,
+                        last_error=type(exc).__name__,
                     )
-                else:
-                    wait = bucket.record_backoff(retry_after)
+                    raise
+                wait = _jitter_wait(attempt, None)
                 logger.warning(
-                    "polite_backoff",
+                    "polite_retry",
                     host=host,
-                    status=response.status_code,
-                    retry_after=retry_after,
+                    error=type(exc).__name__,
                     attempt=attempt + 1,
                     wait_s=round(wait, 3),
-                    **(bucket.snapshot() if bucket is not None else {}),
                 )
-                # Last attempt, keep response open so caller can read body.
-                if attempt == _MAX_RETRIES - 1:
+                await asyncio.sleep(wait)
+                continue
+            retry_after = _parse_retry_after(response.headers.get("retry-after"))
+            if response.status_code in _TRANSIENT_STATUSES and replayable:
+                if last:
                     logger.warning(
                         "polite_retry_exhausted",
                         host=host,
@@ -458,12 +581,50 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                         last_status=response.status_code,
                     )
                     return response
+                wait = _jitter_wait(attempt, retry_after)
+                logger.warning(
+                    "polite_retry",
+                    host=host,
+                    status=response.status_code,
+                    attempt=attempt + 1,
+                    wait_s=round(wait, 3),
+                )
                 await response.aclose()
-                if bucket is None:
-                    await asyncio.sleep(wait)
-                # With a bucket, the next acquire waits the new interval from the refusal.
-            assert response is not None
-            return response
+                await asyncio.sleep(wait)
+                continue
+            if response.status_code not in _BACKOFF_STATUSES:
+                if bucket is not None and bucket.record_answer():
+                    logger.info("polite_recovered", host=host, **bucket.snapshot())
+                return response
+            if bucket is None:
+                # No configured pace to adapt: exponential with full jitter.
+                wait = _jitter_wait(attempt, retry_after)
+            else:
+                wait = bucket.record_backoff(retry_after)
+            logger.warning(
+                "polite_backoff",
+                host=host,
+                status=response.status_code,
+                retry_after=retry_after,
+                attempt=attempt + 1,
+                wait_s=round(wait, 3),
+                **(bucket.snapshot() if bucket is not None else {}),
+            )
+            # Last attempt, keep response open so caller can read body.
+            if last:
+                logger.warning(
+                    "polite_retry_exhausted",
+                    host=host,
+                    attempts=_MAX_RETRIES,
+                    last_status=response.status_code,
+                )
+                return response
+            await response.aclose()
+            if bucket is None:
+                await asyncio.sleep(wait)
+            # With a bucket, the next acquire waits the new interval from the refusal.
+        assert response is not None
+        return response
 
     async def aclose(self) -> None:
         await self._probe.aclose()
@@ -499,12 +660,16 @@ def make_polite_client(
 
 __all__ = [
     "EtagLookup",
+    "HostCircuitOpen",
     "client_tls_context",
     "PoliteTransport",
     "SSRFBlocked",
     "host_bucket",
     "host_bucket_state",
+    "host_circuit",
+    "host_circuit_state",
     "make_polite_client",
     "reset_host_buckets",
+    "reset_host_circuits",
     "ssrf_guard",
 ]
