@@ -641,7 +641,9 @@ def _walk_block(
             cname = _local_name(child)
             if cname in ("num", "heading"):
                 continue
-            follows_phrase = after_phrase and cname == "p"
+            # Where nothing else carries its words, a named block reads like a paragraph.
+            reads_as_p = cname == "p" or (keep_unknown and cname == "block")
+            follows_phrase = after_phrase and reads_as_p
             after_phrase = False
             if cname == "wrapUp" and skip_wrap_up:
                 continue
@@ -654,7 +656,7 @@ def _walk_block(
                 absorb(child)
             elif cname == "wrapUp":
                 push(wrap_up, inline_of(child))
-            elif cname == "p" or (keep_unknown and cname == "block"):
+            elif reads_as_p:
                 segments = _paragraph_segments(child)
                 fresh = not pending_active or pending_children
                 if fresh:
@@ -737,9 +739,11 @@ def _walk_block(
                     pending_eid = None  # merging with prior content
                 else:
                     pending_active = True
+                # A list with rows of its own renders its lead-in and wrap-up there.
+                list_eid = child.get("eId") or ""
                 for sub in child:
                     sname = _local_name(sub)
-                    if sname == "listIntroduction":
+                    if sname == "listIntroduction" and list_eid not in stop_at_eids:
                         push(pending_intro, inline_of(sub))
                     elif sname == "item":
                         # An item persisted as its own row renders there, not here.
@@ -748,7 +752,7 @@ def _walk_block(
                             pending_children.append(
                                 _walk_block(sub, stop_at_eids, keep_unknown=keep_unknown)
                             )
-                    elif sname == "listWrapUp":
+                    elif sname == "listWrapUp" and f"{list_eid}__wrapup" not in stop_at_eids:
                         push(pending_wrap_up, inline_of(sub))
             elif cname == "listIntroduction":
                 if pending_active:

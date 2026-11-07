@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from lxml import etree
+
 from codify.akn._parser import parse_document
 from codify.akn.io import to_akn
 from codify.storage.documents import (
@@ -14,7 +16,12 @@ from codify.storage.documents import (
     _to_provision,
 )
 from codify.storage.mappers import document_to_rows, rows_to_document
-from codify.storage.resolve_refs import RESOLVER_VERSION, element_index, nearest_stored_row
+from codify.storage.resolve_refs import (
+    RESOLVER_VERSION,
+    _closing_row,
+    element_index,
+    nearest_stored_row,
+)
 
 _META = """<meta><identification source="#codify">
   <FRBRWork><FRBRthis value="/akn/xa/act/2004/9/!main"/><FRBRuri value="/akn/xa/act/2004/9"/>
@@ -394,3 +401,37 @@ def test_a_split_off_row_holding_a_table_with_no_eid_reads_as_its_text() -> None
     rendered = _rendered(akn)
     for eid in ("art_15__wrapup", "art_16__intro", "art_17__intro", "art_18__wrapup"):
         assert (eid, rendered[eid], "Licence 40" in text[eid]) == (eid, [], True)
+
+
+def test_a_parent_leaves_a_rowed_list_s_lead_in_and_wrap_up_to_its_rows() -> None:
+    rendered = _rendered(
+        f"""<akomaNtoso {_NS}><doc name="notice">{_META}<mainBody>
+<blockList eId="list_5"><listIntroduction>Fees:</listIntroduction>
+  <item eId="list_5__item_a"><num>(a)</num><p>for renewal,</p>
+    <blockList eId="list_5__item_a__list_1"><listIntroduction>payable</listIntroduction>
+      <item eId="list_5__item_a__list_1__item_i"><num>(i)</num><p>online,</p></item>
+      <listWrapUp>within a month.</listWrapUp></blockList></item>
+</blockList></mainBody></doc></akomaNtoso>"""
+    )
+    (item,) = rendered["list_5__item_a"]
+    assert (_words(item.intro), item.wrap_up) == ("for renewal,", [])
+    assert _words(rendered["list_5__item_a__list_1"][0].intro) == "payable"
+    assert _words(rendered["list_5__item_a__list_1__wrapup"][0].intro) == "within a month."
+
+
+def test_a_named_block_after_a_quoted_phrase_continues_its_sentence() -> None:
+    (closing,) = _rendered(
+        _act("""<article eId="art_20"><num>20</num>
+  <point eId="art_20__point_a"><num>(a)</num><content><p>a fee;</p></content></point>
+  <wrapUp><mod eId="art_20__mod_1">after "fee" insert <quotedText>"or charge"</quotedText></mod
+  ><block name="tail">wherever it occurs.</block></wrapUp></article>""")
+    )["art_20__wrapup"]
+    assert [n.text for n in closing.intro if isinstance(n, InlineText)] == [
+        'after "fee" insert ',
+        "wherever it occurs.",
+    ]
+
+
+def test_a_closing_wrapper_whose_owner_has_no_eid_names_no_row() -> None:
+    wrap_up = etree.fromstring(f"<blockList {_NS}><listWrapUp>due.</listWrapUp></blockList>")[0]
+    assert _closing_row(wrap_up, {"None__wrapup", "__wrapup"}) is None

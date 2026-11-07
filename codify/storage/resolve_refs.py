@@ -711,7 +711,8 @@ def _closing_row(el: etree._Element, provisions: Container[str]) -> str | None:
     """The row the mapper split a ``wrapUp`` or ``listWrapUp`` into, which its
     closing text lands on."""
     owner = el.getparent() if etree.QName(el).localname in ("wrapUp", "listWrapUp") else None
-    closing = f"{owner.get('eId')}__wrapup" if owner is not None else ""
+    owner_eid = owner.get("eId") if owner is not None else None
+    closing = f"{owner_eid}__wrapup" if owner_eid else ""
     return closing if closing in provisions else None
 
 
