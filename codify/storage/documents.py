@@ -869,13 +869,25 @@ _INTRO_SUFFIX = "__intro"
 _WRAP_UP_SUFFIX = "__wrapup"
 
 
+_SPLIT_OFF_TAGS = {_INTRO_SUFFIX: ("intro", "content"), _WRAP_UP_SUFFIX: ("wrapUp", "listWrapUp")}
+
+
 def _wrappers_of(eid: str, xml_index: dict[str, etree._Element]) -> list[etree._Element]:
     """What a split-off ``__intro``/``__wrapup`` row holds: the owner's ``<intro>``
-    and any ``<content>`` the mapper joined to it, or its ``<wrapUp>``."""
-    for suffix, tags in ((_INTRO_SUFFIX, ("intro", "content")), (_WRAP_UP_SUFFIX, ("wrapUp",))):
+    and any ``<content>`` the mapper joined to it, or its or a list's wrap-up."""
+    for suffix, tags in _SPLIT_OFF_TAGS.items():
         if eid.endswith(suffix) and (owner := xml_index.get(eid[: -len(suffix)])) is not None:
             return [w for tag in tags if (w := _direct_child(owner, tag)) is not None]
     return []
+
+
+def _split_off_block(wrapper: etree._Element) -> DocumentProvisionBlock:
+    # A list's wrap-up is an inline run; every other wrapper holds blocks.
+    if _local_name(wrapper) == "listWrapUp":
+        return DocumentProvisionBlock(
+            akn_eid="", akn_type="listWrapUp", intro=_walk_inline(wrapper)
+        )
+    return _walk_block(wrapper, keep_unknown=True).model_copy(update={"akn_eid": ""})
 
 
 def _to_provision(
@@ -887,7 +899,7 @@ def _to_provision(
     is_synthetic_content = False
     # A lead-in or wrap-up row the mapper split off, also where the wrapper carries
     # the row's name as its eId. Nothing else renders its words, so none are dropped.
-    split_off = el is None or _local_name(el) in ("intro", "wrapUp")
+    split_off = el is None or _local_name(el) in ("intro", "wrapUp", "listWrapUp")
     wrappers = _wrappers_of(row.akn_eid, xml_index) if split_off else []
     if wrappers:
         return DocumentProvision(
@@ -897,10 +909,7 @@ def _to_provision(
             text=row.text,
             position=row.position,
             normative=row.normative,
-            blocks=[
-                _walk_block(w, keep_unknown=True).model_copy(update={"akn_eid": ""})
-                for w in wrappers
-            ],
+            blocks=[_split_off_block(w) for w in wrappers],
         )
     if el is None and row.akn_eid.endswith(_SYNTHETIC_CONTENT_SUFFIX):
         # Mapper-synthesised `<eid>__content` row: walk the parent so

@@ -313,3 +313,31 @@ def test_an_anchor_in_closing_words_lands_on_the_wrap_up_row() -> None:
         "art_7__wrapup",
         "container",
     )
+
+
+def test_a_list_closing_row_renders_its_wrap_up() -> None:
+    assert _words(_rendered(NOTICE)["list_1__wrapup"][0].intro) == "and are due on application."
+    # A list's wrap-up may carry its row's name as its own eId.
+    (closing,) = _rendered(
+        f"""<akomaNtoso {_NS}><doc name="notice">{_META}<mainBody>
+<blockList eId="list_2"><listIntroduction>Fees fall due:</listIntroduction>
+  <item eId="list_2__item_a"><num>(a)</num><p>on application,</p></item>
+  <listWrapUp eId="list_2__wrapup">unless the <ref href="#list_1">schedule</ref>
+  waives them.</listWrapUp>
+</blockList></mainBody></doc></akomaNtoso>"""
+    )["list_2__wrapup"]
+    assert any(isinstance(n, InlineRef) and n.text == "schedule" for n in closing.intro)
+
+
+def test_a_content_lead_in_row_renders_its_content() -> None:
+    """Rows stored before intros had rows name a content lead-in `__intro` too.
+    It renders as a block now, where it was plain text."""
+    rendered = _rendered(
+        _act("""<article eId="art_10"><num>10</num>
+  <content><p>The registrar may refuse where:</p></content>
+  <point eId="art_10__point_a"><num>(a)</num><content><p>the fee is unpaid.</p></content></point>
+</article>""")
+    )
+    assert [_words(b.intro) for b in rendered["art_10__intro"]] == [
+        "The registrar may refuse where:"
+    ]
