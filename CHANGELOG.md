@@ -291,6 +291,10 @@ Fixed:
   list's included, lands on its row. `RESOLVER_VERSION` is 3, so references
   stamped before are re-examined. A stored `__intro` row over `<content>`, plain
   text before, now renders that content as a block.
+- `document_to_rows`: a paragraph's or point's closing words after its points are
+  a `wrapUp` row after them where its lead-in row shows its number first, so the
+  reader shows them in order; one with no lead-in keeps them. The rebuilt document
+  reads them back into the provision's text.
 - `work_uri_is_homed` and `config_for_work_uri` read a `{country}-{locality}` place
   as a locality only when no configured jurisdiction has it as its code or FRBR
   place, so a jurisdiction can no longer home a work URI in another's namespace:
