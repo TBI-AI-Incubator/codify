@@ -227,8 +227,12 @@ def document_to_rows(
             # `wrap_up`) with an empty `text`; fold both in so the lead-in isn't
             # dropped, otherwise a first sub-point the body-fill merged into the
             # lead-in (e.g. "أ- …التالية:- ١- …") would vanish entirely.
-            # A list's wrap-up closes its items, so it is rowed after them.
-            tail = element.wrap_up if element.akn_type == "blockList" else ""
+            # A wrap-up closes the children before it, so it is rowed after them: a list's
+            # always, another's once its own row has shown its number above them.
+            closes = element.akn_type == "blockList" or bool(
+                element.children and (element.intro + element.text).strip()
+            )
+            tail = element.wrap_up if closes else ""
             parts = (element.intro, element.text, "" if tail else element.wrap_up)
             own_text = "\n".join(p for p in parts if p.strip())
             # Skip a truly empty point (a bare marker grouping sub-points, or a
@@ -407,6 +411,15 @@ def rows_to_document(
             provisions_by_section.setdefault(p.section_id, []).append(p)
     for prov_kids in provisions_by_section.values():
         prov_kids.sort(key=lambda p: p.position)
+    # A provision's closing words read as part of it here, as before they had a row.
+    by_eid = {p.akn_eid: p for p in provisions}
+    closing = {
+        owner.id: p.text
+        for p in provisions
+        if p.akn_type == "wrapUp"
+        and p.akn_eid.endswith("__wrapup")
+        and (owner := by_eid.get(p.akn_eid.removesuffix("__wrapup"))) is not None
+    }
 
     refs_by_source: dict[uuid.UUID, list[CrossReferenceRow]] = {}
     for r in refs:
@@ -447,7 +460,7 @@ def rows_to_document(
                 akn_wid=row.akn_wid,
                 akn_type=row.akn_type,
                 position=row.position,
-                text=row.text,
+                text=f"{row.text} {closing[row.id]}" if row.id in closing else row.text,
                 references=[_row_to_ref(r) for r in refs_by_source.get(row.id, [])],
                 created_at=row.created_at,
                 updated_at=row.updated_at,

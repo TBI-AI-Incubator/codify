@@ -435,3 +435,93 @@ def test_a_named_block_after_a_quoted_phrase_continues_its_sentence() -> None:
 def test_a_closing_wrapper_whose_owner_has_no_eid_names_no_row() -> None:
     wrap_up = etree.fromstring(f"<blockList {_NS}><listWrapUp>due.</listWrapUp></blockList>")[0]
     assert _closing_row(wrap_up, {"None__wrapup", "__wrapup"}) is None
+
+
+CLOSING = _act("""
+<article eId="art_11"><num>11</num>
+  <paragraph eId="art_11__para_1"><num>1.</num>
+    <intro><p>This Act applies to:</p></intro>
+    <point eId="art_11__para_1__point_a"><num>(a)</num><content><p>vessels,</p></content></point>
+    <wrapUp><p>unless exempted.</p></wrapUp>
+  </paragraph>
+  <paragraph eId="art_11__para_2"><num>2.</num>
+    <intro><p>Fees:</p></intro>
+    <point eId="art_11__para_2__point_a"><num>(a)</num>
+      <content><p>for a licence;</p></content></point>
+    <wrapUp><p>Payable as follows:</p>
+      <table eId="art_11__para_2__table_1">
+        <tr><td><p>Licence</p></td><td><p>40</p></td></tr></table>
+    </wrapUp>
+  </paragraph>
+</article>
+<article eId="art_12"><num>12</num>
+  <paragraph eId="art_12__para_1"><num>1.</num>
+    <point eId="art_12__para_1__point_a"><num>(a)</num><content><p>vessels,</p></content></point>
+    <wrapUp><p>unless exempted.</p></wrapUp>
+  </paragraph>
+</article>
+<article eId="art_13"><num>13</num>
+  <paragraph eId="art_13__para_1"><num>1.</num><intro><p>The holder shall:</p></intro>
+    <point eId="art_13__para_1__point_a"><num>(a)</num>
+      <content><p>pay the fee;</p></content></point>
+    <point eId="art_13__para_1__point_b"><num>(b)</num>
+      <point eId="art_13__para_1__point_b__point_i"><num>(i)</num>
+        <content><p>file the form,</p></content></point>
+      <wrapUp><p>within a month.</p></wrapUp>
+    </point>
+  </paragraph>
+</article>""")
+
+
+def test_closing_words_follow_the_points_they_close() -> None:
+    assert _in("art_11", _rows(CLOSING)) == [
+        ("art_11__para_1", "paragraph", "This Act applies to:", 0),
+        ("art_11__para_1__point_a", "point", "vessels,", 1),
+        ("art_11__para_1__wrapup", "wrapUp", "unless exempted.", 2),
+        ("art_11__para_2", "paragraph", "Fees:", 3),
+        ("art_11__para_2__point_a", "point", "for a licence;", 4),
+        ("art_11__para_2__wrapup", "wrapUp", "Payable as follows: Licence 40", 5),
+    ]
+    rendered = _rendered(CLOSING)
+    # The lead-in renders alone, never fused with closing words that hold a table.
+    (para,) = rendered["art_11__para_2"]
+    assert (_words(para.intro), para.wrap_up, para.blocks) == ("Fees:", [], [])
+    (closing,) = rendered["art_11__para_2__wrapup"]
+    assert (_words(closing.intro), [b.akn_type for b in closing.blocks]) == (
+        "Payable as follows:",
+        ["table"],
+    )
+
+
+def test_a_group_with_no_lead_in_keeps_its_number_and_closing_words_in_place() -> None:
+    rows = _rows(CLOSING)
+    assert [r[0] for r in _in("art_12", rows)] == ["art_12__para_1", "art_12__para_1__point_a"]
+    assert [r[0] for r in _in("art_13", rows)] == [
+        "art_13__para_1",
+        "art_13__para_1__point_a",
+        "art_13__para_1__point_b",
+        "art_13__para_1__point_b__point_i",
+    ]
+    rendered = _rendered(CLOSING)
+    assert rendered["art_12__para_1"][0].num == "1."
+    assert rendered["art_13__para_1__point_b"][0].num == "(b)"
+    assert rendered["art_13__para_1"][0].blocks == []
+
+
+def test_the_rebuilt_document_reads_closing_words_with_their_provision() -> None:
+    """The comparator sees a provision's closing words in its own text, as before."""
+    version, sections, provisions, refs, *_ = document_to_rows(
+        parse_document(CLOSING), law_id=uuid.uuid4()
+    )
+    doc = rows_to_document(version, sections, provisions, refs, frbr_work_uri="/akn/xa/act/2004/9")
+
+    def units(els: list) -> list[tuple[str, str, str]]:
+        return [u for el in els for u in ((el.akn_eid, el.akn_type, el.text), *units(el.children))]
+
+    assert units(doc.body)[:5] == [
+        ("art_11", "article", ""),
+        ("art_11__para_1", "paragraph", "This Act applies to: unless exempted."),
+        ("art_11__para_1__point_a", "point", "vessels,"),
+        ("art_11__para_2", "paragraph", "Fees: Payable as follows: Licence 40"),
+        ("art_11__para_2__point_a", "point", "for a licence;"),
+    ]
