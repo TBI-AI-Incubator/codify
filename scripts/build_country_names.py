@@ -44,6 +44,14 @@ EU_NOTICE = (
 LANGUAGES = frozenset("bul dan deu eng fra ind ita ltz mkd nld nor por spa swe".split())
 ALT_FORMS = frozenset({"", "short", "variant"})
 
+# Reviewed by hand. A name that is also a common word is dropped; a longer place name
+# holding a country's name is matched and discarded, so that country is not counted.
+COMMON_WORDS = {"nor": frozenset({"Man"})}
+NOT_COUNTRIES = {
+    "eng": ["New Guinea", "New Jersey", "New Mexico", "Northern Ireland"],
+    "fra": ["Irlande du Nord"],
+}
+
 
 def _download(package: str) -> tarfile.TarFile:
     url = f"https://registry.npmjs.org/{package}/-/{package}-{CLDR_VERSION}.tgz"
@@ -171,6 +179,20 @@ def merge(*parts: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[s
     return {language: dict(sorted(table.items())) for language, table in sorted(out.items())}
 
 
+def drop_common_words(names: dict[str, dict[str, list[str]]]) -> None:
+    """Drop `COMMON_WORDS`; a country whose only name was one leaves that language."""
+    for language, words in COMMON_WORDS.items():
+        table = names[language]
+        stale = words - {name for found in table.values() for name in found}
+        if stale:
+            raise SystemExit(f"{language}: {sorted(stale)} names no country; review the list")
+        for code in list(table):
+            table[code] = [name for name in table[code] if name not in words]
+            if not table[code]:
+                del table[code]
+                print(f"{language}: removed {code}, whose only name is a common word")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build codify/countries.json.")
     parser.add_argument("--eu-table", type=Path, help="a downloaded country authority table (XML)")
@@ -186,10 +208,11 @@ def main() -> None:
         parts.append(eu)
         sources["eu"] = {"table": "country", "version": version, "notice": EU_NOTICE}
     names = merge(*parts)
+    drop_common_words(names)
     missing = LANGUAGES - names.keys()
     if missing:
         raise SystemExit(f"no names for {sorted(missing)}")
-    payload = {"sources": sources, "names": names}
+    payload = {"sources": sources, "names": names, "not_countries": NOT_COUNTRIES}
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{len(countries)} countries; " + ", ".join(f"{k} {len(v)}" for k, v in names.items()))
 

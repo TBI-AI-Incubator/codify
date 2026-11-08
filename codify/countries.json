@@ -8019,9 +8019,6 @@
    "IL": [
     "Israel"
    ],
-   "IM": [
-    "Man"
-   ],
    "IN": [
     "India"
    ],
@@ -10819,5 +10816,16 @@
     "Zimbabwe"
    ]
   }
+ },
+ "not_countries": {
+  "eng": [
+   "New Guinea",
+   "New Jersey",
+   "New Mexico",
+   "Northern Ireland"
+  ],
+  "fra": [
+   "Irlande du Nord"
+  ]
  }
 }

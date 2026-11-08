@@ -48,6 +48,23 @@ def test_a_name_matches_as_written_or_in_capitals() -> None:
     assert countries_named("Made in CHina or cHINA", "eng") == []
 
 
+def test_a_name_that_is_a_common_word_is_dropped() -> None:
+    assert countries_named("Man skal betale avgift. MAN SKAL", "nor") == []
+    assert "IM" not in country_names("nor")
+    table = {"nor": {"IM": ["Man"], "NO": ["Norge"]}}
+    _build_script().drop_common_words(table)
+    assert table == {"nor": {"NO": ["Norge"]}}
+    with pytest.raises(SystemExit, match="names no country"):
+        _build_script().drop_common_words({"nor": {"NO": ["Norge"]}})
+
+
+def test_a_place_holding_a_country_name_names_no_country() -> None:
+    assert countries_named("England and Wales, Scotland and Northern Ireland", "eng") == []
+    assert countries_named("NORTHERN IRELAND and Ireland", "eng") == [("IE", "Ireland")]
+    assert countries_named("New Mexico, Papua New Guinea", "eng") == [("PG", "Papua New Guinea")]
+    assert countries_named("l’Irlande du Nord et l’Irlande", "fra") == [("IE", "Irlande")]
+
+
 def test_a_name_matches_only_as_a_whole_word() -> None:
     assert countries_named("Chinatown, Indo-China, China-based, Chinas", "eng") == []
     assert countries_named("China's ports (China).", "eng") == [("CN", "China")]
@@ -91,10 +108,12 @@ def test_the_table_carries_countries_only() -> None:
 
 def test_the_data_was_built_from_the_scripts_pins() -> None:
     script = _build_script()
-    sources = json.loads(_DATA.read_text(encoding="utf-8"))["sources"]
+    data = json.loads(_DATA.read_text(encoding="utf-8"))
+    sources = data["sources"]
     assert sources["cldr"]["version"] == script.CLDR_VERSION
     assert sources["cldr"]["packages"] == script.CLDR_PACKAGES
     assert languages() == script.LANGUAGES
+    assert data["not_countries"] == script.NOT_COUNTRIES
 
 
 def test_the_eu_table_reads_short_and_full_names_by_iso_code() -> None:

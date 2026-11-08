@@ -12,6 +12,7 @@ import unicodedata
 from collections import Counter
 from functools import cache
 from pathlib import Path
+from typing import Any
 
 from codify.lang import to_iso639_3
 
@@ -19,8 +20,13 @@ _DATA = Path(__file__).with_name("countries.json")
 
 
 @cache
+def _load() -> dict[str, Any]:
+    loaded: dict[str, Any] = json.loads(_DATA.read_text(encoding="utf-8"))
+    return loaded
+
+
 def _names() -> dict[str, dict[str, list[str]]]:
-    names: dict[str, dict[str, list[str]]] = json.loads(_DATA.read_text(encoding="utf-8"))["names"]
+    names: dict[str, dict[str, list[str]]] = _load()["names"]
     return names
 
 
@@ -43,6 +49,8 @@ def countries_named(text: str, language: str) -> list[tuple[str, str]]:
     for match in pattern.finditer(_fold(text)):
         found = " ".join(match.group().split())
         code = codes[found]
+        if code is None:
+            continue
         hits[code] += 1
         written.setdefault(code, Counter())[found] += 1
     ranked = sorted(hits, key=lambda code: (-hits[code], code))
@@ -72,8 +80,10 @@ def _fold(text: str) -> str:
 
 
 @cache
-def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str]]:
-    codes: dict[str, str] = {}
+def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None]]:
+    codes: dict[str, str | None] = {}
+    for place in _load()["not_countries"].get(language, []):
+        codes.update(dict.fromkeys(name_forms(place)))
     for code, names in _table(language).items():
         for name in names:
             for form in name_forms(name):
