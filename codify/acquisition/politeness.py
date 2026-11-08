@@ -35,7 +35,7 @@ _BACKOFF_STATUSES = frozenset({429, 436, 503})
 # A gateway's failure says nothing about our pace: retried with jitter, interval untouched.
 _TRANSIENT_STATUSES = frozenset({502, 504})
 _FAILED_STATUSES = _BACKOFF_STATUSES | _TRANSIENT_STATUSES
-# Failures before the request was answered; replayed only for a bodyless request.
+# No answer, or one cut off mid-body; replayed only for a bodyless request.
 _TRANSIENT_ERRORS: tuple[type[httpx.TransportError], ...] = (
     httpx.ConnectError,
     httpx.ConnectTimeout,
@@ -172,7 +172,7 @@ class _HostCircuit:
         self.probe = _Ticket(probe=True)
         return self.probe
 
-    def record_success(self, ticket: _Ticket | None = None) -> None:
+    def record_success(self) -> None:
         # Any answer shows the host is up: the circuit closes, and a probe still
         # in flight becomes an ordinary request.
         self.failures, self.opened_at, self.probe = 0, None, None
@@ -535,7 +535,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 if answered is None:
                     circuit.release(ticket)
                 elif answered:
-                    circuit.record_success(ticket)
+                    circuit.record_success()
                 elif circuit.record_failure(ticket):
                     logger.warning("polite_circuit_opened", host=host, **circuit.snapshot())
 
