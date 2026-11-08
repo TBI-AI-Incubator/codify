@@ -14,6 +14,8 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
+import regex
+
 from codify.lang import to_iso639_3
 
 _DATA = Path(__file__).with_name("countries.json")
@@ -93,7 +95,7 @@ def _joins(text: str, start: int, end: int, capitals: bool) -> bool:
 
 
 @cache
-def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None], frozenset[str]]:
+def _matcher(language: str) -> tuple[regex.Pattern[str], dict[str, str | None], frozenset[str]]:
     codes: dict[str, str | None] = {}
     capitals_only: set[str] = set()
     named: list[tuple[str, str | None]] = [
@@ -109,5 +111,6 @@ def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None], fro
     # Longest first, so "Hong Kong SAR China" is one match and not also China.
     forms = sorted(codes, key=lambda form: (-len(form), form))
     alternation = "|".join(re.escape(form).replace(r"\ ", r"\s+") for form in forms)
-    pattern = re.compile(rf"(?<!\w)(?:{alternation})(?!\w)")
+    # `regex`, not `re`: a footnote marker glued to a name (China¹) is not a word character.
+    pattern = regex.compile(rf"(?<!\w)(?:{alternation})(?!\w)")
     return pattern, codes, frozenset(capitals_only)

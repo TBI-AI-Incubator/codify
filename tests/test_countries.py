@@ -231,3 +231,14 @@ def test_sources_merge_and_a_name_two_countries_share_names_neither() -> None:
 def test_a_merge_that_would_leave_a_country_nameless_fails() -> None:
     with pytest.raises(SystemExit, match="no name"):
         _build_script().merge({"eng": {"CZ": ["Czechia"]}}, {"eng": {"TR": ["Czechia"]}})
+
+
+def test_a_footnote_marker_glued_to_a_name_does_not_hide_it() -> None:
+    assert [c for c, _ in countries_named("originating in China\u00b9 and Japan", "eng")] == [
+        "CN",
+        "JP",
+    ]
+    assert [c for c, _ in countries_named("Waren aus China\u00b2 und Japan", "deu")] == [
+        "CN",
+        "JP",
+    ]
