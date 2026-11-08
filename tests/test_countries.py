@@ -126,6 +126,14 @@ def test_a_capitals_form_never_joins_a_hyphen() -> None:
     ]
 
 
+def test_a_refused_match_spends_its_text() -> None:
+    capitals = "EU-NORTHERN IRELAND, EU-EQUATORIAL GUINEA, NEW YORK-NEW JERSEY"
+    assert countries_named(capitals, "eng") == []
+    assert countries_named("UE-REPÚBLICA DEMOCRÁTICA DEL CONGO", "spa") == []
+    assert countries_named("New York-New Jersey, Guinea-Bissau-based", "eng") == []
+    assert countries_named("Cameroon-Equatorial Guinea", "eng") == [("CM", "Cameroon")]
+
+
 def test_apostrophes_line_breaks_and_invisible_characters_do_not_hide_a_name() -> None:
     assert countries_named("Côte d'Ivoire and Hong\nKong", "eng") == [
         ("CI", "Côte d’Ivoire"),

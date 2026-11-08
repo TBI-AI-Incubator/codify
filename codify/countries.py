@@ -7,21 +7,16 @@ Not covered: languages whose country names inflect, country groups and TARIC are
 from __future__ import annotations
 
 import json
+import re
 import unicodedata
 from collections import Counter
 from functools import cache
 from pathlib import Path
 from typing import Any
 
-import regex
-
 from codify.lang import to_iso639_3
 
 _DATA = Path(__file__).with_name("countries.json")
-# A hyphen bounds a name only where a capital stands across it, as in "EU-Japan". A
-# name's capitals form never takes a hyphen: in text set in capitals every letter is one.
-_HYPHEN_JOINS = (r"(?<![^\p{Lu}]-)(?<!^-)", r"(?!-(?!\p{Lu}))")
-_HYPHEN_BLOCKS = (r"(?<!-)", r"(?!-)")
 
 
 @cache
@@ -49,13 +44,15 @@ def countries_named(text: str, language: str) -> list[tuple[str, str]]:
     """(code, name as matched, folded: NFC, one apostrophe and hyphen, single spaces) for
     each country `text` names in `language`, most named first. A name matches as
     written or in capitals, not in any other case."""
-    pattern, codes = _matcher(to_iso639_3(language))
+    pattern, codes, capitals_only = _matcher(to_iso639_3(language))
+    folded = _fold(text)
     hits: Counter[str] = Counter()
     written: dict[str, Counter[str]] = {}
-    for match in pattern.finditer(_fold(text)):
+    # A refused match still spends its text, so no shorter name inside it counts.
+    for match in pattern.finditer(folded):
         found = " ".join(match.group().split())
         code = codes[found]
-        if code is None:
+        if code is None or not _joins(folded, match.start(), match.end(), found in capitals_only):
             continue
         hits[code] += 1
         written.setdefault(code, Counter())[found] += 1
@@ -85,8 +82,18 @@ def _fold(text: str) -> str:
     return unicodedata.normalize("NFC", visible).translate(_MARKS)
 
 
+def _joins(text: str, start: int, end: int, capitals: bool) -> bool:
+    """Whether each hyphen beside a match has a capital across it, as in "EU-Japan". A
+    capitals form takes none: in text set in capitals every letter is one."""
+    for hyphen, far in ((start - 1, start - 2), (end, end + 1)):
+        if 0 <= hyphen < len(text) and text[hyphen] == "-":
+            if capitals or not (0 <= far < len(text) and text[far].isupper()):
+                return False
+    return True
+
+
 @cache
-def _matcher(language: str) -> tuple[regex.Pattern[str], dict[str, str | None]]:
+def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None], frozenset[str]]:
     codes: dict[str, str | None] = {}
     capitals_only: set[str] = set()
     named: list[tuple[str, str | None]] = [
@@ -99,15 +106,8 @@ def _matcher(language: str) -> tuple[regex.Pattern[str], dict[str, str | None]]:
         if capitals not in codes:
             codes[capitals] = code
             capitals_only.add(capitals)
-    groups = []
-    for (before, after), forms in (
-        (_HYPHEN_BLOCKS, capitals_only),
-        (_HYPHEN_JOINS, codes.keys() - capitals_only),
-    ):
-        # Longest first, so "Hong Kong SAR China" is one match and not also China.
-        ordered = sorted(forms, key=lambda form: (-len(form), form))
-        if not ordered:
-            continue
-        alternation = "|".join(regex.escape(f).replace(r"\ ", r"\s+") for f in ordered)
-        groups.append(f"{before}(?:{alternation}){after}")
-    return regex.compile(rf"(?<!\w)(?:{'|'.join(groups)})(?!\w)"), codes
+    # Longest first, so "Hong Kong SAR China" is one match and not also China.
+    forms = sorted(codes, key=lambda form: (-len(form), form))
+    alternation = "|".join(re.escape(form).replace(r"\ ", r"\s+") for form in forms)
+    pattern = re.compile(rf"(?<!\w)(?:{alternation})(?!\w)")
+    return pattern, codes, frozenset(capitals_only)
