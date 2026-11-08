@@ -8,12 +8,13 @@ from collections.abc import Sequence
 from typing import NamedTuple
 
 import structlog
-from sqlalchemy import ColumnElement, delete, literal_column, or_, select
+from sqlalchemy import ColumnElement, delete, func, literal_column, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
 from codify.pipeline.enrich.goods_codes import GoodsCode, extract_goods_codes
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
+from codify.storage.akn_size import oversize_reason
 from codify.storage.models import GoodsCodeReference, Jurisdiction, Law, Version
 
 logger = structlog.get_logger()
@@ -26,12 +27,23 @@ async def index_version_goods_codes(
     given. Idempotent by replacement, so a retry does not double-count.
     Extraction runs on the CPU pool: most of a second on a large annex."""
     if akn_xml is None:
-        akn_xml = (
-            await session.execute(select(Version.akn_xml).where(Version.id == version_id))
+        size = (
+            await session.execute(
+                select(func.char_length(Version.akn_xml)).where(Version.id == version_id)
+            )
         ).scalar_one_or_none()
-        if not akn_xml:
+        if not size:
             logger.warning("goods_codes_no_akn", version_id=str(version_id))
             return 0
+    else:
+        size = len(akn_xml)
+    if reason := oversize_reason(size):
+        logger.warning("goods_codes_skipped", version_id=str(version_id), reason=reason)
+        return 0
+    if akn_xml is None:
+        akn_xml = (
+            await session.execute(select(Version.akn_xml).where(Version.id == version_id))
+        ).scalar_one()
     # Extract before deleting. The caller commits regardless, so a failure
     # after the delete would leave a version that had codes yesterday with none.
     try:
