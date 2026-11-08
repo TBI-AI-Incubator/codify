@@ -134,7 +134,7 @@ def test_a_file_that_is_not_the_eu_table_is_refused(tmp_path: Path, xml: str, re
 def test_sources_merge_and_a_name_two_countries_share_names_neither() -> None:
     merged = _build_script().merge(
         {"eng": {"CZ": ["Czechia"], "TR": ["Türkiye"]}},
-        {"eng": {"CZ": ["Czech Republic", "Shared"], "TR": ["Turkey", "Shared"]}},
+        {"eng": {"CZ": ["Czech Republic", "Shared", "Caps"], "TR": ["Turkey", "Shared", "CAPS"]}},
     )
     assert merged == {"eng": {"CZ": ["Czechia", "Czech Republic"], "TR": ["Türkiye", "Turkey"]}}
 

@@ -59,6 +59,12 @@ def _table(language: str) -> dict[str, list[str]]:
 _MARKS = str.maketrans({"'": "’", "‘": "’", "ʼ": "’", "‐": "-", "‑": "-"})
 
 
+def name_forms(name: str) -> tuple[str, str]:
+    """The forms a name matches in: folded as text is, as written and in capitals."""
+    form = " ".join(_fold(name).split())
+    return form, form.upper()
+
+
 def _fold(text: str) -> str:
     """NFC without format characters (a soft hyphen), and one apostrophe and one hyphen."""
     visible = "".join(c for c in text if unicodedata.category(c) != "Cf")
@@ -70,9 +76,8 @@ def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str]]:
     codes: dict[str, str] = {}
     for code, names in _table(language).items():
         for name in names:
-            form = " ".join(_fold(name).split())
-            codes.setdefault(form, code)
-            codes.setdefault(form.upper(), code)
+            for form in name_forms(name):
+                codes.setdefault(form, code)
     # Longest first, so "Hong Kong SAR China" is one match and not also China.
     forms = sorted(codes, key=len, reverse=True)
     alternation = "|".join(re.escape(form).replace(r"\ ", r"\s+") for form in forms)

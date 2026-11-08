@@ -18,6 +18,7 @@ from typing import Any
 
 from lxml import etree
 
+from codify.countries import name_forms
 from codify.lang import ISO1_TO_3
 
 OUTPUT = Path(__file__).resolve().parents[1] / "codify" / "countries.json"
@@ -139,7 +140,8 @@ def _add(table: dict[str, list[str]], code: str, name: str) -> None:
 
 
 def merge(*parts: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
-    """Each language's names from every source; a name two countries share names neither."""
+    """Each language's names from every source. A name matching as another country's
+    does once folded and capitalised as the matcher does names neither."""
     out: dict[str, dict[str, list[str]]] = {}
     for part in parts:
         for language, table in part.items():
@@ -150,10 +152,17 @@ def merge(*parts: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[s
         owners: dict[str, set[str]] = {}
         for code, names in table.items():
             for name in names:
-                owners.setdefault(name, set()).add(code)
-        shared = {name for name, codes in owners.items() if len(codes) > 1}
+                for form in name_forms(name):
+                    owners.setdefault(form, set()).add(code)
+        shared = {
+            name
+            for names in table.values()
+            for name in names
+            if any(len(owners[form]) > 1 for form in name_forms(name))
+        }
         for name in sorted(shared):
-            print(f"{language}: dropped {name!r}, which names {sorted(owners[name])}")
+            codes = sorted(set().union(*(owners[form] for form in name_forms(name))))
+            print(f"{language}: dropped {name!r}, which matches as {codes}")
         for code in table:
             table[code] = [n for n in table[code] if n not in shared]
         nameless = sorted(code for code, names in table.items() if not names)
