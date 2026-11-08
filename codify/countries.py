@@ -7,16 +7,20 @@ Not covered: languages whose country names inflect, country groups and TARIC are
 from __future__ import annotations
 
 import json
-import re
 import unicodedata
 from collections import Counter
 from functools import cache
 from pathlib import Path
 from typing import Any
 
+import regex
+
 from codify.lang import to_iso639_3
 
 _DATA = Path(__file__).with_name("countries.json")
+# A hyphen bounds a name only where a capital stands across it, as in "EU-Japan".
+_BEFORE = r"(?<!\w)(?<![^\p{Lu}]-)(?<!^-)"
+_AFTER = r"(?!\w)(?!-(?!\p{Lu}))"
 
 
 @cache
@@ -41,8 +45,9 @@ def country_names(language: str) -> dict[str, tuple[str, ...]]:
 
 
 def countries_named(text: str, language: str) -> list[tuple[str, str]]:
-    """(code, name as the text writes it) for each country `text` names in `language`,
-    most named first. A name matches as written or in capitals, not in any other case."""
+    """(code, name as matched, folded: NFC, one apostrophe and hyphen, single spaces) for
+    each country `text` names in `language`, most named first. A name matches as
+    written or in capitals, not in any other case."""
     pattern, codes = _matcher(to_iso639_3(language))
     hits: Counter[str] = Counter()
     written: dict[str, Counter[str]] = {}
@@ -80,7 +85,7 @@ def _fold(text: str) -> str:
 
 
 @cache
-def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None]]:
+def _matcher(language: str) -> tuple[regex.Pattern[str], dict[str, str | None]]:
     codes: dict[str, str | None] = {}
     for place in _load()["not_countries"].get(language, []):
         codes.update(dict.fromkeys(name_forms(place)))
@@ -90,5 +95,5 @@ def _matcher(language: str) -> tuple[re.Pattern[str], dict[str, str | None]]:
                 codes.setdefault(form, code)
     # Longest first, so "Hong Kong SAR China" is one match and not also China.
     forms = sorted(codes, key=len, reverse=True)
-    alternation = "|".join(re.escape(form).replace(r"\ ", r"\s+") for form in forms)
-    return re.compile(rf"(?<![\w-])(?:{alternation})(?![\w-])"), codes
+    alternation = "|".join(regex.escape(form).replace(r"\ ", r"\s+") for form in forms)
+    return regex.compile(rf"{_BEFORE}(?:{alternation}){_AFTER}"), codes

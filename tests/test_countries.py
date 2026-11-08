@@ -8,7 +8,7 @@ from types import ModuleType
 
 import pytest
 
-from codify.countries import _DATA, countries_named, country_names, languages
+from codify.countries import _DATA, countries_named, country_names, languages, name_forms
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,12 +50,21 @@ def test_a_name_matches_as_written_or_in_capitals() -> None:
 
 def test_a_name_that_is_a_common_word_is_dropped() -> None:
     assert countries_named("Man skal betale avgift. MAN SKAL", "nor") == []
+    assert countries_named("Мали држави", "mkd") == []
     assert "IM" not in country_names("nor")
     table = {"nor": {"IM": ["Man"], "NO": ["Norge"]}}
-    _build_script().drop_common_words(table)
+    _build_script().drop_names(table, frozenset({"IM", "NO"}))
     assert table == {"nor": {"NO": ["Norge"]}}
     with pytest.raises(SystemExit, match="names no country"):
-        _build_script().drop_common_words({"nor": {"NO": ["Norge"]}})
+        _build_script().drop_names({"nor": {"NO": ["Norge"]}}, frozenset({"NO"}))
+
+
+def test_a_name_that_is_another_countrys_code_is_dropped() -> None:
+    assert countries_named("RU", "spa") == []
+    assert countries_named("AS", "ind") == []
+    table = {"spa": {"GB": ["Reino Unido", "RU"], "RU": ["Rusia"]}, "eng": {"US": ["US"]}}
+    _build_script().drop_names(table, frozenset({"GB", "RU", "US"}))
+    assert table == {"spa": {"GB": ["Reino Unido"], "RU": ["Rusia"]}, "eng": {"US": ["US"]}}
 
 
 def test_a_place_holding_a_country_name_names_no_country() -> None:
@@ -63,11 +72,42 @@ def test_a_place_holding_a_country_name_names_no_country() -> None:
     assert countries_named("NORTHERN IRELAND and Ireland", "eng") == [("IE", "Ireland")]
     assert countries_named("New Mexico, Papua New Guinea", "eng") == [("PG", "Papua New Guinea")]
     assert countries_named("l’Irlande du Nord et l’Irlande", "fra") == [("IE", "Irlande")]
+    spanish = "Reino Unido de Gran Bretaña e Irlanda del Norte; Nuevo México y Nueva Guinea"
+    assert countries_named(spanish, "spa") == [("GB", "Reino Unido")]
+    assert countries_named("Nuovo Messico", "ita") == []
+
+
+def test_places_come_from_cldr_where_it_has_them_and_the_list_otherwise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    script = _build_script()
+    monkeypatch.setattr(script, "LANGUAGES", frozenset({"eng"}))
+    monkeypatch.setattr(script, "NOT_COUNTRIES", {"eng": ["New Guinea"]})
+    names = {"eng": {"GN": ["Guinea"], "IE": ["Ireland"]}}
+    subdivisions = {"eng": {"gbnir": "Northern Ireland", "gbeng": "England"}}
+    assert script.not_countries(subdivisions, names) == {"eng": ["New Guinea", "Northern Ireland"]}
+    monkeypatch.setattr(script, "NOT_COUNTRIES", {"eng": ["New Atlantis"]})
+    with pytest.raises(SystemExit, match="holds no country's name"):
+        script.not_countries(subdivisions, names)
 
 
 def test_a_name_matches_only_as_a_whole_word() -> None:
     assert countries_named("Chinatown, Indo-China, China-based, Chinas", "eng") == []
     assert countries_named("China's ports (China).", "eng") == [("CN", "China")]
+
+
+def test_a_hyphen_joins_a_name_only_to_a_capital() -> None:
+    assert countries_named("EU-Japan and EU-UK talks", "eng") == [("GB", "UK"), ("JP", "Japan")]
+    assert countries_named("China-Importe", "deu") == [("CN", "China")]
+    assert countries_named("Guinea-Bissau, Timor-Leste, Papua New Guinea", "eng") == [
+        ("GW", "Guinea-Bissau"),
+        ("PG", "Papua New Guinea"),
+        ("TL", "Timor-Leste"),
+    ]
+    assert countries_named("Guinée-Bissau, Papouasie-Nouvelle-Guinée, Nouvelle-Guinée", "fra") == [
+        ("GW", "Guinée-Bissau"),
+        ("PG", "Papouasie-Nouvelle-Guinée"),
+    ]
 
 
 def test_apostrophes_line_breaks_and_invisible_characters_do_not_hide_a_name() -> None:
@@ -101,9 +141,13 @@ def test_language_codes_normalise_and_unknown_languages_raise() -> None:
 def test_the_table_carries_countries_only() -> None:
     not_countries = {"EU", "EZ", "UN", "QO", "XA", "XB", "XK", "ZZ", "AC", "CP", "DG", "EA", "IC"}
     for language in languages():
-        codes = set(country_names(language))
+        table = country_names(language)
+        codes = set(table)
         assert all(len(c) == 2 and c.isalpha() and c.isupper() for c in codes)
         assert not codes & not_countries, language
+        for code, names in table.items():
+            forms = {form for name in names for form in name_forms(name)}
+            assert not (codes - {code}) & forms, (language, code)
 
 
 def test_the_data_was_built_from_the_scripts_pins() -> None:
@@ -113,7 +157,9 @@ def test_the_data_was_built_from_the_scripts_pins() -> None:
     assert sources["cldr"]["version"] == script.CLDR_VERSION
     assert sources["cldr"]["packages"] == script.CLDR_PACKAGES
     assert languages() == script.LANGUAGES
-    assert data["not_countries"] == script.NOT_COUNTRIES
+    for language, places in script.NOT_COUNTRIES.items():
+        assert set(places) <= set(data["not_countries"][language])
+    assert {"Northern Ireland", "New Jersey", "New Mexico"} <= set(data["not_countries"]["eng"])
 
 
 def test_the_eu_table_reads_short_and_full_names_by_iso_code() -> None:

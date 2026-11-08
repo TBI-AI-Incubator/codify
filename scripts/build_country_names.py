@@ -30,6 +30,8 @@ CLDR_PACKAGES = {
     "BXPWi4vd1d98MwotOivh4Uthxwri4A==",
     "cldr-localenames-full": "sha512-nTBCysDVK+JHb2hPhb26fJGp9+Lw0mOiqVsJ/9aTEQIduBTn"
     "ghTSLgZitsM7FLa1Vjr0K0hfBQMdBgoyDxK0nQ==",
+    "cldr-subdivisions-full": "sha512-4Yd6odsg4rsh5+s9jFyS80xUQuwOkidaIcDj69iKHKtBqKQj"
+    "zVd3QcKHaXFX76qFRtkg2JmjonN1/H0rhI8KmA==",
 }
 CLDR_NOTICE = (
     "Unicode CLDR data, Copyright © 2001–2026 Unicode, Inc., under the Unicode "
@@ -44,12 +46,26 @@ EU_NOTICE = (
 LANGUAGES = frozenset("bul dan deu eng fra ind ita ltz mkd nld nor por spa swe".split())
 ALT_FORMS = frozenset({"", "short", "variant"})
 
-# Reviewed by hand. A name that is also a common word is dropped; a longer place name
-# holding a country's name is matched and discarded, so that country is not counted.
-COMMON_WORDS = {"nor": frozenset({"Man"})}
+# Reviewed by hand. A name that is also a common word is dropped. A longer place name
+# holding a country's name is matched and discarded, so that country is not counted:
+# CLDR's names for the subdivisions listed, and the phrases below where CLDR has none.
+COMMON_WORDS = {"mkd": frozenset({"Мали"}), "nor": frozenset({"Man"})}
+NOT_COUNTRY_SUBDIVISIONS = ("gbnir", "usnj", "usnm")
 NOT_COUNTRIES = {
-    "eng": ["New Guinea", "New Jersey", "New Mexico", "Northern Ireland"],
-    "fra": ["Irlande du Nord"],
+    "bul": ["Нова Гвинея", "Ню Джърси", "Ню Мексико", "Северна Ирландия"],
+    "dan": ["New Jersey", "New Mexico", "Ny Guinea"],
+    "deu": ["New Jersey"],
+    "eng": ["New Guinea"],
+    "fra": ["Irlande du Nord", "New Jersey"],
+    "ind": ["Irlandia Utara", "Meksiko Baru", "New Jersey"],
+    "ita": ["Irlanda del Nord", "New Jersey", "Nuova Guinea", "Nuovo Messico"],
+    "ltz": ["New Jersey"],
+    "mkd": ["Нова Гвинеја", "Ново Мексико", "Северна Ирска", "Њу Џерси"],
+    "nld": ["New Jersey", "New Mexico"],
+    "nor": ["New Jersey", "New Mexico"],
+    "por": ["Irlanda do Norte", "Nova Guiné", "Nova Jersey", "Novo México"],
+    "spa": ["Irlanda del Norte", "Nueva Guinea", "Nueva Jersey", "Nuevo México"],
+    "swe": ["New Jersey", "Nya Guinea"],
 }
 
 
@@ -179,18 +195,61 @@ def merge(*parts: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[s
     return {language: dict(sorted(table.items())) for language, table in sorted(out.items())}
 
 
-def drop_common_words(names: dict[str, dict[str, list[str]]]) -> None:
-    """Drop `COMMON_WORDS`; a country whose only name was one leaves that language."""
-    for language, words in COMMON_WORDS.items():
-        table = names[language]
+def drop_names(names: dict[str, dict[str, list[str]]], countries: frozenset[str]) -> None:
+    """Drop `COMMON_WORDS` and any name that reads as another country's alpha-2 code; a
+    country left with no name leaves that language."""
+    for language, table in names.items():
+        words = COMMON_WORDS.get(language, frozenset())
         stale = words - {name for found in table.values() for name in found}
         if stale:
             raise SystemExit(f"{language}: {sorted(stale)} names no country; review the list")
         for code in list(table):
-            table[code] = [name for name in table[code] if name not in words]
-            if not table[code]:
+            codes = countries - {code}
+            kept = [
+                name
+                for name in table[code]
+                if name not in words and not codes.intersection(name_forms(name))
+            ]
+            for name in sorted(set(table[code]) - set(kept)):
+                print(f"{language}: dropped {name!r} for {code}")
+            if kept:
+                table[code] = kept
+            else:
                 del table[code]
-                print(f"{language}: removed {code}, whose only name is a common word")
+
+
+def subdivision_names(archive: tarfile.TarFile) -> dict[str, dict[str, str]]:
+    """CLDR's subdivision names by language, from every locale of each."""
+    out: dict[str, dict[str, str]] = {}
+    for member in archive.getmembers():
+        parts = member.name.split("/")
+        language = ISO1_TO_3.get(parts[2].split("-")[0]) if len(parts) == 4 else None
+        if language in LANGUAGES and parts[1] == "subdivisions":
+            stream = archive.extractfile(member)
+            assert stream is not None
+            found = json.load(stream)["subdivisions"]["localeDisplayNames"]["subdivisions"]
+            out.setdefault(language, {}).update(found)
+    return out
+
+
+def not_countries(
+    subdivisions: dict[str, dict[str, str]], names: dict[str, dict[str, list[str]]]
+) -> dict[str, list[str]]:
+    """Each language's places to discard; a listed phrase holding no country's name fails."""
+    out: dict[str, list[str]] = {}
+    for language in sorted(LANGUAGES):
+        forms = {
+            form for found in names[language].values() for n in found for form in name_forms(n)
+        }
+        listed = NOT_COUNTRIES.get(language, [])
+        idle = [place for place in listed if not any(form in place for form in forms)]
+        if idle:
+            raise SystemExit(f"{language}: {idle} holds no country's name; review the list")
+        cldr = [subdivisions.get(language, {}).get(code) for code in NOT_COUNTRY_SUBDIVISIONS]
+        places = sorted({place for place in cldr if place} | set(listed))
+        if places:
+            out[language] = places
+    return out
 
 
 def main() -> None:
@@ -200,6 +259,7 @@ def main() -> None:
 
     countries = cldr_countries(_download("cldr-core"))
     parts = [cldr_names(_download("cldr-localenames-full"), countries)]
+    subdivisions = subdivision_names(_download("cldr-subdivisions-full"))
     sources: dict[str, Any] = {
         "cldr": {"version": CLDR_VERSION, "packages": CLDR_PACKAGES, "notice": CLDR_NOTICE}
     }
@@ -208,11 +268,12 @@ def main() -> None:
         parts.append(eu)
         sources["eu"] = {"table": "country", "version": version, "notice": EU_NOTICE}
     names = merge(*parts)
-    drop_common_words(names)
     missing = LANGUAGES - names.keys()
     if missing:
         raise SystemExit(f"no names for {sorted(missing)}")
-    payload = {"sources": sources, "names": names, "not_countries": NOT_COUNTRIES}
+    drop_names(names, countries)
+    places = not_countries(subdivisions, names)
+    payload = {"sources": sources, "names": names, "not_countries": places}
     OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{len(countries)} countries; " + ", ".join(f"{k} {len(v)}" for k, v in names.items()))
 
