@@ -16,7 +16,7 @@ from types import TracebackType
 import httpx
 
 from codify.acquisition.base import PolitenessProfile, require_user_agent
-from codify.acquisition.politeness import PoliteTransport, client_tls_context
+from codify.acquisition.politeness import UNBUFFERED, PoliteTransport, client_tls_context
 from codify.core.security import ssrf_guard
 
 # zipfile's local file header: signature, five shorts, three longs, name and extra lengths.
@@ -175,7 +175,12 @@ class _PoliteBridge(httpx.BaseTransport):
             async with self._sem:
                 response = await self._client.send(
                     self._client.build_request(
-                        request.method, str(request.url), headers=request.headers
+                        request.method,
+                        str(request.url),
+                        headers=request.headers,
+                        # The body is read below, no further than the range asked for,
+                        # so the transport must not download it first.
+                        extensions={UNBUFFERED: True},
                     ),
                     stream=True,
                 )
