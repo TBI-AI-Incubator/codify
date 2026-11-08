@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.search import TOKENISER_VERSION, tokenise_to_text
-from codify.storage.akn_size import oversize_reason
+from codify.storage.akn_size import bounded_akn, oversize_reason
 from codify.storage.models import AnnexRow, Version
 from codify.tables.resolve import ResolvedRow, resolve_tables
 
@@ -49,30 +49,20 @@ async def index_version_annex_rows(
     """
     language = "eng"
     if akn_xml is None:
-        head = (
-            await session.execute(
-                select(func.char_length(Version.akn_xml), Version.language).where(
-                    Version.id == version_id
-                )
-            )
-        ).first()
+        head = (await session.execute(bounded_akn(version_id))).first()
         if head is None or not head[0]:
             return 0, "no akn"
-        language = head[1] or "eng"
-        size = head[0]
+        size, akn_xml, language = head[0], head[1], head[2] or "eng"
     else:
         found = (
             await session.execute(select(Version.language).where(Version.id == version_id))
         ).scalar_one_or_none()
         language = found or "eng"
         size = len(akn_xml)
-    if reason := oversize_reason(size):
+    reason = oversize_reason(size)
+    if reason or akn_xml is None:
         logger.warning("annex_rows_skipped", version_id=str(version_id), reason=reason)
-        return 0, reason
-    if akn_xml is None:
-        akn_xml = (
-            await session.execute(select(Version.akn_xml).where(Version.id == version_id))
-        ).scalar_one()
+        return 0, reason or "no akn"
 
     # Resolve before deleting. The caller commits regardless, so a failure
     # after the delete would leave a version that had rows yesterday with none.
