@@ -15,6 +15,10 @@ The PostgreSQL development image builds pg_textsearch from pinned source and
 preserves that project's LICENSE and NOTICE in the image. Container base-image
 and operating-system packages have additional notices not enumerated here.
 
+`codify/countries.json` contains country names from Unicode CLDR 49.0.0,
+Copyright © 2001–2026 Unicode, Inc., under the Unicode License v3; the notice
+is reproduced in `licenses/Unicode-CLDR.txt`.
+
 No customer source-document redistribution permission is implied by a
 jurisdiction configuration or by this inventory. Synthetic fixture material is
 identified in its files; acquired documents require their own rights assessment.
