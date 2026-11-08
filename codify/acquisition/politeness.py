@@ -140,6 +140,14 @@ class HostCircuitOpen(httpx.TransportError):
     """A host failed enough requests in a row that this one was refused unsent."""
 
 
+@dataclass(frozen=True, eq=False)
+class _Ticket:
+    """One admitted request. Compared by identity, so only the probe's own
+    ticket can free or settle the probe slot."""
+
+    probe: bool
+
+
 @dataclass
 class _HostCircuit:
     """Consecutive failed requests per host, shared by every client in the process.
@@ -147,39 +155,47 @@ class _HostCircuit:
     A request counts once, after its own retries, so one bad document cannot
     trip it alone. Open, it refuses every request for the cooldown; then one
     probe goes through while the others are still refused, and its outcome
-    closes or reopens the circuit."""
+    closes or reopens the circuit. A request admitted before the trip and still
+    in flight is a straggler: it counts, but it never holds the probe slot."""
 
     failures: int = 0
     opened_at: float | None = None
-    probing: bool = False
+    probe: _Ticket | None = None
     trips: int = 0
 
-    def admit(self) -> bool:
+    def admit(self) -> _Ticket | None:
+        """A ticket to send, or None to refuse unsent."""
         if self.opened_at is None:
-            return True
-        if self.probing or time.monotonic() - self.opened_at < _CIRCUIT_COOLDOWN_S:
-            return False
-        self.probing = True
-        return True
+            return _Ticket(probe=False)
+        if self.probe is not None or time.monotonic() - self.opened_at < _CIRCUIT_COOLDOWN_S:
+            return None
+        self.probe = _Ticket(probe=True)
+        return self.probe
 
-    def record_success(self) -> None:
-        self.failures, self.opened_at, self.probing = 0, None, False
+    def record_success(self, ticket: _Ticket | None = None) -> None:
+        # Any answer shows the host is up: the circuit closes, and a probe still
+        # in flight becomes an ordinary request.
+        self.failures, self.opened_at, self.probe = 0, None, None
 
-    def record_failure(self) -> bool:
+    def record_failure(self, ticket: _Ticket | None = None) -> bool:
         """Count a failed request; True when it opened (or reopened) the circuit."""
         self.failures += 1
-        opens = self.probing or (self.opened_at is None and self.failures >= _CIRCUIT_FAILURES)
+        probing = ticket is not None and ticket is self.probe
+        opens = probing or (self.opened_at is None and self.failures >= _CIRCUIT_FAILURES)
         if self.opened_at is not None or opens:
             # A straggler admitted before the trip restarts the cooldown too.
             self.opened_at = time.monotonic()
         if opens:
             self.trips += 1
-        self.probing = False
+        if probing:
+            self.probe = None
         return opens
 
-    def release(self) -> None:
-        """Neither outcome (robots or guard refusal, cancellation): free the probe."""
-        self.probing = False
+    def release(self, ticket: _Ticket) -> None:
+        """Neither outcome (robots or guard refusal, cancellation). Only the probe's
+        own ticket frees the slot; a straggler ending this way leaves it held."""
+        if ticket is self.probe:
+            self.probe = None
 
     def snapshot(self) -> dict[str, int | bool]:
         return {
@@ -208,6 +224,33 @@ def host_circuit_state(host: str) -> dict[str, int | bool] | None:
 def reset_host_circuits() -> None:
     """Tests only: close every host's circuit."""
     _CIRCUITS.clear()
+
+
+#: Request extension: `client.stream(..., extensions={UNBUFFERED: True})` keeps a
+#: body too large to hold streaming from the socket. Its download then happens
+#: after the transport returns, so a failure partway through is not retried.
+UNBUFFERED = "codify_unbuffered"
+
+
+async def _buffered(response: httpx.Response) -> httpx.Response:
+    """The response with its body downloaded now, inside the retry boundary.
+
+    The raw bytes are kept, still encoded, behind a fresh stream, so the client
+    decodes them as it would have and `aiter_raw` still works once."""
+    if response.is_stream_consumed:
+        # Already in memory (a transport that built it from bytes): nothing left to drop.
+        return response
+    try:
+        raw = b"".join([part async for part in response.aiter_raw()])
+    finally:
+        await response.aclose()
+    return httpx.Response(
+        response.status_code,
+        headers=response.headers,
+        stream=httpx.ByteStream(raw),
+        # The connection is closed; the rest (http_version, reason_phrase) still holds.
+        extensions={k: v for k, v in response.extensions.items() if k != "network_stream"},
+    )
 
 
 def _jitter_wait(attempt: int, retry_after: float | None) -> float:
@@ -470,7 +513,8 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         async with self._sem:
             host = request.url.host
             circuit = host_circuit(host)
-            if not circuit.admit():
+            ticket = circuit.admit()
+            if ticket is None:
                 logger.warning("polite_circuit_refused", host=host, **circuit.snapshot())
                 raise HostCircuitOpen(
                     f"{host} failed {circuit.failures} requests in a row; refusing "
@@ -489,10 +533,10 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 raise
             finally:
                 if answered is None:
-                    circuit.release()
+                    circuit.release(ticket)
                 elif answered:
-                    circuit.record_success()
-                elif circuit.record_failure():
+                    circuit.record_success(ticket)
+                elif circuit.record_failure(ticket):
                     logger.warning("polite_circuit_opened", host=host, **circuit.snapshot())
 
     async def _send(self, request: httpx.Request, host: str) -> httpx.Response:
@@ -543,6 +587,9 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         request.headers["user-agent"] = self.profile.user_agent
 
         replayable = _replayable(request)
+        # A dropped download is replayed with the request, so a replayable body is
+        # read here rather than by the client after this returns.
+        buffer = replayable and not request.extensions.get(UNBUFFERED)
         response: httpx.Response | None = None
         for attempt in range(_MAX_RETRIES):
             last = attempt == _MAX_RETRIES - 1
@@ -550,6 +597,9 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 await bucket.acquire()
             try:
                 response = await self._inner.handle_async_request(request)
+                # A failed status is retried or returned as it stands, unread.
+                if buffer and response.status_code not in _FAILED_STATUSES:
+                    response = await _buffered(response)
             except _TRANSIENT_ERRORS as exc:
                 if not replayable:
                     raise
@@ -664,6 +714,7 @@ __all__ = [
     "client_tls_context",
     "PoliteTransport",
     "SSRFBlocked",
+    "UNBUFFERED",
     "host_bucket",
     "host_bucket_state",
     "host_circuit",

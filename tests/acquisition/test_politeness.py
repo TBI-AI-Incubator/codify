@@ -15,6 +15,7 @@ from codify.acquisition.politeness import (
     _MAX_RETRIES,
     _ROBOTS_FAIL_TTL_S,
     _ROBOTS_OK_TTL_S,
+    UNBUFFERED,
     HostCircuitOpen,
     PoliteTransport,
     host_bucket,
@@ -649,16 +650,126 @@ async def test_after_the_cooldown_one_probe_closes_or_reopens_the_circuit(
 
 def test_only_one_probe_is_admitted_while_the_circuit_is_half_open() -> None:
     circuit = host_circuit("busy.test")
+    straggler = circuit.admit()
+    assert straggler is not None and not straggler.probe
     for _ in range(_CIRCUIT_FAILURES):
         circuit.record_failure()
-    assert circuit.admit() is False
+    assert circuit.admit() is None
     assert circuit.opened_at is not None
     circuit.opened_at -= _CIRCUIT_COOLDOWN_S
-    assert circuit.admit() is True
-    assert circuit.admit() is False
-    # A probe that ends without an outcome (robots refusal, cancellation) frees the slot.
-    circuit.release()
-    assert circuit.admit() is True
+    probe = circuit.admit()
+    assert probe is not None and probe.probe
+    assert circuit.admit() is None
+    # A straggler admitted before the trip cannot free the probe's slot, whether
+    # it ends without an outcome or fails.
+    circuit.release(straggler)
+    assert circuit.admit() is None
+    circuit.record_failure(straggler)
+    assert circuit.probe is probe
+    # The probe itself, ending without an outcome (robots refusal, cancellation), frees it.
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    circuit.release(probe)
+    assert circuit.admit() is not None
+
+
+@pytest.mark.asyncio
+async def test_cancelling_an_older_request_keeps_the_probe_single() -> None:
+    import asyncio
+
+    gates = {"/old": asyncio.Event(), "/probe": asyncio.Event()}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if gate := gates.get(request.url.path):
+            await gate.wait()
+        return _ok()
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        old = asyncio.create_task(c.get("https://slow.test/old"))
+        await asyncio.sleep(0.01)  # admitted while the circuit is closed
+        circuit = host_circuit("slow.test")
+        for _ in range(_CIRCUIT_FAILURES):
+            circuit.record_failure()
+        assert circuit.opened_at is not None
+        circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+        probe = asyncio.create_task(c.get("https://slow.test/probe"))
+        await asyncio.sleep(0.01)
+        assert circuit.probe is not None
+
+        old.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await old
+        # The probe is still in flight, so a second one is refused.
+        with pytest.raises(HostCircuitOpen):
+            await c.get("https://slow.test/x")
+
+        gates["/probe"].set()
+        assert (await probe).status_code == 200
+    assert host_circuit_state("slow.test") == {"failures": 0, "open": False, "trips": 1}
+
+
+class _DroppedAfter(httpx.AsyncByteStream):
+    """A body that resets partway through the download."""
+
+    async def __aiter__(self):  # type: ignore[no-untyped-def]
+        yield b"part of the "
+        raise httpx.ReadError("connection reset mid-body")
+
+
+@pytest.mark.asyncio
+async def test_a_download_dropped_mid_body_is_retried(no_jitter: None) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(200, stream=_DroppedAfter())
+        return _ok("whole document")
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        resp = await c.get("https://reset.test/doc")
+    assert resp.text == "whole document"
+    assert attempts == 2
+    assert host_circuit_state("reset.test") == {"failures": 0, "open": False, "trips": 0}
+
+
+@pytest.mark.asyncio
+async def test_a_buffered_body_still_decodes_and_streams_raw() -> None:
+    import gzip
+
+    packed = gzip.compress(b"<akomaNtoso/>")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # `stream=` leaves the body unread, as a network transport hands it over.
+        return httpx.Response(
+            200, stream=httpx.ByteStream(packed), headers={"content-encoding": "gzip"}
+        )
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        assert (await c.get("https://gzip.test/doc")).content == b"<akomaNtoso/>"
+        async with c.stream("GET", "https://gzip.test/doc") as resp:
+            raw = b"".join([part async for part in resp.aiter_raw()])
+    assert raw == packed
+
+
+@pytest.mark.asyncio
+async def test_an_unbuffered_stream_is_left_to_the_caller(no_jitter: None) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(200, stream=_DroppedAfter())
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        async with c.stream(
+            "GET", "https://big.test/dump.zip", extensions={UNBUFFERED: True}
+        ) as resp:
+            assert resp.status_code == 200
+            with pytest.raises(httpx.ReadError):
+                await resp.aread()
+    assert attempts == 1
 
 
 @pytest.mark.asyncio

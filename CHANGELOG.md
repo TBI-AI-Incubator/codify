@@ -60,13 +60,17 @@ New, additive:
   (502, 504) or a connection that never answered, each counted once after its
   own retries, open it: every request to that host then raises
   `HostCircuitOpen`, an `httpx.TransportError`, unsent, for 60 seconds. One
-  probe then goes through; an answer closes the circuit, a failure reopens it.
-  A robots refusal counts as neither. `host_circuit_state` reports a host's
-  circuit.
+  probe then goes through, and only that request can free its slot; an answer
+  closes the circuit, a failure reopens it. A robots refusal counts as
+  neither. `host_circuit_state` reports a host's circuit.
 - `PoliteTransport` retries a bodyless request on a 502 or 504, and on a
   connect or read timeout, a dropped connection or a protocol error, with
-  exponential full jitter and without widening the host's pace. A request
-  with a body is not replayed.
+  exponential full jitter and without widening the host's pace. It downloads
+  such a request's body itself, inside the request's concurrency slot, so a
+  body that drops partway is retried too; the client still decodes it and
+  `aiter_raw` still reads it. A `client.stream(...)` call that passes
+  `extensions={UNBUFFERED: True}` keeps the body streaming from the socket and
+  is not retried once its headers arrive. A request with a body is not replayed.
 - `AnchorCoverage.state` says which kind of coverage a scan has: `measured`,
   `captured_unmeasured` (units found, no marker to count them against) or `empty`.
   `unfilled_anchors` counts the anchors heading text no body-fill window reaches,
