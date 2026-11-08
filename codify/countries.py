@@ -18,9 +18,10 @@ import regex
 from codify.lang import to_iso639_3
 
 _DATA = Path(__file__).with_name("countries.json")
-# A hyphen bounds a name only where a capital stands across it, as in "EU-Japan".
-_BEFORE = r"(?<!\w)(?<![^\p{Lu}]-)(?<!^-)"
-_AFTER = r"(?!\w)(?!-(?!\p{Lu}))"
+# A hyphen bounds a name only where a capital stands across it, as in "EU-Japan". A
+# name's capitals form never takes a hyphen: in text set in capitals every letter is one.
+_HYPHEN_JOINS = (r"(?<![^\p{Lu}]-)(?<!^-)", r"(?!-(?!\p{Lu}))")
+_HYPHEN_BLOCKS = (r"(?<!-)", r"(?!-)")
 
 
 @cache
@@ -87,13 +88,26 @@ def _fold(text: str) -> str:
 @cache
 def _matcher(language: str) -> tuple[regex.Pattern[str], dict[str, str | None]]:
     codes: dict[str, str | None] = {}
-    for place in _load()["not_countries"].get(language, []):
-        codes.update(dict.fromkeys(name_forms(place)))
-    for code, names in _table(language).items():
-        for name in names:
-            for form in name_forms(name):
-                codes.setdefault(form, code)
-    # Longest first, so "Hong Kong SAR China" is one match and not also China.
-    forms = sorted(codes, key=len, reverse=True)
-    alternation = "|".join(regex.escape(form).replace(r"\ ", r"\s+") for form in forms)
-    return regex.compile(rf"{_BEFORE}(?:{alternation}){_AFTER}"), codes
+    capitals_only: set[str] = set()
+    named: list[tuple[str, str | None]] = [
+        (place, None) for place in _load()["not_countries"].get(language, [])
+    ]
+    named += [(name, code) for code, names in _table(language).items() for name in names]
+    for name, code in named:
+        written, capitals = name_forms(name)
+        codes.setdefault(written, code)
+        if capitals not in codes:
+            codes[capitals] = code
+            capitals_only.add(capitals)
+    groups = []
+    for (before, after), forms in (
+        (_HYPHEN_BLOCKS, capitals_only),
+        (_HYPHEN_JOINS, codes.keys() - capitals_only),
+    ):
+        # Longest first, so "Hong Kong SAR China" is one match and not also China.
+        ordered = sorted(forms, key=lambda form: (-len(form), form))
+        if not ordered:
+            continue
+        alternation = "|".join(regex.escape(f).replace(r"\ ", r"\s+") for f in ordered)
+        groups.append(f"{before}(?:{alternation}){after}")
+    return regex.compile(rf"(?<!\w)(?:{'|'.join(groups)})(?!\w)"), codes

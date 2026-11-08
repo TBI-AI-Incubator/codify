@@ -110,6 +110,22 @@ def test_a_hyphen_joins_a_name_only_to_a_capital() -> None:
     ]
 
 
+def test_a_capitals_form_never_joins_a_hyphen() -> None:
+    dutch = "VERENIGD KONINKRIJK VAN GROOT-BRITTANNIË EN NOORD-IERLAND"
+    assert countries_named(dutch, "nld") == [("GB", "VERENIGD KONINKRIJK")]
+    norwegian = "DET FORENTE KONGERIKE STORBRITANNIA OG NORD-IRLAND"
+    assert countries_named(norwegian, "nor") == [("GB", "STORBRITANNIA")]
+    assert countries_named("NOUVELLE-GUINÉE, NOUVEAU-MEXIQUE", "fra") == []
+    assert countries_named("NIEUW-MEXICO", "nld") == []
+    assert countries_named("NY-GUINEA", "nor") == []
+    assert countries_named("INDO-CHINA, CHINA-BASED, EU-JAPAN", "eng") == []
+    assert countries_named("EU-UK", "eng") == [("GB", "UK")]
+    assert countries_named("GUINEA-BISSAU, TIMOR-LESTE", "eng") == [
+        ("GW", "GUINEA-BISSAU"),
+        ("TL", "TIMOR-LESTE"),
+    ]
+
+
 def test_apostrophes_line_breaks_and_invisible_characters_do_not_hide_a_name() -> None:
     assert countries_named("Côte d'Ivoire and Hong\nKong", "eng") == [
         ("CI", "Côte d’Ivoire"),
