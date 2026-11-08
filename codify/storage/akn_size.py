@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-# Peak memory runs at 25 to 40 times the document size, so this stays near 2.5 GiB.
+# Parsing holds the whole tree in memory, so a very large version is refused.
 MAX_INDEXED_AKN_CHARS = 64_000_000
 
 
