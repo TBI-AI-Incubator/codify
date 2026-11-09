@@ -1,0 +1,282 @@
+"""Build `codify/countries.json` from pinned Unicode CLDR data and, given a downloaded
+copy, the EU Publications Office country authority table (`--eu-table country.xml`).
+
+Run with `uv run python scripts/build_country_names.py`.
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import io
+import json
+import tarfile
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+from lxml import etree
+
+from codify.countries import name_forms
+from codify.lang import ISO1_TO_3
+
+OUTPUT = Path(__file__).resolve().parents[1] / "codify" / "countries.json"
+
+CLDR_VERSION = "49.0.0"
+# npm's published integrity for each tarball; a changed download fails the build.
+CLDR_PACKAGES = {
+    "cldr-core": "sha512-2Z2dYeDO95AbKIG9dIUdZy6DD4f0hhHjTYnaHZj/9JTQ82pX5EsJlCs2"
+    "BXPWi4vd1d98MwotOivh4Uthxwri4A==",
+    "cldr-localenames-full": "sha512-nTBCysDVK+JHb2hPhb26fJGp9+Lw0mOiqVsJ/9aTEQIduBTn"
+    "ghTSLgZitsM7FLa1Vjr0K0hfBQMdBgoyDxK0nQ==",
+    "cldr-subdivisions-full": "sha512-4Yd6odsg4rsh5+s9jFyS80xUQuwOkidaIcDj69iKHKtBqKQj"
+    "zVd3QcKHaXFX76qFRtkg2JmjonN1/H0rhI8KmA==",
+}
+CLDR_NOTICE = (
+    "Unicode CLDR data, Copyright © 2001–2026 Unicode, Inc., under the Unicode "
+    "License v3; see licenses/Unicode-CLDR.txt."
+)
+EU_NOTICE = (
+    "Contains data from the country authority table, © European Union, Publications "
+    "Office of the European Union; names selected by language and keyed by ISO code."
+)
+
+# Languages whose country names take no case endings; a genitive -s is still missed.
+LANGUAGES = frozenset("bul dan deu eng fra ind ita ltz mkd nld nor por spa swe".split())
+ALT_FORMS = frozenset({"", "short", "variant"})
+
+# Reviewed by hand. A name that is also a common word is dropped. A longer place name
+# holding a country's name is matched and discarded, so that country is not counted:
+# CLDR's names for the subdivisions listed, and the phrases below where CLDR has none.
+COMMON_WORDS = {"mkd": frozenset({"Мали"}), "nor": frozenset({"Man"})}
+NOT_COUNTRY_SUBDIVISIONS = ("gbnir", "usnj", "usnm")
+NOT_COUNTRIES = {
+    "bul": ["Нова Гвинея", "Ню Джърси", "Ню Мексико", "Северна Ирландия"],
+    "dan": ["New Jersey", "New Mexico", "Ny Guinea"],
+    "deu": ["New Jersey"],
+    "eng": ["New Guinea"],
+    "fra": ["Irlande du Nord", "New Jersey"],
+    "ind": ["Irlandia Utara", "Meksiko Baru", "New Jersey"],
+    "ita": ["Irlanda del Nord", "New Jersey", "Nuova Guinea", "Nuovo Messico"],
+    "ltz": ["New Jersey"],
+    "mkd": ["Нова Гвинеја", "Ново Мексико", "Северна Ирска", "Њу Џерси"],
+    "nld": ["New Jersey", "New Mexico"],
+    "nor": ["New Jersey", "New Mexico"],
+    "por": ["Irlanda do Norte", "Nova Guiné", "Nova Jersey", "Novo México"],
+    "spa": ["Irlanda del Norte", "Nueva Guinea", "Nueva Jersey", "Nuevo México"],
+    "swe": ["New Jersey", "Nya Guinea"],
+}
+
+
+def _download(package: str) -> tarfile.TarFile:
+    url = f"https://registry.npmjs.org/{package}/-/{package}-{CLDR_VERSION}.tgz"
+    with urllib.request.urlopen(url, timeout=120) as response:
+        body = response.read()
+    digest = "sha512-" + base64.b64encode(hashlib.sha512(body).digest()).decode()
+    if digest != CLDR_PACKAGES[package]:
+        raise SystemExit(f"{url} does not match its pinned integrity")
+    return tarfile.open(fileobj=io.BytesIO(body), mode="r:gz")
+
+
+def _supplemental(core: tarfile.TarFile, name: str) -> Any:
+    member = core.extractfile(f"package/supplemental/{name}.json")
+    assert member is not None
+    return json.load(member)["supplemental"]
+
+
+def _user_assigned(code: str) -> bool:
+    """ISO 3166-1's user-assigned alpha-2 codes: AA, QM to QZ, XA to XZ and ZZ."""
+    return code in {"AA", "ZZ"} or code[0] == "X" or (code[0] == "Q" and code[1] >= "M")
+
+
+def cldr_countries(core: tarfile.TarFile) -> frozenset[str]:
+    """Alpha-2 codes with an ISO numeric code that are not user-assigned, withdrawn
+    or a region containing others (the EU, the UN)."""
+    mappings = _supplemental(core, "codeMappings")["codeMappings"]
+    regions = _supplemental(core, "territoryContainment")["territoryContainment"]
+    withdrawn = _supplemental(core, "aliases")["metadata"]["alias"]["territoryAlias"]
+    return frozenset(
+        code
+        for code, mapping in mappings.items()
+        if len(code) == 2
+        and code.isalpha()
+        and mapping.get("_numeric")
+        and not _user_assigned(code)
+        and code not in regions
+        and code not in withdrawn
+    )
+
+
+def cldr_names(
+    locales: tarfile.TarFile, countries: frozenset[str]
+) -> dict[str, dict[str, list[str]]]:
+    """Every locale of each language, its own locale first, so a code's first name is
+    the language's standard one."""
+    files: dict[str, str] = {}
+    for member in locales.getmembers():
+        parts = member.name.split("/")
+        if len(parts) == 4 and parts[1] == "main" and parts[3] == "territories.json":
+            files[parts[2]] = member.name
+    out: dict[str, dict[str, list[str]]] = {}
+    for locale in sorted(files, key=lambda loc: ("-" in loc, loc)):
+        language = ISO1_TO_3.get(locale.split("-")[0])
+        if language not in LANGUAGES:
+            continue
+        stream = locales.extractfile(files[locale])
+        assert stream is not None
+        territories = json.load(stream)["main"][locale]["localeDisplayNames"]["territories"]
+        table = out.setdefault(language, {})
+        for key, name in territories.items():
+            code, _, alt = key.partition("-alt-")
+            if code in countries and alt in ALT_FORMS:
+                _add(table, code, name)
+    return out
+
+
+def eu_names(path: Path, countries: frozenset[str]) -> tuple[str, dict[str, dict[str, list[str]]]]:
+    """The table's version and its short and full names, deprecated records included:
+    a former official name is still the name an older law uses."""
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, recover=False)
+    root = etree.parse(str(path), parser).getroot()
+    version = root.get("version")
+    records = root.findall("record")
+    if root.get("table.id") != "country" or not version or not records:
+        raise SystemExit(f"{path} is not a country authority table with a version and records")
+    out: dict[str, dict[str, list[str]]] = {}
+    for record in records:
+        code = (record.findtext("code-3166-1-alpha-2") or "").strip()
+        if code not in countries:
+            continue
+        for name in record.findall("label/lg.version") + record.findall("long.label/lg.version"):
+            language = name.get("lg")
+            if language in LANGUAGES and name.text and name.text.strip():
+                _add(out.setdefault(language, {}), code, name.text.strip())
+    if not out:
+        raise SystemExit(f"{path} names no country in {sorted(LANGUAGES)}")
+    return version, out
+
+
+def _add(table: dict[str, list[str]], code: str, name: str) -> None:
+    names = table.setdefault(code, [])
+    if name not in names:
+        names.append(name)
+
+
+def merge(*parts: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
+    """Each language's names from every source. A name matching as another country's
+    does once folded and capitalised as the matcher does names neither."""
+    out: dict[str, dict[str, list[str]]] = {}
+    for part in parts:
+        for language, table in part.items():
+            for code, names in table.items():
+                for name in names:
+                    _add(out.setdefault(language, {}), code, name)
+    for language, table in out.items():
+        owners: dict[str, set[str]] = {}
+        for code, names in table.items():
+            for name in names:
+                for form in name_forms(name):
+                    owners.setdefault(form, set()).add(code)
+        shared = {
+            name
+            for names in table.values()
+            for name in names
+            if any(len(owners[form]) > 1 for form in name_forms(name))
+        }
+        for name in sorted(shared):
+            codes = sorted(set().union(*(owners[form] for form in name_forms(name))))
+            print(f"{language}: dropped {name!r}, which matches as {codes}")
+        for code in table:
+            table[code] = [n for n in table[code] if n not in shared]
+        nameless = sorted(code for code, names in table.items() if not names)
+        if nameless:
+            raise SystemExit(f"{language}: {nameless} would be left with no name")
+    return {language: dict(sorted(table.items())) for language, table in sorted(out.items())}
+
+
+def drop_names(names: dict[str, dict[str, list[str]]], countries: frozenset[str]) -> None:
+    """Drop `COMMON_WORDS` and any name that reads as another country's alpha-2 code; a
+    country left with no name leaves that language."""
+    for language, table in names.items():
+        words = COMMON_WORDS.get(language, frozenset())
+        stale = words - {name for found in table.values() for name in found}
+        if stale:
+            raise SystemExit(f"{language}: {sorted(stale)} names no country; review the list")
+        for code in list(table):
+            codes = countries - {code}
+            kept = [
+                name
+                for name in table[code]
+                if name not in words and not codes.intersection(name_forms(name))
+            ]
+            for name in sorted(set(table[code]) - set(kept)):
+                print(f"{language}: dropped {name!r} for {code}")
+            if kept:
+                table[code] = kept
+            else:
+                del table[code]
+
+
+def subdivision_names(archive: tarfile.TarFile) -> dict[str, dict[str, str]]:
+    """CLDR's subdivision names by language, from every locale of each."""
+    out: dict[str, dict[str, str]] = {}
+    for member in archive.getmembers():
+        parts = member.name.split("/")
+        language = ISO1_TO_3.get(parts[2].split("-")[0]) if len(parts) == 4 else None
+        if language in LANGUAGES and parts[1] == "subdivisions":
+            stream = archive.extractfile(member)
+            assert stream is not None
+            found = json.load(stream)["subdivisions"]["localeDisplayNames"]["subdivisions"]
+            out.setdefault(language, {}).update(found)
+    return out
+
+
+def not_countries(
+    subdivisions: dict[str, dict[str, str]], names: dict[str, dict[str, list[str]]]
+) -> dict[str, list[str]]:
+    """Each language's places to discard; a listed phrase holding no country's name fails."""
+    out: dict[str, list[str]] = {}
+    for language in sorted(LANGUAGES):
+        forms = {
+            form for found in names[language].values() for n in found for form in name_forms(n)
+        }
+        listed = NOT_COUNTRIES.get(language, [])
+        idle = [place for place in listed if not any(form in place for form in forms)]
+        if idle:
+            raise SystemExit(f"{language}: {idle} holds no country's name; review the list")
+        cldr = [subdivisions.get(language, {}).get(code) for code in NOT_COUNTRY_SUBDIVISIONS]
+        places = sorted({place for place in cldr if place} | set(listed))
+        if places:
+            out[language] = places
+    return out
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build codify/countries.json.")
+    parser.add_argument("--eu-table", type=Path, help="a downloaded country authority table (XML)")
+    args = parser.parse_args()
+
+    countries = cldr_countries(_download("cldr-core"))
+    parts = [cldr_names(_download("cldr-localenames-full"), countries)]
+    subdivisions = subdivision_names(_download("cldr-subdivisions-full"))
+    sources: dict[str, Any] = {
+        "cldr": {"version": CLDR_VERSION, "packages": CLDR_PACKAGES, "notice": CLDR_NOTICE}
+    }
+    if args.eu_table:
+        version, eu = eu_names(args.eu_table, countries)
+        parts.append(eu)
+        sources["eu"] = {"table": "country", "version": version, "notice": EU_NOTICE}
+    names = merge(*parts)
+    missing = LANGUAGES - names.keys()
+    if missing:
+        raise SystemExit(f"no names for {sorted(missing)}")
+    drop_names(names, countries)
+    places = not_countries(subdivisions, names)
+    payload = {"sources": sources, "names": names, "not_countries": places}
+    OUTPUT.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(f"{len(countries)} countries; " + ", ".join(f"{k} {len(v)}" for k, v in names.items()))
+
+
+if __name__ == "__main__":
+    main()

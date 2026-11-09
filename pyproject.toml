@@ -104,6 +104,7 @@ include = [
   "codify/translate/pins/*.jsonl",
   "codify/migrations/versions/*.sql",
   "codify/contract/*.txt",
+  "codify/countries.json",
 ]
 
 # The shipping subset of data/ is selected by the configs' own flags at build

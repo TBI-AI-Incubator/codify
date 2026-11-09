@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-made sample in the country authority table's XML layout; not real table data. -->
+<countries table.id="country" version="20990101-0">
+   <record deprecated="false" id="COU9001">
+      <code-3166-1-alpha-2>CZ</code-3166-1-alpha-2>
+      <authority-code>CZE</authority-code>
+      <label>
+         <lg.version lg="ces">Česko</lg.version>
+         <lg.version lg="deu">Tschechien</lg.version>
+         <lg.version lg="eng">Czechia</lg.version>
+      </label>
+      <long.label>
+         <lg.version lg="deu">Tschechische Republik</lg.version>
+         <lg.version lg="eng">Czech Republic</lg.version>
+      </long.label>
+   </record>
+   <record deprecated="true" id="COU9002">
+      <code-3166-1-alpha-2>TR</code-3166-1-alpha-2>
+      <authority-code>TUR</authority-code>
+      <label>
+         <lg.version lg="eng">Turkey</lg.version>
+      </label>
+      <long.label>
+         <lg.version lg="eng">Republic of Turkey</lg.version>
+      </long.label>
+   </record>
+   <record deprecated="false" id="COU9003">
+      <code-3166-1-alpha-2>TR</code-3166-1-alpha-2>
+      <authority-code>TUR</authority-code>
+      <label>
+         <lg.version lg="eng">Türkiye</lg.version>
+      </label>
+      <long.label>
+         <lg.version lg="eng">Republic of Türkiye</lg.version>
+      </long.label>
+   </record>
+   <record deprecated="false" id="COU9004">
+      <authority-code>1A0</authority-code>
+      <label>
+         <lg.version lg="eng">Kosovo</lg.version>
+      </label>
+   </record>
+</countries>
