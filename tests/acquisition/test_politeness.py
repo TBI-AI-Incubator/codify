@@ -236,9 +236,10 @@ async def test_robots_429_is_named_as_unavailable_not_disallowed() -> None:
     assert resp.status_code == 451
     assert resp.headers["x-codify-blocked-by"] == "robots.txt-unavailable"
     assert resp.reason_phrase == "robots.txt unavailable (HTTP 429)"
-    assert "example.org" in resp.text
-    assert "HTTP 429" in resp.text
-    assert "up to 5 minutes" in resp.text
+    assert resp.text == (
+        "robots.txt for example.org could not be read (HTTP 429); "
+        "requests to example.org are held for up to 5 minutes"
+    )
     with pytest.raises(httpx.HTTPStatusError, match="robots.txt unavailable"):
         resp.raise_for_status()
 
