@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.search import TOKENISER_VERSION, tokenise_to_text
+from codify.storage.akn_size import bounded_akn
 from codify.storage.annex_rows import (
     count_annex_rows,
     count_stale_annex_row_tokens,
@@ -269,3 +270,28 @@ async def test_the_stale_count_sees_rows_the_current_tokeniser_has_not_written(
     await session.flush()
 
     assert await count_stale_annex_row_tokens(session, version_id) == (1, 4)
+
+
+async def test_an_oversize_version_is_refused_and_keeps_its_rows(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    version_id = await _a_version(session)
+    assert await index_version_annex_rows(session, version_id) == (4, None)
+    await session.flush()
+    monkeypatch.setattr("codify.storage.akn_size.MAX_INDEXED_AKN_CHARS", 100)
+    for passed in (None, _AKN):
+        count, reason = await index_version_annex_rows(session, version_id, passed)
+        assert count == 0
+        assert reason is not None and "limit 100" in reason and f"{len(_AKN):,}" in reason
+    await session.flush()
+    assert await count_annex_rows(session, version_id, "t1") == 4
+
+
+async def test_an_oversize_document_is_not_read_with_its_length(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    version_id = await _a_version(session)
+    monkeypatch.setattr("codify.storage.akn_size.MAX_INDEXED_AKN_CHARS", 100)
+    size, akn, _ = (await session.execute(bounded_akn(version_id))).one()
+    assert size == len(_AKN)
+    assert akn is None

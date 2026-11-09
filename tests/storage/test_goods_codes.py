@@ -148,3 +148,16 @@ async def test_a_lookup_keeps_to_the_jurisdictions_it_is_given(session: AsyncSes
         session, "99021000", jurisdiction_codes=["none-such"], current_only=False
     )
     assert elsewhere == []
+
+
+async def test_an_oversize_version_is_refused_and_keeps_its_codes(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    version_id = await _a_version(session)
+    assert await index_version_goods_codes(session, version_id, _AKN) == 3
+    await session.flush()
+    monkeypatch.setattr("codify.storage.akn_size.MAX_INDEXED_AKN_CHARS", 100)
+    assert await index_version_goods_codes(session, version_id) == 0
+    assert await index_version_goods_codes(session, version_id, _AKN) == 0
+    await session.flush()
+    assert len(await goods_codes_for_version(session, version_id)) == 3
