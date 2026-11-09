@@ -128,6 +128,7 @@ class _RobotsCacheEntry:
     ttl_s: float
     # When True, the parser is empty because the fetch failed; default-deny.
     fetch_failed: bool = False
+    failure: str = ""
 
 
 @dataclass
@@ -172,7 +173,9 @@ class _RobotsCache:
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             logger.warning("robots_fetch_failed", host=host, error=str(exc))
             rp.parse([])
-            return _RobotsCacheEntry(now, rp, _ROBOTS_FAIL_TTL_S, fetch_failed=True)
+            return _RobotsCacheEntry(
+                now, rp, _ROBOTS_FAIL_TTL_S, fetch_failed=True, failure=type(exc).__name__
+            )
 
         if resp.status_code == 200:
             rp.parse(resp.text.splitlines())
@@ -184,7 +187,8 @@ class _RobotsCache:
 
         logger.warning("robots_fetch_failed", host=host, status=resp.status_code)
         rp.parse([])
-        return _RobotsCacheEntry(now, rp, _ROBOTS_FAIL_TTL_S, fetch_failed=True)
+        failure = f"HTTP {resp.status_code}"
+        return _RobotsCacheEntry(now, rp, _ROBOTS_FAIL_TTL_S, fetch_failed=True, failure=failure)
 
 
 _REPLAYABLE = frozenset({"GET", "HEAD"})
@@ -380,11 +384,28 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
                 if not allowed:
                     # Explicit reason: a bare sentinel reads as a remote error.
+                    entry = self._robots.entries.get(urlparse(url_str).netloc)
+                    if entry is not None and entry.fetch_failed:
+                        why = entry.failure
+                        return httpx.Response(
+                            status_code=451,
+                            headers={"x-codify-blocked-by": "robots.txt-unavailable"},
+                            extensions={
+                                "reason_phrase": f"robots.txt unavailable ({why})".encode()
+                            },
+                            text=(
+                                f"robots.txt for {host} could not be read ({why}); "
+                                f"requests to {host} are held for up to "
+                                f"{int(_ROBOTS_FAIL_TTL_S // 60)} minutes"
+                            ),
+                            request=request,
+                        )
                     return httpx.Response(
                         status_code=451,
                         headers={"x-codify-blocked-by": "robots.txt"},
+                        extensions={"reason_phrase": b"Blocked by robots.txt"},
                         text=(
-                            f"blocked by {request.url.host}/robots.txt for "
+                            f"blocked by {host}/robots.txt for "
                             f"user-agent {self.profile.user_agent!r} "
                             "(set robots_respect=false on the source to override)"
                         ),
