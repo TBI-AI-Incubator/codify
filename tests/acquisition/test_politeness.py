@@ -81,6 +81,7 @@ async def test_robots_blocks_disallowed_url() -> None:
         ok = await c.get("https://example.test/public/x")
     assert blocked.status_code == 451
     assert blocked.headers.get("x-codify-blocked-by") == "robots.txt"
+    assert blocked.reason_phrase == "Blocked by robots.txt"
     assert ok.status_code == 200
 
 
@@ -212,12 +213,66 @@ async def test_robots_503_default_denies_with_short_ttl(capsys) -> None:
     async with httpx.AsyncClient(transport=transport) as c:
         resp = await c.get("https://example.test/x")
     assert resp.status_code == 451
-    assert resp.headers.get("x-codify-blocked-by") == "robots.txt"
+    assert resp.headers.get("x-codify-blocked-by") == "robots.txt-unavailable"
     cached = transport._robots.entries.get("example.test")
     assert cached is not None
     assert cached.fetch_failed is True
     assert cached.ttl_s == _ROBOTS_FAIL_TTL_S
     assert "robots_fetch_failed" in capsys.readouterr().out
+
+
+@pytest.mark.asyncio
+async def test_robots_429_is_named_as_unavailable_not_disallowed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(429)
+        return _ok()
+
+    transport = PoliteTransport(
+        profile=PolitenessProfile(robots_respect=True), inner=_make_inner(handler), resolver=_public
+    )
+    async with httpx.AsyncClient(transport=transport) as c:
+        resp = await c.get("https://example.org/x")
+    assert resp.status_code == 451
+    assert resp.headers["x-codify-blocked-by"] == "robots.txt-unavailable"
+    assert resp.reason_phrase == "robots.txt unavailable (HTTP 429)"
+    assert "example.org" in resp.text
+    assert "HTTP 429" in resp.text
+    assert "up to 5 minutes" in resp.text
+    with pytest.raises(httpx.HTTPStatusError, match="robots.txt unavailable"):
+        resp.raise_for_status()
+
+
+@pytest.mark.asyncio
+async def test_robots_unavailable_is_named_on_a_non_default_port() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(429)
+        return _ok()
+
+    transport = PoliteTransport(
+        profile=PolitenessProfile(robots_respect=True), inner=_make_inner(handler), resolver=_public
+    )
+    async with httpx.AsyncClient(transport=transport) as c:
+        resp = await c.get("https://example.org:8443/x")
+    assert resp.headers["x-codify-blocked-by"] == "robots.txt-unavailable"
+
+
+@pytest.mark.asyncio
+async def test_robots_transport_error_is_named_as_unavailable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            raise httpx.ConnectError("refused")
+        return _ok()
+
+    transport = PoliteTransport(
+        profile=PolitenessProfile(robots_respect=True), inner=_make_inner(handler), resolver=_public
+    )
+    async with httpx.AsyncClient(transport=transport) as c:
+        resp = await c.get("https://example.org/x")
+    assert resp.headers["x-codify-blocked-by"] == "robots.txt-unavailable"
+    assert resp.reason_phrase == "robots.txt unavailable (ConnectError)"
+    assert "ConnectError" in resp.text
 
 
 @pytest.mark.asyncio
