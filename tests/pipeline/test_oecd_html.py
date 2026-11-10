@@ -1325,3 +1325,601 @@ def test_an_annex_caption_followed_by_a_lettered_heading_keeps_the_heading() -> 
     assert root.xpath("//a:attachment//a:section/a:heading/text()", namespaces=NS) == [
         "Quay lanterns"
     ]
+
+
+# The shape of OECD/LEGAL/0194, Annex II: a numbered list under each heading,
+# every list starting again at `1.`, and prose that prints no number.
+_RESTARTED_LISTS = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents apply the principles set out in the Annex.</p>
+<p>ANNEX</p>
+<p>PRINCIPLES OF GOOD LANTERN KEEPING</p>
+<p>Preface</p>
+<p>Harbours and keepers share an interest in well kept lanterns.</p>
+<p>These principles replace those of the previous decade.</p>
+<p>Lamp rooms</p>
+<p>1. A lamp room should be dry.</p>
+<p>2. A lamp room should be locked at night.</p>
+<p>Oil stores</p>
+<p>1. Oil should be kept apart from wicks, in:</p>
+<p>a) a stone store;</p>
+<p>b) a tin chest.</p>
+<p>2. An oil store should be aired each week.</p>
+<p>3. Spilt oil should be reported.</p>
+<p>Records</p>
+<p>The keeper is answerable for the register.</p>
+<p>1. Each lighting should be entered.</p>
+<p>2. Each fault should be entered.</p>
+<p>3. The register should be kept for ten years.</p>
+"""
+
+
+def _numbers(root: etree._Element, *tags: str) -> dict[str, str | None]:
+    """Each element's eId against the number it prints, None where it prints none."""
+    return {
+        el.get("eId") or "": el.findtext("a:num", namespaces=NS)
+        for el in root.iter(*[f"{{{NS['a']}}}{t}" for t in tags])
+    }
+
+
+def test_a_list_restarting_under_each_heading_is_numbered_within_its_section() -> None:
+    xml, _, root = _convert(_RESTARTED_LISTS, type="recommendation")
+    _clean(xml)
+    # A number repeats only among the paragraphs it ends up beside, so no list
+    # carries a suffix for the lists printed above it.
+    assert _numbers(root, "paragraph", "point") == {
+        "att_1__sec_1__para_1": None,
+        "att_1__sec_1__para_2": None,
+        "att_1__sec_2__para_1": "1.",
+        "att_1__sec_2__para_2": "2.",
+        "att_1__sec_3__para_1": "1.",
+        "att_1__sec_3__para_1__point_a": "a)",
+        "att_1__sec_3__para_1__point_b": "b)",
+        "att_1__sec_3__para_2": "2.",
+        "att_1__sec_3__para_3": "3.",
+        # The annex's third unnumbered paragraph stands beside a printed `3.`:
+        # the printed number names its own paragraph.
+        "att_1__sec_4__para_3_dup2": None,
+        "att_1__sec_4__para_1": "1.",
+        "att_1__sec_4__para_2": "2.",
+        "att_1__sec_4__para_3": "3.",
+    }
+
+
+def test_a_printed_number_keeps_its_eid_when_prose_is_added_above() -> None:
+    """One more unnumbered paragraph earlier in the annex moves no numbered eId."""
+    longer = _RESTARTED_LISTS.replace(
+        "<p>Lamp rooms</p>", "<p>They apply in every harbour.</p><p>Lamp rooms</p>"
+    )
+    _, _, before = _convert(_RESTARTED_LISTS, type="recommendation")
+    _, _, after = _convert(longer, type="recommendation")
+
+    def numbered(root: etree._Element) -> list[str]:
+        return [eid for eid, num in _numbers(root, "paragraph", "point").items() if num]
+
+    assert numbered(after) == numbered(before)
+    assert not [eid for eid in numbered(after) if "_dup" in eid]
+
+
+def test_rows_derive_from_restarted_lists_with_distinct_ids() -> None:
+    xml, _, _ = _convert(_RESTARTED_LISTS, type="recommendation")
+    _, _, provisions, *_ = document_to_rows(parse_akn(xml), law_id=uuid.uuid4())
+    ids = [p.akn_eid for p in provisions]
+    assert len(ids) == len(set(ids))
+    assert not [eid for eid in ids if "_dup" in eid and "sec_4__para_3_dup2" not in eid]
+
+
+# The shape of OECD/LEGAL/0002, Annex A: a second list of sections under a
+# heading of its own, keeping the numbers of the first and skipping some.
+_TWO_LISTS = """
+<p>THE COUNCIL,</p>
+<p>I. DECIDES that Members shall keep the lists set out in Annex A.</p>
+<p>Annex A</p>
+<p>Lists of Lantern Duties</p>
+<p>LIST A</p>
+<p>I. Lighting at dusk</p>
+<p>II. Lighting in fog</p>
+<p>1. A fog lantern is lit on the word of the harbour master.</p>
+<p>III. Trimming of wicks</p>
+<p>IV. Storage of oil</p>
+<p>LIST B</p>
+<p>II. Lighting in fog</p>
+<p>1. A fog lantern may be lit by any keeper.</p>
+<p>IV. Storage of oil</p>
+<p>V. Keeping of registers</p>
+"""
+
+
+def test_a_second_list_of_sections_under_its_heading_is_a_group() -> None:
+    xml, _, root = _convert(_TWO_LISTS, type="decision")
+    _clean(xml)
+    assert _eids(root, "section", "hcontainer", "paragraph") == [
+        "sec_I",
+        "att_1__sec_I",
+        "att_1__sec_II",
+        "att_1__sec_II__para_1",
+        "att_1__sec_III",
+        "att_1__sec_IV",
+        "att_1__hcontainer_1",
+        "att_1__hcontainer_1__sec_II",
+        "att_1__hcontainer_1__sec_II__para_1",
+        "att_1__hcontainer_1__sec_IV",
+        # `V.` follows the first list's `IV.` and still belongs to the second.
+        "att_1__hcontainer_1__sec_V",
+    ]
+    group = root.find(".//a:attachment//a:hcontainer", NS)
+    assert group is not None
+    assert group.get("name") == "group"
+    assert group.findtext("a:heading", namespaces=NS) == "LIST B"
+    # The heading names the list, not the list's first section.
+    assert group.find("a:section/a:heading", NS) is None
+
+
+# The shape of OECD/LEGAL/0307: procedures appended to the body under a title,
+# numbered `I.` to `III.` as the sections before them are.
+_APPENDED_PROCEDURES = """
+<p>THE COUNCIL,</p>
+<p>HAVING REGARD to Article 5 a) of the Convention;</p>
+<p>DECIDES:</p>
+<p>I. Harbour Offices</p>
+<p>1. Adherents shall set up harbour offices.</p>
+<p>2. Harbour offices shall meet each year.</p>
+<p>II. The Harbour Committee</p>
+<p>1. The Committee shall oversee this Decision.</p>
+<p>Procedures</p>
+<p>I. Harbour Offices</p>
+<p>1. A harbour office will answer enquiries.</p>
+<p>II. The Harbour Committee</p>
+<p>1. The Committee will consider requests from keepers.</p>
+<p>III. Review</p>
+<p>1. These procedures are reviewed every five years.</p>
+"""
+
+
+def test_a_text_reproduced_in_the_body_under_its_title_is_a_group() -> None:
+    xml, _, root = _convert(_APPENDED_PROCEDURES, type="decision")
+    _clean(xml)
+    assert _eids(root, "section", "hcontainer", "paragraph") == [
+        "sec_I",
+        "sec_I__para_1",
+        "sec_I__para_2",
+        "sec_II",
+        "sec_II__para_1",
+        "hcontainer_1",
+        "hcontainer_1__sec_I",
+        "hcontainer_1__sec_I__para_1",
+        "hcontainer_1__sec_II",
+        "hcontainer_1__sec_II__para_1",
+        "hcontainer_1__sec_III",
+        "hcontainer_1__sec_III__para_1",
+    ]
+    assert root.findtext(".//a:body/a:hcontainer/a:heading", namespaces=NS) == "Procedures"
+    _, _, provisions, *_ = document_to_rows(parse_akn(xml), law_id=uuid.uuid4())
+    ids = [p.akn_eid for p in provisions]
+    assert len(ids) == len(set(ids))
+    assert not [eid for eid in ids if "_dup" in eid]
+
+
+def test_each_reproduced_text_is_a_group_of_its_own() -> None:
+    body = _APPENDED_PROCEDURES + (
+        "<p>Commentary</p><p>I. Harbour Offices</p><p>1. An office may be shared.</p>"
+    )
+    xml, _, root = _convert(body, type="decision")
+    _clean(xml)
+    assert _eids(root, "hcontainer") == ["hcontainer_1", "hcontainer_2"]
+    assert "hcontainer_2__sec_I__para_1" in _eids(root, "paragraph")
+    assert not [e for e in _eids(root, "section", "paragraph") if "_dup" in e]
+
+
+def test_a_verb_section_after_a_group_is_the_bodys_own() -> None:
+    """A text of two sections reproduced under section II, as long as the body
+    so far: the next verb carries the body on, whatever its number follows."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light every lantern.</p>
+<p>II. RECOMMENDS that Adherents report against the reference points below.</p>
+<p>Reference points</p>
+<p>I. Lanterns lit</p>
+<p>II. Keepers trained</p>
+<p>III. INVITES the Secretary-General to disseminate this Recommendation.</p>
+<p>IV. INSTRUCTS the Harbour Committee to report to the Council.</p>
+"""
+    xml, provenance, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert _eids(root, "section", "hcontainer") == [
+        "sec_I",
+        "sec_II",
+        "hcontainer_1",
+        "hcontainer_1__sec_I",
+        "hcontainer_1__sec_II",
+        "sec_III",
+        "sec_IV",
+    ]
+    assert _marked(root) == {"sec_III", "sec_IV"}
+    html_source = provenance["html_source"]
+    assert isinstance(html_source, dict)
+    assert html_source["verbs"] == ["RECOMMENDS", "RECOMMENDS", "INVITES", "INSTRUCTS"]
+
+
+def test_a_group_of_verb_sections_keeps_its_own_count() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents follow the procedures below.</p>
+<p>Procedures</p>
+<p>I. AGREES that harbour offices answer enquiries.</p>
+<p>II. AGREES that harbour offices meet each year.</p>
+<p>INVITES the Secretary-General to disseminate these procedures.</p>
+"""
+    xml, provenance, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    # The unnumbered verb is counted among the group's sections, not the body's.
+    assert _numbers(root, "section") == {
+        "sec_I": "I.",
+        "hcontainer_1__sec_I": "I.",
+        "hcontainer_1__sec_II": "II.",
+        "hcontainer_1__sec_III": "III.",
+    }
+    html_source = provenance["html_source"]
+    assert isinstance(html_source, dict)
+    assert html_source["verbs"] == ["RECOMMENDS", "AGREES", "AGREES", "INVITES"]
+
+
+def test_a_numbered_table_row_opens_no_group() -> None:
+    """A table numbers its rows `I.`, `II.` inside section III: rows are not a
+    second text, and the body's own sections stay where they were."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. AGREES that this Recommendation concerns harbour lanterns.</p>
+<p>II. RECOMMENDS that Adherents light every lantern at dusk.</p>
+<p>III. RECOMMENDS that Adherents report their position against the reference points:</p>
+<table>
+<tr><td>Position</td><td>Reference point</td></tr>
+<tr><td>I. Lanterns lit</td><td>0.6</td></tr>
+<tr><td>II. Keepers trained</td><td>0.4</td></tr>
+<tr><td>III. Wicks trimmed</td><td>0.2</td></tr>
+</table>
+<p>IV. INVITES the Secretary-General to disseminate this Recommendation.</p>
+<p>V. INSTRUCTS the Harbour Committee to report to the Council.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert not _eids(root, "hcontainer")
+    assert _eids(root, "section") == [
+        "sec_I",
+        "sec_II",
+        "sec_III",
+        "sec_I_dup2",
+        "sec_II_dup2",
+        "sec_III_dup2",
+        "sec_IV",
+        "sec_V",
+    ]
+    assert _marked(root) == {"sec_IV", "sec_V"}
+
+
+def test_chapters_reproduced_after_a_summary_are_a_group() -> None:
+    """A summary lists the chapters, then the model text prints them in full. The
+    group takes the heading line directly before the restart; the model's title,
+    cut off from it by a line of prose, stays where it was read before."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents follow the model text in the Annex.</p>
+<p>Annex</p>
+<p>SUMMARY</p>
+<p>CHAPTER I</p>
+<p>Scope</p>
+<p>CHAPTER II</p>
+<p>Definitions</p>
+<p>MODEL CONVENTION ON HARBOUR LANTERNS</p>
+<p>Convention between (State A) and (State B) on the keeping of the harbour lanterns that
+stand along their common coast and its approaches</p>
+<p>OPENING WORDS</p>
+<p>CHAPTER I</p>
+<p>SCOPE</p>
+<p>Article 1</p>
+<p>This Convention applies to fixed harbour lanterns.</p>
+<p>CHAPTER II</p>
+<p>DEFINITIONS</p>
+<p>Article 2</p>
+<p>A lantern is any fixed harbour light.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _eids(root, "chapter", "hcontainer", "article", "paragraph") == [
+        "att_1__chp_i",
+        "att_1__chp_ii",
+        "att_1__chp_ii__para_1",
+        "att_1__hcontainer_1",
+        "att_1__hcontainer_1__chp_i",
+        "att_1__hcontainer_1__chp_i__art_1",
+        "att_1__hcontainer_1__chp_ii",
+        "att_1__hcontainer_1__chp_ii__art_2",
+    ]
+    group = root.find(".//a:attachment//a:hcontainer", NS)
+    assert group is not None
+    assert group.findtext("a:heading", namespaces=NS) == "OPENING WORDS"
+    assert group.xpath("a:chapter/a:heading/text()", namespaces=NS) == ["SCOPE", "DEFINITIONS"]
+    title = "//a:paragraph[@eId='att_1__chp_ii__para_1']/a:heading/text()"
+    assert root.xpath(title, namespaces=NS) == ["MODEL CONVENTION ON HARBOUR LANTERNS"]
+
+
+def test_the_first_of_two_heading_lines_heads_the_group() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>a) light every lantern at dusk;</p>
+<p>b) trim every wick.</p>
+<p>Second list</p>
+<p>Registers</p>
+<p>a) keep a register of keepers;</p>
+<p>b) publish it each year.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert root.xpath("//a:hcontainer/a:heading/text()", namespaces=NS) == ["Second list"]
+    first = "//a:paragraph[@eId='sec_I__hcontainer_1__para_a']/a:heading/text()"
+    assert root.xpath(first, namespaces=NS) == ["Registers"]
+
+
+def test_a_heading_before_a_number_only_an_unnumbered_paragraph_holds_opens_no_group() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>Keep every lantern lit through the night and through fog, in summer as in winter, on
+every quay.</p>
+<p>Registers</p>
+<p>1. Keep a register of keepers.</p>
+<p>2. Publish it each year.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert not _eids(root, "hcontainer")
+    assert _numbers(root, "paragraph") == {
+        "sec_I__para_1_dup2": None,
+        "sec_I__para_1": "1.",
+        "sec_I__para_2": "2.",
+    }
+
+
+def test_an_unnumbered_paragraphs_suffix_ignores_the_numbers_repeated_below_it() -> None:
+    annex = (
+        "<p>THE COUNCIL,</p><p>I. RECOMMENDS that Adherents apply the Annex.</p><p>Annex</p>"
+        "<p>Each keeper answers for the lanterns of one quay.</p>"
+        "<p>1. A keeper lights them at dusk.</p><p>2. A keeper trims them at dawn.</p>"
+    )
+    _, _, short = _convert(annex, type="recommendation")
+    _, _, longer = _convert(annex + "<p>1. A keeper reports faults.</p>", type="recommendation")
+    assert _numbers(short, "paragraph") == {
+        "att_1__sec_1__para_1_dup2": None,
+        "att_1__sec_1__para_1": "1.",
+        "att_1__sec_1__para_2": "2.",
+    }
+    assert _numbers(longer, "paragraph") == {
+        **_numbers(short, "paragraph"),
+        "att_1__sec_1__para_1_dup3": "1.",
+    }
+
+
+def test_a_verb_section_naming_no_one_judges_the_items_of_its_groups() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light every lantern at dusk.</p>
+<p>II. INVITES:</p>
+<p>Reporting</p>
+<p>a) the Secretary-General to report on lanterns each year;</p>
+<p>b) the Harbour Committee to review the reports.</p>
+<p>Outreach</p>
+<p>a) the Secretary-General to disseminate this Recommendation;</p>
+<p>b) the Harbour Committee to hold a forum of keepers.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert _marked(root) == {
+        "sec_II",
+        "sec_II__para_a",
+        "sec_II__para_b",
+        "sec_II__hcontainer_1__para_a",
+        "sec_II__hcontainer_1__para_b",
+    }
+
+
+def test_a_lettered_list_restarting_under_a_heading_inside_a_section_is_a_group() -> None:
+    """The shape of OECD/LEGAL/0449: headed lists of `a)`, `b)` in one section."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>Lighting</p>
+<p>a) light every lantern at dusk;</p>
+<p>b) trim every wick.</p>
+<p>Registers</p>
+<p>a) keep a register of keepers;</p>
+<p>b) publish it each year;</p>
+<p>c) correct it on request.</p>
+<p>II. INVITES the Secretary-General to disseminate this Recommendation.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    _clean(xml)
+    assert _eids(root, "section", "hcontainer", "paragraph") == [
+        "sec_I",
+        "sec_I__para_a",
+        "sec_I__para_b",
+        "sec_I__hcontainer_1",
+        "sec_I__hcontainer_1__para_a",
+        "sec_I__hcontainer_1__para_b",
+        "sec_I__hcontainer_1__para_c",
+        "sec_II",
+    ]
+    # The first list is as it was: its heading stays on its first item.
+    assert root.xpath("//a:paragraph[@eId='sec_I__para_a']/a:heading/text()", namespaces=NS) == [
+        "Lighting"
+    ]
+    assert root.xpath("//a:hcontainer/a:heading/text()", namespaces=NS) == ["Registers"]
+
+
+def test_a_group_keeps_the_declarants_voice_for_its_items() -> None:
+    body = """
+<p>WE, THE MINISTERS of the lantern ports,</p>
+<p>DECLARE that we:</p>
+<p>Coordination</p>
+<p>1. Support the work of the harbour masters.</p>
+<p>2. Call on the Harbour Committee to count every keeper.</p>
+<p>Review</p>
+<p>1. Call on the Harbour Committee to report each year.</p>
+<p>2. Welcome the work of keepers.</p>
+"""
+    xml, _, root = _convert(body, type="declaration")
+    _clean(xml)
+    assert _eids(root, "paragraph") == [
+        "sec_I__para_1",
+        "sec_I__para_2",
+        "sec_I__hcontainer_1__para_1",
+        "sec_I__hcontainer_1__para_2",
+    ]
+    assert _marked(root) == {"sec_I__para_2", "sec_I__hcontainer_1__para_1"}
+
+
+def test_a_list_restarting_with_no_heading_keeps_a_suffix_counted_in_its_section() -> None:
+    """Nothing in the source marks the second list, so it keeps the suffix it
+    had, counted within its own section."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>1. Light every lantern.</p>
+<p>2. Trim every wick.</p>
+<p>1. Keep a register.</p>
+<p>II. RECOMMENDS that Adherents:</p>
+<p>1. Train every keeper.</p>
+<p>2. Pay every keeper.</p>
+<p>1. Publish the register.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _eids(root, "paragraph") == [
+        "sec_I__para_1",
+        "sec_I__para_2",
+        "sec_I__para_1_dup2",
+        "sec_II__para_1",
+        "sec_II__para_2",
+        "sec_II__para_1_dup2",
+    ]
+
+
+def test_a_verb_on_a_line_of_its_own_heads_its_section_not_a_group() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>DECIDES:</p>
+<p>I. Harbour offices shall open at dawn.</p>
+<p>II. Harbour offices shall close at dusk.</p>
+<p>INVITES</p>
+<p>I. the Secretary-General to report on lanterns each year.</p>
+<p>II. the Harbour Committee to review the reports.</p>
+"""
+    xml, _, root = _convert(body, type="decision")
+    validate_akn(xml)
+    assert not _eids(root, "hcontainer")
+    assert root.xpath("//a:section[@eId='sec_I_dup2']/a:heading/text()", namespaces=NS) == [
+        "INVITES"
+    ]
+    assert "sec_I_dup2" in _marked(root)
+
+
+def test_a_numbered_table_row_ends_no_group() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light every lantern.</p>
+<p>II. RECOMMENDS that Adherents report against the reference points below.</p>
+<p>Reference points</p>
+<p>I. Lanterns lit</p>
+<table><tr><td>II. INVITES keepers to count</td><td>0.4</td></tr></table>
+<p>III. Wicks trimmed</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _eids(root, "section", "hcontainer") == [
+        "sec_I",
+        "sec_II",
+        "hcontainer_1",
+        "hcontainer_1__sec_I",
+        "hcontainer_1__sec_II",
+        "hcontainer_1__sec_III",
+    ]
+
+
+def test_an_unnumbered_verb_in_a_group_follows_the_groups_last_number() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents follow the procedures below.</p>
+<p>II. RECOMMENDS that Adherents review them each year.</p>
+<p>Procedures</p>
+<p>II. AGREES that harbour offices answer enquiries.</p>
+<p>INVITES the Secretary-General to disseminate these procedures.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _numbers(root, "section") == {
+        "sec_I": "I.",
+        "sec_II": "II.",
+        "hcontainer_1__sec_II": "II.",
+        "hcontainer_1__sec_III": "III.",
+    }
+
+
+def test_bullets_before_a_headed_first_number_open_no_group() -> None:
+    """A bullet's ordinal is no printed number of the list that follows."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>- light every lantern;</p>
+<p>- trim every wick.</p>
+<p>Registers</p>
+<p>1. Keep a register of keepers.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert not _eids(root, "hcontainer")
+    assert "sec_I__para_1" in _eids(root, "paragraph")
+
+
+def test_headed_prose_after_a_numbered_list_opens_no_group() -> None:
+    """The prose is the section's first unnumbered paragraph: its ordinal is the
+    list's `1.`, but it prints no number and starts nothing over."""
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>1. Light every lantern.</p>
+<p>2. Trim every wick.</p>
+<p>Registers</p>
+<p>Each harbour keeps a register of its keepers and of the lanterns that each of them
+tends, and publishes it.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert not _eids(root, "hcontainer")
+    assert _numbers(root, "paragraph") == {
+        "sec_I__para_1": "1.",
+        "sec_I__para_2": "2.",
+        "sec_I__para_1_dup2": None,
+    }
+
+
+def test_items_after_a_repeated_number_nest_as_after_its_first_printing() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>i. record every keeper;</p>
+<p>ii. train each keeper;</p>
+<p>ii. pay each keeper, including:</p>
+<p>a. night watch pay;</p>
+<p>b. weather pay;</p>
+<p>iii. publish the register.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _eids(root, "paragraph", "point") == [
+        "sec_I__para_i",
+        "sec_I__para_ii",
+        "sec_I__para_ii_dup2",
+        "sec_I__para_ii_dup2__point_a",
+        "sec_I__para_ii_dup2__point_b",
+        "sec_I__para_iii",
+    ]
