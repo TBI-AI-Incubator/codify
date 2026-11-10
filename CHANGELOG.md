@@ -280,6 +280,13 @@ New, additive:
 
 Fixed:
 
+- `LiteLLMClient.chat` and `chat_json` drop the `<think>…</think>` block that a
+  reasoning model served without a reasoning parser prints before its answer.
+  A translated title no longer carries the model's reasoning, and a JSON answer
+  after it parses. Only a closed block at the start of the reply is dropped; an
+  unclosed one is left whole, and a reply of reasoning alone is still invalid
+  JSON. An invalid JSON error shows the answer after the block, or the whole
+  reply when there is none.
 - `DiarioAcquirer` rereads a screen action's `apiVersion` and the module version
   from the site's module manifest and screen script when a call answers that the
   API version changed, then retries once. It raises `SiteChanged` only when the
