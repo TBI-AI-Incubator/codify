@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from codify.akn import Document
 from codify.akn._parser import carried_ids
 from codify.akn._schema import parse_xml
+from codify.akn.eids import ensure_unique_eids
 from codify.akn.io import parse_akn
 from codify.akn.vocabulary import RECITAL
+from codify.pipeline.formats.akn_native import mint_missing_eids
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.quality.sentinels import LAW_REASONS
 from codify.search import TOKENISER_VERSION, tokenise_to_text
@@ -501,6 +503,11 @@ _DerivedRows = tuple[
 ]
 
 
+def _with_unique_eids(akn_xml: str) -> str:
+    """The AKN as ingest now stores it. Older ingests gave the rows ids the XML lacks."""
+    return ensure_unique_eids(mint_missing_eids(akn_xml)[0])[0]
+
+
 def _derive_rows(
     akn_xml: str, law_id: uuid.UUID, version_id: uuid.UUID, language: str
 ) -> _DerivedRows:
@@ -574,6 +581,7 @@ async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, ak
     ).scalar_one_or_none()
     if version is None:
         return
+    akn_xml = await on_the_cpu_pool(_with_unique_eids, akn_xml)
     derived: _DerivedRows = await on_the_cpu_pool(
         _derive_rows, akn_xml, version.law_id, version_id, version.language
     )
