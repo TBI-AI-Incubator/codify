@@ -17,7 +17,7 @@ import structlog
 from lxml import etree
 
 from codify.akn._parser import carried_ids
-from codify.akn._schema import AKN_NS, parse_xml
+from codify.akn._schema import AKN_NS, main_body, parse_xml
 from codify.akn.document import Document
 from codify.akn.eids import ensure_unique_eids
 from codify.akn.io import parse_akn
@@ -147,7 +147,7 @@ def mint_missing_eids(xml: str) -> tuple[str, int]:
                 child.set("eId", eid)
             visit(child, None if scope is None else eid)
 
-    body = doc_root.find(f"{{{AKN_NS}}}body")
+    body = main_body(root)
     if body is not None:
         visit(body, None)
     container = doc_root.find(f"{{{AKN_NS}}}attachments")
