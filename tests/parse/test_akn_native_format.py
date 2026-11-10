@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lxml import etree
 
+from codify.akn._schema import AKN_NS
 from codify.akn.document import Document
 from codify.akn.elements import BodyElement
 from codify.akn.io import parse_akn
@@ -563,3 +564,15 @@ def test_mint_missing_eids_matches_the_parser_walk() -> None:
     assert _all_ids(parse_akn(out)) == _all_ids(normalise_native_akn(parse_akn(out))[0])
     again, none = mint_missing_eids(out)
     assert (again, none) == (out, 0)
+
+
+def test_mint_missing_eids_reaches_a_doc_main_body() -> None:
+    from codify.pipeline.formats.akn_native import mint_missing_eids
+
+    xml = (
+        f'<akomaNtoso xmlns="{AKN_NS}"><doc name="guidance"><meta/>'
+        "<mainBody><paragraph><content><p>t</p></content></paragraph></mainBody></doc></akomaNtoso>"
+    )
+    out, minted = mint_missing_eids(xml)
+    assert minted == 1
+    assert 'eId="codify-synth-1"' in out
