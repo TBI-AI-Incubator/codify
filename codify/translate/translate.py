@@ -158,7 +158,53 @@ def _akn_text_content(akn_xml: str) -> str:
 
 
 _INLINE = frozenset(
-    {"term", "def", "b", "i", "u", "sub", "sup", "span", "a", "ref", "abbr", "inline", "docTitle"}
+    {
+        "term",
+        "def",
+        "b",
+        "i",
+        "u",
+        "sub",
+        "sup",
+        "span",
+        "a",
+        "ref",
+        "mref",
+        "rref",
+        "abbr",
+        "inline",
+        "docTitle",
+        "ins",
+        "date",
+        "time",
+        "noteRef",
+        "docNumber",
+        "shortTitle",
+        "concept",
+        "person",
+        "organization",
+        "quantity",
+        "role",
+        "entity",
+        "object",
+        "event",
+        "location",
+        "courtType",
+        "docType",
+        "docDate",
+        "docStatus",
+        "docPurpose",
+        "docCommittee",
+        "docProponent",
+        "docIntroducer",
+        "docStage",
+        "docJurisdiction",
+        "docketNumber",
+        "mod",
+        "quotedText",
+        "embeddedText",
+        "affectedDocument",
+    }
 )
 
 
@@ -168,7 +214,11 @@ def _flow(el: etree._Element, out: list[str]) -> None:
         if not isinstance(child.tag, str):
             out.append(child.tail or "")
             continue
-        block = etree.QName(child).localname not in _INLINE
+        name = etree.QName(child).localname
+        if name == "meta":
+            out.append(child.tail or "")
+            continue
+        block = name not in _INLINE
         out.append(" " if block else "")
         _flow(child, out)
         out.append(" " if block else "")
