@@ -142,3 +142,19 @@ def test_inline_markup_does_not_split_terms() -> None:
 def test_block_boundaries_still_separate_words() -> None:
     prose = source_prose(_akn("<body><p>fact</p><p>ory</p></body>"))
     assert _sources(prose, "factory") == []
+
+
+def test_tracked_insertions_and_dates_do_not_split_terms() -> None:
+    xml = _akn("<body><p><ins>Re</ins>gistrar files on <date>2024</date>/12.</p></body>")
+    assert _sources(source_prose(xml), "registrar", "2024/12") == ["registrar", "2024/12"]
+
+
+def test_deleted_text_and_annex_meta_are_not_prose() -> None:
+    xml = _akn(
+        "<body><p>kept <del>struck</del> text</p></body>"
+        "<attachments><attachment><doc><meta><x>annexmeta</x></meta>"
+        "<mainBody><p>x</p></mainBody></doc></attachment></attachments>"
+    )
+    prose = source_prose(xml)
+    assert _sources(prose, "struck", "annexmeta") == []
+    assert _sources(prose, "kept") == ["kept"]
