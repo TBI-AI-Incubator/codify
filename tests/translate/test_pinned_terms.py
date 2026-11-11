@@ -157,3 +157,8 @@ def test_deleted_text_is_searched_and_annex_meta_is_not() -> None:
     )
     prose = source_prose(xml)
     assert _sources(prose, "struck", "annexmeta") == ["struck"]
+
+
+def test_struck_text_is_its_own_run_beside_an_insertion() -> None:
+    xml = _akn("<body><p>the <del>clerk</del><ins>Registrar</ins> files</p></body>")
+    assert _sources(source_prose(xml), "registrar", "clerk") == ["registrar", "clerk"]

@@ -175,7 +175,6 @@ _INLINE = frozenset(
         "inline",
         "docTitle",
         "ins",
-        "del",
         "date",
         "time",
         "noteRef",
