@@ -706,10 +706,13 @@ async def translate_document(
     # Attach the notes_status to the dict handed to the caller so the run
     # stream carries the degradation on the same event that already ships
     # the terminology sheet; no separate protocol slot needed.
-    if pinned_terms:
-        # A linear scan per term: off the event loop for a large list.
-        chosen = await asyncio.to_thread(select_pinned_terms, source_bluebell, pinned_terms)
-        notes = apply_pinned_terms(notes, chosen)
+    # A linear scan per term: off the event loop for a large list.
+    chosen = (
+        await asyncio.to_thread(select_pinned_terms, source_bluebell, pinned_terms)
+        if pinned_terms
+        else []
+    )
+    notes = apply_pinned_terms(notes, chosen)
     notes["notes_status"] = notes_status
     if on_notes is not None:
         on_notes(notes)

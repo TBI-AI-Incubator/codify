@@ -71,3 +71,12 @@ async def test_translate_document_reports_pinned_origin() -> None:
 
 def test_combining_marks_are_part_of_a_word() -> None:
     assert _sources("क़ानून कि", "क") == []
+
+
+@pytest.mark.asyncio
+async def test_model_origin_is_recorded_without_a_glossary() -> None:
+    seen: list[dict[str, Any]] = []
+    await translate_document(
+        _source_akn_xml(), target_language="French", llm=_StubLLM(), on_notes=seen.append
+    )
+    assert [t["origin"] for t in seen[0]["defined_terms"]] == ["model"]
