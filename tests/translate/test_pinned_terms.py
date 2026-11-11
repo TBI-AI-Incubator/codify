@@ -67,3 +67,7 @@ async def test_translate_document_reports_pinned_origin() -> None:
     )
     terms = seen[0]["defined_terms"]
     assert [(t["target"], t["origin"]) for t in terms] == [("personne", "pinned")]
+
+
+def test_combining_marks_are_part_of_a_word() -> None:
+    assert _sources("क़ानून कि", "क") == []

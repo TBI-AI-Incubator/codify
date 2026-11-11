@@ -6,6 +6,7 @@ eId, and `translate/write.py` does the write, so counts match by construction.
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -675,9 +676,7 @@ async def translate_document(
         llm=llm,
         on_partial=on_notes_partial,
     )
-    notes = apply_pinned_terms(
-        notes_outcome.notes, select_pinned_terms(source_bluebell, pinned_terms or [])
-    )
+    notes = notes_outcome.notes
     notes_status = notes_outcome.status
     if notes_status != "complete":
         flags.append(
@@ -707,6 +706,10 @@ async def translate_document(
     # Attach the notes_status to the dict handed to the caller so the run
     # stream carries the degradation on the same event that already ships
     # the terminology sheet; no separate protocol slot needed.
+    if pinned_terms:
+        # A linear scan per term: off the event loop for a large list.
+        chosen = await asyncio.to_thread(select_pinned_terms, source_bluebell, pinned_terms)
+        notes = apply_pinned_terms(notes, chosen)
     notes["notes_status"] = notes_status
     if on_notes is not None:
         on_notes(notes)

@@ -247,6 +247,10 @@ def _norm(text: str) -> str:
     return " ".join("".join(kept).split())
 
 
+def _wordy(ch: str) -> bool:
+    return ch.isalnum() or unicodedata.category(ch).startswith("M")
+
+
 def _unspaced(ch: str) -> bool:
     return ch.isalpha() and unicodedata.name(ch, "").startswith(_UNSPACED)
 
@@ -259,8 +263,8 @@ def _occurs(term: str, text: str) -> bool:
         end = start + len(term)
         before = text[start - 1] if start else " "
         after = text[end] if end < len(text) else " "
-        ok_left = not before.isalnum() or _unspaced(term[0]) or not term[0].isalnum()
-        ok_right = not after.isalnum() or _unspaced(term[-1]) or not term[-1].isalnum()
+        ok_left = not _wordy(before) or _unspaced(term[0]) or not _wordy(term[0])
+        ok_right = not _wordy(after) or _unspaced(term[-1]) or not _wordy(term[-1])
         if ok_left and ok_right:
             return True
         start = text.find(term, start + 1)
