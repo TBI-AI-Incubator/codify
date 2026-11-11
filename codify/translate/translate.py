@@ -157,6 +157,47 @@ def _akn_text_content(akn_xml: str) -> str:
     return " ".join(parts)
 
 
+_INLINE = frozenset(
+    {"term", "def", "b", "i", "u", "sub", "sup", "span", "a", "ref", "abbr", "inline", "docTitle"}
+)
+
+
+def _flow(el: etree._Element, out: list[str]) -> None:
+    out.append(el.text or "")
+    for child in el:
+        if not isinstance(child.tag, str):
+            out.append(child.tail or "")
+            continue
+        block = etree.QName(child).localname not in _INLINE
+        out.append(" " if block else "")
+        _flow(child, out)
+        out.append(" " if block else "")
+        out.append(child.tail or "")
+
+
+def source_prose(akn_xml: str) -> str:
+    """All text outside `<meta>`, split at block boundaries only, so a term broken by
+    inline markup stays whole."""
+    try:
+        root = etree.fromstring(akn_xml.encode("utf-8"))
+    except etree.XMLSyntaxError:
+        return ""
+    containers = {"preface", "preamble", "mainBody", "body", "conclusions", "attachments"}
+    out: list[str] = []
+    for el in root.iter():
+        if not isinstance(el.tag, str) or etree.QName(el).localname not in containers:
+            continue
+        # A container inside another is already read with its parent.
+        if any(
+            isinstance(a.tag, str) and etree.QName(a).localname in containers
+            for a in el.iterancestors()
+        ):
+            continue
+        _flow(el, out)
+        out.append(" ")
+    return "".join(out)
+
+
 async def translate_title(title: str, *, target_language: str, llm: LLMClient) -> str:
     title = (title or "").strip()
     if not title:
@@ -708,9 +749,7 @@ async def translate_document(
     # the terminology sheet; no separate protocol slot needed.
     # A linear scan per term: off the event loop for a large list.
     chosen = (
-        await asyncio.to_thread(
-            select_pinned_terms, _akn_text_content(source_akn_xml), pinned_terms
-        )
+        await asyncio.to_thread(select_pinned_terms, source_prose(source_akn_xml), pinned_terms)
         if pinned_terms
         else []
     )

@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from codify.translate.notes import PinnedTerm, apply_pinned_terms, select_pinned_terms
-from codify.translate.translate import translate_document
+from codify.translate.translate import source_prose, translate_document
 from tests.translate.test_translate import _source_akn_xml, _StubLLM
 
 
@@ -101,3 +101,44 @@ async def test_selection_ignores_markup_keywords() -> None:
         pinned_terms=[_pin("ARTICLE", "x"), _pin("person", "personne")],
     )
     assert [t["source"] for t in seen[0]["defined_terms"] if t["origin"] == "pinned"] == ["person"]
+
+
+def test_numeric_and_symbol_terms_do_not_crash() -> None:
+    assert _sources("fee of 12 € at 5% on 2024/12 §", "12", "€", "%", "2024/12", "§") == [
+        "12",
+        "€",
+        "%",
+        "2024/12",
+        "§",
+    ]
+
+
+_NS = 'xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"'
+
+
+def _akn(inner: str) -> str:
+    return f"<akomaNtoso {_NS}><act><meta><x>secret</x></meta>{inner}</act></akomaNtoso>"
+
+
+def test_prose_reaches_annexes_and_ignores_meta() -> None:
+    xml = _akn(
+        "<body><p>body</p></body>"
+        "<attachments><attachment><doc><mainBody><p>annexterm here</p></mainBody></doc>"
+        "</attachment></attachments>"
+    )
+    prose = source_prose(xml)
+    assert _sources(prose, "annexterm") == ["annexterm"]
+    assert _sources(prose, "secret") == []
+
+
+def test_inline_markup_does_not_split_terms() -> None:
+    xml = _akn(
+        "<body><p>事業者は<term>許可</term>申請を出す。 A <b>Li</b>cence is held.</p></body>"
+    )
+    prose = source_prose(xml)
+    assert _sources(prose, "許可申請", "licence") == ["許可申請", "licence"]
+
+
+def test_block_boundaries_still_separate_words() -> None:
+    prose = source_prose(_akn("<body><p>fact</p><p>ory</p></body>"))
+    assert _sources(prose, "factory") == []

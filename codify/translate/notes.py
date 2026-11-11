@@ -254,7 +254,7 @@ def _wordy(ch: str) -> bool:
 def _unspaced(term: str) -> bool:
     """Whether the term's first base letter is in a script written without word spaces."""
     base = next((c for c in term if c.isalpha()), "")
-    return unicodedata.name(base, "").startswith(_UNSPACED)
+    return bool(base) and unicodedata.name(base, "").startswith(_UNSPACED)
 
 
 def _occurs(term: str, text: str) -> bool:
