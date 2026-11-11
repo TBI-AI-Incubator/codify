@@ -6,8 +6,9 @@ eId, and `translate/write.py` does the write, so counts match by construction.
 
 from __future__ import annotations
 
+import asyncio
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,7 +30,13 @@ from codify.translate.audit import (
     front_matter_source_retained,
     text_is_alien_dominated,
 )
-from codify.translate.notes import build_translation_notes, notes_to_prompt
+from codify.translate.notes import (
+    PinnedTerm,
+    apply_pinned_terms,
+    build_translation_notes,
+    notes_to_prompt,
+    select_pinned_terms,
+)
 from codify.translate.notes_audit import run_checks as run_notes_checks
 from codify.translate.repair import MAX_REPAIR_ITERATIONS, repair_provision
 from codify.translate.translate_bodies import (
@@ -148,6 +155,47 @@ def _akn_text_content(akn_xml: str) -> str:
         if name in {"preface", "preamble", "body", "conclusions"}:
             parts.append(" ".join(s.strip() for s in el.itertext() if s.strip()))
     return " ".join(parts)
+
+
+_INLINE = frozenset(
+    {"term", "def", "b", "i", "u", "sub", "sup", "span", "a", "ref", "abbr", "inline", "docTitle"}
+)
+
+
+def _flow(el: etree._Element, out: list[str]) -> None:
+    out.append(el.text or "")
+    for child in el:
+        if not isinstance(child.tag, str):
+            out.append(child.tail or "")
+            continue
+        block = etree.QName(child).localname not in _INLINE
+        out.append(" " if block else "")
+        _flow(child, out)
+        out.append(" " if block else "")
+        out.append(child.tail or "")
+
+
+def source_prose(akn_xml: str) -> str:
+    """All text outside `<meta>`, split at block boundaries only, so a term broken by
+    inline markup stays whole."""
+    try:
+        root = etree.fromstring(akn_xml.encode("utf-8"))
+    except etree.XMLSyntaxError:
+        return ""
+    containers = {"preface", "preamble", "mainBody", "body", "conclusions", "attachments"}
+    out: list[str] = []
+    for el in root.iter():
+        if not isinstance(el.tag, str) or etree.QName(el).localname not in containers:
+            continue
+        # A container inside another is already read with its parent.
+        if any(
+            isinstance(a.tag, str) and etree.QName(a).localname in containers
+            for a in el.iterancestors()
+        ):
+            continue
+        _flow(el, out)
+        out.append(" ")
+    return "".join(out)
 
 
 async def translate_title(title: str, *, target_language: str, llm: LLMClient) -> str:
@@ -612,6 +660,7 @@ async def translate_document(
     judge_llm: LLMClient | None = None,
     judge_model: str | None = None,
     expression_date: str | None = None,
+    pinned_terms: Sequence[PinnedTerm] | None = None,
 ) -> TranslationResult:
     # Strip gazette running-headers from the source tree where the
     # jurisdiction ships patterns, so the LLM never sees the bleed. The
@@ -698,6 +747,13 @@ async def translate_document(
     # Attach the notes_status to the dict handed to the caller so the run
     # stream carries the degradation on the same event that already ships
     # the terminology sheet; no separate protocol slot needed.
+    # A linear scan per term: off the event loop for a large list.
+    chosen = (
+        await asyncio.to_thread(select_pinned_terms, source_prose(source_akn_xml), pinned_terms)
+        if pinned_terms
+        else []
+    )
+    notes = apply_pinned_terms(notes, chosen)
     notes["notes_status"] = notes_status
     if on_notes is not None:
         on_notes(notes)
