@@ -708,7 +708,9 @@ async def translate_document(
     # the terminology sheet; no separate protocol slot needed.
     # A linear scan per term: off the event loop for a large list.
     chosen = (
-        await asyncio.to_thread(select_pinned_terms, source_bluebell, pinned_terms)
+        await asyncio.to_thread(
+            select_pinned_terms, _akn_text_content(source_akn_xml), pinned_terms
+        )
         if pinned_terms
         else []
     )

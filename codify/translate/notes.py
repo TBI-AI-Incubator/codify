@@ -242,7 +242,7 @@ _UNSPACED = ("THAI", "LAO", "KHMER", "MYANMAR", "CJK", "HIRAGANA", "KATAKANA", "
 
 def _norm(text: str) -> str:
     """NFKC, case-folded, Arabic diacritics and tatweel removed, whitespace collapsed."""
-    folded = unicodedata.normalize("NFKC", text).casefold()
+    folded = unicodedata.normalize("NFKC", text).casefold().replace("i\u0307", "i")
     kept = (c for c in folded if not (0x64B <= ord(c) <= 0x65F or ord(c) in (0x670, 0x640)))
     return " ".join("".join(kept).split())
 
@@ -251,20 +251,23 @@ def _wordy(ch: str) -> bool:
     return ch.isalnum() or unicodedata.category(ch).startswith("M")
 
 
-def _unspaced(ch: str) -> bool:
-    return ch.isalpha() and unicodedata.name(ch, "").startswith(_UNSPACED)
+def _unspaced(term: str) -> bool:
+    """Whether the term's first base letter is in a script written without word spaces."""
+    base = next((c for c in term if c.isalpha()), "")
+    return unicodedata.name(base, "").startswith(_UNSPACED)
 
 
 def _occurs(term: str, text: str) -> bool:
     """Whether `term` occurs in `text` (both normalised). Spaced scripts need a word
     boundary at each end; unspaced scripts match as plain substrings."""
+    unspaced = _unspaced(term)
     start = text.find(term)
     while start != -1:
         end = start + len(term)
         before = text[start - 1] if start else " "
         after = text[end] if end < len(text) else " "
-        ok_left = not _wordy(before) or _unspaced(term[0]) or not _wordy(term[0])
-        ok_right = not _wordy(after) or _unspaced(term[-1]) or not _wordy(term[-1])
+        ok_left = unspaced or not _wordy(before) or not _wordy(term[0])
+        ok_right = unspaced or not _wordy(after) or not _wordy(term[-1])
         if ok_left and ok_right:
             return True
         start = text.find(term, start + 1)

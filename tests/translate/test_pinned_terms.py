@@ -22,8 +22,16 @@ def test_latin_needs_word_boundaries_and_ignores_case() -> None:
 
 
 def test_unspaced_script_matches_as_substring() -> None:
-    thai = "ผู้ประกอบการต้องยื่นคำขอใบอนุญาต"
-    assert _sources(thai, "ใบอนุญาต", "คำขอ", "ศาล") == ["ใบอนุญาต", "คำขอ"]
+    text = "事業者は許可申請を提出しなければならない。各人々は届出る。"
+    assert _sources(text, "許可申請", "人々", "裁判所") == ["許可申請", "人々"]
+
+
+def test_unspaced_term_ending_in_a_mark_matches_mid_sentence() -> None:
+    assert _sources("ဤဥပဒေကို", "ဥပဒေ") == ["ဥပဒေ"]
+
+
+def test_turkish_dotted_capital_i_folds_to_plain_i() -> None:
+    assert _sources("İzin belgesi", "izin") == ["izin"]
 
 
 def test_arabic_script_ignores_diacritics_and_respects_boundaries() -> None:
@@ -80,3 +88,16 @@ async def test_model_origin_is_recorded_without_a_glossary() -> None:
         _source_akn_xml(), target_language="French", llm=_StubLLM(), on_notes=seen.append
     )
     assert [t["origin"] for t in seen[0]["defined_terms"]] == ["model"]
+
+
+@pytest.mark.asyncio
+async def test_selection_ignores_markup_keywords() -> None:
+    seen: list[dict[str, Any]] = []
+    await translate_document(
+        _source_akn_xml(),
+        target_language="French",
+        llm=_StubLLM(),
+        on_notes=seen.append,
+        pinned_terms=[_pin("ARTICLE", "x"), _pin("person", "personne")],
+    )
+    assert [t["source"] for t in seen[0]["defined_terms"] if t["origin"] == "pinned"] == ["person"]
