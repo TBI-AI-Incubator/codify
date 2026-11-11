@@ -7,7 +7,7 @@ eId, and `translate/write.py` does the write, so counts match by construction.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,7 +29,13 @@ from codify.translate.audit import (
     front_matter_source_retained,
     text_is_alien_dominated,
 )
-from codify.translate.notes import build_translation_notes, notes_to_prompt
+from codify.translate.notes import (
+    PinnedTerm,
+    apply_pinned_terms,
+    build_translation_notes,
+    notes_to_prompt,
+    select_pinned_terms,
+)
 from codify.translate.notes_audit import run_checks as run_notes_checks
 from codify.translate.repair import MAX_REPAIR_ITERATIONS, repair_provision
 from codify.translate.translate_bodies import (
@@ -612,6 +618,7 @@ async def translate_document(
     judge_llm: LLMClient | None = None,
     judge_model: str | None = None,
     expression_date: str | None = None,
+    pinned_terms: Sequence[PinnedTerm] | None = None,
 ) -> TranslationResult:
     # Strip gazette running-headers from the source tree where the
     # jurisdiction ships patterns, so the LLM never sees the bleed. The
@@ -668,7 +675,9 @@ async def translate_document(
         llm=llm,
         on_partial=on_notes_partial,
     )
-    notes = notes_outcome.notes
+    notes = apply_pinned_terms(
+        notes_outcome.notes, select_pinned_terms(source_bluebell, pinned_terms or [])
+    )
     notes_status = notes_outcome.status
     if notes_status != "complete":
         flags.append(

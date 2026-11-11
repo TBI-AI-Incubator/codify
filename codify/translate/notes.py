@@ -6,7 +6,8 @@ response cannot coerce to an empty term list; every call returns a `NotesOutcome
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import unicodedata
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -225,6 +226,89 @@ def _merge_notes(partials: list[dict[str, Any]], *, target_language: str) -> dic
     return merged
 
 
+@dataclass(frozen=True)
+class PinnedTerm:
+    """A partner-supplied rendering that overrides the model for one source term."""
+
+    source: str
+    target: str
+    note: str = ""
+    origin: str = ""
+
+
+# Scripts written without spaces between words: matched as substrings.
+_UNSPACED = ("THAI", "LAO", "KHMER", "MYANMAR", "CJK", "HIRAGANA", "KATAKANA", "TIBETAN")
+
+
+def _norm(text: str) -> str:
+    """NFKC, case-folded, Arabic diacritics and tatweel removed, whitespace collapsed."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    kept = (c for c in folded if not (0x64B <= ord(c) <= 0x65F or ord(c) in (0x670, 0x640)))
+    return " ".join("".join(kept).split())
+
+
+def _unspaced(ch: str) -> bool:
+    return ch.isalpha() and unicodedata.name(ch, "").startswith(_UNSPACED)
+
+
+def _occurs(term: str, text: str) -> bool:
+    """Whether `term` occurs in `text` (both normalised). Spaced scripts need a word
+    boundary at each end; unspaced scripts match as plain substrings."""
+    start = text.find(term)
+    while start != -1:
+        end = start + len(term)
+        before = text[start - 1] if start else " "
+        after = text[end] if end < len(text) else " "
+        ok_left = not before.isalnum() or _unspaced(term[0]) or not term[0].isalnum()
+        ok_right = not after.isalnum() or _unspaced(term[-1]) or not term[-1].isalnum()
+        if ok_left and ok_right:
+            return True
+        start = text.find(term, start + 1)
+    return False
+
+
+def select_pinned_terms(source_text: str, terms: Sequence[PinnedTerm]) -> list[PinnedTerm]:
+    """Keep the terms whose source occurs in the act, dropping blank entries."""
+    text = _norm(source_text)
+    out: list[PinnedTerm] = []
+    for t in terms:
+        key = _norm(t.source)
+        if key and t.target.strip() and _occurs(key, text):
+            out.append(t)
+    return out
+
+
+def apply_pinned_terms(notes: dict[str, Any], pinned: Sequence[PinnedTerm]) -> dict[str, Any]:
+    """Tag every model entry `origin: model`, drop model entries whose source a pinned term
+    also names, and put the pinned terms first in `defined_terms` tagged with their label."""
+    keys = {_norm(t.source) for t in pinned}
+    out = dict(notes)
+    for key in _TERM_KEYS:
+        out[key] = [
+            {**e, "origin": "model"}
+            for e in notes.get(key) or []
+            if _norm(e.get("source") or "") not in keys
+        ]
+    seen: set[str] = set()
+    entries: list[dict[str, Any]] = []
+    for t in pinned:
+        k = _norm(t.source)
+        if k in seen:
+            continue
+        seen.add(k)
+        entries.append(
+            {
+                "source": t.source,
+                "target": t.target,
+                "note": t.note,
+                "origin": "pinned",
+                "origin_label": t.origin,
+            }
+        )
+    out["defined_terms"] = entries + out["defined_terms"]
+    return out
+
+
 def notes_to_prompt(notes: dict[str, Any]) -> str:
     """Render the notes as the context block prepended to each section call."""
     lines = [f"TRANSLATION NOTES (binding). Target language: {notes['target_language']}", ""]
@@ -257,7 +341,10 @@ __all__ = [
     "NOTES_MAX_CHARS",
     "NotesOutcome",
     "NotesStatus",
+    "PinnedTerm",
     "TranslationNotesSchema",
+    "apply_pinned_terms",
     "build_translation_notes",
     "notes_to_prompt",
+    "select_pinned_terms",
 ]
