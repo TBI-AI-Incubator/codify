@@ -149,12 +149,11 @@ def test_tracked_insertions_and_dates_do_not_split_terms() -> None:
     assert _sources(source_prose(xml), "registrar", "2024/12") == ["registrar", "2024/12"]
 
 
-def test_deleted_text_and_annex_meta_are_not_prose() -> None:
+def test_deleted_text_is_searched_and_annex_meta_is_not() -> None:
     xml = _akn(
         "<body><p>kept <del>struck</del> text</p></body>"
         "<attachments><attachment><doc><meta><x>annexmeta</x></meta>"
         "<mainBody><p>x</p></mainBody></doc></attachment></attachments>"
     )
     prose = source_prose(xml)
-    assert _sources(prose, "struck", "annexmeta") == []
-    assert _sources(prose, "kept") == ["kept"]
+    assert _sources(prose, "struck", "annexmeta") == ["struck"]

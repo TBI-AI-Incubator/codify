@@ -175,6 +175,7 @@ _INLINE = frozenset(
         "inline",
         "docTitle",
         "ins",
+        "del",
         "date",
         "time",
         "noteRef",
@@ -215,7 +216,7 @@ def _flow(el: etree._Element, out: list[str]) -> None:
             out.append(child.tail or "")
             continue
         name = etree.QName(child).localname
-        if name in {"del", "meta"}:
+        if name == "meta":
             out.append(child.tail or "")
             continue
         block = name not in _INLINE
@@ -226,8 +227,8 @@ def _flow(el: etree._Element, out: list[str]) -> None:
 
 
 def source_prose(akn_xml: str) -> str:
-    """All text outside `<meta>` and deleted text, split at block boundaries only, so a
-    term broken by inline markup stays whole."""
+    """All text outside `<meta>`, split at block boundaries only, so a term broken by
+    inline markup stays whole."""
     try:
         root = etree.fromstring(akn_xml.encode("utf-8"))
     except etree.XMLSyntaxError:
