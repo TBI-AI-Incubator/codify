@@ -159,7 +159,7 @@ def _viide_targets(raw_uri: str) -> list[str]:
         t = _VIIDE_TARGET.fullmatch(part)
         if t:
             urls.append(f"{_AKT_URL}{t.group(1)}" + (f"#{t.group(2)}" if t.group(2) else ""))
-    return urls
+    return urls or [raw_uri]
 
 
 _SCHEMA_NAMESPACE = re.compile(r"Juurakt|[a-z]+_\d+_\d{2}\.\d{2}\.\d{4}")
@@ -369,8 +369,9 @@ def _write_native(node: etree._Element, w: _Blocks) -> None:
         tag = _local(child)
         if tag == "viide":
             v_text = child.findtext("{*}kuvatavTekst") or "".join(child.itertext())
-            v_uri = child.findtext(".//{*}viideURI")
-            targets = _viide_targets(v_uri) if v_uri else []
+            targets = [
+                t for u in child.findall(".//{*}viideURI") for t in _viide_targets(u.text or "")
+            ]
             if targets:
                 w.leaf("ref", v_text, href=targets[0])
                 for extra in targets[1:]:

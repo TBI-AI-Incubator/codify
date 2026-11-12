@@ -254,3 +254,45 @@ def test_formula_line_with_two_references_keeps_text_and_both() -> None:
     assert row.text == "Alusel esimese seaduse ja teise seaduse määrus."
     refs = document_to_rows(parse_akn(akn), uuid.uuid4())[3]
     assert sorted(r.target_uri for r in refs) == [f"{_URL}105#pr16", f"{_URL}106"]
+
+
+def test_note_on_a_unit_without_an_id_is_not_the_enclosing_unit() -> None:
+    bare = _loige(1, "A.", _note("750865")).replace(' id="para1lg1"', "")
+    akn, meta = riigi_teataja_to_akn(_act(bare + _loige(2, "B.")))
+    assert _mods(akn) == []
+    assert meta["amendment_notes"] == {"skipped_no_unit": 1}
+
+
+def test_note_on_a_collapsed_single_paragraph_belongs_to_its_article() -> None:
+    only = (
+        '<loige id="para1lg1"><sisuTekst><tavatekst>A.</tavatekst></sisuTekst>'
+        f"{_note('750865')}</loige>"
+    )
+    akn, _ = riigi_teataja_to_akn(_act(only))
+    assert _mods(akn)[0].find(f"{N}destination").get("href").endswith("#art_1")
+
+
+def test_external_link_with_an_id_parameter_keeps_its_uri() -> None:
+    assert _viide_targets("https://example.test/doc?id=law-7") == [
+        "https://example.test/doc?id=law-7"
+    ]
+
+
+def test_every_uri_of_a_link_is_a_target() -> None:
+    link = (
+        "<viide><kuvatavTekst>seadus</kuvatavTekst><viideURID>"
+        "<viideURI>./dyn=1&amp;id=105</viideURI><viideURI>./dyn=1&amp;id=106</viideURI>"
+        "</viideURID></viide>"
+    )
+    body = f'<loige id="para1lg1"><loigeNr>1</loigeNr><sisuTekst>{link}</sisuTekst></loige>'
+    akn, _ = riigi_teataja_to_akn(_act(body + _loige(2, "B.")))
+    hrefs = [r.get("href") for r in etree.fromstring(akn.encode()).iter(f"{N}ref")]
+    assert hrefs == [f"{_URL}105", f"{_URL}106"]
+
+
+def test_plain_entry_into_force_label_keeps_the_date() -> None:
+    akn, meta = riigi_teataja_to_akn(
+        _act(_loige(1, "A.", _note("750865", tail="- jõust.")) + _loige(2, "B."))
+    )
+    assert meta["amendment_notes"]["dated"] == 1
+    assert parse_akn(akn).textual_mods[0].in_force_date == date(2004, 6, 1)

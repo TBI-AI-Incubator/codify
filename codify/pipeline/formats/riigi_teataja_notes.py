@@ -29,6 +29,7 @@ _REPEAL = re.compile(
 )
 # Words that mark an entry into force other than the plain date in <joustumine>.
 _QUALIFIED = re.compile(r"osaliselt|muudetud|jõust", re.I)
+_PLAIN_LABEL = re.compile(r"[\s\-–.,;]*jõust(?:ub|us)?[\s.,;]*", re.I)
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -60,9 +61,22 @@ _AMBIGUOUS = "\0"
 
 def _unit_eid(mark: etree._Element, by_source_id: dict[str, str]) -> str | None:
     for ancestor in mark.iterancestors():
-        if _local(ancestor) in _UNIT_TAGS and (sid := ancestor.get("id")) in by_source_id:
-            return by_source_id[sid]
+        if _local(ancestor) not in _UNIT_TAGS or _collapsed(ancestor):
+            continue
+        return by_source_id.get(ancestor.get("id") or "")
     return None
+
+
+def _collapsed(unit: etree._Element) -> bool:
+    """A lone unnumbered loige, which the converter folds into its paragrahv."""
+    parent = unit.getparent()
+    return (
+        _local(unit) == "loige"
+        and parent is not None
+        and len(parent.findall("{*}loige")) == 1
+        and not (unit.findtext("{*}loigeNr") or "").strip()
+        and not unit.findall("{*}alampunkt")
+    )
 
 
 def annotate(
@@ -91,7 +105,9 @@ def annotate(
         whole_act = eid is None and parent is not None and _local(parent) == "oigusakt"
         texts = [" ".join((t.text or "").split()) for t in mark.findall("{*}tavatekst")]
         when = (mark.findtext("{*}joustumine") or "").strip()[:10]
-        dated = bool(_ISO_DATE.fullmatch(when)) and not any(_QUALIFIED.search(t) for t in texts)
+        dated = bool(_ISO_DATE.fullmatch(when)) and not any(
+            _QUALIFIED.search(t) and not _PLAIN_LABEL.fullmatch(t) for t in texts
+        )
         if not re.fullmatch(r"\d+", akt):
             counts["skipped_no_amending_act"] += 1
         elif eid == _AMBIGUOUS:
