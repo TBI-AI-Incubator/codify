@@ -274,6 +274,12 @@ def _eids(doc: Any) -> list[str]:
     return [str(e) for e in root.xpath("//a:article/@eId | //a:chapter/@eId", namespaces=NS)]
 
 
+async def test_the_official_work_id_is_the_gazettes_own_dated_eli() -> None:
+    doc, _ = await _fetch(Gazette(), _ref("7", 2042))
+    assert doc.official is not None
+    assert (doc.official.publisher, doc.official.work_id) == ("dre", "dec-lei/7/2042/03/02")
+
+
 async def test_the_law_takes_its_sumario_as_title_and_its_citation_as_short_title() -> None:
     doc, _ = await _fetch(Gazette(), _ref("7", 2042))
     xml = doc.primary().content.decode()

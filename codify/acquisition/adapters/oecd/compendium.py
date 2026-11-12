@@ -189,6 +189,7 @@ class OecdCompendiumAcquirer(BaseAcquirer):
         wanted = ref.languages or list(LANGUAGES.values())
         refs = (record.get("bodyText") or {}).get("ref") or []
         bodies: list[Body] = []
+        language_codes: list[str] = []
         for entry in refs:
             lang = str(entry.get("lang") or "")
             uri = entry.get("uri")
@@ -209,6 +210,7 @@ class OecdCompendiumAcquirer(BaseAcquirer):
                     "lang": lang,
                 },
             )
+            language_codes.append(lang)
             bodies.append(
                 Body(
                     content=page,
@@ -219,6 +221,16 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             )
         if not any(b.role == "primary" for b in bodies):
             raise OecdInstrumentMissing(f"{key} has no HTML body text in {wanted[0]}")
+        pairs = list(zip(language_codes, bodies, strict=True))
+
+        def edition(code: str) -> OfficialRef:
+            return OfficialRef(
+                publisher="oecd-compendium",
+                work_id=key,
+                edition_id=code,
+                edition_date=revised or None,
+            )
+
         number = key.rsplit("/", 1)[-1]
         work_uri = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
         return AcquiredDocument(
@@ -232,9 +244,8 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             # `transmittedAt` is when this response was built.
             last_modified=str(ref.extra.get("last_published") or "") or None,
             upstream_metadata=meta,
-            official=OfficialRef(
-                publisher="oecd-compendium", work_id=key, edition_date=revised or None
-            ),
+            official=edition(next(code for code, body in pairs if body.role == "primary")),
+            official_translations=[edition(code) for code, body in pairs if body.role != "primary"],
         )
 
 

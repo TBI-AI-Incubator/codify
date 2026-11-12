@@ -10,7 +10,7 @@ import pytest
 
 import codify.acquisition.adapters  # noqa: F401  registers adapters
 from codify.acquisition import DocumentRef, get_acquirer
-from codify.acquisition.adapters.akn_native import AknNativeAcquirer
+from codify.acquisition.adapters.akn_native import AknNativeAcquirer, _official
 from codify.jurisdictions import SourceAdapter
 
 _AKN = b'<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0"><act/></akomaNtoso>'
@@ -179,6 +179,46 @@ async def test_publisher_path_wins_and_the_document_names_the_work() -> None:
     assert seen == ["https://www.legislation.gov.uk/ukpga/Geo6/14-15/48/data.akn"]
     assert acquired.frbr_work_uri == "/akn/gb/act/ukpga/1951/48"
     assert acquired.expression_uri == "http://www.legislation.gov.uk/ukpga/1951/48/enacted"
+
+
+async def test_the_edition_comes_from_the_expression_when_the_url_names_none() -> None:
+    _, transport = _recording()
+    acquirer = AknNativeAcquirer("gb", _adapter(), client=_client(transport))
+    acquired = await acquirer.fetch(_ref())
+    assert acquired.official is not None
+    assert (acquired.official.edition_id, acquired.official.edition_date) == ("enacted", None)
+
+
+@pytest.mark.parametrize(
+    ("url", "expression", "edition_id", "edition_date"),
+    [
+        (
+            "https://www.legislation.gov.uk/ukpga/2018/12/data.akn",
+            "http://www.legislation.gov.uk/ukpga/2018/12/2026-04-06",
+            "2026-04-06",
+            "2026-04-06",
+        ),
+        (
+            "https://www.legislation.gov.uk/ukpga/2018/12/data.akn",
+            "/akn/gb/act/ukpga/2018/12/eng@2026-04-06",
+            "2026-04-06",
+            "2026-04-06",
+        ),
+        (
+            "https://www.legislation.gov.uk/uksi/2020/1/made/data.akn",
+            "http://www.legislation.gov.uk/uksi/2020/1/made",
+            "made",
+            None,
+        ),
+        ("https://www.legislation.gov.uk/ukpga/2018/12/data.akn", None, None, None),
+    ],
+)
+def test_official_edition_ids_and_dates(
+    url: str, expression: str | None, edition_id: str | None, edition_date: str | None
+) -> None:
+    ref = _official(url, expression)
+    assert ref is not None
+    assert (ref.edition_id, ref.edition_date) == (edition_id, edition_date)
 
 
 async def test_licence_rides_the_adapter() -> None:

@@ -28,6 +28,7 @@ from codify.storage.official_sources import (
     get_official_sources,
     lookup_official_id,
     official_anchors,
+    official_provision_url,
     record_official_source,
     upsert_official_ids,
     upsert_official_source,
@@ -324,3 +325,52 @@ async def test_a_publisher_url_resolves_to_the_version_in_force_and_its_unit(
     ).scalar_one()
     assert rows[urls[1]].target_law_id == law_id
     assert rows[urls[2]].target_law_id is None
+
+
+async def test_a_repeated_id_in_one_batch_keeps_the_last(session: AsyncSession) -> None:
+    pub = f"test-{uuid.uuid4().hex[:6]}"
+    await upsert_official_ids(
+        session,
+        pub,
+        [("5", "/akn/zz/act/2020/a", "group"), ("5", "/akn/zz/act/2020/b", "group")],
+    )
+    row = await lookup_official_id(session, pub, "5")
+    assert row is not None and row.frbr_work_uri == "/akn/zz/act/2020/b"
+
+
+async def test_a_refetch_stores_the_hash_it_fetched_where_a_reuse_does_not(
+    session: AsyncSession,
+) -> None:
+    version = await _version(session, sha=uuid.uuid4().hex * 2)
+    fetched = uuid.uuid4().hex * 2
+    await record_official_source(session, version, _record(content_sha256=fetched), stored=False)
+    assert (await _row(session, version)).content_sha256 is None
+    await upsert_official_source(session, version, _record(content_sha256=fetched))
+    assert (await _row(session, version)).content_sha256 == fetched
+
+
+async def test_a_provision_url_prefers_an_anchor_and_waits_for_verification(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codify.provenance import PATTERN_VERIFIED
+
+    version = await _version(session)
+    await record_official_source(
+        session,
+        version,
+        _record(publisher="legislation-gov-uk", work_id="ukpga/1998/42"),
+        stored=True,
+    )
+    read = await get_official_source(session, version)
+    assert read is not None
+    source = read.source
+    assert await official_provision_url(session, version, source, "section-13-2") is None
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section", True)
+    assert (
+        await official_provision_url(session, version, source, "section-13-2")
+        == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2"
+    )
+    await write_official_anchors(session, version, {"section-13-2": "section/13/2A"})
+    url = await official_provision_url(session, version, source, "section-13-2")
+    assert url is not None and url.endswith("section/13/2A")
+    assert await official_provision_url(session, version, source, "crossheading-x") is None

@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 from urllib.parse import SplitResult, parse_qs, quote, unquote, urlsplit
 
 from pydantic import BaseModel, ConfigDict
@@ -17,7 +18,11 @@ from codify.frbr import UK_TYPE_TOKENS
 
 
 class OfficialRef(BaseModel):
-    """A publisher's own ids for an acquired text; ISO date string, so it travels in run params."""
+    """A publisher's own ids for an acquired text; ISO date string, so it travels in run params.
+
+    `edition_id` names this exact text where the publisher has such an id, for example a
+    language code where the same instrument is published in several.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -51,15 +56,34 @@ class Publisher:
     # (work id, edition id, fragment) to a URL, and the pattern that URL belongs to.
     fragment: Callable[[str, str | None, str], str | None] | None = None
     fragment_pattern: Callable[[str], str] | None = None
+    # An eId to the publisher's fragment, where it can be derived; None where it cannot.
+    eid_fragment: Callable[[str], str | None] | None = None
 
     def act_url(self, work_id: str, edition_id: str | None = None) -> str | None:
-        return self.act(work_id, edition_id)
+        """The act page, or None until the pattern is verified."""
+        return self.act(work_id, edition_id) if is_verified(f"{self.key}.act") else None
 
     def edition_url(self, work_id: str, edition_id: str) -> str | None:
-        return self.edition(work_id, edition_id) if self.edition else None
+        if self.edition is None or not is_verified(f"{self.key}.edition"):
+            return None
+        return self.edition(work_id, edition_id)
 
     def current_url(self, work_id: str, edition_id: str | None = None) -> str | None:
-        return self.current(work_id, edition_id) if self.current else None
+        if self.current is None or not is_verified(f"{self.key}.current"):
+            return None
+        return self.current(work_id, edition_id)
+
+    def page_url(
+        self, work_id: str, edition_id: str | None = None
+    ) -> tuple[str, Literal["edition", "act"]] | None:
+        """The best verified page: the edition's, else the act's, else no link."""
+        if edition_id and (url := self.edition_url(work_id, edition_id)):
+            return url, "edition"
+        url = self.act_url(work_id, edition_id)
+        return (url, "act") if url else None
+
+    def fragment_for_eid(self, eid: str) -> str | None:
+        return self.eid_fragment(eid) if self.eid_fragment else None
 
     def provision_url(self, work_id: str, edition_id: str | None, fragment: str) -> str | None:
         """The URL of one provision, or None until its pattern is verified."""
@@ -131,10 +155,19 @@ def _gb_fragment_pattern(fragment: str) -> str:
     return f"legislation-gov-uk.fragment.{fragment.split('/', 1)[0]}"
 
 
+_GB_PROVISIONS = ("section", "article", "regulation", "rule", "schedule")
+
+
+def _gb_eid_fragment(eid: str) -> str | None:
+    path = re.sub(r"_dup\d+$", "", eid).replace("-", "/")
+    return path if path.split("/", 1)[0] in _GB_PROVISIONS else None
+
+
 # EUR-Lex
 
 _EUR = "https://eur-lex.europa.eu"
 _CELEX = re.compile(r"(?:3|0)\d{4}[A-Z]+\d+", re.I)
+_SECTOR3 = re.compile(r"3\d{4}[A-Z]+\d+(?:\(\d+\))?")
 _CONSOLIDATED = re.compile(r"^0(\d{4}[A-Z]+\d+)-(\d{4})(\d{2})(\d{2})$")
 _ELI_TYPE = {"reg": "R", "dir": "L", "dec": "D"}
 
@@ -145,8 +178,17 @@ def _celex_ids(celex: str) -> tuple[str, str | None]:
     m = _CONSOLIDATED.match(celex)
     if m:
         return f"3{m[1]}", celex
-    base = re.match(r"3\d{4}[A-Z]+\d+", celex)
+    base = _SECTOR3.match(celex)
     return (base[0] if base else celex), None
+
+
+def _eu_eid_fragment(eid: str) -> str | None:
+    """The last article of an eId; none for an annex or a renamed duplicate."""
+    parts = eid.split("__")
+    if any(p.startswith("att_") or "_dup" in p for p in parts):
+        return None
+    articles = [p for p in parts if re.fullmatch(r"art_\d+", p)]
+    return articles[-1] if articles else None
 
 
 def _eur_parse(u: SplitResult) -> ParsedUrl | None:
@@ -187,14 +229,17 @@ def _oecd_parse(u: SplitResult) -> ParsedUrl | None:
     if m is None:
         return None
     work = m[2].upper().replace("-", "/")
-    return ParsedUrl("oecd-compendium", "oecd-compendium.act", work, None, None, (work,))
+    return ParsedUrl(
+        "oecd-compendium", "oecd-compendium.edition", work, m[1].lower(), None, (work,)
+    )
 
 
 # Verkhovna Rada
 
 _RADA = "https://zakon.rada.gov.ua"
 _RADA_PATH = re.compile(
-    r"^/laws/show/(?P<nreg>.+?)(?:/(?P<ed>ed\d{8}))?(?:/(?:page\d*|print|card))?/?$"
+    r"^/laws/show/(?:(?P<lang>en)/)?(?P<nreg>.+?)(?:/(?P<ed>ed\d{8}))?"
+    r"(?:/(?:page\d*|print|card))?/?$"
 )
 
 
@@ -202,7 +247,7 @@ def _rada_parse(u: SplitResult) -> ParsedUrl | None:
     if m := re.match(r"^/go/([^/]+)/?$", u.path):
         nreg, edition = unquote(m[1]), None
     elif m := _RADA_PATH.match(u.path):
-        nreg, edition = unquote(m["nreg"]), m["ed"]
+        nreg, edition = unquote(m["nreg"]), m["ed"] or m["lang"]
     else:
         return None
     pattern = "zakon-rada.edition" if edition else "zakon-rada.act"
@@ -211,6 +256,15 @@ def _rada_parse(u: SplitResult) -> ParsedUrl | None:
 
 def _rada_act(work_id: str, edition_id: str | None) -> str:
     return f"{_RADA}/laws/show/{quote(work_id, safe='/')}"
+
+
+def _rada_edition(work_id: str, edition_id: str) -> str:
+    nreg = quote(work_id, safe="/")
+    return (
+        f"{_RADA}/laws/show/en/{nreg}"
+        if edition_id == "en"
+        else f"{_rada_act(work_id, None)}/{edition_id}"
+    )
 
 
 # QBZ (Albania)
@@ -245,7 +299,7 @@ def _ocs_edition(work_id: str, edition_id: str) -> str:
 
 _DRE = "https://data.dre.pt/eli"
 _DRE_PATH = re.compile(
-    r"^/eli/(?P<work>[a-z]+/[0-9A-Za-z-]+/\d{4})/p/(?P<kind>dre|cons)(?:/(?P<date>\d{8}))?(?:/pt(?:/html)?)?/?$"
+    r"^/eli/(?P<work>[a-z-]+/[0-9A-Za-z-]+/\d{4}(?:/\d{2}/\d{2})?)/p/(?P<kind>dre|cons)(?:/(?P<date>\d{8}))?(?:/pt(?:/html)?)?/?$"
 )
 
 
@@ -305,6 +359,7 @@ def _build() -> tuple[Publisher, ...]:
             current=lambda w, e: f"{_GB}/{w}",
             fragment=_gb_fragment,
             fragment_pattern=_gb_fragment_pattern,
+            eid_fragment=_gb_eid_fragment,
         ),
         Publisher(
             "eur-lex",
@@ -314,6 +369,7 @@ def _build() -> tuple[Publisher, ...]:
             act=lambda w, e: f"{_EUR}/legal-content/EN/TXT/?uri=CELEX:{w}",
             edition=lambda w, e: f"{_EUR}/legal-content/EN/TXT/?uri=CELEX:{e}",
             fragment=lambda w, e, f: f"{_EUR}/legal-content/EN/TXT/?uri=CELEX:{e or w}#{f}",
+            eid_fragment=_eu_eid_fragment,
         ),
         Publisher(
             "oecd-compendium",
@@ -329,7 +385,7 @@ def _build() -> tuple[Publisher, ...]:
             ("zakon.rada.gov.ua",),
             _rada_parse,
             act=_rada_act,
-            edition=lambda w, e: f"{_rada_act(w, None)}/{e}",
+            edition=_rada_edition,
             current=lambda w, e: _rada_act(w, None),
             fragment=lambda w, e, f: (
                 f"{_rada_act(w, None)}/{e}#{f}" if e else f"{_rada_act(w, None)}#{f}"
@@ -392,9 +448,7 @@ def _register_patterns() -> None:
             if builder is not None
         ]
         PATTERN_VERIFIED.update({f"{p.key}.{k}": False for k in kinds})
-    PATTERN_VERIFIED.update(
-        {f"legislation-gov-uk.fragment.{k}": False for k in ("section", "article", "schedule")}
-    )
+    PATTERN_VERIFIED.update({f"legislation-gov-uk.fragment.{k}": False for k in _GB_PROVISIONS})
     PATTERN_VERIFIED.pop("legislation-gov-uk.fragment", None)
 
 

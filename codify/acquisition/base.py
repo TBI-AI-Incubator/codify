@@ -76,6 +76,8 @@ class AcquiredDocument(BaseModel):
     ocr_required: bool = False
     upstream_metadata: dict[str, Any] = Field(default_factory=dict)
     official: OfficialRef | None = None
+    # One per further language body that has its own page at the publisher.
+    official_translations: list[OfficialRef] = Field(default_factory=list)
 
     def primary(self) -> Body:
         for b in self.bodies:
@@ -85,7 +87,7 @@ class AcquiredDocument(BaseModel):
 
 
 def archive_date(path: Path | None) -> datetime:
-    """When a bulk archive was written, as its file's own date; now where it is unknown."""
+    """A bulk archive's modified time: its copy or download date unless preserved; else now."""
     try:
         return datetime.fromtimestamp(path.stat().st_mtime, UTC) if path else datetime.now(UTC)
     except OSError:

@@ -18,7 +18,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
-from codify.provenance import parse_official_url
+from codify.provenance import PUBLISHERS, parse_official_url
 from codify.storage.models import OfficialAnchor, OfficialId, OfficialSource, Version
 
 _LINEAGE_DEPTH_CAP = 100
@@ -54,7 +54,7 @@ async def _own_hash(session: AsyncSession, version_id: uuid.UUID) -> str | None:
 
 
 def _values(
-    version_id: uuid.UUID, record: OfficialSourceRecord, own_hash: str | None
+    version_id: uuid.UUID, record: OfficialSourceRecord, own_hash: str | None, *, gate_hash: bool
 ) -> dict[str, Any]:
     return {
         "version_id": version_id,
@@ -64,8 +64,10 @@ def _values(
         "edition_date": record.edition_date,
         "fetch_url": record.fetch_url,
         "retrieved_at": record.retrieved_at,
-        # A hash of bytes the version was not built from would vouch for the wrong text.
-        "content_sha256": record.content_sha256 if record.content_sha256 == own_hash else None,
+        # On reuse, a hash of bytes the version was not built from would vouch for the wrong text.
+        "content_sha256": record.content_sha256
+        if not gate_hash or record.content_sha256 == own_hash
+        else None,
         "licence": record.licence,
         "recorded_by": record.recorded_by,
     }
@@ -80,9 +82,16 @@ async def record_official_source(
 ) -> None:
     """Record a version's source: written in full for a newly stored version, and for a
     reused one only into fields still empty, so a reuse never rewrites what was recorded."""
-    values = _values(version_id, record, await _own_hash(session, version_id))
+    await _write(session, version_id, record, fill_only=not stored)
+
+
+async def _write(
+    session: AsyncSession, version_id: uuid.UUID, record: OfficialSourceRecord, *, fill_only: bool
+) -> None:
+    own_hash = await _own_hash(session, version_id)
+    values = _values(version_id, record, own_hash, gate_hash=fill_only)
     stmt = insert(OfficialSource).values(values)
-    if stored:
+    if not fill_only:
         update = {k: v for k, v in values.items() if k != "version_id"} | {
             "recorded_at": func.now()
         }
@@ -94,8 +103,8 @@ async def record_official_source(
 async def upsert_official_source(
     session: AsyncSession, version_id: uuid.UUID, record: OfficialSourceRecord
 ) -> None:
-    """Replace a version's row after the text was fetched again."""
-    await record_official_source(session, version_id, record, stored=True)
+    """Replace a version's row after a refetch; the hash is stored as fetched."""
+    await _write(session, version_id, record, fill_only=False)
 
 
 async def get_official_sources(
@@ -179,6 +188,30 @@ async def official_anchors(session: AsyncSession, version_id: uuid.UUID) -> dict
     return {eid: frag for eid, frag in rows.all()}
 
 
+async def official_provision_url(
+    session: AsyncSession, version_id: uuid.UUID, source: OfficialSource, eid: str
+) -> str | None:
+    """The publisher's URL for one provision of a version, or None.
+
+    A recorded anchor wins over the publisher's eId rule; either way the link is only
+    given once its URL pattern is verified. `source` is the version's own or ancestor's row.
+    """
+    publisher = PUBLISHERS.get(source.publisher)
+    if publisher is None:
+        return None
+    anchor = (
+        await session.execute(
+            select(col(OfficialAnchor.fragment))
+            .where(col(OfficialAnchor.version_id) == version_id)
+            .where(col(OfficialAnchor.akn_eid) == eid)
+        )
+    ).scalar_one_or_none()
+    fragment = anchor or publisher.fragment_for_eid(eid)
+    if fragment is None:
+        return None
+    return publisher.provision_url(source.work_id, source.edition_id, fragment)
+
+
 async def eid_for_fragment(
     session: AsyncSession, version_id: uuid.UUID, fragment: str
 ) -> str | None:
@@ -200,10 +233,12 @@ async def upsert_official_ids(
     ids: Iterable[tuple[str, str, str]],
 ) -> int:
     """Upsert `(id, frbr_work_uri, id_kind)` triples for a publisher; returns how many."""
-    items = [
-        {"publisher": publisher, "id": i, "frbr_work_uri": uri, "id_kind": kind}
+    # One statement cannot touch a key twice; the last triple for an id wins.
+    by_id = {
+        i: {"publisher": publisher, "id": i, "frbr_work_uri": uri, "id_kind": kind}
         for i, uri, kind in ids
-    ]
+    }
+    items = list(by_id.values())
     for start in range(0, len(items), _ANCHOR_CHUNK):
         stmt = insert(OfficialId).values(items[start : start + _ANCHOR_CHUNK])
         await session.execute(
@@ -249,6 +284,7 @@ __all__ = [
     "get_official_sources",
     "lookup_official_id",
     "official_anchors",
+    "official_provision_url",
     "record_official_source",
     "upsert_official_ids",
     "upsert_official_source",

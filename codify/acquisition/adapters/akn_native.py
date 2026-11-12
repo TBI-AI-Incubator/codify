@@ -18,6 +18,7 @@ ref's language is fetched (English unless `languages` says otherwise).
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from urllib.parse import urlparse
 
@@ -43,7 +44,7 @@ from codify.frbr import (
     parse_source_ref,
 )
 from codify.jurisdictions import SourceAdapter
-from codify.provenance import OfficialRef, official_ref_from_url
+from codify.provenance import OfficialRef, official_ref_from_url, parse_official_url
 
 logger = structlog.get_logger()
 
@@ -131,15 +132,18 @@ def _pdf_alternative(content: bytes, language: str, host: str) -> str | None:
 
 
 _MAX_REDIRECTS = 5
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def _official(url: str, expression: str | None) -> OfficialRef | None:
-    """The publisher's ids from the fetched URL; an undated URL takes the expression's date."""
-    edition_date = expression_uri_date(expression)
-    ref = official_ref_from_url(url, edition_date=edition_date)
-    if ref is not None and ref.edition_id is None:
-        ref = ref.model_copy(update={"edition_id": edition_date})
-    return ref
+    """The publisher's ids from the fetched URL; an undated URL takes the expression's edition."""
+    ref = official_ref_from_url(url)
+    if ref is None:
+        return None
+    named = parse_official_url(expression or "")
+    edition = ref.edition_id or (named.edition_id if named else None)
+    date = edition if edition and _ISO_DATE.fullmatch(edition) else expression_uri_date(expression)
+    return ref.model_copy(update={"edition_id": edition or date, "edition_date": date})
 
 
 class AknNativeAcquirer:

@@ -22,16 +22,16 @@ from codify.provenance import (
 
 
 def _shipped_acquirers() -> set[str]:
-    for mod in pkgutil.walk_packages(adapters.__path__, f"{adapters.__name__}."):
-        importlib.import_module(mod.name)
+    """Every class in an adapter module that can fetch, whether or not it subclasses the base."""
     names: set[str] = set()
-    stack = list(BaseAcquirer.__subclasses__())
-    while stack:
-        cls = stack.pop()
-        stack.extend(cls.__subclasses__())
-        if inspect.getmodule(cls).__name__.startswith(adapters.__name__):  # type: ignore[union-attr]
-            names.add(cls.__name__)
-    return names | {"AknNativeAcquirer"}
+    for mod in pkgutil.walk_packages(adapters.__path__, f"{adapters.__name__}."):
+        module = importlib.import_module(mod.name)
+        for name, cls in inspect.getmembers(module, inspect.isclass):
+            if cls.__module__ == module.__name__ and name.endswith("Acquirer"):
+                names.add(name)
+            elif cls.__module__ == module.__name__ and issubclass(cls, BaseAcquirer):
+                names.add(name)
+    return names
 
 
 def test_every_shipped_adapter_maps_to_a_publisher_or_is_listed_without_one() -> None:
@@ -129,7 +129,7 @@ def test_no_pattern_is_verified_yet() -> None:
             "https://legalinstruments.oecd.org/en/instruments/OECD-LEGAL-0368",
             "oecd-compendium",
             "OECD/LEGAL/0368",
-            None,
+            "en",
             None,
         ),
         ("https://zakon.rada.gov.ua/laws/show/435-15", "zakon-rada", "435-15", None, None),
@@ -148,6 +148,21 @@ def test_no_pattern_is_verified_yet() -> None:
             None,
         ),
         ("https://zakon.rada.gov.ua/go/435-15", "zakon-rada", "435-15", None, None),
+        ("https://zakon.rada.gov.ua/laws/show/en/435-15", "zakon-rada", "435-15", "en", None),
+        (
+            "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32012D0026(01)",
+            "eur-lex",
+            "32012D0026(01)",
+            None,
+            None,
+        ),
+        (
+            "https://data.dre.pt/eli/dec-lei/7/2009/02/12/p/dre/pt/html",
+            "dre",
+            "dec-lei/7/2009/02/12",
+            None,
+            None,
+        ),
         ("https://qbz.gov.al/eli/fz/2020/226/162-2020.pdf", "qbz", "fz/2020/226", None, None),
         (
             "https://searchlaw.ocs.go.th/council-of-state/#/public/doc/abc123",
@@ -209,13 +224,20 @@ def test_parser_ignores_other_urls(url: str) -> None:
     assert parse_official_url(url) is None
 
 
-def test_builders_round_trip_through_the_parser() -> None:
+@pytest.fixture
+def all_verified(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in PATTERN_VERIFIED:
+        monkeypatch.setitem(PATTERN_VERIFIED, key, True)
+
+
+def test_builders_round_trip_through_the_parser(all_verified: None) -> None:
     cases = [
         ("riigi-teataja", "5555", "130062026129"),
         ("legislation-gov-uk", "ukpga/1998/42", "2026-04-06"),
         ("zakon-rada", "254к/96-вр", "ed20260525"),
         ("ocs", "ก0003-1B-0001", "abc123"),
         ("dre", "lei/12/2020", "20240101"),
+        ("dre", "dec-lei/7/2009/02/12", "20240101"),
     ]
     for key, work, edition in cases:
         publisher = PUBLISHERS[key]
@@ -226,7 +248,7 @@ def test_builders_round_trip_through_the_parser() -> None:
             assert work in parsed.lookup or edition in parsed.lookup
 
 
-def test_a_publisher_with_no_such_page_returns_none() -> None:
+def test_a_publisher_with_no_such_page_returns_none(all_verified: None) -> None:
     assert PUBLISHERS["riigi-teataja"].act_url("5555") is None
     assert PUBLISHERS["qbz"].edition_url("fz/2020/226", "x") is None
     assert PUBLISHERS["eur-lex"].current_url("32016R0679") is None
@@ -289,3 +311,73 @@ def test_an_acquired_document_carries_its_ids_as_json() -> None:
         "edition_id": "1",
         "edition_date": "2023-01-01",
     }
+
+
+def test_no_page_link_is_given_until_its_pattern_is_verified() -> None:
+    gb = PUBLISHERS["legislation-gov-uk"]
+    assert gb.act_url("ukpga/1998/42") is None
+    assert gb.edition_url("ukpga/1998/42", "enacted") is None
+    assert gb.current_url("ukpga/1998/42") is None
+    assert gb.page_url("ukpga/1998/42", "enacted") is None
+
+
+def test_the_page_falls_back_from_edition_to_act(monkeypatch: pytest.MonkeyPatch) -> None:
+    gb = PUBLISHERS["legislation-gov-uk"]
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.act", True)
+    assert gb.page_url("ukpga/1998/42", "enacted") == (
+        "https://www.legislation.gov.uk/ukpga/1998/42",
+        "act",
+    )
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.edition", True)
+    assert gb.page_url("ukpga/1998/42", "enacted") == (
+        "https://www.legislation.gov.uk/ukpga/1998/42/enacted",
+        "edition",
+    )
+    assert gb.page_url("ukpga/1998/42") == (
+        "https://www.legislation.gov.uk/ukpga/1998/42",
+        "act",
+    )
+
+
+def test_a_suffixed_celex_is_not_cut_to_another_act() -> None:
+    assert celex_ref("32012D0026(01)").work_id == "32012D0026(01)"
+    assert celex_ref("32016R0679R(01)").work_id == "32016R0679"
+
+
+def test_the_dated_dre_work_keeps_its_date_in_the_act_url(all_verified: None) -> None:
+    assert (
+        PUBLISHERS["dre"].act_url("dec-lei/7/2009/02/12")
+        == "https://data.dre.pt/eli/dec-lei/7/2009/02/12/p/dre"
+    )
+
+
+@pytest.mark.parametrize(
+    ("key", "eid", "fragment"),
+    [
+        ("legislation-gov-uk", "section-13-2", "section/13/2"),
+        ("legislation-gov-uk", "section-9A-1_dup2", "section/9A/1"),
+        ("legislation-gov-uk", "article-2", "article/2"),
+        ("legislation-gov-uk", "crossheading-powers", None),
+        ("legislation-gov-uk", "date-2020", None),
+        ("legislation-gov-uk", "period-from-2020", None),
+        ("eur-lex", "chp_1__sec_2__art_5__para_1", "art_5"),
+        ("eur-lex", "art_1__para_1", "art_1"),
+        ("eur-lex", "att_1__art_2", None),
+        ("eur-lex", "art_3_dup1", None),
+        ("eur-lex", "recitals__rec_4", None),
+        ("riigi-teataja", "art_10", None),
+    ],
+)
+def test_an_eid_gives_a_fragment_only_where_a_rule_is_sure(
+    key: str, eid: str, fragment: str | None
+) -> None:
+    assert PUBLISHERS[key].fragment_for_eid(eid) == fragment
+
+
+def test_the_rada_english_edition_has_its_own_page(all_verified: None) -> None:
+    rada = PUBLISHERS["zakon-rada"]
+    assert rada.edition_url("435-15", "en") == "https://zakon.rada.gov.ua/laws/show/en/435-15"
+    assert (
+        rada.edition_url("435-15", "ed20260525")
+        == "https://zakon.rada.gov.ua/laws/show/435-15/ed20260525"
+    )

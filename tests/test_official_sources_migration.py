@@ -11,11 +11,11 @@ _ROOT = Path(__file__).resolve().parents[1]
 _REVISION = "0029_official_sources"
 
 
-def test_official_sources_follows_goods_code_scope_and_is_the_head() -> None:
+def test_official_sources_follows_goods_code_scope_on_one_chain() -> None:
     scripts = ScriptDirectory.from_config(Config(str(_ROOT / "alembic.ini")))
     rev = scripts.get_revision(_REVISION)
     assert rev is not None and rev.down_revision == "0028_goods_code_scope"
-    assert scripts.get_heads() == [_REVISION]
+    assert len(scripts.get_heads()) == 1
 
 
 def test_the_tables_are_owned_by_the_core_chain_and_ids_carry_no_law_key() -> None:
