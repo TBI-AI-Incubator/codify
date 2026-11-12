@@ -116,13 +116,20 @@ def carried_ids(root: etree._Element) -> set[str]:
 
 
 def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
-    """Each identified `<recital>` under the preamble, as a paragraph carrying its prose."""
+    """Each identified `<recital>` under the preamble, and each enacting-formula line that
+    holds a reference, as a paragraph carrying its prose."""
     preamble = _akn_child(doc_root, "preamble")
     if preamble is None:
         return []
     out: list[BodyElement] = []
     seen: set[str] = set()
-    for el in preamble.iter(f"{{{AKN_NS}}}recital"):
+    formula_lines = (
+        p
+        for formula in preamble.iter(f"{{{AKN_NS}}}formula")
+        for p in formula.iter(f"{{{AKN_NS}}}p")
+        if p.find(f".//{{{AKN_NS}}}ref") is not None
+    )
+    for el in (*preamble.iter(f"{{{AKN_NS}}}recital"), *formula_lines):
         eid = el.get("eId", "")
         if not eid or eid in seen:
             continue
@@ -525,6 +532,27 @@ def _inner_xml_or_text(el: etree._Element) -> str:
     return (el.text or "").strip()
 
 
+def _force_date(meta: etree._Element, mod_el: etree._Element) -> date | None:
+    """The date a mod's `<force period>` starts: its temporal group's first interval, read
+    through the event it names."""
+    force = _akn_child(mod_el, "force")
+    period = ((force.get("period") if force is not None else "") or "").lstrip("#")
+    if not period:
+        return None
+    for group in meta.iterfind(f"{{{AKN_NS}}}temporalData/{{{AKN_NS}}}temporalGroup"):
+        if group.get("eId") != period:
+            continue
+        interval = _akn_child(group, "timeInterval")
+        start = ((interval if interval is not None else group).get("start") or "").lstrip("#")
+        for event in meta.iterfind(f"{{{AKN_NS}}}lifecycle/{{{AKN_NS}}}eventRef"):
+            if start and event.get("eId") == start:
+                try:
+                    return date.fromisoformat((event.get("date") or "")[:10])
+                except ValueError:
+                    return None
+    return None
+
+
 def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
     analysis = _akn_child(meta, "analysis")
     if analysis is None:
@@ -552,14 +580,15 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
             source_el = _akn_child(mod_el, "source")
             if source_el is not None and not source_href:
                 authority = authority or source_el.get("href") or None
-                if target_href:
+                if "#" in target_href:
                     source_href = target_href.rsplit("#", 1)[-1]
                 if target_wid is None and "#" in target_href:
                     target_wid = target_href.rsplit("#", 1)[-1]
             for_ref = mod_el.get("for") or None
             if for_ref and for_ref.startswith("#"):
                 for_ref = for_ref[1:]
-            if not source_href or not target_href:
+            # A destination with no fragment is a whole-work effect.
+            if not target_href or (not source_href and source_el is None):
                 continue
             out.append(
                 TextualMod(
@@ -571,6 +600,7 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
                     quoted=_quoted_content(mod_el),
                     authority_uri=authority,
                     mod_eid_ref=for_ref,
+                    in_force_date=_force_date(meta, mod_el),
                 )
             )
     return out

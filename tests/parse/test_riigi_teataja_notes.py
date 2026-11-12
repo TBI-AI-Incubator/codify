@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import date
+
 import pytest
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, validate_akn
 from codify.akn.io import parse_akn
 from codify.pipeline.formats.riigi_teataja import _viide_targets, riigi_teataja_to_akn
+from codify.storage.mappers import document_to_rows
 
 N = f"{{{AKN_NS}}}"
 _URL = "https://www.riigiteataja.ee/akt/"
@@ -77,6 +81,7 @@ def test_parsed_document_carries_effect_and_date() -> None:
     assert effect.authority_uri == f"{_URL}750865"
     assert effect.source_akn_wid == "art_1__para_1"
     assert [e.event_date for e in doc.lifecycle_events] == ["2004-06-01"]
+    assert effect.in_force_date == date(2004, 6, 1)
     force = etree.fromstring(akn.encode()).find(f".//{N}force")
     assert force is not None
     group = etree.fromstring(akn.encode()).find(
@@ -123,14 +128,18 @@ def test_unusable_notes_are_skipped_and_counted() -> None:
     assert len(_mods(akn)) == 1
 
 
-def test_act_level_note_is_counted_not_emitted() -> None:
+def test_act_level_note_is_a_whole_work_effect() -> None:
     xml = _act(_loige(1, "A.") + _loige(2, "B.")).replace(
         "</oigusakt>", _note("750865") + "</oigusakt>"
     )
     akn, meta = riigi_teataja_to_akn(xml)
-    assert meta["amendment_notes"] == {"skipped_act_level": 1}
-    assert _mods(akn) == []
-    assert etree.fromstring(akn.encode()).find(f".//{N}analysis") is None
+    assert meta["amendment_notes"]["whole_act"] == 1
+    (mod,) = _mods(akn)
+    assert mod.find(f"{N}destination").get("href").endswith("/main")
+    (effect,) = parse_akn(akn).textual_mods
+    assert effect.target_akn_wid is None
+    assert effect.authority_uri == f"{_URL}750865"
+    assert effect.in_force_date == date(2004, 6, 1)
 
 
 def _body(xml: str) -> tuple[list[str], str]:
@@ -191,3 +200,11 @@ def test_preamble_references_are_emitted() -> None:
     akn, _ = riigi_teataja_to_akn(_act(_loige(1, "A.") + _loige(2, "B."), preamble))
     preamble_el = etree.fromstring(akn.encode())[0].find(f"{N}preamble")
     assert [r.get("href") for r in preamble_el.iter(f"{N}ref")] == [f"{_URL}105#pr16"]
+
+
+def test_preamble_reference_becomes_a_row() -> None:
+    link = _viide("./dyn=1&amp;id=105!pr16")
+    preamble = f"<preambul><tavatekst>Alusel </tavatekst>{link}</preambul>"
+    akn, _ = riigi_teataja_to_akn(_act(_loige(1, "A.") + _loige(2, "B."), preamble))
+    *_, refs, _effects, _events = document_to_rows(parse_akn(akn), uuid.uuid4())
+    assert [r.target_uri for r in refs] == [f"{_URL}105#pr16"]

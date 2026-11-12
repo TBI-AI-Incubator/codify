@@ -599,9 +599,9 @@ async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, ak
     # rebuilds intra-document refs only, so cross-version resolution around a
     # repaired law is lost until a resolve-references pass runs.
     vid = version_id
-    # The AKN parser never supplies these fields. They identify an external
-    # overlay, including legacy sidecars without publisher IDs. Keep the row
-    # and its metadata even if its target disappears; the timeline reports a
+    # These fields identify an external overlay, including legacy sidecars without
+    # publisher IDs. A date the AKN declares matches its derived effect by identity. Keep the
+    # row and its metadata even if its target disappears; the timeline reports a
     # missing-target hole. Unannotated legacy rows have no such evidence and
     # remain ordinary derived rows. Caller rollback covers both sets.
     external = or_(

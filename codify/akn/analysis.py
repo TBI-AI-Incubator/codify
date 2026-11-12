@@ -10,6 +10,7 @@ event of type `generation`, `amendment`, or `repeal` on a given date.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -116,6 +117,7 @@ class TextualMod(BaseModel):
     quoted: QuotedContent | None = None
     authority_uri: str | None = None
     mod_eid_ref: str | None = None
+    in_force_date: date | None = None
 
 
 class LifecycleEvent(BaseModel):

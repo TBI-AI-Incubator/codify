@@ -79,12 +79,12 @@ def annotate(
         am = mark.find("{*}avaldamismarge")
         akt = (am.findtext("{*}aktViide") or "").strip() if am is not None else ""
         eid = _unit_eid(mark, by_source_id)
+        parent = mark.getparent()
+        whole_act = eid is None and parent is not None and _local(parent) == "oigusakt"
         if not re.fullmatch(r"\d+", akt):
             counts["skipped_no_amending_act"] += 1
-        elif eid is None:
-            parent = mark.getparent()
-            level = parent is not None and _local(parent) == "oigusakt"
-            counts["skipped_act_level" if level else "skipped_no_unit"] += 1
+        elif eid is None and not whole_act:
+            counts["skipped_no_unit"] += 1
         else:
             texts = [" ".join((t.text or "").split()) for t in mark.findall("{*}tavatekst")]
             first = mark[0] if len(mark) else None
@@ -100,7 +100,10 @@ def annotate(
             etree.SubElement(mod, _q("source"), href=f"{AKT_URL}{akt}")
             if cite := _citation(mark):
                 citations.setdefault(akt, cite)
-            etree.SubElement(mod, _q("destination"), href=f"{work_uri}/main#{eid}")
+            fragment = f"#{eid}" if eid else ""
+            etree.SubElement(mod, _q("destination"), href=f"{work_uri}/main{fragment}")
+            if whole_act:
+                counts["whole_act"] += 1
             if dated:
                 index = dates.setdefault(when, len(dates) + 1)
                 etree.SubElement(mod, _q("force"), period=f"#tg_{index}")
