@@ -285,6 +285,27 @@ def _messages(prompt: str, system: str | None) -> list[ChatCompletionMessagePara
     return cast(list[ChatCompletionMessageParam], out)
 
 
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+
+
+def _strip_reasoning(text: str) -> str:
+    """``text`` without a leading ``<think>…</think>`` block.
+
+    A reasoning model served without a reasoning parser prints its chain of
+    thought in ``content`` before the answer. Only a closed block at the start
+    is the model's: a block later in the reply is the answer's own text. An
+    unclosed block is left whole, so a reply cut off mid-thought shows what came
+    back rather than reading as an empty answer."""
+    head = text.lstrip()
+    if not head.startswith(_THINK_OPEN):
+        return text
+    end = head.find(_THINK_CLOSE, len(_THINK_OPEN))
+    if end < 0:
+        return text
+    return head[end + len(_THINK_CLOSE) :].lstrip()
+
+
 def content_filtered(finish_reason: object) -> bool:
     """Gemini's OpenAI-compatible endpoint suffixes the cause, as in
     'content_filter: RECITATION', so an equality test never sees the block."""
@@ -373,7 +394,7 @@ class LiteLLMClient:
                 extra_headers=self._headers(),
                 extra_body=self._body(),
             )
-        return resp.choices[0].message.content or ""
+        return _strip_reasoning(resp.choices[0].message.content or "")
 
     @_resilient
     async def chat_stream(
@@ -460,12 +481,17 @@ class LiteLLMClient:
             resp = await self.client.chat.completions.create(**kwargs)
             if observation is not None:
                 _finish_usage(observation, resolved_model, resp)
-        text = resp.choices[0].message.content or "{}"
+        # Stripped after the default, so a reply of reasoning alone is invalid
+        # JSON, not an empty object.
+        raw = resp.choices[0].message.content or "{}"
+        text = _strip_reasoning(raw)
         try:
             return cast(dict[str, Any], json.loads(text))
         except json.JSONDecodeError as exc:
-            logger.warning("invalid_json", model=model or self.model, preview=text[:500])
-            raise ValueError(f"Model returned invalid JSON: {text[:200]}") from exc
+            # The answer that failed, or the whole reply when there is none.
+            shown = text or raw
+            logger.warning("invalid_json", model=model or self.model, preview=shown[:500])
+            raise ValueError(f"Model returned invalid JSON: {shown[:200]}") from exc
 
     @_resilient
     async def chat_schema(
