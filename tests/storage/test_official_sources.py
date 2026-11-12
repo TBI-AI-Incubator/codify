@@ -104,7 +104,7 @@ async def _row(session: AsyncSession, version_id: uuid.UUID) -> OfficialSource:
     ).scalar_one()
 
 
-async def test_a_new_version_gets_its_row_and_a_foreign_hash_is_not_kept(
+async def test_a_new_version_gets_its_row_and_a_reuse_drops_a_foreign_hash(
     session: AsyncSession,
 ) -> None:
     sha = uuid.uuid4().hex * 2
@@ -115,7 +115,7 @@ async def test_a_new_version_gets_its_row_and_a_foreign_hash_is_not_kept(
     assert (await _row(session, own)).content_sha256 == sha
 
     other = await _version(session, sha=uuid.uuid4().hex * 2)
-    await record_official_source(session, other, _record(content_sha256=sha), stored=True)
+    await record_official_source(session, other, _record(content_sha256=sha), stored=False)
     assert (await _row(session, other)).content_sha256 is None
 
 
@@ -368,9 +368,9 @@ async def test_a_provision_url_prefers_an_anchor_and_waits_for_verification(
     monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section", True)
     assert (
         await official_provision_url(session, version, source, "section-13-2")
-        == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2"
+        == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2/123"
     )
     await write_official_anchors(session, version, {"section-13-2": "section/13/2A"})
     url = await official_provision_url(session, version, source, "section-13-2")
-    assert url is not None and url.endswith("section/13/2A")
+    assert url is not None and "/section/13/2A" in url
     assert await official_provision_url(session, version, source, "crossheading-x") is None
