@@ -211,11 +211,17 @@ async def official_provision_urls(
             col(OfficialAnchor.akn_eid),
             col(OfficialAnchor.fragment),
         )
-        .where(col(OfficialAnchor.version_id).in_({v for v, _, _ in wanted}))
+        .where(
+            col(OfficialAnchor.version_id).in_({x for v, s, _ in wanted for x in (v, s.version_id)})
+        )
         .where(col(OfficialAnchor.akn_eid).in_({e for _, _, e in wanted}))
     )
     anchors = {(v, e): f for v, e, f in rows.all()}
-    return {(v, e): _provision_url(src, e, anchors.get((v, e))) for v, src, e in wanted}
+    # A derived version, such as a translation, falls back to the anchors of its source.
+    return {
+        (v, e): _provision_url(src, e, anchors.get((v, e)) or anchors.get((src.version_id, e)))
+        for v, src, e in wanted
+    }
 
 
 async def official_provision_url(
@@ -224,7 +230,8 @@ async def official_provision_url(
     """The publisher's URL for one provision of a version, or None.
 
     A recorded anchor wins over the publisher's eId rule; either way the link is only
-    given once its URL pattern is verified. `source` is the version's own or ancestor's row.
+    given once its URL pattern is verified. `source` is the version's own or ancestor's row;
+    an ancestor's anchors apply where the version has none of its own.
     """
     urls = await official_provision_urls(session, [(version_id, source, eid)])
     return urls[(version_id, eid)]

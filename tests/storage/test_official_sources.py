@@ -486,3 +486,26 @@ async def test_provision_urls_come_from_one_batch(
     )
     assert urls[(b, "crossheading-x")] is None
     assert await official_provision_urls(session, []) == {}
+
+
+async def test_a_translation_uses_its_sources_anchor_unless_it_has_its_own(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codify.provenance import PATTERN_VERIFIED
+
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
+    parent = await _version(session)
+    child = await _version(session, parent=parent)
+    await record_official_source(
+        session,
+        parent,
+        _record(publisher="legislation-gov-uk", work_id="ukpga/1998/42"),
+        stored=True,
+    )
+    await write_official_anchors(session, parent, {"section-3-1": "section/3/1A"})
+    read = (await get_official_sources(session, [child]))[child]
+    url = await official_provision_url(session, child, read.source, "section-3-1")
+    assert url is not None and "/section/3/1A" in url
+    await write_official_anchors(session, child, {"section-3-1": "section/3/1B"})
+    url = await official_provision_url(session, child, read.source, "section-3-1")
+    assert url is not None and "/section/3/1B" in url
