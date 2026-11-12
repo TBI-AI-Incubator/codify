@@ -152,7 +152,8 @@ def _viide_targets(raw_uri: str) -> list[str]:
         return []
     m = _VIIDE_ID.search(raw_uri)
     if not m:
-        return [raw_uri]
+        bare = re.fullmatch(r"\./(\d+)", raw_uri)
+        return [f"{_AKT_URL}{bare.group(1)}" if bare else raw_uri]
     urls: list[str] = []
     for part in m.group(1).split(";"):
         t = _VIIDE_TARGET.fullmatch(part)

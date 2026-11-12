@@ -128,18 +128,49 @@ def test_unusable_notes_are_skipped_and_counted() -> None:
     assert len(_mods(akn)) == 1
 
 
-def test_act_level_note_is_a_whole_work_effect() -> None:
+def test_act_level_note_is_a_lifecycle_event_not_an_effect() -> None:
     xml = _act(_loige(1, "A.") + _loige(2, "B.")).replace(
         "</oigusakt>", _note("750865") + "</oigusakt>"
     )
     akn, meta = riigi_teataja_to_akn(xml)
-    assert meta["amendment_notes"]["whole_act"] == 1
-    (mod,) = _mods(akn)
-    assert mod.find(f"{N}destination").get("href").endswith("/main")
-    (effect,) = parse_akn(akn).textual_mods
-    assert effect.target_akn_wid is None
-    assert effect.authority_uri == f"{_URL}750865"
-    assert effect.in_force_date == date(2004, 6, 1)
+    validate_akn(akn)
+    assert meta["amendment_notes"] == {"whole_act_event": 1}
+    doc = parse_akn(akn)
+    assert doc.textual_mods == []
+    (event,) = doc.lifecycle_events
+    assert (event.event_type, event.event_date) == ("amendment", "2004-06-01")
+    assert event.source_uri == "#rt_750865"
+
+
+def test_undated_act_level_note_is_skipped() -> None:
+    xml = _act(_loige(1, "A.") + _loige(2, "B.")).replace(
+        "</oigusakt>", _note("750865", tail=", osaliselt 01.01.2007") + "</oigusakt>"
+    )
+    akn, meta = riigi_teataja_to_akn(xml)
+    assert meta["amendment_notes"] == {"skipped_whole_act_undated": 1}
+    assert parse_akn(akn).lifecycle_events == []
+
+
+def test_repeated_source_id_is_not_a_unit() -> None:
+    twin = _loige(1, "A.", _note("750865")).replace("para1lg1", "dup")
+    other = _loige(2, "B.", _note("1")).replace("para1lg2", "dup")
+    akn, meta = riigi_teataja_to_akn(_act(twin + other))
+    assert meta["amendment_notes"] == {"skipped_repeated_unit_id": 2}
+    assert _mods(akn) == []
+
+
+@pytest.mark.parametrize(
+    "lead",
+    [
+        "Välja jäetud - ",
+        "– Riigikohtu üldkogu otsus tunnistab seaduse § 9 põhiseaduse vastaseks ja kehtetuks.",
+    ],
+)
+def test_omissions_and_court_annulments_are_repeals(lead: str) -> None:
+    akn, _ = riigi_teataja_to_akn(
+        _act(_loige(1, "A.", _note("750865", lead=lead)) + _loige(2, "B."))
+    )
+    assert _mods(akn)[0].get("type") == "repeal"
 
 
 def _body(xml: str) -> tuple[list[str], str]:
@@ -164,7 +195,7 @@ def test_notes_leave_body_text_and_eids_unchanged() -> None:
             [f"{_URL}105#pr10lg2p3", f"{_URL}106#pr5b1lg1"],
         ),
         ("./../vaheleht.html", []),
-        ("./915681", ["./915681"]),
+        ("./915681", [f"{_URL}915681"]),
     ],
 )
 def test_viide_targets(raw: str, expected: list[str]) -> None:
@@ -208,3 +239,18 @@ def test_preamble_reference_becomes_a_row() -> None:
     akn, _ = riigi_teataja_to_akn(_act(_loige(1, "A.") + _loige(2, "B."), preamble))
     *_, refs, _effects, _events = document_to_rows(parse_akn(akn), uuid.uuid4())
     assert [r.target_uri for r in refs] == [f"{_URL}105#pr16"]
+
+
+def test_formula_line_with_two_references_keeps_text_and_both() -> None:
+    first = _viide("./dyn=1&amp;id=105!pr16", "esimese seaduse")
+    second = _viide("./dyn=1&amp;id=106", "teise seaduse")
+    preamble = (
+        f"<preambul><tavatekst>Alusel </tavatekst>{first}"
+        f"<tavatekst> ja </tavatekst>{second}<tavatekst> määrus.</tavatekst></preambul>"
+    )
+    akn, _ = riigi_teataja_to_akn(_act(_loige(1, "A.") + _loige(2, "B."), preamble))
+    prov = document_to_rows(parse_akn(akn), uuid.uuid4())[2]
+    (row,) = [p for p in prov if p.akn_eid.startswith("preamble")]
+    assert row.text == "Alusel esimese seaduse ja teise seaduse määrus."
+    refs = document_to_rows(parse_akn(akn), uuid.uuid4())[3]
+    assert sorted(r.target_uri for r in refs) == [f"{_URL}105#pr16", f"{_URL}106"]

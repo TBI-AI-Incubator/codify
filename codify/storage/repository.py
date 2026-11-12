@@ -493,6 +493,20 @@ def _effect_identity(row: AmendmentEffectRow) -> tuple[Any, ...]:
     )
 
 
+def _overlay_rows(
+    held: list[AmendmentEffectRow], derived: list[AmendmentEffectRow]
+) -> list[AmendmentEffectRow]:
+    """Held rows that stay: publisher rows, and dated rows the AKN no longer declares."""
+    declared = {(_effect_identity(row), row.in_force_date) for row in derived}
+    return [
+        row
+        for row in held
+        if row.publisher_effect_id is not None
+        or row.applied is not None
+        or (_effect_identity(row), row.in_force_date) not in declared
+    ]
+
+
 _DerivedRows = tuple[
     str,
     list[Section],
@@ -599,29 +613,32 @@ async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, ak
     # rebuilds intra-document refs only, so cross-version resolution around a
     # repaired law is lost until a resolve-references pass runs.
     vid = version_id
-    # These fields identify an external overlay, including legacy sidecars without
-    # publisher IDs. A date the AKN declares matches its derived effect by identity. Keep the
-    # row and its metadata even if its target disappears; the timeline reports a
-    # missing-target hole. Unannotated legacy rows have no such evidence and
-    # remain ordinary derived rows. Caller rollback covers both sets.
+    # A row with a publisher id, an applied flag or a date is an external overlay and is
+    # kept even if its target disappears, except a dated row whose identity and date the
+    # AKN still declares, which is replaced. A date the AKN no longer declares cannot be
+    # told from a sidecar date, so it stays. Caller rollback covers both sets.
     external = or_(
         AmendmentEffectRow.publisher_effect_id.is_not(None),
         AmendmentEffectRow.in_force_date.is_not(None),
         AmendmentEffectRow.applied.is_not(None),
     )
-    retained = list(
+    held = list(
         (
             await session.execute(
                 select(AmendmentEffectRow).where(AmendmentEffectRow.version_id == vid, external)
             )
         ).scalars()
     )
+    retained = _overlay_rows(held, amendment_effects)
     retained_keys = {_effect_identity(row) for row in retained}
     amendment_effects = [
         row for row in amendment_effects if _effect_identity(row) not in retained_keys
     ]
     await session.execute(
-        delete(AmendmentEffectRow).where(AmendmentEffectRow.version_id == vid, ~external)
+        delete(AmendmentEffectRow).where(
+            AmendmentEffectRow.version_id == vid,
+            AmendmentEffectRow.id.not_in([row.id for row in retained]),
+        )
     )
     await session.execute(delete(LifecycleEventRow).where(LifecycleEventRow.version_id == vid))
     await session.execute(delete(Provision).where(Provision.version_id == vid))

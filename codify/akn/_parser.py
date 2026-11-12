@@ -139,6 +139,11 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
         for child in list(prose):
             if isinstance(child.tag, str) and (_local(child) == "num" or is_lifted_note(child)):
                 prose.remove(child)
+        if _local(el) == "p":
+            # Alone in a one-child container, the line is read as inline text.
+            holder = etree.Element(el.tag)
+            holder.append(prose)
+            prose = holder
         text, refs = _extract_text_and_refs(prose)
         seen.add(eid)
         out.append(
@@ -580,15 +585,14 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
             source_el = _akn_child(mod_el, "source")
             if source_el is not None and not source_href:
                 authority = authority or source_el.get("href") or None
-                if "#" in target_href:
+                if target_href:
                     source_href = target_href.rsplit("#", 1)[-1]
                 if target_wid is None and "#" in target_href:
                     target_wid = target_href.rsplit("#", 1)[-1]
             for_ref = mod_el.get("for") or None
             if for_ref and for_ref.startswith("#"):
                 for_ref = for_ref[1:]
-            # A destination with no fragment is a whole-work effect.
-            if not target_href or (not source_href and source_el is None):
+            if not source_href or not target_href:
                 continue
             out.append(
                 TextualMod(
