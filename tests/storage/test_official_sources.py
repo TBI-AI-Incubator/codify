@@ -374,3 +374,83 @@ async def test_a_provision_url_prefers_an_anchor_and_waits_for_verification(
     url = await official_provision_url(session, version, source, "section-13-2")
     assert url is not None and "/section/13/2A" in url
     assert await official_provision_url(session, version, source, "crossheading-x") is None
+
+
+async def test_a_citation_older_than_every_held_version_resolves_to_the_law_only(
+    session: AsyncSession,
+) -> None:
+    tag = uuid.uuid4().hex[:8]
+    target_work = f"/akn/xa/act/2000/f-{tag}"
+    await save_document(
+        session,
+        _doc(target_work, date(2025, 1, 1)),
+        jurisdiction_code="xa",
+        law_title="Target",
+        year=2000,
+        akn_xml=_BODY,
+    )
+    redaction = f"7{tag}"
+    await upsert_official_ids(session, _RT, [(redaction, target_work, "redaction")])
+    citing = await save_document(
+        session,
+        _doc(f"/akn/xa/act/2019/c-{tag}", date(2019, 1, 1)),
+        jurisdiction_code="xa",
+        law_title="Citing",
+        year=2019,
+        akn_xml=_BODY,
+    )
+    source = (
+        await session.execute(
+            select(Provision.id).where(Provision.version_id == citing, Provision.akn_eid == "art_1")
+        )
+    ).scalar_one()
+    ref = CrossReference(
+        source_provision_id=source,
+        target_uri=f"https://www.riigiteataja.ee/akt/{redaction}#para1",
+        ref_type="citation",
+        edge_class="freetext_reference",
+    )
+    session.add(ref)
+    await session.flush()
+    await resolve_references_for_version(session, citing)
+    assert ref.target_provision_id is None and ref.target_law_id is not None
+
+
+async def test_a_mapped_rada_url_resolves_through_official_ids_first(
+    session: AsyncSession,
+) -> None:
+    tag = uuid.uuid4().hex[:8]
+    work = f"/akn/xa/act/2000/r-{tag}"
+    await save_document(
+        session,
+        _doc(work, date(2020, 1, 1)),
+        jurisdiction_code="xa",
+        law_title="Target",
+        year=2000,
+        akn_xml=_BODY,
+    )
+    nreg = f"{tag}-15"
+    await upsert_official_ids(session, "zakon-rada", [(nreg, work, "nreg")])
+    citing = await save_document(
+        session,
+        _doc(f"/akn/xa/act/2021/c-{tag}", date(2021, 1, 1)),
+        jurisdiction_code="xa",
+        law_title="Citing",
+        year=2021,
+        akn_xml=_BODY,
+    )
+    source = (
+        await session.execute(
+            select(Provision.id).where(Provision.version_id == citing, Provision.akn_eid == "art_1")
+        )
+    ).scalar_one()
+    ref = CrossReference(
+        source_provision_id=source,
+        target_uri=f"https://zakon.rada.gov.ua/laws/show/{nreg}",
+        ref_type="citation",
+        edge_class="freetext_reference",
+    )
+    session.add(ref)
+    await session.flush()
+    stats = await resolve_references_for_version(session, citing)
+    assert ref.target_law_id is not None and stats.resolved_official == 1

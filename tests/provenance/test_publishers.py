@@ -417,3 +417,26 @@ def test_an_oecd_french_edition_never_falls_back_to_the_english_page(
         "https://legalinstruments.oecd.org/fr/instruments/OECD-LEGAL-0368",
         "act",
     )
+
+
+@pytest.mark.parametrize(
+    ("url", "fragment"),
+    [
+        ("https://www.legislation.gov.uk/ukpga/1998/42#section-13", "section-13"),
+        ("https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679#art_5", "art_5"),
+    ],
+)
+def test_an_explicit_url_fragment_is_kept(url: str, fragment: str) -> None:
+    parsed = parse_official_url(url)
+    assert parsed is not None and parsed.fragment == fragment
+
+
+def test_an_ocs_timeline_id_may_hold_slashes_plus_and_equals(all_verified: None) -> None:
+    url = PUBLISHERS["ocs"].edition_url("x", "+/8=")
+    assert url is not None
+    parsed = parse_official_url(url)
+    assert parsed is not None and parsed.edition_id == "+/8="
+
+
+def test_a_malformed_url_is_not_a_publisher_url() -> None:
+    assert parse_official_url("https://[broken/") is None

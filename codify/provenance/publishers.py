@@ -141,7 +141,7 @@ def _gb_parse(u: SplitResult) -> ParsedUrl | None:
         segments.pop()
     edition = next((s for s in segments if _GB_EDITION.fullmatch(s)), None)
     provision = [s for s in segments if s != edition and s not in ("welsh", "contents")]
-    fragment = "/".join(provision) or None
+    fragment = u.fragment or "/".join(provision) or None
     return ParsedUrl(
         "legislation-gov-uk", "legislation-gov-uk.edition", work, edition, fragment, (work,)
     )
@@ -211,7 +211,7 @@ def _eur_parse(u: SplitResult) -> ParsedUrl | None:
         "eur-lex.act" if edition is None else "eur-lex.edition",
         work,
         edition,
-        None,
+        u.fragment or None,
         (work,),
     )
 
@@ -279,7 +279,7 @@ def _qbz_parse(u: SplitResult) -> ParsedUrl | None:
 # Council of State (Thailand)
 
 _OCS = "https://searchlaw.ocs.go.th"
-_OCS_FRAGMENT = re.compile(r"^/public/doc/([0-9A-Za-z-]+)/?$")
+_OCS_FRAGMENT = re.compile(r"^/public/doc/(.+?)/?$")
 
 
 def _ocs_parse(u: SplitResult) -> ParsedUrl | None:
@@ -483,7 +483,10 @@ ADAPTER_PUBLISHERS: dict[str, str | None] = {
 
 def parse_official_url(url: str) -> ParsedUrl | None:
     """The publisher and ids an official URL names; None for any other URL."""
-    parts = urlsplit(url.strip())
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return None
     if parts.scheme not in ("http", "https"):
         return None
     host = _host(parts.netloc)

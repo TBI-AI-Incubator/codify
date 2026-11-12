@@ -362,6 +362,8 @@ async def test_the_fallback_takes_the_pdf_the_metadata_names_over_https() -> Non
     assert acquired.source_url == seen[1]
     assert acquired.frbr_work_uri == "/akn/gb/act/nisi/1982/7"
     assert acquired.expression_uri == "http://www.legislation.gov.uk/xsi/1982/7/made"
+    assert acquired.official is not None
+    assert (acquired.official.work_id, acquired.official.edition_id) == ("nisi/1982/7", "made")
 
 
 async def test_the_fallback_is_opt_in() -> None:

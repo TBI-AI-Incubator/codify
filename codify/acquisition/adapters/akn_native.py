@@ -291,7 +291,7 @@ class AknNativeAcquirer:
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
             licence=self._adapter.licence,
-            official=_official(pdf_url, expression if language == "eng" else None),
+            official=_official(url, expression if language == "eng" else None),
         )
 
     async def enumerate(  # noqa: A003

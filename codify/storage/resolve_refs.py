@@ -326,7 +326,7 @@ class _LawCache:
     names_by_law: dict[uuid.UUID, list[tuple[uuid.UUID, str]]] = field(default_factory=dict)
     scoped_evidence: dict[tuple[uuid.UUID, str, str], tuple[str, str]] | None = None
     official_work: dict[tuple[str, str], str | None] = field(default_factory=dict)
-    in_force: dict[tuple[str, date | None], tuple[uuid.UUID, uuid.UUID] | None] = field(
+    in_force: dict[tuple[str, date | None], tuple[uuid.UUID, uuid.UUID | None] | None] = field(
         default_factory=dict
     )
 
@@ -582,8 +582,9 @@ async def _official_work_uri(
 
 async def _law_version_in_force(
     session: AsyncSession, cache: _LawCache, work_uri: str, on: date | None
-) -> tuple[uuid.UUID, uuid.UUID] | None:
-    """The held version in force on `on` (the latest not after it), else the latest."""
+) -> tuple[uuid.UUID, uuid.UUID | None] | None:
+    """The held version in force on `on` (the latest not after it). Where every held version
+    is later, only the law: a unit of text that did not exist yet is no target."""
     if on is None:
         return await _law_latest_version(session, cache, work_uri)
     key = (work_uri, on)
@@ -599,10 +600,48 @@ async def _law_version_in_force(
                 .limit(1)
             )
         ).one_or_none()
-        cache.in_force[key] = (
-            (row[0], row[1]) if row else await _law_latest_version(session, cache, work_uri)
-        )
+        latest = None if row else await _law_latest_version(session, cache, work_uri)
+        cache.in_force[key] = (row[0], row[1]) if row else (latest[0], None) if latest else None
     return cache.in_force[key]
+
+
+async def _stamp_official(
+    session: AsyncSession,
+    cache: _LawCache,
+    ref: CrossReference,
+    official: ParsedUrl,
+    citing_date: date | None,
+    stats: ResolveStats,
+) -> bool:
+    """Resolve a publisher URL through `official_ids`; False when no held law answers it."""
+    work_uri = await _official_work_uri(session, cache, official)
+    hit = await _law_version_in_force(session, cache, work_uri, citing_date) if work_uri else None
+    if hit is None:
+        return False
+    # An exact publisher id names the instrument, so the text need not.
+    law_id, target_version_id = hit
+    if official.fragment and target_version_id is not None:
+        eid = await eid_for_fragment(session, target_version_id, official.fragment)
+        pid = await _provision_in_version(session, target_version_id, eid) if eid else None
+        sid = (
+            await _section_in_version(session, target_version_id, eid)
+            if eid and pid is None
+            else None
+        )
+        if pid is not None or sid is not None:
+            if pid is not None:
+                ref.target_provision_id = pid
+                stats.resolved_provision += 1
+            else:
+                ref.target_section_id = sid
+                stats.resolved_section += 1
+            stats.resolved_official += 1
+            return True
+        stats.fragment_fallback += 1
+    ref.target_law_id = law_id
+    stats.resolved_law += 1
+    stats.resolved_official += 1
+    return True
 
 
 def _answers_a_reference() -> ColumnElement[bool]:
@@ -951,6 +990,11 @@ async def resolve_references_for_version(
             else:
                 stats.missing_same_doc += 1
             continue
+        official = parse_official_url(uri)
+        if official is not None and await _stamp_official(
+            session, cache, ref, official, citing_date, stats
+        ):
+            continue
         is_registry, registry_law = await _registry_target(session, version_id, uri)
         if is_registry:
             if registry_law is not None:
@@ -961,43 +1005,10 @@ async def resolve_references_for_version(
             continue
         parsed = parse_source_ref(uri)
         if parsed is None:
-            official = parse_official_url(uri)
-            if official is None:
-                stats.unparsed += 1
-                continue
-            official_work = await _official_work_uri(session, cache, official)
-            hit = (
-                await _law_version_in_force(session, cache, official_work, citing_date)
-                if official_work
-                else None
-            )
-            if hit is None:
+            if official is not None:
                 stats.unknown_law += 1
-                continue
-            # An exact publisher id names the instrument, so the text need not.
-            law_id, target_version_id = hit
-            if official.fragment:
-                eid = await eid_for_fragment(session, target_version_id, official.fragment)
-                pid = await _provision_in_version(session, target_version_id, eid) if eid else None
-                sid = (
-                    await _section_in_version(session, target_version_id, eid)
-                    if eid and pid is None
-                    else None
-                )
-                if pid is not None:
-                    ref.target_provision_id = pid
-                    stats.resolved_provision += 1
-                    stats.resolved_official += 1
-                    continue
-                if sid is not None:
-                    ref.target_section_id = sid
-                    stats.resolved_section += 1
-                    stats.resolved_official += 1
-                    continue
-                stats.fragment_fallback += 1
-            ref.target_law_id = law_id
-            stats.resolved_law += 1
-            stats.resolved_official += 1
+            else:
+                stats.unparsed += 1
             continue
         work_uri, eid = parsed
         # A citation carrying the unknown-year placeholder names no enactment

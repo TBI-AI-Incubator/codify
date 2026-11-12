@@ -419,6 +419,8 @@ class OcsAcquirer(BaseAcquirer):
                     ),
                     "",
                 )
+        # An amending text is another act: its own timeline code, not the law's.
+        official_code = str(info.get("timelineLawCode" if kind == "amending" else "lawCode") or "")
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=work,
@@ -432,12 +434,9 @@ class OcsAcquirer(BaseAcquirer):
             gazette_ref=gazette_ref(payload.get("footnoteList") or [], published),
             upstream_metadata=upstream,
             official=OfficialRef(
-                publisher="ocs",
-                work_id=str(info["lawCode"]),
-                edition_id=timeline_id,
-                edition_date=as_of,
+                publisher="ocs", work_id=official_code, edition_id=timeline_id, edition_date=as_of
             )
-            if info.get("lawCode")
+            if official_code
             else None,
         )
 
