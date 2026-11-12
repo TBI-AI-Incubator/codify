@@ -152,7 +152,9 @@ def _gb_fragment(work: str, edition: str | None, fragment: str) -> str:
 
 
 def _gb_fragment_pattern(fragment: str) -> str:
-    return f"legislation-gov-uk.fragment.{fragment.split('/', 1)[0]}"
+    """Keyed by kind and depth: `section/13` is depth 1, `section/13/2` depth 2, deeper is 3."""
+    kind, *rest = fragment.split("/")
+    return f"legislation-gov-uk.fragment.{kind}.{min(len(rest), 3)}"
 
 
 _GB_PROVISIONS = ("section", "article", "regulation", "rule", "schedule")
@@ -183,9 +185,9 @@ def _celex_ids(celex: str) -> tuple[str, str | None]:
 
 
 def _eu_eid_fragment(eid: str) -> str | None:
-    """The last article of an eId; none for an annex or a renamed duplicate."""
+    """The last article of an eId; none for an annex, quoted amending text or a duplicate."""
     parts = eid.split("__")
-    if any(p.startswith("att_") or "_dup" in p for p in parts):
+    if any(p.startswith(("att_", "mod_", "qstr_")) or "_dup" in p for p in parts):
         return None
     articles = [p for p in parts if re.fullmatch(r"art_\d+", p)]
     return articles[-1] if articles else None
@@ -247,24 +249,20 @@ def _rada_parse(u: SplitResult) -> ParsedUrl | None:
     if m := re.match(r"^/go/([^/]+)/?$", u.path):
         nreg, edition = unquote(m[1]), None
     elif m := _RADA_PATH.match(u.path):
-        nreg, edition = unquote(m["nreg"]), m["ed"] or m["lang"]
+        nreg = unquote(m["nreg"])
+        edition = "/".join(x for x in (m["lang"], m["ed"]) if x) or None
     else:
         return None
     pattern = "zakon-rada.edition" if edition else "zakon-rada.act"
     return ParsedUrl("zakon-rada", pattern, nreg, edition, u.fragment or None, (nreg,))
 
 
-def _rada_act(work_id: str, edition_id: str | None) -> str:
-    return f"{_RADA}/laws/show/{quote(work_id, safe='/')}"
-
-
-def _rada_edition(work_id: str, edition_id: str) -> str:
-    nreg = quote(work_id, safe="/")
-    return (
-        f"{_RADA}/laws/show/en/{nreg}"
-        if edition_id == "en"
-        else f"{_rada_act(work_id, None)}/{edition_id}"
-    )
+def _rada_page(work_id: str, edition_id: str | None) -> str:
+    """The page for an edition id made of an optional `en` and an optional `ed` date."""
+    parts = (edition_id or "").split("/")
+    lang = "en/" if "en" in parts else ""
+    ed = next((f"/{p}" for p in parts if p.startswith("ed")), "")
+    return f"{_RADA}/laws/show/{lang}{quote(work_id, safe='/')}{ed}"
 
 
 # QBZ (Albania)
@@ -303,12 +301,18 @@ _DRE_PATH = re.compile(
 )
 
 
+def _dre_work(work: str) -> str:
+    """The undated work: consolidated texts are addressed without the printed date."""
+    return re.sub(r"/\d{2}/\d{2}$", "", work)
+
+
 def _dre_parse(u: SplitResult) -> ParsedUrl | None:
     m = _DRE_PATH.match(u.path)
     if m is None:
         return None
+    work = _dre_work(m["work"])
     pattern = "dre.edition" if m["date"] else "dre.act"
-    return ParsedUrl("dre", pattern, m["work"], m["date"], None, (m["work"],))
+    return ParsedUrl("dre", pattern, work, m["date"], None, (work,))
 
 
 # Boletín Oficial del Estado (Spain)
@@ -376,7 +380,7 @@ def _build() -> tuple[Publisher, ...]:
             "OECD Legal Instruments",
             ("legalinstruments.oecd.org",),
             _oecd_parse,
-            act=lambda w, e: _oecd_url(w, "en"),
+            act=lambda w, e: _oecd_url(w, e or "en"),
             edition=lambda w, e: _oecd_url(w, e),
         ),
         Publisher(
@@ -384,12 +388,10 @@ def _build() -> tuple[Publisher, ...]:
             "Verkhovna Rada",
             ("zakon.rada.gov.ua",),
             _rada_parse,
-            act=_rada_act,
-            edition=_rada_edition,
-            current=lambda w, e: _rada_act(w, None),
-            fragment=lambda w, e, f: (
-                f"{_rada_act(w, None)}/{e}#{f}" if e else f"{_rada_act(w, None)}#{f}"
-            ),
+            act=lambda w, e: _rada_page(w, None),
+            edition=_rada_page,
+            current=lambda w, e: _rada_page(w, None),
+            fragment=lambda w, e, f: f"{_rada_page(w, e)}#{f}",
         ),
         Publisher(
             "qbz",
@@ -412,8 +414,8 @@ def _build() -> tuple[Publisher, ...]:
             ("data.dre.pt",),
             _dre_parse,
             act=lambda w, e: f"{_DRE}/{w}/p/dre",
-            edition=lambda w, e: f"{_DRE}/{w}/p/cons/{e}",
-            current=lambda w, e: f"{_DRE}/{w}/p/cons",
+            edition=lambda w, e: f"{_DRE}/{_dre_work(w)}/p/cons/{e}",
+            current=lambda w, e: f"{_DRE}/{_dre_work(w)}/p/cons",
         ),
         Publisher(
             "boe",
@@ -448,7 +450,13 @@ def _register_patterns() -> None:
             if builder is not None
         ]
         PATTERN_VERIFIED.update({f"{p.key}.{k}": False for k in kinds})
-    PATTERN_VERIFIED.update({f"legislation-gov-uk.fragment.{k}": False for k in _GB_PROVISIONS})
+    PATTERN_VERIFIED.update(
+        {
+            f"legislation-gov-uk.fragment.{k}.{depth}": False
+            for k in _GB_PROVISIONS
+            for depth in (1, 2, 3)
+        }
+    )
     PATTERN_VERIFIED.pop("legislation-gov-uk.fragment", None)
 
 

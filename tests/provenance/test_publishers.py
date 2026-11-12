@@ -237,7 +237,7 @@ def test_builders_round_trip_through_the_parser(all_verified: None) -> None:
         ("zakon-rada", "254к/96-вр", "ed20260525"),
         ("ocs", "ก0003-1B-0001", "abc123"),
         ("dre", "lei/12/2020", "20240101"),
-        ("dre", "dec-lei/7/2009/02/12", "20240101"),
+        ("dre", "dec-lei/7/2009", "20240101"),
     ]
     for key, work, edition in cases:
         publisher = PUBLISHERS[key]
@@ -268,12 +268,14 @@ def test_a_fragment_is_withheld_until_its_pattern_is_verified(
 
 def test_a_gb_fragment_is_verified_per_provision_kind(monkeypatch: pytest.MonkeyPatch) -> None:
     gb = PUBLISHERS["legislation-gov-uk"]
-    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section", True)
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
     assert (
         gb.provision_url("ukpga/1998/42", None, "section/13/2")
         == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2"
     )
     assert gb.provision_url("ukpga/1998/42", None, "schedule/1/part/3") is None
+    assert gb.provision_url("ukpga/1998/42", None, "section/13") is None
+    assert gb.provision_url("ukpga/1998/42", None, "section/13/2/a") is None
 
 
 def test_celex_ref_keeps_a_consolidated_text_as_the_edition() -> None:
@@ -344,11 +346,20 @@ def test_a_suffixed_celex_is_not_cut_to_another_act() -> None:
     assert celex_ref("32016R0679R(01)").work_id == "32016R0679"
 
 
-def test_the_dated_dre_work_keeps_its_date_in_the_act_url(all_verified: None) -> None:
-    assert (
-        PUBLISHERS["dre"].act_url("dec-lei/7/2009/02/12")
-        == "https://data.dre.pt/eli/dec-lei/7/2009/02/12/p/dre"
+def test_a_dated_dre_work_is_stored_undated_and_consolidated_links_drop_the_date(
+    all_verified: None,
+) -> None:
+    dre = PUBLISHERS["dre"]
+    assert dre.edition_url("dec-lei/7/2009/02/12", "20240101") == (
+        "https://data.dre.pt/eli/dec-lei/7/2009/p/cons/20240101"
     )
+    assert (
+        dre.current_url("dec-lei/7/2009/02/12") == "https://data.dre.pt/eli/dec-lei/7/2009/p/cons"
+    )
+    cons = parse_official_url("https://data.dre.pt/eli/dec-lei/7/2009/p/cons/20240101")
+    printed = parse_official_url("https://data.dre.pt/eli/dec-lei/7/2009/02/12/p/dre")
+    assert cons is not None and printed is not None
+    assert cons.work_id == printed.work_id == "dec-lei/7/2009"
 
 
 @pytest.mark.parametrize(
@@ -363,6 +374,7 @@ def test_the_dated_dre_work_keeps_its_date_in_the_act_url(all_verified: None) ->
         ("eur-lex", "chp_1__sec_2__art_5__para_1", "art_5"),
         ("eur-lex", "art_1__para_1", "art_1"),
         ("eur-lex", "att_1__art_2", None),
+        ("eur-lex", "art_1__para_2__mod_1__qstr_1__art_5", None),
         ("eur-lex", "art_3_dup1", None),
         ("eur-lex", "recitals__rec_4", None),
         ("riigi-teataja", "art_10", None),
@@ -377,7 +389,31 @@ def test_an_eid_gives_a_fragment_only_where_a_rule_is_sure(
 def test_the_rada_english_edition_has_its_own_page(all_verified: None) -> None:
     rada = PUBLISHERS["zakon-rada"]
     assert rada.edition_url("435-15", "en") == "https://zakon.rada.gov.ua/laws/show/en/435-15"
+    assert rada.provision_url("435-15", "en/ed20260525", "n12") == (
+        "https://zakon.rada.gov.ua/laws/show/en/435-15/ed20260525#n12"
+    )
     assert (
         rada.edition_url("435-15", "ed20260525")
         == "https://zakon.rada.gov.ua/laws/show/435-15/ed20260525"
+    )
+
+
+def test_a_rada_url_keeps_both_language_and_date() -> None:
+    parsed = parse_official_url("https://zakon.rada.gov.ua/laws/show/en/435-15/ed20260525#n12")
+    assert parsed is not None
+    assert (parsed.work_id, parsed.edition_id, parsed.fragment) == (
+        "435-15",
+        "en/ed20260525",
+        "n12",
+    )
+
+
+def test_an_oecd_french_edition_never_falls_back_to_the_english_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(PATTERN_VERIFIED, "oecd-compendium.act", True)
+    oecd = PUBLISHERS["oecd-compendium"]
+    assert oecd.page_url("OECD/LEGAL/0368", "fr") == (
+        "https://legalinstruments.oecd.org/fr/instruments/OECD-LEGAL-0368",
+        "act",
     )
