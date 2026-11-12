@@ -6,6 +6,7 @@ import uuid
 from datetime import date
 
 import pytest
+import structlog
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, validate_akn
@@ -57,6 +58,13 @@ def _loige(nr: int, text: str, notes: str = "") -> str:
     )
 
 
+def _counts(xml: str) -> dict[str, int]:
+    with structlog.testing.capture_logs() as logs:
+        riigi_teataja_to_akn(xml)
+    events = [e for e in logs if e["event"] == "riigi_teataja_notes"]
+    return {k: v for e in events for k, v in e.items() if k not in ("event", "log_level", "work")}
+
+
 def _mods(akn: str) -> list[etree._Element]:
     return list(etree.fromstring(akn.encode()).iter(f"{N}textualMod"))
 
@@ -69,7 +77,6 @@ def test_note_becomes_textual_mod_on_its_unit() -> None:
     assert mod.get("type") == "substitution"
     assert mod.find(f"{N}source").get("href") == f"{_URL}750865"
     assert mod.find(f"{N}destination").get("href").endswith("/main#art_1__para_1")
-    assert meta["amendment_notes"]["kept"] == 1
     assert meta["source_anchors"]["art_1__para_1"] == "para1lg1"
     assert meta["source_anchors"]["art_1"] == "para1"
 
@@ -94,7 +101,6 @@ def test_repeal_note_is_a_repeal() -> None:
     notes = _note("118022014002", lead="Kehtetu - ")
     akn, meta = riigi_teataja_to_akn(_act(_loige(1, "Kehtetu.", notes) + _loige(2, "B.")))
     assert _mods(akn)[0].get("type") == "repeal"
-    assert meta["amendment_notes"]["repeal"] == 1
 
 
 @pytest.mark.parametrize(
@@ -111,20 +117,13 @@ def test_qualified_entry_into_force_is_left_undated(tail: str) -> None:
     )
     (mod,) = _mods(akn)
     assert mod.find(f"{N}force") is None
-    assert meta["amendment_notes"]["undated"] == 1
 
 
 def test_unusable_notes_are_skipped_and_counted() -> None:
     body = _loige(1, "A.", _note(None)) + _loige(2, "B.", _note("750865", joustumine=None))
     xml = _act(body).replace("<sisu>", f"<sisu>{_note('750865')}", 1)
     akn, meta = riigi_teataja_to_akn(xml)
-    assert meta["amendment_notes"] == {
-        "skipped_no_amending_act": 1,
-        "skipped_no_unit": 1,
-        "kept": 1,
-        "amendment": 1,
-        "undated": 1,
-    }
+    assert _counts(xml) == {"skipped_no_amending_act": 1, "skipped_no_unit": 1, "kept": 1}
     assert len(_mods(akn)) == 1
 
 
@@ -134,7 +133,7 @@ def test_act_level_note_is_a_lifecycle_event_not_an_effect() -> None:
     )
     akn, meta = riigi_teataja_to_akn(xml)
     validate_akn(akn)
-    assert meta["amendment_notes"] == {"whole_act_event": 1}
+    assert _counts(xml) == {"whole_act_event": 1}
     doc = parse_akn(akn)
     assert doc.textual_mods == []
     (event,) = doc.lifecycle_events
@@ -147,15 +146,16 @@ def test_undated_act_level_note_is_skipped() -> None:
         "</oigusakt>", _note("750865", tail=", osaliselt 01.01.2007") + "</oigusakt>"
     )
     akn, meta = riigi_teataja_to_akn(xml)
-    assert meta["amendment_notes"] == {"skipped_whole_act_undated": 1}
+    assert _counts(xml) == {"skipped_whole_act_undated": 1}
     assert parse_akn(akn).lifecycle_events == []
 
 
 def test_repeated_source_id_is_not_a_unit() -> None:
     twin = _loige(1, "A.", _note("750865")).replace("para1lg1", "dup")
     other = _loige(2, "B.", _note("1")).replace("para1lg2", "dup")
-    akn, meta = riigi_teataja_to_akn(_act(twin + other))
-    assert meta["amendment_notes"] == {"skipped_repeated_unit_id": 2}
+    xml = _act(twin + other)
+    akn, _ = riigi_teataja_to_akn(xml)
+    assert _counts(xml) == {"skipped_repeated_unit_id": 2}
     assert _mods(akn) == []
 
 
@@ -258,9 +258,10 @@ def test_formula_line_with_two_references_keeps_text_and_both() -> None:
 
 def test_note_on_a_unit_without_an_id_is_not_the_enclosing_unit() -> None:
     bare = _loige(1, "A.", _note("750865")).replace(' id="para1lg1"', "")
-    akn, meta = riigi_teataja_to_akn(_act(bare + _loige(2, "B.")))
+    xml = _act(bare + _loige(2, "B."))
+    akn, _ = riigi_teataja_to_akn(xml)
     assert _mods(akn) == []
-    assert meta["amendment_notes"] == {"skipped_no_unit": 1}
+    assert _counts(xml) == {"skipped_no_unit": 1}
 
 
 def test_note_on_a_collapsed_single_paragraph_belongs_to_its_article() -> None:
@@ -294,5 +295,23 @@ def test_plain_entry_into_force_label_keeps_the_date() -> None:
     akn, meta = riigi_teataja_to_akn(
         _act(_loige(1, "A.", _note("750865", tail="- jõust.")) + _loige(2, "B."))
     )
-    assert meta["amendment_notes"]["dated"] == 1
     assert parse_akn(akn).textual_mods[0].in_force_date == date(2004, 6, 1)
+
+
+_X = "<sisuTekst><tavatekst>x</tavatekst></sisuTekst>"
+
+
+def _point(note: str = "") -> str:
+    return f'<alampunkt id="para1lg1p1"><alampunktNr>1</alampunktNr>{_X}{note}</alampunkt>'
+
+
+def test_unnumbered_paragraph_with_points_keeps_its_own_note() -> None:
+    only = f'<loige id="para1lg1">{_X}{_point()}{_note("750865")}</loige>'
+    akn, _ = riigi_teataja_to_akn(_act(only))
+    assert _mods(akn)[0].find(f"{N}destination").get("href").endswith("#art_1__para_1")
+
+
+def test_note_on_a_point_targets_the_point() -> None:
+    body = f'<loige id="para1lg1"><loigeNr>1</loigeNr>{_X}{_point(_note("750865"))}</loige>'
+    akn, _ = riigi_teataja_to_akn(_act(body + _loige(2, "B.")))
+    assert _mods(akn)[0].find(f"{N}destination").get("href").endswith("#art_1__para_1__point_1")

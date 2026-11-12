@@ -37,16 +37,14 @@ from codify.pipeline.formats.riigi_teataja_annexes import (
     annex_elements,
     annex_url,
 )
+from codify.pipeline.formats.riigi_teataja_notes import AKT_URL, FOLDED, annotate
 from codify.pipeline.formats.riigi_teataja_notes import MARK as _MARK
-from codify.pipeline.formats.riigi_teataja_notes import annotate
+from codify.pipeline.formats.riigi_teataja_notes import local as _local
+from codify.pipeline.formats.riigi_teataja_notes import q as _q
 
 logger = structlog.get_logger()
 
 NSMAP = {None: AKN_NS}
-
-
-def _q(tag: str) -> str:
-    return f"{{{AKN_NS}}}{tag}"
 
 
 _SUPERSCRIPT_MAP = {
@@ -114,10 +112,6 @@ def _mark(el: etree._Element, src: etree._Element) -> etree._Element:
     return el
 
 
-def _local(el: etree._Element) -> str:
-    return etree.QName(el).localname if isinstance(el.tag, str) else ""
-
-
 def _clean_text(el: etree._Element | None) -> str:
     """All text under ``el`` with its tails, whitespace collapsed; superscript
     digits stay superscript and a line break is a space."""
@@ -140,7 +134,6 @@ def _clean_text(el: etree._Element | None) -> str:
     return " ".join("".join(parts).split())
 
 
-_AKT_URL = "https://www.riigiteataja.ee/akt/"
 _VIIDE_ID = re.compile(r"id=([^&]+)")
 _VIIDE_TARGET = re.compile(r"(\d+)(?:!([a-z]+\d\w*))?")
 
@@ -153,12 +146,12 @@ def _viide_targets(raw_uri: str) -> list[str]:
     m = _VIIDE_ID.search(raw_uri)
     if not m:
         bare = re.fullmatch(r"\./(\d+)", raw_uri)
-        return [f"{_AKT_URL}{bare.group(1)}" if bare else raw_uri]
+        return [f"{AKT_URL}{bare.group(1)}" if bare else raw_uri]
     urls: list[str] = []
     for part in m.group(1).split(";"):
         t = _VIIDE_TARGET.fullmatch(part)
         if t:
-            urls.append(f"{_AKT_URL}{t.group(1)}" + (f"#{t.group(2)}" if t.group(2) else ""))
+            urls.append(f"{AKT_URL}{t.group(1)}" + (f"#{t.group(2)}" if t.group(2) else ""))
     return urls or [raw_uri]
 
 
@@ -610,6 +603,7 @@ def _convert_paragrahv(
     single_has_points = single_unnumbered and bool(loiked[0].findall("{*}alampunkt"))
 
     if single_unnumbered and not single_has_points:
+        loiked[0].set(FOLDED, "1")
         own = _split_text(loiked[0], None)[0]
         c = etree.SubElement(art, _q("content"))
         _fill(
@@ -1111,7 +1105,7 @@ def riigi_teataja_to_akn(
         ),
     )
     unique_xml, _ = ensure_unique_eids(raw_xml_out, huge_tree=True)
-    unique_xml, anchors, note_counts = annotate(unique_xml, root, work_uri)
+    unique_xml, anchors = annotate(unique_xml, root, work_uri)
 
     metadata: dict[str, Any] = {
         "title": title,
@@ -1130,7 +1124,6 @@ def riigi_teataja_to_akn(
         },
     }
     metadata["source_anchors"] = anchors
-    metadata["amendment_notes"] = note_counts
     if left_out:
         # A wrong layout call drops body text, so each document says what it left out.
         logger.info("riigi_teataja_tables_left_out", expression=exp_uri, **left_out)

@@ -537,25 +537,26 @@ def _inner_xml_or_text(el: etree._Element) -> str:
     return (el.text or "").strip()
 
 
-def _force_date(meta: etree._Element, mod_el: etree._Element) -> date | None:
-    """The date a mod's `<force period>` starts: its temporal group's first interval, read
-    through the event it names."""
-    force = _akn_child(mod_el, "force")
-    period = ((force.get("period") if force is not None else "") or "").lstrip("#")
-    if not period:
-        return None
+def _force_periods(meta: etree._Element) -> dict[str, date]:
+    """Start date of each temporal group, read through the event its interval names."""
+    events = {
+        e.get("eId"): (e.get("date") or "")[:10]
+        for e in meta.iterfind(f"{{{AKN_NS}}}lifecycle/{{{AKN_NS}}}eventRef")
+    }
+    out: dict[str, date] = {}
     for group in meta.iterfind(f"{{{AKN_NS}}}temporalData/{{{AKN_NS}}}temporalGroup"):
-        if group.get("eId") != period:
-            continue
         interval = _akn_child(group, "timeInterval")
-        start = ((interval if interval is not None else group).get("start") or "").lstrip("#")
-        for event in meta.iterfind(f"{{{AKN_NS}}}lifecycle/{{{AKN_NS}}}eventRef"):
-            if start and event.get("eId") == start:
-                try:
-                    return date.fromisoformat((event.get("date") or "")[:10])
-                except ValueError:
-                    return None
-    return None
+        start = (interval.get("start") or "").lstrip("#") if interval is not None else ""
+        try:
+            out[group.get("eId") or ""] = date.fromisoformat(events.get(start, ""))
+        except ValueError:
+            pass
+    return out
+
+
+def _force_period(mod_el: etree._Element) -> str:
+    force = _akn_child(mod_el, "force")
+    return (force.get("period") or "").lstrip("#") if force is not None else ""
 
 
 def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
@@ -563,6 +564,7 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
     if analysis is None:
         return []
     out: list[TextualMod] = []
+    periods = _force_periods(meta)
     for container_name in ("passiveModifications", "activeModifications"):
         container = _akn_child(analysis, container_name)
         if container is None:
@@ -604,7 +606,7 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
                     quoted=_quoted_content(mod_el),
                     authority_uri=authority,
                     mod_eid_ref=for_ref,
-                    in_force_date=_force_date(meta, mod_el),
+                    in_force_date=periods.get(_force_period(mod_el)),
                 )
             )
     return out

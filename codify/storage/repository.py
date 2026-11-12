@@ -634,10 +634,11 @@ async def rederive_version_rows(session: AsyncSession, version_id: uuid.UUID, ak
     amendment_effects = [
         row for row in amendment_effects if _effect_identity(row) not in retained_keys
     ]
+    kept_ids = {row.id for row in retained}
     await session.execute(
         delete(AmendmentEffectRow).where(
             AmendmentEffectRow.version_id == vid,
-            AmendmentEffectRow.id.not_in([row.id for row in retained]),
+            or_(~external, AmendmentEffectRow.id.in_([r.id for r in held if r.id not in kept_ids])),
         )
     )
     await session.execute(delete(LifecycleEventRow).where(LifecycleEventRow.version_id == vid))

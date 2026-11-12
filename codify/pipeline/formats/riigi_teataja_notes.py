@@ -5,11 +5,15 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+import structlog
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, parse_xml
 
+logger = structlog.get_logger()
+
 MARK = "x-rt-id"
+FOLDED = "x-rt-folded"
 AKT_URL = "https://www.riigiteataja.ee/akt/"
 _UNIT_TAGS = frozenset(
     {
@@ -33,11 +37,11 @@ _PLAIN_LABEL = re.compile(r"[\s\-–.,;]*jõust(?:ub|us)?[\s.,;]*", re.I)
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
-def _q(tag: str) -> str:
+def q(tag: str) -> str:
     return f"{{{AKN_NS}}}{tag}"
 
 
-def _local(el: etree._Element) -> str:
+def local(el: etree._Element) -> str:
     return etree.QName(el).localname if isinstance(el.tag, str) else ""
 
 
@@ -61,28 +65,15 @@ _AMBIGUOUS = "\0"
 
 def _unit_eid(mark: etree._Element, by_source_id: dict[str, str]) -> str | None:
     for ancestor in mark.iterancestors():
-        if _local(ancestor) not in _UNIT_TAGS or _collapsed(ancestor):
-            continue
-        return by_source_id.get(ancestor.get("id") or "")
+        if local(ancestor) in _UNIT_TAGS and not ancestor.get(FOLDED):
+            return by_source_id.get(ancestor.get("id") or "")
     return None
-
-
-def _collapsed(unit: etree._Element) -> bool:
-    """A lone unnumbered loige, which the converter folds into its paragrahv."""
-    parent = unit.getparent()
-    return (
-        _local(unit) == "loige"
-        and parent is not None
-        and len(parent.findall("{*}loige")) == 1
-        and not (unit.findtext("{*}loigeNr") or "").strip()
-        and not unit.findall("{*}alampunkt")
-    )
 
 
 def annotate(
     akn_xml: str, source_root: etree._Element, work_uri: str
-) -> tuple[str, dict[str, str], dict[str, int]]:
-    """Move unit marks into an eId to source id map and add the notes, counting each skip."""
+) -> tuple[str, dict[str, str]]:
+    """Move unit marks into an eId to source id map and add the notes, logging each skip."""
     root = parse_xml(akn_xml, huge_tree=True)
     anchors: dict[str, str] = {}
     by_source_id: dict[str, str] = {}
@@ -102,7 +93,7 @@ def annotate(
         akt = (am.findtext("{*}aktViide") or "").strip() if am is not None else ""
         eid = _unit_eid(mark, by_source_id)
         parent = mark.getparent()
-        whole_act = eid is None and parent is not None and _local(parent) == "oigusakt"
+        whole_act = eid is None and parent is not None and local(parent) == "oigusakt"
         texts = [" ".join((t.text or "").split()) for t in mark.findall("{*}tavatekst")]
         when = (mark.findtext("{*}joustumine") or "").strip()[:10]
         dated = bool(_ISO_DATE.fullmatch(when)) and not any(
@@ -125,26 +116,26 @@ def annotate(
             first = mark[0] if len(mark) else None
             repeal = (
                 first is not None
-                and _local(first) == "tavatekst"
+                and local(first) == "tavatekst"
                 and bool(_REPEAL.match(first.text or ""))
             )
-            mod = etree.Element(_q("textualMod"), type="repeal" if repeal else "substitution")
+            mod = etree.Element(q("textualMod"), type="repeal" if repeal else "substitution")
             mod.set("eId", f"pmod_ee_{len(mods) + 1}")
-            etree.SubElement(mod, _q("source"), href=f"{AKT_URL}{akt}")
+            etree.SubElement(mod, q("source"), href=f"{AKT_URL}{akt}")
             if cite := _citation(mark):
                 citations.setdefault(akt, cite)
-            etree.SubElement(mod, _q("destination"), href=f"{work_uri}/main#{eid}")
+            etree.SubElement(mod, q("destination"), href=f"{work_uri}/main#{eid}")
             if dated:
                 index = dates.setdefault(when, len(dates) + 1)
-                etree.SubElement(mod, _q("force"), period=f"#tg_{index}")
+                etree.SubElement(mod, q("force"), period=f"#tg_{index}")
             mods.append(mod)
             counts["kept"] += 1
-            counts["repeal" if repeal else "amendment"] += 1
-            counts["dated" if dated else "undated"] += 1
 
     if mods or act_events:
         _add_meta(root, mods, dates, citations, act_events)
-    return etree.tostring(root, encoding="unicode"), anchors, dict(counts)
+    if counts:
+        logger.info("riigi_teataja_notes", work=work_uri, **counts)
+    return etree.tostring(root, encoding="unicode"), anchors
 
 
 def _add_meta(
@@ -154,59 +145,44 @@ def _add_meta(
     citations: dict[str, str],
     act_events: dict[tuple[str, str], int],
 ) -> None:
-    act = root[0]
-    meta = act.find(_q("meta"))
-    refs = meta.find(_q("references")) if meta is not None else None
+    meta = root[0].find(q("meta"))
+    refs = meta.find(q("references")) if meta is not None else None
     if meta is None or refs is None:
         return
-    if dates or act_events:
-        life = etree.Element(_q("lifecycle"), source="#codify")
-        for (akt, when), index in act_events.items():
+    events = [(f"evt_act_{i}", when, f"#rt_{akt}") for (akt, when), i in act_events.items()]
+    events += [(f"evt_{i}", when, "#codify") for when, i in dates.items()]
+    if events:
+        life = etree.Element(q("lifecycle"), source="#codify")
+        for eid, when, source in events:
             etree.SubElement(
-                life,
-                _q("eventRef"),
-                eId=f"evt_act_{index}",
-                date=when,
-                type="amendment",
-                source=f"#rt_{akt}",
-            )
-        temporal = etree.Element(_q("temporalData"), source="#codify")
-        for when, index in dates.items():
-            etree.SubElement(
-                life,
-                _q("eventRef"),
-                eId=f"evt_{index}",
-                date=when,
-                type="amendment",
-                source="#codify",
-            )
-            group = etree.SubElement(temporal, _q("temporalGroup"), eId=f"tg_{index}")
-            etree.SubElement(
-                group,
-                _q("timeInterval"),
-                start=f"#evt_{index}",
-                refersTo="#entryIntoForce",
+                life, q("eventRef"), eId=eid, date=when, type="amendment", source=source
             )
         refs.addprevious(life)
     if mods:
-        analysis = etree.Element(_q("analysis"), source="#codify")
-        passive = etree.SubElement(analysis, _q("passiveModifications"))
-        passive.extend(mods)
+        analysis = etree.Element(q("analysis"), source="#codify")
+        etree.SubElement(analysis, q("passiveModifications")).extend(mods)
         refs.addprevious(analysis)
+    if dates:
+        temporal = etree.Element(q("temporalData"), source="#codify")
+        for index in dates.values():
+            group = etree.SubElement(temporal, q("temporalGroup"), eId=f"tg_{index}")
+            etree.SubElement(
+                group, q("timeInterval"), start=f"#evt_{index}", refersTo="#entryIntoForce"
+            )
+        refs.addprevious(temporal)
     for akt, cite in citations.items():
         etree.SubElement(
             refs,
-            _q("TLCReference"),
+            q("TLCReference"),
             eId=f"rt_{akt}",
             name="amendingAct",
             href=f"{AKT_URL}{akt}",
             showAs=cite,
         )
     if dates:
-        refs.addprevious(temporal)
         etree.SubElement(
             refs,
-            _q("TLCConcept"),
+            q("TLCConcept"),
             eId="entryIntoForce",
             href="/ontology/concept/entryIntoForce",
             showAs="Entry into force",
