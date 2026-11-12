@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
+from codify.provenance import parse_official_url
 from codify.storage.models import OfficialAnchor, OfficialId, OfficialSource, Version
 
 _LINEAGE_DEPTH_CAP = 100
@@ -229,6 +230,16 @@ async def lookup_official_id(
     ).scalar_one_or_none()
 
 
+async def work_uri_for_official_url(session: AsyncSession, url: str) -> str | None:
+    """The work URI a publisher URL names, such as an amending act's, or None if unrecorded."""
+    parsed = parse_official_url(url)
+    for official_id in parsed.lookup if parsed else ():
+        row = await lookup_official_id(session, parsed.publisher, official_id)
+        if row is not None:
+            return row.frbr_work_uri
+    return None
+
+
 __all__ = [
     "OfficialSourceRead",
     "OfficialSourceRecord",
@@ -241,5 +252,6 @@ __all__ = [
     "record_official_source",
     "upsert_official_ids",
     "upsert_official_source",
+    "work_uri_for_official_url",
     "write_official_anchors",
 ]

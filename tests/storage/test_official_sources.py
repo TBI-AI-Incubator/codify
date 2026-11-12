@@ -31,6 +31,7 @@ from codify.storage.official_sources import (
     record_official_source,
     upsert_official_ids,
     upsert_official_source,
+    work_uri_for_official_url,
     write_official_anchors,
 )
 from codify.storage.repository import save_document
@@ -210,6 +211,7 @@ async def test_ids_upsert_and_survive_without_a_law(session: AsyncSession) -> No
     row = await lookup_official_id(session, pub, "5555")
     assert row is not None and (row.frbr_work_uri, row.id_kind) == ("/akn/zz/act/2020/b", "group")
     assert await lookup_official_id(session, pub, "missing") is None
+    assert await work_uri_for_official_url(session, "https://example.org/akt/5555") is None
     count = (
         await session.execute(
             text("SELECT count(*) FROM official_ids WHERE publisher = :p"), {"p": pub}
