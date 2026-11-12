@@ -25,11 +25,13 @@ from codify.acquisition.base import (
     BaseAcquirer,
     Body,
     DocumentRef,
+    archive_date,
 )
 from codify.acquisition.index import index_path as acquisition_index_path
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
 from codify.lang import to_iso639_3
+from codify.provenance import celex_ref
 
 logger = structlog.get_logger()
 
@@ -319,8 +321,9 @@ class EuDatadumpAcquirer(BaseAcquirer):
                 )
             ],
             source_url=f"datadump://{Path(archive.filename or '').name}!{path}",
-            fetched_at=datetime.now(UTC),
+            fetched_at=archive_date(self._archive_path),
             licence="EU-RU/2011/833",
+            official=celex_ref(celex),
             upstream_metadata={
                 "cellar_uuid": path.split("/", 1)[0],
                 "fmx_filename": path.rsplit("/", 1)[-1],

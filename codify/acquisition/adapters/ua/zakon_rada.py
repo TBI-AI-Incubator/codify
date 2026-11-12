@@ -19,6 +19,7 @@ from codify.acquisition.base import (
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter, authoritative_language
+from codify.provenance import official_ref_from_url
 
 logger = structlog.get_logger()
 
@@ -140,6 +141,7 @@ class ZakonRadaAcquirer(BaseAcquirer):
             else None,
             ocr_required=False,
             upstream_metadata=upstream,
+            official=official_ref_from_url(card_url),
         )
 
 

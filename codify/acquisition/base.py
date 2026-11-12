@@ -5,9 +5,12 @@ from __future__ import annotations
 import hashlib
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from codify.provenance import OfficialRef
 
 MediaType = Literal[
     "application/pdf", "application/xml", "application/json", "text/html", "text/plain"
@@ -72,12 +75,23 @@ class AcquiredDocument(BaseModel):
     gazette_ref: GazetteRef | None = None
     ocr_required: bool = False
     upstream_metadata: dict[str, Any] = Field(default_factory=dict)
+    official: OfficialRef | None = None
+    # One per further language body that has its own page at the publisher.
+    official_translations: list[OfficialRef] = Field(default_factory=list)
 
     def primary(self) -> Body:
         for b in self.bodies:
             if b.role == "primary":
                 return b
         return self.bodies[0]
+
+
+def archive_date(path: Path | None) -> datetime:
+    """A bulk archive's modified time: its copy or download date unless preserved; else now."""
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, UTC) if path else datetime.now(UTC)
+    except OSError:
+        return datetime.now(UTC)
 
 
 class DiscoveryQuery(BaseModel):
@@ -209,6 +223,7 @@ class BaseAcquirer:
 __all__ = [
     "Acquirer",
     "AcquiredDocument",
+    "archive_date",
     "BaseAcquirer",
     "Body",
     "BodyRole",

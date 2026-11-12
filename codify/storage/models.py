@@ -1013,6 +1013,59 @@ class Acquisition(SQLModel, table=True):
     fetched_at: datetime = ts_now()
 
 
+class OfficialSource(SQLModel, table=True):
+    """Where a version's text came from at its publisher; one row per version."""
+
+    __tablename__ = "official_sources"
+
+    version_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("versions.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    publisher: str = Field(sa_column=Column(Text, nullable=False))
+    work_id: str = Field(sa_column=Column(Text, nullable=False))
+    edition_id: str | None = Field(default=None, sa_column=Column(Text))
+    edition_date: date | None = Field(default=None, sa_column=Column(Date))
+    fetch_url: str | None = Field(default=None, sa_column=Column(Text))
+    retrieved_at: datetime | None = Field(
+        default=None, sa_column=Column(TIMESTAMP(timezone=True), nullable=True)
+    )
+    content_sha256: str | None = Field(default=None, sa_column=Column(Text))
+    licence: str | None = Field(default=None, sa_column=Column(Text))
+    recorded_by: str = Field(sa_column=Column(Text, nullable=False))
+    recorded_at: datetime = ts_now()
+
+
+class OfficialAnchor(SQLModel, table=True):
+    """The publisher's fragment for one eId of one version."""
+
+    __tablename__ = "official_anchors"
+
+    version_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("versions.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    akn_eid: str = Field(sa_column=Column(Text, primary_key=True))
+    fragment: str = Field(sa_column=Column(Text, nullable=False))
+
+
+class OfficialId(SQLModel, table=True):
+    """A publisher's id for a work. No law key: ids for acts not held are kept."""
+
+    __tablename__ = "official_ids"
+
+    publisher: str = Field(sa_column=Column(Text, primary_key=True))
+    id: str = Field(sa_column=Column(Text, primary_key=True))
+    frbr_work_uri: str = Field(sa_column=Column(Text, nullable=False))
+    id_kind: str = Field(sa_column=Column(Text, nullable=False))
+
+
 class TranslationRun(SQLModel, table=True):
     """One translation job, a source Version rendered into a target language. The
     translated act persists as a sibling Version referenced by
@@ -1121,6 +1174,9 @@ __all__ = [
     "Law",
     "LensRunRow",
     "LifecycleEventRow",
+    "OfficialAnchor",
+    "OfficialId",
+    "OfficialSource",
     "PageRead",
     "PageReadDisputeRow",
     "Provision",

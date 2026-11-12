@@ -46,6 +46,7 @@ from codify.calendar import local_date_from_text
 from codify.frbr import build_frbr_work_uri, identity_from_code, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config, try_load_config
 from codify.lang import normalise_digits
+from codify.provenance import OfficialRef
 
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
 DOC_PATH = "/ocs-api/public/doc/getLawDoc"
@@ -418,6 +419,8 @@ class OcsAcquirer(BaseAcquirer):
                     ),
                     "",
                 )
+        # An amending text is another act: its own timeline code, not the law's.
+        official_code = str(info.get("timelineLawCode" if kind == "amending" else "lawCode") or "")
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=work,
@@ -430,6 +433,11 @@ class OcsAcquirer(BaseAcquirer):
             citation_alt=title or None,
             gazette_ref=gazette_ref(payload.get("footnoteList") or [], published),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="ocs", work_id=official_code, edition_id=timeline_id, edition_date=as_of
+            )
+            if official_code
+            else None,
         )
 
     async def search(

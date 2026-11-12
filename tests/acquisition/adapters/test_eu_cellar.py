@@ -155,6 +155,7 @@ async def test_fetch_round_trip_via_mock() -> None:
     assert acquired.frbr_work_uri == "/akn/eu/act/dir/2016/943"
     assert acquired.licence == "EU-RU/2011/833"
     assert acquired.etag == 'W/"abc"'
+    assert acquired.official is not None and acquired.official.work_id == "32016L0943"
     assert len(acquired.bodies) == 1
     assert acquired.bodies[0].language == "eng"
     assert acquired.bodies[0].media_type == "application/xml"

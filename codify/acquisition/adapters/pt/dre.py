@@ -36,6 +36,7 @@ from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_expression_uri, build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import OfficialRef, official_ref_from_url
 
 try:
     _RELEASE = version("codify-core")
@@ -441,6 +442,7 @@ class DiarioAcquirer(BaseAcquirer):
         }
         card = {"detail": detail, "consolidation": cons["raw"] if cons else None}
         pages = str(detail.get("Pagina") or "").split("-")[0].strip()
+        alias_ref = official_ref_from_url(alias)
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=work,
@@ -467,6 +469,12 @@ class DiarioAcquirer(BaseAcquirer):
                 date=published,
             ),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="dre",
+                work_id=alias_ref.work_id if alias_ref else f"{eli_type}/{eli_num}/{eli_year}",
+                edition_id=as_of.replace("-", "") if cons else None,
+                edition_date=as_of,
+            ),
         )
 
 

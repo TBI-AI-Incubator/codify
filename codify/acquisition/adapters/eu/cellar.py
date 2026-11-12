@@ -24,6 +24,7 @@ from codify.acquisition.politeness import make_polite_client
 from codify.akn._schema import parse_xml
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import celex_ref
 
 CELLAR_BASE = "https://publications.europa.eu/resource/celex"
 SPARQL_ENDPOINT = "http://publications.europa.eu/webapi/rdf/sparql"
@@ -132,6 +133,7 @@ class EuCellarAcquirer(BaseAcquirer):
                 "formats": formats,
                 **({"consolidated": as_of} if as_of else {}),
             },
+            official=celex_ref(celex, edition_date=as_of),
         )
 
     async def discover(self, query: DiscoveryQuery) -> AsyncIterator[DocumentRef]:

@@ -1129,6 +1129,14 @@ async def test_an_amending_text_asked_for_by_code_takes_its_own_timelines_code()
     assert amending.frbr_work_uri == (f"/akn/th/act/2010/{identity_from_code('ก0001-1B-0001-xx')}")
 
 
+async def test_an_amending_text_has_its_own_official_work_id() -> None:
+    base, _ = await _fetch(BASE)
+    amending, _ = await _fetch(AMENDING)
+    assert base.official is not None and amending.official is not None
+    assert base.official.work_id == "ก0001-1B-0001"
+    assert amending.official.work_id == "ก0001-1B-0001-xx"
+
+
 async def test_an_identity_the_acquirer_does_not_know_is_refused() -> None:
     with pytest.raises(ValueError, match="unknown identity 'lawcode'"):
         await _fetch(TWIN, identity="lawcode")
