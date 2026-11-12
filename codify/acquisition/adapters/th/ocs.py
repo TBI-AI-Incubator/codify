@@ -46,6 +46,7 @@ from codify.calendar import local_date_from_text
 from codify.frbr import build_frbr_work_uri, identity_from_code, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config, try_load_config
 from codify.lang import normalise_digits
+from codify.provenance import OfficialRef
 
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
 DOC_PATH = "/ocs-api/public/doc/getLawDoc"
@@ -430,6 +431,14 @@ class OcsAcquirer(BaseAcquirer):
             citation_alt=title or None,
             gazette_ref=gazette_ref(payload.get("footnoteList") or [], published),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="ocs",
+                work_id=str(info["lawCode"]),
+                edition_id=timeline_id,
+                edition_date=as_of,
+            )
+            if info.get("lawCode")
+            else None,
         )
 
     async def search(

@@ -36,6 +36,7 @@ from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_expression_uri, build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import OfficialRef
 
 try:
     _RELEASE = version("codify-core")
@@ -467,6 +468,12 @@ class DiarioAcquirer(BaseAcquirer):
                 date=published,
             ),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="dre",
+                work_id=f"{eli_type}/{eli_num}/{eli_year}",
+                edition_id=as_of.replace("-", "") if cons else None,
+                edition_date=as_of,
+            ),
         )
 
 

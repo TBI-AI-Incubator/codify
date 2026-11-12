@@ -60,6 +60,11 @@ async def test_fetch_expands_publisher_path() -> None:
     assert acquired.primary().media_type == "application/xml"
     assert acquired.primary().content == _AKN
     assert acquired.etag == '"abc"'
+    assert acquired.official is not None
+    assert (acquired.official.publisher, acquired.official.work_id) == (
+        "legislation-gov-uk",
+        "ukpga/2018/12",
+    )
 
 
 async def test_fetch_si_uses_uksi_token() -> None:

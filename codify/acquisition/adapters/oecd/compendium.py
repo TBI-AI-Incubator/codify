@@ -34,6 +34,7 @@ from codify.acquisition.base import (
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import OfficialRef
 
 logger = structlog.get_logger()
 
@@ -231,6 +232,9 @@ class OecdCompendiumAcquirer(BaseAcquirer):
             # `transmittedAt` is when this response was built.
             last_modified=str(ref.extra.get("last_published") or "") or None,
             upstream_metadata=meta,
+            official=OfficialRef(
+                publisher="oecd-compendium", work_id=key, edition_date=revised or None
+            ),
         )
 
 

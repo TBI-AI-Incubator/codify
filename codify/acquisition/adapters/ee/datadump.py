@@ -7,7 +7,7 @@ import json
 import os
 import re
 import zipfile
-from datetime import date
+from datetime import UTC, date, datetime
 from html import unescape
 from pathlib import Path
 from typing import IO, Any, ClassVar
@@ -22,10 +22,12 @@ from codify.acquisition.base import (
     BaseAcquirer,
     Body,
     DocumentRef,
+    archive_date,
 )
 from codify.acquisition.index import index_path as acquisition_index_path
 from codify.akn._schema import parse_xml
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import OfficialRef
 
 logger = structlog.get_logger()
 
@@ -149,12 +151,26 @@ class EeDatadumpAcquirer(BaseAcquirer):
         # From the member, not the index or ref: an index built earlier can carry a stale slug.
         frbr_work_uri = read_identity(parse_xml(raw_xml, huge_tree=True)).work_uri
 
+        head = raw_xml[:_HEAD_LIMIT].decode("utf-8", "ignore")
+        listed = entry if isinstance(entry, dict) else {}
+        group = listed.get("group") or _group(head)
+        edition_date = (listed.get("expression_date") or _field(head, "kehtivuseAlgus"))[:10]
         return AcquiredDocument(
             ref=ref,
             source_url=source_url,
             bodies=[Body(content=raw_xml, media_type="application/xml")],
             frbr_work_uri=frbr_work_uri,
             licence="open_government",
+            # A remote member is read live; a local one is as old as its archive.
+            fetched_at=datetime.now(UTC) if remote else archive_date(self._archive_path),
+            official=OfficialRef(
+                publisher="riigi-teataja",
+                work_id=group,
+                edition_id=doc_id,
+                edition_date=edition_date or None,
+            )
+            if group
+            else None,
         )
 
 

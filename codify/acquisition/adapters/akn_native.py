@@ -38,10 +38,12 @@ from codify.akn._schema import parse_xml
 from codify.frbr import (
     build_frbr_work_uri,
     expand_source_template,
+    expression_uri_date,
     original_expression_path,
     parse_source_ref,
 )
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import OfficialRef, official_ref_from_url
 
 logger = structlog.get_logger()
 
@@ -129,6 +131,15 @@ def _pdf_alternative(content: bytes, language: str, host: str) -> str | None:
 
 
 _MAX_REDIRECTS = 5
+
+
+def _official(url: str, expression: str | None) -> OfficialRef | None:
+    """The publisher's ids from the fetched URL; an undated URL takes the expression's date."""
+    edition_date = expression_uri_date(expression)
+    ref = official_ref_from_url(url, edition_date=edition_date)
+    if ref is not None and ref.edition_id is None:
+        ref = ref.model_copy(update={"edition_id": edition_date})
+    return ref
 
 
 class AknNativeAcquirer:
@@ -227,6 +238,7 @@ class AknNativeAcquirer:
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
             licence=self._adapter.licence,
+            official=_official(url, expression),
         )
 
     async def _get_on_host(self, url: str, host: str) -> httpx.Response:
@@ -275,6 +287,7 @@ class AknNativeAcquirer:
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
             licence=self._adapter.licence,
+            official=_official(pdf_url, expression if language == "eng" else None),
         )
 
     async def enumerate(  # noqa: A003
