@@ -289,6 +289,7 @@ def document_to_rows(
             quoted=mod.quoted.model_dump(mode="json") if mod.quoted is not None else None,
             authority_uri=mod.authority_uri,
             mod_eid_ref=mod.mod_eid_ref,
+            in_force_date=mod.in_force_date,
         )
         for mod in doc.textual_mods
     ]
@@ -503,6 +504,7 @@ def _row_to_textual_mod(row: AmendmentEffectRow) -> TextualMod:
         quoted=quoted,
         authority_uri=row.authority_uri,
         mod_eid_ref=row.mod_eid_ref,
+        in_force_date=row.in_force_date,
     )
 
 

@@ -471,7 +471,7 @@ def test_an_act_whose_only_text_is_its_preamble_puts_it_in_the_body() -> None:
     assert (
         body_text == "Ratifitseerida juurdelisatud näidisleping, mis on alla kirjutatud Tallinnas."
     )
-    assert root.find(".//a:body//a:ref", ns).get("href") == "./1001"
+    assert root.find(".//a:body//a:ref", ns).get("href") == "https://www.riigiteataja.ee/akt/1001"
     assert len(parse_akn(akn_xml).body) == 1
 
 
