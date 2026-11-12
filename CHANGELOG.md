@@ -56,13 +56,22 @@ Breaks, in that the structurer's output changes for documents it already read:
 New, additive:
 
 - `PoliteTransport` keeps a circuit per host, shared across the process. Five
-  requests in a row that end in a refusal (429, 436, 503), a gateway failure
-  (502, 504) or a connection that never answered, each counted once after its
-  own retries, open it: every request to that host then raises
-  `HostCircuitOpen`, an `httpx.TransportError`, unsent, for 60 seconds. One
-  probe then goes through, and only that request can free its slot; an answer
-  closes the circuit, a failure reopens it. A robots refusal counts as
-  neither. `host_circuit_state` reports a host's circuit.
+  requests in a row that fail, each counted once after its own retries, open
+  it: a gateway failure (502, 504), a connection that never answered, or the
+  host refusing the client (403, 451, not retried, though a bodyless 403 still
+  tries the host's next address while the circuit is closed). A request still
+  refused after every backoff (429, 436, 503) opens it at once. Open, every request to
+  that host raises `HostCircuitOpen`, an `httpx.TransportError`, unsent, for 60
+  seconds or the last refusal's longer Retry-After, up to an hour. A request
+  already in flight is checked before every send, its robots.txt fetch and
+  each of the host's addresses included, and stops with the same error: one
+  that had reached the host counts without restarting the cooldown, one that
+  had not counts as neither. One probe then goes through: it may read
+  robots.txt as any request does, then sends its request once, to one address.
+  Only that request can free its slot; an answer closes the circuit, a failure
+  reopens it. A robots refusal counts as neither, and a 403 or 451 does not
+  bring the host's pace back toward its floor. `host_circuit_state` reports a
+  host's circuit.
 - `PoliteTransport` retries a bodyless request on a 502 or 504, and on a
   connect or read timeout, a dropped connection or a protocol error, with
   exponential full jitter and without widening the host's pace. It downloads

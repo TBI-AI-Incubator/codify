@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import os
 import random
 import ssl
@@ -35,6 +36,10 @@ _BACKOFF_STATUSES = frozenset({429, 436, 503})
 # A gateway's failure says nothing about our pace: retried with jitter, interval untouched.
 _TRANSIENT_STATUSES = frozenset({502, 504})
 _FAILED_STATUSES = _BACKOFF_STATUSES | _TRANSIENT_STATUSES
+# The host refusing this client: not retried, and no answer for the circuit or pace.
+# A bodyless 403 may still try the host's next address while its circuit is closed.
+_REFUSED_STATUSES = frozenset({403, 451})
+_NOT_ANSWERED = _FAILED_STATUSES | _REFUSED_STATUSES
 # No answer, or one cut off mid-body; replayed only for a bodyless request.
 _TRANSIENT_ERRORS: tuple[type[httpx.TransportError], ...] = (
     httpx.ConnectError,
@@ -53,7 +58,8 @@ class _HostBucket:
     """Adaptive interval per host, shared by every client in the process.
 
     A refusal (429, 436, 503) doubles the interval or takes Retry-After; each
-    answered request brings it back by 0.95 toward the configured floor."""
+    answered request brings it back by 0.95 toward the configured floor. A 403
+    or 451 is no answer, so it leaves the interval where it is."""
 
     floor_s: float
     interval_s: float = 0.0
@@ -134,10 +140,14 @@ def reset_host_buckets() -> None:
 
 _CIRCUIT_FAILURES = 5
 _CIRCUIT_COOLDOWN_S = 60.0
+# A Retry-After past this (or infinite) would leave the host unprobed for the
+# life of the process.
+_MAX_CIRCUIT_HOLD_S = 3600.0
 
 
 class HostCircuitOpen(httpx.TransportError):
-    """A host failed enough requests in a row that this one was refused unsent."""
+    """A host's circuit is open: this request was refused unsent, or stopped
+    before it reached the host again because the circuit opened under it."""
 
 
 @dataclass(frozen=True, eq=False)
@@ -153,21 +163,30 @@ class _HostCircuit:
     """Consecutive failed requests per host, shared by every client in the process.
 
     A request counts once, after its own retries, so one bad document cannot
-    trip it alone. Open, it refuses every request for the cooldown; then one
-    probe goes through while the others are still refused, and its outcome
-    closes or reopens the circuit. A request admitted before the trip and still
-    in flight is a straggler: it counts, but it never holds the probe slot."""
+    trip it alone, unless the host refused it to the end (429, 436, 503 after
+    every backoff): that opens it at once. Open, it refuses every request for
+    the cooldown, the longer of 60 seconds and that refusal's Retry-After (up
+    to an hour); then one probe goes through, sent once, while the others are
+    still refused, and its outcome closes or reopens the circuit. A request
+    admitted before the trip and still in flight is a straggler: it is stopped
+    before it next reaches the host, and it never holds the probe slot."""
 
     failures: int = 0
     opened_at: float | None = None
+    cooldown_s: float = _CIRCUIT_COOLDOWN_S
     probe: _Ticket | None = None
     trips: int = 0
+
+    @property
+    def is_open(self) -> bool:
+        """Open or half-open: no request but the probe may reach the host."""
+        return self.opened_at is not None
 
     def admit(self) -> _Ticket | None:
         """A ticket to send, or None to refuse unsent."""
         if self.opened_at is None:
             return _Ticket(probe=False)
-        if self.probe is not None or time.monotonic() - self.opened_at < _CIRCUIT_COOLDOWN_S:
+        if self.probe is not None or time.monotonic() - self.opened_at < self.cooldown_s:
             return None
         self.probe = _Ticket(probe=True)
         return self.probe
@@ -176,17 +195,35 @@ class _HostCircuit:
         # Any answer shows the host is up: the circuit closes, and a probe still
         # in flight becomes an ordinary request.
         self.failures, self.opened_at, self.probe = 0, None, None
+        self.cooldown_s = _CIRCUIT_COOLDOWN_S
 
-    def record_failure(self, ticket: _Ticket | None = None) -> bool:
-        """Count a failed request; True when it opened (or reopened) the circuit."""
+    def record_failure(
+        self,
+        ticket: _Ticket | None = None,
+        *,
+        refused: bool = False,
+        retry_after: float | None = None,
+        restart: bool = True,
+    ) -> bool:
+        """Count a failed request; True when it opened (or reopened) the circuit.
+
+        `refused` marks a request that ended in 429, 436 or 503, `retry_after`
+        that response's hint. `restart=False` counts a straggler stopped by the
+        open circuit: its failure came before the trip, so it moves no cooldown."""
         self.failures += 1
         probing = ticket is not None and ticket is self.probe
-        opens = probing or (self.opened_at is None and self.failures >= _CIRCUIT_FAILURES)
-        if self.opened_at is not None or opens:
-            # A straggler admitted before the trip restarts the cooldown too.
-            self.opened_at = time.monotonic()
+        opens = probing or (
+            self.opened_at is None and (refused or self.failures >= _CIRCUIT_FAILURES)
+        )
+        hold = _CIRCUIT_COOLDOWN_S
+        if refused:
+            hold = min(_MAX_CIRCUIT_HOLD_S, max(hold, retry_after or 0.0))
         if opens:
+            self.cooldown_s, self.opened_at = hold, time.monotonic()
             self.trips += 1
+        elif self.opened_at is not None and restart:
+            # A straggler admitted before the trip restarts the cooldown, never shortens it.
+            self.cooldown_s, self.opened_at = max(self.cooldown_s, hold), time.monotonic()
         if probing:
             self.probe = None
         return opens
@@ -200,7 +237,7 @@ class _HostCircuit:
     def snapshot(self) -> dict[str, int | bool]:
         return {
             "failures": self.failures,
-            "open": self.opened_at is not None,
+            "open": self.is_open,
             "trips": self.trips,
         }
 
@@ -225,6 +262,64 @@ def reset_host_circuits() -> None:
     """Tests only: close every host's circuit."""
     _CIRCUITS.clear()
 
+
+@dataclass
+class _InFlight:
+    """One admitted request on its way to the host, as the guard sees it per send."""
+
+    host: str
+    circuit: _HostCircuit
+    ticket: _Ticket
+    # The request itself has been sent at least once (the robots fetch does not count).
+    sent: bool = False
+    # The robots.txt fetch the request makes first is going out.
+    robots: bool = False
+
+
+# Set for the duration of one PoliteTransport request: the guard reads it before
+# every send, the robots fetch and each address included.
+_IN_FLIGHT: contextvars.ContextVar[_InFlight | None] = contextvars.ContextVar(
+    "codify_in_flight", default=None
+)
+
+
+def _refuse_if_open(request: httpx.Request) -> None:
+    """Called just before each send: raise unless this request may reach the host now."""
+    flight = _IN_FLIGHT.get()
+    if flight is None:
+        return
+    if flight.ticket.probe:
+        # The probe asks once: its robots fetch, read as any is (the client's redirect
+        # limit bounds it), then one send of the request.
+        if flight.sent and not flight.robots:
+            raise HostCircuitOpen(
+                f"the probe of {flight.host} has had its one attempt", request=request
+            )
+    elif flight.circuit.is_open:
+        logger.warning(
+            "polite_send_stopped", host=flight.host, sent=flight.sent, **flight.circuit.snapshot()
+        )
+        raise HostCircuitOpen(
+            f"the circuit for {flight.host} opened while this request was in flight; "
+            "stopped before it reached the host " + ("again" if flight.sent else "at all"),
+            request=request,
+        )
+    if not flight.robots:
+        flight.sent = True
+
+
+def _may_try_next_address() -> bool:
+    """After the host refused one address: may this request try the next one?"""
+    flight = _IN_FLIGHT.get()
+    if flight is None:
+        return True
+    # The host has answered: that was the probe's attempt, and an open circuit stops the rest.
+    return not flight.ticket.probe and not flight.circuit.is_open
+
+
+# Response extension on the 451 this transport makes for a robots refusal. A host
+# can send any header, so the header alone cannot tell its answer from ours.
+_ROBOTS_REFUSAL = "codify_robots_refusal"
 
 #: Request extension: `client.stream(..., extensions={UNBUFFERED: True})` keeps a
 #: body too large to hold streaming from the socket. Its download then happens
@@ -309,6 +404,9 @@ class _RobotsCache:
         now = time.monotonic()
         try:
             resp = await client.get(robots_url, timeout=httpx.Timeout(10.0))
+        except HostCircuitOpen:
+            # Our refusal to send, not the host's robots.txt: nothing to cache.
+            raise
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             logger.warning("robots_fetch_failed", host=host, error=str(exc))
             rp.parse([])
@@ -388,12 +486,18 @@ class GuardedTransport(httpx.AsyncBaseTransport):
         *,
         resolver: Resolver | None = None,
         before_retry: Callable[[str], Awaitable[None]] | None = None,
+        before_send: Callable[[httpx.Request], None] | None = None,
+        may_try_next: Callable[[], bool] | None = None,
     ) -> None:
         self._inner = inner
         self._resolver = resolver
         # Awaited with the host before a replay, so the caller's rate limit
         # charges the second hop too.
         self._before_retry = before_retry
+        # Called just before each send, after every wait, and may raise to stop it.
+        self._before_send = before_send
+        # Asked before moving on from an address whose host refused the request.
+        self._may_try_next = may_try_next
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
@@ -413,6 +517,14 @@ class GuardedTransport(httpx.AsyncBaseTransport):
             if index:
                 if self._before_retry is not None:
                     await self._before_retry(host)
+            if self._before_send is not None:
+                try:
+                    self._before_send(request)
+                except HostCircuitOpen:
+                    # Stopped before the next address: what the host did is the answer.
+                    if failed is not None:
+                        raise failed from None
+                    raise
             try:
                 response = await self._send_pinned(request, address, host)
             except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
@@ -431,7 +543,12 @@ class GuardedTransport(httpx.AsyncBaseTransport):
                         retried=addresses[index + 1],
                     )
                 continue
-            if response.status_code == 403 and _replayable(request) and index < last:
+            if (
+                response.status_code == 403
+                and _replayable(request)
+                and index < last
+                and (self._may_try_next is None or self._may_try_next())
+            ):
                 await response.aclose()
                 logger.warning(
                     "guard_retry_next_address",
@@ -489,6 +606,8 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             inner or httpx.AsyncHTTPTransport(verify=client_tls_context()),
             resolver=resolver,
             before_retry=self._take_token,
+            before_send=_refuse_if_open,
+            may_try_next=_may_try_next_address,
         )
         self._robots = _RobotsCache()
         self._sem = asyncio.Semaphore(profile.concurrency)
@@ -517,30 +636,55 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             if ticket is None:
                 logger.warning("polite_circuit_refused", host=host, **circuit.snapshot())
                 raise HostCircuitOpen(
-                    f"{host} failed {circuit.failures} requests in a row; refusing "
-                    f"requests for {_CIRCUIT_COOLDOWN_S:.0f}s from the last failure",
+                    f"the circuit for {host} is open after {circuit.failures} failed "
+                    f"request(s); refusing requests for {circuit.cooldown_s:.0f}s "
+                    "from the last failure",
                     request=request,
                 )
+            flight = _InFlight(host, circuit, ticket)
+            token = _IN_FLIGHT.set(flight)
             answered: bool | None = None
+            refused = stopped = False
+            retry_after: float | None = None
             try:
-                response = await self._send(request, host)
+                response = await self._send(request, flight)
                 # A robots refusal is ours, not the host's answer.
-                if "x-codify-blocked-by" not in response.headers:
-                    answered = response.status_code not in _FAILED_STATUSES
+                if not response.extensions.get(_ROBOTS_REFUSAL):
+                    status = response.status_code
+                    answered = status not in _NOT_ANSWERED
+                    if status in _BACKOFF_STATUSES:
+                        # Still refused after every backoff it was allowed.
+                        refused = True
+                        retry_after = _parse_retry_after(response.headers.get("retry-after"))
                 return response
             except _TRANSIENT_ERRORS:
                 answered = False
                 raise
+            except HostCircuitOpen:
+                # Stopped by the circuit. Never sent, it is neither outcome; sent
+                # before, it failed at the host then, which is no news to restart on.
+                if flight.sent:
+                    answered, stopped = False, True
+                raise
             finally:
+                _IN_FLIGHT.reset(token)
                 if answered is None:
                     circuit.release(ticket)
                 elif answered:
                     circuit.record_success()
-                elif circuit.record_failure(ticket):
-                    logger.warning("polite_circuit_opened", host=host, **circuit.snapshot())
+                elif circuit.record_failure(
+                    ticket, refused=refused, retry_after=retry_after, restart=not stopped
+                ):
+                    logger.warning(
+                        "polite_circuit_opened",
+                        host=host,
+                        cooldown_s=round(circuit.cooldown_s, 3),
+                        **circuit.snapshot(),
+                    )
 
-    async def _send(self, request: httpx.Request, host: str) -> httpx.Response:
+    async def _send(self, request: httpx.Request, flight: _InFlight) -> httpx.Response:
         url_str = str(request.url)
+        host = flight.host
 
         bucket = self._bucket(host)
         if self.profile.robots_respect:
@@ -548,7 +692,11 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             # its turn in the bucket rather than riding ahead of the fetch.
             if bucket is not None and not self._robots.is_fresh(host):
                 await bucket.acquire()
-            allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
+            flight.robots = True
+            try:
+                allowed = await self._robots.allowed(self._probe, url_str, self.profile.user_agent)
+            finally:
+                flight.robots = False
             if not allowed:
                 # Explicit reason: a bare sentinel reads as a remote error.
                 entry = self._robots.entries.get(urlparse(url_str).netloc)
@@ -557,7 +705,10 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                     return httpx.Response(
                         status_code=451,
                         headers={"x-codify-blocked-by": "robots.txt-unavailable"},
-                        extensions={"reason_phrase": f"robots.txt unavailable ({why})".encode()},
+                        extensions={
+                            "reason_phrase": f"robots.txt unavailable ({why})".encode(),
+                            _ROBOTS_REFUSAL: True,
+                        },
                         text=(
                             f"robots.txt for {host} could not be read ({why}); "
                             f"requests to {host} are held for up to "
@@ -568,7 +719,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 return httpx.Response(
                     status_code=451,
                     headers={"x-codify-blocked-by": "robots.txt"},
-                    extensions={"reason_phrase": b"Blocked by robots.txt"},
+                    extensions={"reason_phrase": b"Blocked by robots.txt", _ROBOTS_REFUSAL: True},
                     text=(
                         f"blocked by {host}/robots.txt for "
                         f"user-agent {self.profile.user_agent!r} "
@@ -591,8 +742,13 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         # read here rather than by the client after this returns.
         buffer = replayable and not request.extensions.get(UNBUFFERED)
         response: httpx.Response | None = None
-        for attempt in range(_MAX_RETRIES):
-            last = attempt == _MAX_RETRIES - 1
+        # The probe asks the host once whether it is back; its outcome is the answer.
+        attempts = 1 if flight.ticket.probe else _MAX_RETRIES
+        for attempt in range(attempts):
+            last = attempt == attempts - 1
+            if attempt:
+                # Not worth waiting a turn for: the guard checks again at the send itself.
+                self._stop_if_open(request, flight, attempt)
             if bucket is not None:
                 await bucket.acquire()
             try:
@@ -601,13 +757,21 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 if buffer and response.status_code not in _FAILED_STATUSES:
                     response = await _buffered(response)
             except _TRANSIENT_ERRORS as exc:
+                # The circuit opened under it (the guard may have refused the host's next
+                # address): it stops now, with no backoff to sit out.
+                if not flight.ticket.probe and flight.circuit.is_open:
+                    raise HostCircuitOpen(
+                        f"the circuit for {host} opened while this request was in flight; "
+                        "stopped before it reached the host again",
+                        request=request,
+                    ) from exc
                 if not replayable:
                     raise
                 if last:
                     logger.warning(
                         "polite_retry_exhausted",
                         host=host,
-                        attempts=_MAX_RETRIES,
+                        attempts=attempts,
                         last_error=type(exc).__name__,
                     )
                     raise
@@ -627,7 +791,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                     logger.warning(
                         "polite_retry_exhausted",
                         host=host,
-                        attempts=_MAX_RETRIES,
+                        attempts=attempts,
                         last_status=response.status_code,
                     )
                     return response
@@ -643,7 +807,8 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 await asyncio.sleep(wait)
                 continue
             if response.status_code not in _BACKOFF_STATUSES:
-                if bucket is not None and bucket.record_answer():
+                answered = response.status_code not in _NOT_ANSWERED
+                if answered and bucket is not None and bucket.record_answer():
                     logger.info("polite_recovered", host=host, **bucket.snapshot())
                 return response
             if bucket is None:
@@ -665,7 +830,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
                 logger.warning(
                     "polite_retry_exhausted",
                     host=host,
-                    attempts=_MAX_RETRIES,
+                    attempts=attempts,
                     last_status=response.status_code,
                 )
                 return response
@@ -675,6 +840,20 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             # With a bucket, the next acquire waits the new interval from the refusal.
         assert response is not None
         return response
+
+    @staticmethod
+    def _stop_if_open(request: httpx.Request, flight: _InFlight, attempt: int) -> None:
+        """Raise rather than retry once the host's circuit has opened under this request."""
+        if flight.ticket.probe or not flight.circuit.is_open:
+            return
+        logger.warning(
+            "polite_retry_stopped", host=flight.host, attempts=attempt, **flight.circuit.snapshot()
+        )
+        raise HostCircuitOpen(
+            f"the circuit for {flight.host} opened while this request was retrying; "
+            f"stopped after {attempt} attempt(s)",
+            request=request,
+        )
 
     async def aclose(self) -> None:
         await self._probe.aclose()
