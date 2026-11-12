@@ -127,7 +127,11 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
         p
         for formula in preamble.iter(f"{{{AKN_NS}}}formula")
         for p in formula.iter(f"{{{AKN_NS}}}p")
-        if p.find(f".//{{{AKN_NS}}}ref") is not None
+        if not any(is_lifted_note(a) for a in p.iterancestors())
+        and any(
+            not any(is_lifted_note(a) for a in r.iterancestors())
+            for r in p.iter(f"{{{AKN_NS}}}ref")
+        )
     )
     for el in (*preamble.iter(f"{{{AKN_NS}}}recital"), *formula_lines):
         eid = el.get("eId", "")

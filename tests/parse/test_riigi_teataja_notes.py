@@ -315,3 +315,18 @@ def test_note_on_a_point_targets_the_point() -> None:
     body = f'<loige id="para1lg1"><loigeNr>1</loigeNr>{_X}{_point(_note("750865"))}</loige>'
     akn, _ = riigi_teataja_to_akn(_act(body + _loige(2, "B.")))
     assert _mods(akn)[0].find(f"{N}destination").get("href").endswith("#art_1__para_1__point_1")
+
+
+def test_lifted_footnote_inside_a_formula_line_is_not_a_row() -> None:
+    link = _viide("./dyn=1&amp;id=105!pr16")
+    preamble = f"<preambul><tavatekst>Alusel </tavatekst>{link}</preambul>"
+    akn, _ = riigi_teataja_to_akn(_act(_loige(1, "A.") + _loige(2, "B."), preamble))
+    note = (
+        '<authorialNote placement="bottom" eId="fn_1"><p eId="fn_1__p_1">'
+        '<ref href="https://example.test/x">x</ref></p></authorialNote>'
+    )
+    noted = akn.replace("</p>\n      </formula>", f"{note}</p>\n      </formula>", 1)
+    assert noted != akn
+    rows = document_to_rows(parse_akn(noted), uuid.uuid4())
+    assert [p.akn_eid for p in rows[2] if p.akn_type == "recital"] == ["preamble__formula__p_1"]
+    assert [r.target_uri for r in rows[3]] == [f"{_URL}105#pr16"]
