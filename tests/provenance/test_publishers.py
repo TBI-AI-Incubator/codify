@@ -39,9 +39,17 @@ def test_every_shipped_adapter_maps_to_a_publisher_or_is_listed_without_one() ->
     assert {p for p in ADAPTER_PUBLISHERS.values() if p} <= set(PUBLISHERS)
 
 
-def test_no_pattern_is_verified_yet() -> None:
-    assert PATTERN_VERIFIED and not any(PATTERN_VERIFIED.values())
-    assert all(PATTERN_VERIFIED.get(f"{k}.act") is not None for k in PUBLISHERS)
+def test_no_pattern_is_verified_yet_and_every_builder_has_a_flag() -> None:
+    assert not any(PATTERN_VERIFIED.values())
+    for key, p in PUBLISHERS.items():
+        for kind, builder in (
+            ("act", p.act),
+            ("edition", p.edition),
+            ("current", p.current),
+            ("fragment", p.fragment),
+        ):
+            if builder is not None and not (key == "legislation-gov-uk" and kind == "fragment"):
+                assert f"{key}.{kind}" in PATTERN_VERIFIED, (key, kind)
 
 
 @pytest.mark.parametrize(

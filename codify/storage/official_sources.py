@@ -47,32 +47,6 @@ class OfficialSourceRead:
     derived: bool
 
 
-async def _own_hash(session: AsyncSession, version_id: uuid.UUID) -> str | None:
-    return (
-        await session.execute(select(Version.source_sha256).where(Version.id == version_id))
-    ).scalar_one_or_none()
-
-
-def _values(
-    version_id: uuid.UUID, record: OfficialSourceRecord, own_hash: str | None, *, gate_hash: bool
-) -> dict[str, Any]:
-    return {
-        "version_id": version_id,
-        "publisher": record.publisher,
-        "work_id": record.work_id,
-        "edition_id": record.edition_id,
-        "edition_date": record.edition_date,
-        "fetch_url": record.fetch_url,
-        "retrieved_at": record.retrieved_at,
-        # On reuse, a hash of bytes the version was not built from would vouch for the wrong text.
-        "content_sha256": record.content_sha256
-        if not gate_hash or record.content_sha256 == own_hash
-        else None,
-        "licence": record.licence,
-        "recorded_by": record.recorded_by,
-    }
-
-
 async def record_official_source(
     session: AsyncSession,
     version_id: uuid.UUID,
@@ -80,31 +54,34 @@ async def record_official_source(
     *,
     stored: bool,
 ) -> None:
-    """Record a version's source: written in full for a newly stored version, and for a
-    reused one only into fields still empty, so a reuse never rewrites what was recorded."""
-    await _write(session, version_id, record, fill_only=not stored)
-
-
-async def _write(
-    session: AsyncSession, version_id: uuid.UUID, record: OfficialSourceRecord, *, fill_only: bool
-) -> None:
-    own_hash = await _own_hash(session, version_id)
-    values = _values(version_id, record, own_hash, gate_hash=fill_only)
+    """Record a version's source. `stored=True` (a new version, or a refetch) writes it in
+    full and keeps the hash as fetched. A reuse fills only empty fields, and keeps the hash
+    only if it is the version's own, since another file's would vouch for the wrong text."""
+    own_hash = (
+        await session.execute(select(Version.source_sha256).where(Version.id == version_id))
+    ).scalar_one_or_none()
+    values: dict[str, Any] = {
+        "version_id": version_id,
+        "publisher": record.publisher,
+        "work_id": record.work_id,
+        "edition_id": record.edition_id,
+        "edition_date": record.edition_date,
+        "fetch_url": record.fetch_url,
+        "retrieved_at": record.retrieved_at,
+        "content_sha256": record.content_sha256
+        if stored or record.content_sha256 == own_hash
+        else None,
+        "licence": record.licence,
+        "recorded_by": record.recorded_by,
+    }
     stmt = insert(OfficialSource).values(values)
-    if not fill_only:
+    if stored:
         update = {k: v for k, v in values.items() if k != "version_id"} | {
             "recorded_at": func.now()
         }
     else:
         update = {k: func.coalesce(getattr(OfficialSource, k), stmt.excluded[k]) for k in _FILLABLE}
     await session.execute(stmt.on_conflict_do_update(index_elements=["version_id"], set_=update))
-
-
-async def upsert_official_source(
-    session: AsyncSession, version_id: uuid.UUID, record: OfficialSourceRecord
-) -> None:
-    """Replace a version's row after a refetch; the hash is stored as fetched."""
-    await _write(session, version_id, record, fill_only=False)
 
 
 async def get_official_sources(
@@ -201,7 +178,11 @@ def _provision_url(source: OfficialSource, eid: str, anchor: str | None) -> str 
 async def official_provision_urls(
     session: AsyncSession, items: Iterable[tuple[uuid.UUID, OfficialSource, str]]
 ) -> dict[tuple[uuid.UUID, str], str | None]:
-    """`official_provision_url` for many `(version_id, source, eid)` triples, one anchors query."""
+    """The publisher's URL for each `(version_id, source, eid)`, or None, with one anchors query.
+
+    A recorded anchor wins over the publisher's eId rule, and a derived version falls back to
+    its source's anchors; a link is only given once its URL pattern is verified.
+    """
     wanted = list(items)
     if not wanted:
         return {}
@@ -217,24 +198,10 @@ async def official_provision_urls(
         .where(col(OfficialAnchor.akn_eid).in_({e for _, _, e in wanted}))
     )
     anchors = {(v, e): f for v, e, f in rows.all()}
-    # A derived version, such as a translation, falls back to the anchors of its source.
     return {
         (v, e): _provision_url(src, e, anchors.get((v, e)) or anchors.get((src.version_id, e)))
         for v, src, e in wanted
     }
-
-
-async def official_provision_url(
-    session: AsyncSession, version_id: uuid.UUID, source: OfficialSource, eid: str
-) -> str | None:
-    """The publisher's URL for one provision of a version, or None.
-
-    A recorded anchor wins over the publisher's eId rule; either way the link is only
-    given once its URL pattern is verified. `source` is the version's own or ancestor's row;
-    an ancestor's anchors apply where the version has none of its own.
-    """
-    urls = await official_provision_urls(session, [(version_id, source, eid)])
-    return urls[(version_id, eid)]
 
 
 async def eid_for_fragment(
@@ -309,11 +276,9 @@ __all__ = [
     "get_official_sources",
     "lookup_official_id",
     "official_anchors",
-    "official_provision_url",
     "official_provision_urls",
     "record_official_source",
     "upsert_official_ids",
-    "upsert_official_source",
     "work_uri_for_official_url",
     "write_official_anchors",
 ]

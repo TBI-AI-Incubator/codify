@@ -28,11 +28,9 @@ from codify.storage.official_sources import (
     get_official_sources,
     lookup_official_id,
     official_anchors,
-    official_provision_url,
     official_provision_urls,
     record_official_source,
     upsert_official_ids,
-    upsert_official_source,
     work_uri_for_official_url,
     write_official_anchors,
 )
@@ -92,6 +90,12 @@ async def _version(
     return version.id
 
 
+async def _url(
+    session: AsyncSession, version: uuid.UUID, source: OfficialSource, eid: str
+) -> str | None:
+    return (await official_provision_urls(session, [(version, source, eid)]))[(version, eid)]
+
+
 def _record(**kw: object) -> OfficialSourceRecord:
     base: dict[str, object] = {"publisher": _RT, "work_id": "5555", "edition_id": "123"}
     return OfficialSourceRecord(**(base | kw))  # type: ignore[arg-type]
@@ -149,8 +153,8 @@ async def test_a_refetch_replaces_the_row(session: AsyncSession) -> None:
     version = await _version(session)
     await record_official_source(session, version, _record(), stored=True)
     when = datetime(2026, 11, 1, tzinfo=UTC)
-    await upsert_official_source(
-        session, version, _record(retrieved_at=when, fetch_url="https://c")
+    await record_official_source(
+        session, version, _record(retrieved_at=when, fetch_url="https://c"), stored=True
     )
     row = await _row(session, version)
     assert (row.retrieved_at, row.fetch_url) == (when, "https://c")
@@ -346,7 +350,7 @@ async def test_a_refetch_stores_the_hash_it_fetched_where_a_reuse_does_not(
     fetched = uuid.uuid4().hex * 2
     await record_official_source(session, version, _record(content_sha256=fetched), stored=False)
     assert (await _row(session, version)).content_sha256 is None
-    await upsert_official_source(session, version, _record(content_sha256=fetched))
+    await record_official_source(session, version, _record(content_sha256=fetched), stored=True)
     assert (await _row(session, version)).content_sha256 == fetched
 
 
@@ -365,16 +369,16 @@ async def test_a_provision_url_prefers_an_anchor_and_waits_for_verification(
     read = await get_official_source(session, version)
     assert read is not None
     source = read.source
-    assert await official_provision_url(session, version, source, "section-13-2") is None
+    assert await _url(session, version, source, "section-13-2") is None
     monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
     assert (
-        await official_provision_url(session, version, source, "section-13-2")
+        await _url(session, version, source, "section-13-2")
         == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2/123"
     )
     await write_official_anchors(session, version, {"section-13-2": "section/13/2A"})
-    url = await official_provision_url(session, version, source, "section-13-2")
+    url = await _url(session, version, source, "section-13-2")
     assert url is not None and "/section/13/2A" in url
-    assert await official_provision_url(session, version, source, "crossheading-x") is None
+    assert await _url(session, version, source, "crossheading-x") is None
 
 
 async def test_a_citation_older_than_every_held_version_resolves_to_the_law_only(
@@ -504,8 +508,19 @@ async def test_a_translation_uses_its_sources_anchor_unless_it_has_its_own(
     )
     await write_official_anchors(session, parent, {"section-3-1": "section/3/1A"})
     read = (await get_official_sources(session, [child]))[child]
-    url = await official_provision_url(session, child, read.source, "section-3-1")
+    url = await _url(session, child, read.source, "section-3-1")
     assert url is not None and "/section/3/1A" in url
     await write_official_anchors(session, child, {"section-3-1": "section/3/1B"})
-    url = await official_provision_url(session, child, read.source, "section-3-1")
+    url = await _url(session, child, read.source, "section-3-1")
     assert url is not None and "/section/3/1B" in url
+
+
+async def test_anchors_are_written_in_chunks_above_the_chunk_size(session: AsyncSession) -> None:
+    version = await _version(session)
+    n = 5001
+    assert (
+        await write_official_anchors(session, version, {f"art_{i}": f"para{i}" for i in range(n)})
+        == n
+    )
+    anchors = await official_anchors(session, version)
+    assert len(anchors) == n and anchors["art_5000"] == "para5000"

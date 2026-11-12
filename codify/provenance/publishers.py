@@ -37,7 +37,6 @@ class ParsedUrl:
     """What an official URL names. `lookup` holds the ids to try against `official_ids`."""
 
     publisher: str
-    pattern: str
     work_id: str | None = None
     edition_id: str | None = None
     fragment: str | None = None
@@ -96,7 +95,38 @@ class Publisher:
 
 
 #: Pattern key to verified flag. Set a key to True once a sample link has been checked.
-PATTERN_VERIFIED: dict[str, bool] = {}
+PATTERN_VERIFIED: dict[str, bool] = {
+    "riigi-teataja.act": False,
+    "riigi-teataja.edition": False,
+    "riigi-teataja.current": False,
+    "riigi-teataja.fragment": False,
+    "legislation-gov-uk.act": False,
+    "legislation-gov-uk.edition": False,
+    "legislation-gov-uk.current": False,
+    **{
+        f"legislation-gov-uk.fragment.{kind}.{depth}": False
+        for kind in ("section", "article", "regulation", "rule", "schedule")
+        for depth in (1, 2, 3)
+    },
+    "eur-lex.act": False,
+    "eur-lex.edition": False,
+    "eur-lex.fragment": False,
+    "oecd-compendium.act": False,
+    "oecd-compendium.edition": False,
+    "zakon-rada.act": False,
+    "zakon-rada.edition": False,
+    "zakon-rada.current": False,
+    "zakon-rada.fragment": False,
+    "qbz.act": False,
+    "ocs.act": False,
+    "ocs.edition": False,
+    "ocs.current": False,
+    "dre.act": False,
+    "dre.edition": False,
+    "dre.current": False,
+    "boe.act": False,
+    "gaceta-oficial-do.act": False,
+}
 
 
 def is_verified(pattern: str) -> bool:
@@ -110,6 +140,12 @@ def _host(netloc: str) -> str:
 # Riigi Teataja
 
 _RT = "https://www.riigiteataja.ee"
+
+
+def _rt_page(edition_id: str | None, suffix: str = "") -> str | None:
+    return f"{_RT}/akt/{edition_id}{suffix}" if edition_id else None
+
+
 _RT_PATH = re.compile(r"^/(?:en/)?akt/([0-9A-Za-z-]+?)(?:\.(?:xml|html))?/?$")
 
 
@@ -118,7 +154,7 @@ def _rt_parse(u: SplitResult) -> ParsedUrl | None:
     if m is None:
         return None
     fragment = u.fragment.lstrip("!") or None
-    return ParsedUrl("riigi-teataja", "riigi-teataja.edition", None, m[1], fragment, (m[1],))
+    return ParsedUrl("riigi-teataja", None, m[1], fragment, (m[1],))
 
 
 # legislation.gov.uk
@@ -142,13 +178,15 @@ def _gb_parse(u: SplitResult) -> ParsedUrl | None:
     edition = next((s for s in segments if _GB_EDITION.fullmatch(s)), None)
     provision = [s for s in segments if s != edition and s not in ("welsh", "contents")]
     fragment = u.fragment or "/".join(provision) or None
-    return ParsedUrl(
-        "legislation-gov-uk", "legislation-gov-uk.edition", work, edition, fragment, (work,)
-    )
+    return ParsedUrl("legislation-gov-uk", work, edition, fragment, (work,))
+
+
+def _gb_page(work: str, *parts: str | None) -> str:
+    return "/".join([f"{_GB}/{work}", *(p for p in parts if p)])
 
 
 def _gb_fragment(work: str, edition: str | None, fragment: str) -> str:
-    return f"{_GB}/{work}/{fragment}" + (f"/{edition}" if edition else "")
+    return _gb_page(work, fragment, edition)
 
 
 def _gb_fragment_pattern(fragment: str) -> str:
@@ -206,14 +244,7 @@ def _eur_parse(u: SplitResult) -> ParsedUrl | None:
     if celex is None or not _CELEX.match(celex):
         return None
     work, edition = _celex_ids(celex)
-    return ParsedUrl(
-        "eur-lex",
-        "eur-lex.act" if edition is None else "eur-lex.edition",
-        work,
-        edition,
-        u.fragment or None,
-        (work,),
-    )
+    return ParsedUrl("eur-lex", work, edition, u.fragment or None, (work,))
 
 
 # OECD Legal Instruments
@@ -231,9 +262,7 @@ def _oecd_parse(u: SplitResult) -> ParsedUrl | None:
     if m is None:
         return None
     work = m[2].upper().replace("-", "/")
-    return ParsedUrl(
-        "oecd-compendium", "oecd-compendium.edition", work, m[1].lower(), None, (work,)
-    )
+    return ParsedUrl("oecd-compendium", work, m[1].lower(), None, (work,))
 
 
 # Verkhovna Rada
@@ -253,8 +282,7 @@ def _rada_parse(u: SplitResult) -> ParsedUrl | None:
         edition = "/".join(x for x in (m["lang"], m["ed"]) if x) or None
     else:
         return None
-    pattern = "zakon-rada.edition" if edition else "zakon-rada.act"
-    return ParsedUrl("zakon-rada", pattern, nreg, edition, u.fragment or None, (nreg,))
+    return ParsedUrl("zakon-rada", nreg, edition, u.fragment or None, (nreg,))
 
 
 def _rada_page(work_id: str, edition_id: str | None) -> str:
@@ -273,7 +301,7 @@ _QBZ_PATH = re.compile(r"^/eli/(fz/\d{4}/\d+)(?:/.*)?$")
 
 def _qbz_parse(u: SplitResult) -> ParsedUrl | None:
     m = _QBZ_PATH.match(u.path)
-    return ParsedUrl("qbz", "qbz.act", m[1], None, None, (m[1],)) if m else None
+    return ParsedUrl("qbz", m[1], None, None, (m[1],)) if m else None
 
 
 # Council of State (Thailand)
@@ -286,7 +314,7 @@ def _ocs_parse(u: SplitResult) -> ParsedUrl | None:
     m = _OCS_FRAGMENT.match(u.fragment)
     if u.path.rstrip("/") != "/council-of-state" or m is None:
         return None
-    return ParsedUrl("ocs", "ocs.edition", None, m[1], None, (m[1],))
+    return ParsedUrl("ocs", None, m[1], None, (m[1],))
 
 
 def _ocs_edition(work_id: str, edition_id: str) -> str:
@@ -306,13 +334,16 @@ def _dre_work(work: str) -> str:
     return re.sub(r"/\d{2}/\d{2}$", "", work)
 
 
+def _dre_page(work: str, *parts: str | None) -> str:
+    return "/".join([f"{_DRE}/{_dre_work(work)}/p/cons", *(p for p in parts if p)])
+
+
 def _dre_parse(u: SplitResult) -> ParsedUrl | None:
     m = _DRE_PATH.match(u.path)
     if m is None:
         return None
     work = _dre_work(m["work"])
-    pattern = "dre.edition" if m["date"] else "dre.act"
-    return ParsedUrl("dre", pattern, work, m["date"], None, (work,))
+    return ParsedUrl("dre", work, m["date"], None, (work,))
 
 
 # Boletín Oficial del Estado (Spain)
@@ -323,7 +354,7 @@ _BOE_ELI = re.compile(r"^/eli/(es(?:-[a-z]{2})?/[a-z]+/\d{4}/\d{2}/\d{2}/[^/]+)(
 
 def _boe_parse(u: SplitResult) -> ParsedUrl | None:
     m = _BOE_ELI.match(u.path)
-    return ParsedUrl("boe", "boe.act", m[1], None, None, (m[1],)) if m else None
+    return ParsedUrl("boe", m[1], None, None, (m[1],)) if m else None
 
 
 # Gaceta Oficial (Dominican Republic)
@@ -334,11 +365,7 @@ _GACETA_PATH = re.compile(r"^/(uploads/[^/]+\.pdf)$")
 
 def _gaceta_parse(u: SplitResult) -> ParsedUrl | None:
     m = _GACETA_PATH.match(u.path)
-    return (
-        ParsedUrl("gaceta-oficial-do", "gaceta-oficial-do.act", m[1], None, None, (m[1],))
-        if m
-        else None
-    )
+    return ParsedUrl("gaceta-oficial-do", m[1], None, None, (m[1],)) if m else None
 
 
 def _build() -> tuple[Publisher, ...]:
@@ -348,19 +375,19 @@ def _build() -> tuple[Publisher, ...]:
             "Riigi Teataja",
             ("riigiteataja.ee",),
             _rt_parse,
-            act=lambda w, e: f"{_RT}/akt/{e}" if e else None,
-            edition=lambda w, e: f"{_RT}/akt/{e}",
-            current=lambda w, e: f"{_RT}/akt/{e}?leiaKehtiv" if e else None,
-            fragment=lambda w, e, f: f"{_RT}/akt/{e}#{f}" if e else None,
+            act=lambda w, e: _rt_page(e),
+            edition=lambda w, e: _rt_page(e),
+            current=lambda w, e: _rt_page(e, "?leiaKehtiv"),
+            fragment=lambda w, e, f: _rt_page(e, f"#{f}"),
         ),
         Publisher(
             "legislation-gov-uk",
             "legislation.gov.uk",
             ("legislation.gov.uk",),
             _gb_parse,
-            act=lambda w, e: f"{_GB}/{w}",
-            edition=lambda w, e: f"{_GB}/{w}/{e}",
-            current=lambda w, e: f"{_GB}/{w}",
+            act=lambda w, e: _gb_page(w),
+            edition=lambda w, e: _gb_page(w, e),
+            current=lambda w, e: _gb_page(w),
             fragment=_gb_fragment,
             fragment_pattern=_gb_fragment_pattern,
             eid_fragment=_gb_eid_fragment,
@@ -416,8 +443,8 @@ def _build() -> tuple[Publisher, ...]:
             ("data.dre.pt",),
             _dre_parse,
             act=lambda w, e: f"{_DRE}/{w}/p/dre",
-            edition=lambda w, e: f"{_DRE}/{_dre_work(w)}/p/cons/{e}",
-            current=lambda w, e: f"{_DRE}/{_dre_work(w)}/p/cons",
+            edition=lambda w, e: _dre_page(w, e),
+            current=lambda w, e: _dre_page(w),
         ),
         Publisher(
             "boe",
@@ -437,32 +464,6 @@ def _build() -> tuple[Publisher, ...]:
 
 
 PUBLISHERS: dict[str, Publisher] = {p.key: p for p in _build()}
-
-
-def _register_patterns() -> None:
-    for p in PUBLISHERS.values():
-        kinds = [
-            kind
-            for kind, builder in (
-                ("act", p.act),
-                ("edition", p.edition),
-                ("current", p.current),
-                ("fragment", p.fragment),
-            )
-            if builder is not None
-        ]
-        PATTERN_VERIFIED.update({f"{p.key}.{k}": False for k in kinds})
-    PATTERN_VERIFIED.update(
-        {
-            f"legislation-gov-uk.fragment.{k}.{depth}": False
-            for k in _GB_PROVISIONS
-            for depth in (1, 2, 3)
-        }
-    )
-    PATTERN_VERIFIED.pop("legislation-gov-uk.fragment", None)
-
-
-_register_patterns()
 
 
 #: Every shipped acquirer class and the publisher its texts come from; None where the
