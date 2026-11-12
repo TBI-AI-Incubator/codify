@@ -346,8 +346,14 @@ Fixed:
   own open no group, and loose paragraphs still gather into a section at each
   heading. A list that restarts with no heading keeps its suffix, and what
   follows a repeated number nests as it does after the number's first
-  printing. An instrument that had no `_dup` eId is unchanged; one that had
-  needs a re-derive.
+  printing. An instrument that had no `_dup` eId is unchanged. One that had
+  may convert differently, and only converting it again from its stored
+  Compendium HTML picks that up: a re-derive rebuilds rows from the stored AKN.
+  Where it changes, its eIds are a new set, not the old one renamed: a plain
+  eId can name a different paragraph (the printed `2.` takes `para_2` from the
+  unnumbered paragraph above it, which takes `para_2_dup2` in exchange, and
+  the points under each go with them), so data keyed by the old eIds is
+  replaced, not carried across.
 
 - Riigi Teataja converter: a line break ends one `<p>` and the text after it
   starts the next, which Bluebell reads as a line too. Every `sisuTekst` of a
