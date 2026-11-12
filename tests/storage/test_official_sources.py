@@ -365,7 +365,7 @@ async def test_a_provision_url_prefers_an_anchor_and_waits_for_verification(
     assert read is not None
     source = read.source
     assert await official_provision_url(session, version, source, "section-13-2") is None
-    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section", True)
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
     assert (
         await official_provision_url(session, version, source, "section-13-2")
         == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2/123"
