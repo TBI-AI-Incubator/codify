@@ -125,7 +125,7 @@ def _render_text(
         line_refs = [
             (r, r.start_offset - cursor, min(r.end_offset, cursor + len(line)) - cursor)
             for r in sorted_refs
-            if cursor <= r.start_offset < cursor + len(line)
+            if cursor <= r.start_offset <= cursor + len(line)
         ]
         _render_line(p, line, line_refs)
         cursor += len(line) + 1  # +1 for the newline split() removed

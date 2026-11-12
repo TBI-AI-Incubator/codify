@@ -10,7 +10,7 @@ import structlog
 from lxml import etree
 
 from codify.akn._schema import AKN_NS, validate_akn
-from codify.akn.io import parse_akn
+from codify.akn.io import parse_akn, to_akn
 from codify.pipeline.formats.riigi_teataja import _viide_targets, riigi_teataja_to_akn
 from codify.storage.mappers import document_to_rows
 
@@ -330,3 +330,15 @@ def test_lifted_footnote_inside_a_formula_line_is_not_a_row() -> None:
     rows = document_to_rows(parse_akn(noted), uuid.uuid4())
     assert [p.akn_eid for p in rows[2] if p.akn_type == "recital"] == ["preamble__formula__p_1"]
     assert [r.target_uri for r in rows[3]] == [f"{_URL}105#pr16"]
+
+
+def test_extra_link_targets_at_a_paragraph_end_survive_a_round_trip() -> None:
+    link = (
+        "<viide><kuvatavTekst>seadus</kuvatavTekst><viideURID>"
+        "<viideURI>./dyn=1&amp;id=105;106</viideURI></viideURID></viide>"
+    )
+    body = f'<loige id="para1lg1"><loigeNr>1</loigeNr><sisuTekst>{link}</sisuTekst></loige>'
+    akn, _ = riigi_teataja_to_akn(_act(body + _loige(2, "B.")))
+    again = to_akn(parse_akn(akn))
+    hrefs = [r.get("href") for r in etree.fromstring(again.encode()).iter(f"{N}ref")]
+    assert hrefs == [f"{_URL}105", f"{_URL}106"]
