@@ -440,10 +440,11 @@ def test_an_explicit_url_fragment_is_kept(url: str, fragment: str) -> None:
 
 
 def test_an_ocs_timeline_id_may_hold_slashes_plus_and_equals(all_verified: None) -> None:
-    url = PUBLISHERS["ocs"].edition_url("x", "+/8=")
-    assert url is not None
-    parsed = parse_official_url(url)
-    assert parsed is not None and parsed.edition_id == "+/8="
+    for timeline in ("+/8=", "AAA/"):
+        url = PUBLISHERS["ocs"].edition_url("x", timeline)
+        assert url is not None
+        parsed = parse_official_url(url)
+        assert parsed is not None and parsed.edition_id == timeline
 
 
 def test_a_malformed_url_is_not_a_publisher_url() -> None:

@@ -307,7 +307,7 @@ def _qbz_parse(u: SplitResult) -> ParsedUrl | None:
 # Council of State (Thailand)
 
 _OCS = "https://searchlaw.ocs.go.th"
-_OCS_FRAGMENT = re.compile(r"^/public/doc/(.+?)/?$")
+_OCS_FRAGMENT = re.compile(r"^/public/doc/(.+)$")
 
 
 def _ocs_parse(u: SplitResult) -> ParsedUrl | None:
