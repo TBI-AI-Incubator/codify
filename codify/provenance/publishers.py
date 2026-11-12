@@ -405,8 +405,10 @@ def _build() -> tuple[Publisher, ...]:
             "Office of the Council of State",
             ("searchlaw.ocs.go.th",),
             _ocs_parse,
-            act=lambda w, e: _ocs_edition(w, e) if e else None,
+            # With no edition id, the work id is the work-level timeline's.
+            act=lambda w, e: _ocs_edition(w, e or w),
             edition=_ocs_edition,
+            current=lambda w, e: _ocs_edition(w, w),
         ),
         Publisher(
             "dre",

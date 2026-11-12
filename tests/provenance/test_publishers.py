@@ -440,3 +440,13 @@ def test_an_ocs_timeline_id_may_hold_slashes_plus_and_equals(all_verified: None)
 
 def test_a_malformed_url_is_not_a_publisher_url() -> None:
     assert parse_official_url("https://[broken/") is None
+
+
+def test_an_ocs_page_can_be_built_from_the_work_level_timeline_alone(
+    all_verified: None,
+) -> None:
+    ocs = PUBLISHERS["ocs"]
+    expected = "https://searchlaw.ocs.go.th/council-of-state/#/public/doc/abc"
+    assert ocs.act_url("abc") == expected
+    assert ocs.current_url("abc") == expected
+    assert ocs.page_url("abc") == (expected, "act")

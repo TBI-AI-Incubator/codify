@@ -188,6 +188,36 @@ async def official_anchors(session: AsyncSession, version_id: uuid.UUID) -> dict
     return {eid: frag for eid, frag in rows.all()}
 
 
+def _provision_url(source: OfficialSource, eid: str, anchor: str | None) -> str | None:
+    publisher = PUBLISHERS.get(source.publisher)
+    if publisher is None:
+        return None
+    fragment = anchor or publisher.fragment_for_eid(eid)
+    if fragment is None:
+        return None
+    return publisher.provision_url(source.work_id, source.edition_id, fragment)
+
+
+async def official_provision_urls(
+    session: AsyncSession, items: Iterable[tuple[uuid.UUID, OfficialSource, str]]
+) -> dict[tuple[uuid.UUID, str], str | None]:
+    """`official_provision_url` for many `(version_id, source, eid)` triples, one anchors query."""
+    wanted = list(items)
+    if not wanted:
+        return {}
+    rows = await session.execute(
+        select(
+            col(OfficialAnchor.version_id),
+            col(OfficialAnchor.akn_eid),
+            col(OfficialAnchor.fragment),
+        )
+        .where(col(OfficialAnchor.version_id).in_({v for v, _, _ in wanted}))
+        .where(col(OfficialAnchor.akn_eid).in_({e for _, _, e in wanted}))
+    )
+    anchors = {(v, e): f for v, e, f in rows.all()}
+    return {(v, e): _provision_url(src, e, anchors.get((v, e))) for v, src, e in wanted}
+
+
 async def official_provision_url(
     session: AsyncSession, version_id: uuid.UUID, source: OfficialSource, eid: str
 ) -> str | None:
@@ -196,20 +226,8 @@ async def official_provision_url(
     A recorded anchor wins over the publisher's eId rule; either way the link is only
     given once its URL pattern is verified. `source` is the version's own or ancestor's row.
     """
-    publisher = PUBLISHERS.get(source.publisher)
-    if publisher is None:
-        return None
-    anchor = (
-        await session.execute(
-            select(col(OfficialAnchor.fragment))
-            .where(col(OfficialAnchor.version_id) == version_id)
-            .where(col(OfficialAnchor.akn_eid) == eid)
-        )
-    ).scalar_one_or_none()
-    fragment = anchor or publisher.fragment_for_eid(eid)
-    if fragment is None:
-        return None
-    return publisher.provision_url(source.work_id, source.edition_id, fragment)
+    urls = await official_provision_urls(session, [(version_id, source, eid)])
+    return urls[(version_id, eid)]
 
 
 async def eid_for_fragment(
@@ -285,6 +303,7 @@ __all__ = [
     "lookup_official_id",
     "official_anchors",
     "official_provision_url",
+    "official_provision_urls",
     "record_official_source",
     "upsert_official_ids",
     "upsert_official_source",

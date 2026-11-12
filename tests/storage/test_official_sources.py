@@ -29,6 +29,7 @@ from codify.storage.official_sources import (
     lookup_official_id,
     official_anchors,
     official_provision_url,
+    official_provision_urls,
     record_official_source,
     upsert_official_ids,
     upsert_official_source,
@@ -454,3 +455,34 @@ async def test_a_mapped_rada_url_resolves_through_official_ids_first(
     await session.flush()
     stats = await resolve_references_for_version(session, citing)
     assert ref.target_law_id is not None and stats.resolved_official == 1
+
+
+async def test_provision_urls_come_from_one_batch(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codify.provenance import PATTERN_VERIFIED
+
+    monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
+    a, b = await _version(session), await _version(session)
+    await record_official_source(
+        session, a, _record(publisher="legislation-gov-uk", work_id="ukpga/1998/42"), stored=True
+    )
+    await record_official_source(
+        session, b, _record(publisher="legislation-gov-uk", work_id="ukpga/2000/1"), stored=True
+    )
+    await write_official_anchors(session, b, {"section-3-1": "section/3/1A"})
+    read = await get_official_sources(session, [a, b])
+    items = [
+        (a, read[a].source, "section-13-2"),
+        (b, read[b].source, "section-3-1"),
+        (b, read[b].source, "crossheading-x"),
+    ]
+    urls = await official_provision_urls(session, items)
+    assert (
+        urls[(a, "section-13-2")] == "https://www.legislation.gov.uk/ukpga/1998/42/section/13/2/123"
+    )
+    assert (
+        urls[(b, "section-3-1")] == "https://www.legislation.gov.uk/ukpga/2000/1/section/3/1A/123"
+    )
+    assert urls[(b, "crossheading-x")] is None
+    assert await official_provision_urls(session, []) == {}
