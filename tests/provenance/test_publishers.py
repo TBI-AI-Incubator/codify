@@ -159,7 +159,7 @@ def test_no_pattern_is_verified_yet() -> None:
         (
             "https://data.dre.pt/eli/dec-lei/7/2009/02/12/p/dre/pt/html",
             "dre",
-            "dec-lei/7/2009/02/12",
+            "dec-lei/7/2009",
             None,
             None,
         ),
