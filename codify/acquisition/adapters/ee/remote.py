@@ -47,14 +47,19 @@ def refused(status: int) -> bool:
 
 
 _STOP_HOLD_S = 900.0
-_STOPPED: tuple[ArchiveRefused, float] | None = None
+# (url, status, until): metadata, not an exception, so no traceback outlives the hold.
+_STOPPED: tuple[str, int, float] | None = None
 
 
 def archive_refusal() -> ArchiveRefused | None:
     """The refusal holding archive reads in this process, until it lapses or is reset."""
-    if _STOPPED is not None and time.monotonic() < _STOPPED[1]:
-        return _STOPPED[0]
-    return None
+    global _STOPPED
+    if _STOPPED is None:
+        return None
+    if time.monotonic() >= _STOPPED[2]:
+        _STOPPED = None
+        return None
+    return ArchiveRefused(_STOPPED[0], _STOPPED[1])
 
 
 def reset_archive_refusal() -> None:
@@ -68,8 +73,8 @@ def _refuse(url: str, status: int) -> ArchiveRefused:
     global _STOPPED
     held = archive_refusal()
     if held is None:
-        _STOPPED = (ArchiveRefused(url, status), time.monotonic() + _STOP_HOLD_S)
-        held = _STOPPED[0]
+        _STOPPED = (url, status, time.monotonic() + _STOP_HOLD_S)
+        held = ArchiveRefused(url, status)
     return held
 
 
