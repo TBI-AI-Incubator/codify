@@ -417,8 +417,7 @@ def index_remote_ee_archive(
     the read honours robots.txt and keeps the Estonian acquirer's pace."""
     if client is not None:
         return _index_remote(url, modified_since, max_members, workers, client)
-    with polite_http_client(_EE_PROFILE) as polite:
-        return _index_remote(url, modified_since, max_members, workers, polite)
+    return _index_remote(url, modified_since, max_members, workers, polite_http_client(_EE_PROFILE))
 
 
 def _index_remote(

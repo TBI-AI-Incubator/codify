@@ -161,13 +161,21 @@ class _PoliteBridge(httpx.BaseTransport):
         asyncio.run_coroutine_threadsafe(self._client.aclose(), _polite_loop()).result()
 
 
+_CLIENTS: dict[str, httpx.Client] = {}
+
+
 def polite_http_client(profile: PolitenessProfile) -> httpx.Client:
-    """A sync client under the acquirer's politeness profile; no redirect is followed."""
-    inner = _StopOnRefusal(httpx.AsyncHTTPTransport(verify=client_tls_context()))
-    return httpx.Client(
-        transport=_PoliteBridge(PoliteTransport(profile=profile, inner=inner)),
-        follow_redirects=False,
-    )
+    """One sync client per profile for the process, so the concurrency cap and the host's
+    pace hold across every caller; no redirect is followed."""
+    key = profile.model_dump_json()
+    with _LOOP_LOCK:
+        if key not in _CLIENTS:
+            inner = _StopOnRefusal(httpx.AsyncHTTPTransport(verify=client_tls_context()))
+            _CLIENTS[key] = httpx.Client(
+                transport=_PoliteBridge(PoliteTransport(profile=profile, inner=inner)),
+                follow_redirects=False,
+            )
+        return _CLIENTS[key]
 
 
 def http_client() -> httpx.Client:
