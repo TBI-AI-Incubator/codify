@@ -270,14 +270,17 @@ def _blocks_before(
     node: etree._Element, *, headings_only: bool
 ) -> list[tuple[str, etree._Element]]:
     """What precedes a node under its parent, nearest first: a lead-in, earlier
-    siblings' paragraphs, the parent's own heading."""
+    siblings' paragraphs, the parent's own heading. Nothing from inside an earlier
+    part, section or group, whose openers govern only what it holds."""
     parent = node.getparent()
     out: list[tuple[str, etree._Element]] = []
     for sibling in reversed(list(parent)[: parent.index(node)]):
         name = _local(sibling)
         if name == "heading":
             out.append(("heading", sibling))
-        elif not headings_only and name and name not in _ASIDE:
+        elif headings_only or not name or name in _ASIDE:
+            continue
+        elif (sibling.get("name") or name) not in _BOUNDARY:
             kind = "lead" if name == "intro" else "sibling"
             out.extend((kind, p) for p in reversed(_own_paragraphs(sibling)))
     return out

@@ -570,6 +570,26 @@ def test_a_title_only_referred_to_is_not_the_act_amended() -> None:
     assert got == Refused("names_another_act")
 
 
+def test_an_opener_inside_an_earlier_part_does_not_govern_what_follows_the_part() -> None:
+    def read(opener_holder: str) -> EffectText | Refused:
+        opener = _leaves(1, 1, f"The {LIGHTS} is amended as follows.")
+        doc = _act(
+            f"""<hcontainer name="schedule" eId="schedule-1"><{opener_holder}>{opener}
+            </{opener_holder}>{_leaves(1, 2, "In section 5, for “a” substitute “b”.")}
+            </hcontainer>"""
+        )
+        return effect_text(
+            doc,
+            source_eid="schedule-1-paragraph-2",
+            target_eid="section-5",
+            action="substitution",
+            target_titles=[LIGHTS],
+        )
+
+    assert read("part") == Refused("target_not_named")
+    assert isinstance(read("wrapper"), EffectText)
+
+
 def test_scope_starts_at_the_paragraph_giving_the_instruction() -> None:
     doc = _act(
         f"""<section eId="section-1"><subsection eId="section-1-1"><content>
