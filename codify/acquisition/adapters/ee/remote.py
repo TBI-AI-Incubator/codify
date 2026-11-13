@@ -125,8 +125,10 @@ class _StopOnRefusal(httpx.AsyncBaseTransport):
         _raise_if_stopped()
         response = await self._inner.handle_async_request(request)
         if refused(response.status_code):
+            # Held before the close yields, so no other read passes the check meanwhile.
+            held = _refuse(str(request.url), response.status_code)
             await response.aclose()
-            raise _refuse(str(request.url), response.status_code)
+            raise held
         return response
 
     async def aclose(self) -> None:

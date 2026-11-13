@@ -577,3 +577,31 @@ def test_a_read_waiting_in_the_polite_transport_is_not_sent_after_a_refusal() ->
     with pytest.raises(ArchiveRefused):
         client.get(_URL, headers={"range": "bytes=0-9"})
     assert _URL.rsplit("/", 1)[1] not in sent
+
+
+def test_a_read_queued_behind_one_that_is_refused_never_reaches_the_publisher() -> None:
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    ranges: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        ranges.append(request.headers["range"])
+        await asyncio.sleep(0.4)
+        return httpx.Response(429)
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None, concurrency=1))
+
+    def read(start: int) -> None:
+        RemoteFile(_URL, client=client).read(start, 10)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(read, 0)
+        time.sleep(0.15)
+        second = pool.submit(read, 100)
+        for outcome in (first, second):
+            with pytest.raises(ArchiveRefused):
+                outcome.result(timeout=10)
+    assert ranges == ["bytes=0-9"]
