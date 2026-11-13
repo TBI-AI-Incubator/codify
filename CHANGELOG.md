@@ -12,6 +12,12 @@ New, additive:
   `ArchiveRefused` at the first answer and is never retried, and no later read in
   the process is sent for fifteen minutes (or until `reset_archive_refusal()`).
   Pass a client to `index_remote_ee_archive` to read with your own.
+- `codify.acquisition.effects.uk_text.effect_text` reads the text a UK amendment
+  effect put in place: the words or structure quoted in the amending provision
+  the feed names, cut to the unit the effect names. It attaches only where the
+  instruction, its lead-in, an opener before it or a heading over it names the
+  affected act by title or by a short form the amending act defines, and
+  returns `Refused(reason)` otherwise. Nothing calls it yet.
 
 ## 0.7.0 (2026-11-13)
 
