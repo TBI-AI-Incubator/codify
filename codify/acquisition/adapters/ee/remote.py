@@ -45,12 +45,15 @@ def refused(status: int) -> bool:
     return status in (429, 403) or status >= 500
 
 
-_STOPPED: ArchiveRefused | None = None
+_STOP_HOLD_S = 900.0
+_STOPPED: tuple[ArchiveRefused, float] | None = None
 
 
 def archive_refusal() -> ArchiveRefused | None:
-    """The refusal that stopped archive reads in this process, until reset."""
-    return _STOPPED
+    """The refusal holding archive reads in this process, until it lapses or is reset."""
+    if _STOPPED is not None and time.monotonic() < _STOPPED[1]:
+        return _STOPPED[0]
+    return None
 
 
 def reset_archive_refusal() -> None:
@@ -59,16 +62,19 @@ def reset_archive_refusal() -> None:
 
 
 def _refuse(url: str, status: int) -> ArchiveRefused:
-    """The first refusal stops every later read in the process, so a batch in flight
-    sends nothing more to a host that has refused."""
+    """The first refusal holds every later read in the process for fifteen minutes, so a
+    batch in flight sends nothing more to a host that has refused."""
     global _STOPPED
-    _STOPPED = _STOPPED or ArchiveRefused(url, status)
-    return _STOPPED
+    held = archive_refusal()
+    if held is None:
+        _STOPPED = (ArchiveRefused(url, status), time.monotonic() + _STOP_HOLD_S)
+        held = _STOPPED[0]
+    return held
 
 
 def _raise_if_stopped() -> None:
-    if _STOPPED is not None:
-        raise _STOPPED
+    if (held := archive_refusal()) is not None:
+        raise held
 
 
 @dataclass(frozen=True)
