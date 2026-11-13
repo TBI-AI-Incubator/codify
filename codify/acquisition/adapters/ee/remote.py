@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import re
 import struct
+import threading
 import time
 import zipfile
 import zlib
@@ -14,6 +16,7 @@ from types import TracebackType
 import httpx
 
 from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.politeness import PoliteTransport, client_tls_context
 from codify.core.security import ssrf_guard
 
 # zipfile's local file header: signature, five shorts, three longs, name and extra lengths.
@@ -28,6 +31,18 @@ class RangeRefused(OSError):
 
 class ArchiveChanged(OSError):
     """A member is no longer where its location says: the archive was replaced."""
+
+
+class ArchiveRefused(OSError):
+    """The host answered 429, 403 or a 5xx. Never retried: the caller stops and waits."""
+
+    def __init__(self, url: str, status: int) -> None:
+        super().__init__(f"{url} answered {status}")
+        self.status = status
+
+
+def refused(status: int) -> bool:
+    return status in (429, 403) or status >= 500
 
 
 @dataclass(frozen=True)
@@ -64,6 +79,69 @@ class MemberLocation:
             int(extra["crc"]),
             int(extra["method"]),
         )
+
+
+class _StopOnRefusal(httpx.AsyncBaseTransport):
+    """Under the polite transport, so its own backoff never retries a refusal."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport) -> None:
+        self._inner = inner
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        response = await self._inner.handle_async_request(request)
+        if refused(response.status_code):
+            await response.aclose()
+            raise ArchiveRefused(str(request.url), response.status_code)
+        return response
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
+
+_LOOP: asyncio.AbstractEventLoop | None = None
+_LOOP_LOCK = threading.Lock()
+
+
+def _polite_loop() -> asyncio.AbstractEventLoop:
+    global _LOOP
+    with _LOOP_LOCK:
+        if _LOOP is None:
+            _LOOP = asyncio.new_event_loop()
+            threading.Thread(target=_LOOP.run_forever, daemon=True, name="polite-archive").start()
+        return _LOOP
+
+
+class _PoliteBridge(httpx.BaseTransport):
+    """Sends a sync client's requests through the polite transport on a background loop,
+    so robots.txt, the host's pace and the concurrency cap apply to range reads."""
+
+    def __init__(self, transport: PoliteTransport) -> None:
+        self._client = httpx.AsyncClient(
+            transport=transport,
+            follow_redirects=False,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        async def send() -> httpx.Response:
+            return await self._client.request(
+                request.method, str(request.url), headers=request.headers
+            )
+
+        sent = asyncio.run_coroutine_threadsafe(send(), _polite_loop()).result()
+        return httpx.Response(sent.status_code, headers=sent.headers, content=sent.content)
+
+    def close(self) -> None:
+        asyncio.run_coroutine_threadsafe(self._client.aclose(), _polite_loop()).result()
+
+
+def polite_http_client(profile: PolitenessProfile) -> httpx.Client:
+    """A sync client under the acquirer's politeness profile; no redirect is followed."""
+    inner = _StopOnRefusal(httpx.AsyncHTTPTransport(verify=client_tls_context()))
+    return httpx.Client(
+        transport=_PoliteBridge(PoliteTransport(profile=profile, inner=inner)),
+        follow_redirects=False,
+    )
 
 
 def http_client() -> httpx.Client:
@@ -127,6 +205,8 @@ class RemoteFile:
                 with self._client.stream("GET", self.url, headers=headers) as resp:
                     m = _CONTENT_RANGE.fullmatch(resp.headers.get("content-range", ""))
                     sent = resp.headers.get("content-length")
+                    if refused(resp.status_code):
+                        raise ArchiveRefused(self.url, resp.status_code)
                     if resp.status_code != 206 or m is None:
                         last = f"status {resp.status_code}"
                     elif (int(m.group(1)), int(m.group(2))) != (start, end):
@@ -146,6 +226,8 @@ class RemoteFile:
         """The archive's members, from its central directory alone."""
         # The length of the bytes the ranges will read, not of an encoded representation.
         head = self._client.head(self.url, headers={"accept-encoding": "identity"})
+        if refused(head.status_code):
+            raise ArchiveRefused(self.url, head.status_code)
         head.raise_for_status()
         self.size = int(head.headers["content-length"])
         self._validator = head.headers.get("last-modified")
@@ -227,8 +309,11 @@ class _RangeIO(io.RawIOBase):
 
 __all__ = [
     "ArchiveChanged",
+    "ArchiveRefused",
     "MemberLocation",
     "RangeRefused",
     "RemoteFile",
     "http_client",
+    "polite_http_client",
+    "refused",
 ]

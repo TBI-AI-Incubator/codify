@@ -16,12 +16,17 @@ import httpx
 import structlog
 
 from codify.acquisition.adapters.ee.identity import classify, read_identity, romanise
-from codify.acquisition.adapters.ee.remote import MemberLocation, RemoteFile
+from codify.acquisition.adapters.ee.remote import (
+    MemberLocation,
+    RemoteFile,
+    polite_http_client,
+)
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
     Body,
     DocumentRef,
+    PolitenessProfile,
     archive_date,
 )
 from codify.acquisition.index import index_path as acquisition_index_path
@@ -47,8 +52,8 @@ class TooManyMembers(ValueError):
     """More members changed since the day than the caller will read."""
 
 
-def _read_remote_member(url: str, loc: MemberLocation) -> bytes:
-    with RemoteFile(url) as remote:
+def _read_remote_member(url: str, loc: MemberLocation, client: httpx.Client) -> bytes:
+    with RemoteFile(url, client=client) as remote:
         return remote.member(loc)
 
 
@@ -56,6 +61,8 @@ class EeDatadumpAcquirer(BaseAcquirer):
     """Acquire Estonian legislation from the local Riigi Teataja zip archive."""
 
     JURISDICTION: ClassVar[str] = "ee"
+    DEFAULT_RATE: ClassVar[int | None] = 30
+    _CONCURRENCY: ClassVar[int] = 2
 
     def __init__(
         self,
@@ -70,6 +77,7 @@ class EeDatadumpAcquirer(BaseAcquirer):
         self._archive_path = archive_path or (Path(env_archive) if env_archive else None)
         self._index: dict[str, Any] | None = None
         self._zf: zipfile.ZipFile | None = None
+        self._http: httpx.Client | None = None
 
     def _load_index(self) -> dict[str, Any]:
         if self._index is not None:
@@ -135,8 +143,12 @@ class EeDatadumpAcquirer(BaseAcquirer):
             raise EeDocNotInDump(f"Statute {ref.number!r} not in Estonian datadump index")
 
         if remote:
+            self._http = self._http or polite_http_client(self.politeness)
             raw_xml = await asyncio.to_thread(
-                _read_remote_member, remote, MemberLocation.from_extra(ref.extra)
+                _read_remote_member,
+                remote,
+                MemberLocation.from_extra(ref.extra),
+                self._http,
             )
         else:
             archive = self._zip()
@@ -173,6 +185,11 @@ class EeDatadumpAcquirer(BaseAcquirer):
             else None,
         )
 
+
+_EE_PROFILE = PolitenessProfile(
+    rate_limit_per_minute=EeDatadumpAcquirer.DEFAULT_RATE,
+    concurrency=EeDatadumpAcquirer._CONCURRENCY,
+)
 
 # Every local government body the archive names: a rural municipality, town or
 # borough council or government. Their acts are municipal whichever series printed them.
@@ -392,11 +409,25 @@ def index_remote_ee_archive(
     *,
     modified_since: date,
     max_members: int | None = None,
-    workers: int = 8,
+    workers: int = 2,
     client: httpx.Client | None = None,
 ) -> dict[str, Any]:
     """Index the members an archive changed on or after `modified_since`, reading by range;
-    each entry carries its member's location, which is all a fetch needs."""
+    each entry carries its member's location, which is all a fetch needs. Without a `client`
+    the read honours robots.txt and keeps the Estonian acquirer's pace."""
+    if client is not None:
+        return _index_remote(url, modified_since, max_members, workers, client)
+    with polite_http_client(_EE_PROFILE) as polite:
+        return _index_remote(url, modified_since, max_members, workers, polite)
+
+
+def _index_remote(
+    url: str,
+    modified_since: date,
+    max_members: int | None,
+    workers: int,
+    client: httpx.Client,
+) -> dict[str, Any]:
     from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
     from datetime import UTC, datetime
 

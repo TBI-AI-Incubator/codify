@@ -60,6 +60,10 @@ Breaks, in that the structurer's output changes for documents it already read:
 
 New, additive:
 
+- Reads from a published Riigi Teataja archive go through the polite transport:
+  robots.txt, two requests at a time and 30 a minute. A 429, 403 or 5xx raises
+  `ArchiveRefused` at the first answer and is never retried. Pass a client to
+  `index_remote_ee_archive` to read with your own.
 - `AnchorCoverage.state` says which kind of coverage a scan has: `measured`,
   `captured_unmeasured` (units found, no marker to count them against) or `empty`.
   `unfilled_anchors` counts the anchors heading text no body-fill window reaches,
