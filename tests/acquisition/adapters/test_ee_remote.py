@@ -538,3 +538,42 @@ def test_a_refusal_in_the_trailer_read_keeps_its_type_through_zipfile() -> None:
 
     with pytest.raises(ArchiveRefused):
         RemoteFile(_URL, client=_client(handler)).directory()
+
+
+def test_the_polite_client_reads_an_exact_range_sent_without_a_length() -> None:
+    data = bytes(range(50))
+
+    async def chunks(body: bytes) -> AsyncIterator[bytes]:
+        yield body[:4]
+        yield body[4:]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        m = _RANGE.fullmatch(request.headers["range"])
+        assert m is not None
+        start, end = int(m.group(1)), int(m.group(2))
+        return httpx.Response(
+            206,
+            headers={"content-range": f"bytes {start}-{end}/{len(data)}"},
+            content=chunks(data[start : end + 1]),
+        )
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    assert RemoteFile(_URL, client=client).read(5, 10) == data[5:15]
+
+
+def test_a_read_waiting_in_the_polite_transport_is_not_sent_after_a_refusal() -> None:
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(429)
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None, concurrency=1))
+    remote._refuse(_URL, 429)
+    with pytest.raises(ArchiveRefused):
+        client.get(_URL, headers={"range": "bytes=0-9"})
+    assert _URL.rsplit("/", 1)[1] not in sent

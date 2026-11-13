@@ -121,6 +121,8 @@ class _StopOnRefusal(httpx.AsyncBaseTransport):
         self._inner = inner
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        # After the polite transport's waits, so a refusal recorded meanwhile holds this one back.
+        _raise_if_stopped()
         response = await self._inner.handle_async_request(request)
         if refused(response.status_code):
             await response.aclose()
@@ -175,15 +177,23 @@ class _PoliteBridge(httpx.BaseTransport):
                     if (
                         request.method == "HEAD"
                         or response.status_code != 206
-                        or announced is None
-                        or int(announced) != wanted
+                        or (announced is not None and int(announced) != wanted)
                     ):
                         # Anything but the exact range asked for is rejected by the reader
                         # from its headers; its body is never downloaded.
                         return httpx.Response(response.status_code, headers=response.headers)
-                    body = await response.aread()
+                    if announced is not None:
+                        body = bytearray(await response.aread())
+                    else:
+                        # Unannounced (chunked): read to one byte past the range, which the
+                        # reader's own size check then refuses.
+                        body = bytearray()
+                        async for chunk in response.aiter_raw():
+                            body += chunk
+                            if len(body) > (wanted or 0):
+                                break
                     return httpx.Response(
-                        response.status_code, headers=response.headers, content=body
+                        response.status_code, headers=response.headers, content=bytes(body)
                     )
                 finally:
                     await response.aclose()
