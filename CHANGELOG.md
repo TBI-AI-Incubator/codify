@@ -56,6 +56,7 @@ Breaks, in that the structurer's output changes for documents it already read:
    in-process lane passes. The structural scan's `anchor_coverage` finding reports
    that document as `captured_unmeasured` and a refused skeleton as a failing
    `containers_only`, where both read `no_markers_in_source` before.
+6. OECD section identifiers are provisional and will change in the next release.
 
 New, additive:
 
