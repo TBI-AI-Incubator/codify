@@ -475,5 +475,65 @@ def test_old_is_left_empty_when_the_instruction_substitutes_for_two_quotes() -> 
     assert isinstance(got, EffectText) and (got.old, got.new) == ((), ("z",))
 
 
+def test_old_is_left_empty_when_the_quote_only_locates_what_is_replaced() -> None:
+    got = _one("In section 5, for the entry for “Harbour Board” substitute “the Board”.")
+    assert isinstance(got, EffectText) and (got.old, got.new) == ((), ("the Board",))
+
+
+@pytest.mark.parametrize(
+    "earlier",
+    ["In Article 5 of the Regulation, omit “x”.", "In section 4 of the principal Act, omit “x”."],
+)
+def test_an_instruction_naming_anything_else_ends_the_scope_for_those_after_it(
+    earlier: str,
+) -> None:
+    doc = _act(
+        '<hcontainer name="schedule" eId="schedule-1">'
+        + _leaves(1, 1, f"The {LIGHTS} is amended as follows.", earlier)
+        + _leaves(1, 3, "In section 5, for “a” substitute “b”.")
+        + "</hcontainer>"
+    )
+    got = effect_text(
+        doc,
+        source_eid="schedule-1-paragraph-3",
+        target_eid="section-5",
+        action="substitution",
+        target_titles=[LIGHTS],
+    )
+    assert got == Refused("names_another_act")
+
+
+def _quoting(quoted: str, target: str = "section-5") -> EffectText | Refused:
+    doc = _act(
+        f"""<section eId="section-1"><content><p><mod>In the {LIGHTS}, for section 5
+        substitute {quoted}</mod></p></content></section>"""
+    )
+    return effect_text(
+        doc,
+        source_eid="section-1",
+        target_eid=target,
+        action="substitution",
+        target_titles=[LIGHTS],
+    )
+
+
+def test_marks_inside_a_quoted_element_must_balance() -> None:
+    assert isinstance(_quoting("<quotedText>“beacon”</quotedText>"), EffectText)
+    assert _quoting("<quotedText>“beacon</quotedText>") == Refused("quotes_unbalanced")
+
+
+def test_a_bare_numbered_unit_is_matched_as_the_element_it_is() -> None:
+    def unit(name: str) -> str:
+        return (
+            f"<quotedStructure><{name}><num>5</num><content><p>five</p></content></{name}>"
+            f"<{name}><num>6</num><content><p>six</p></content></{name}></quotedStructure>"
+        )
+
+    got = _quoting(unit("section"))
+    assert isinstance(got, EffectText) and got.new == ("5 five",)
+    assert _quoting(unit("paragraph")) == Refused("quoted_unit_differs")
+    assert isinstance(_quoting(unit("paragraph"), "schedule-1-paragraph-5"), EffectText)
+
+
 def test_no_title_is_no_target() -> None:
     assert _read("schedule-1-paragraph-2", title=" ") == Refused("target_title_unknown")

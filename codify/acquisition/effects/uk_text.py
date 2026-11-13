@@ -78,7 +78,7 @@ class _Unit:
     number: str
     #: Numbered in brackets, as a subsection or sub-paragraph is and a section is not.
     sub: bool
-    #: The word its number carries ("part", "schedule"); empty for a bare number.
+    #: The word its number carries ("part", "schedule"), else its element's name.
     kind: str
     text: str
 
@@ -121,7 +121,8 @@ def _units(el: etree._Element) -> list[_Unit]:
         tokens = re.findall(r"[0-9A-Za-z]+", own)
         if tokens:
             text = _squash(f"{lead} {_flat(child)}")
-            kind = tokens[0].lower() if len(tokens) > 1 and tokens[0].isalpha() else ""
+            worded = len(tokens) > 1 and tokens[0].isalpha()
+            kind = tokens[0].lower() if worded else _local(child)
             out.append(_Unit(tokens[-1].lower(), own.startswith("("), kind, text))
             lead = ""
         elif _local(child) == "heading":
@@ -173,7 +174,9 @@ def _slot_inline_quotes(prose: str, quotes: list[_Quote]) -> str | None:
 def _readable(el: etree._Element) -> tuple[str, list[_Quote]] | None:
     quotes: list[_Quote] = []
     prose = _slot_inline_quotes(_prose(el, quotes), quotes)
-    return (_squash(prose), quotes) if prose is not None else None
+    if prose is None or any(q.text.count("“") != q.text.count("”") for q in quotes):
+        return None
+    return _squash(prose), quotes
 
 
 def _own_paragraphs(el: etree._Element, apart: Collection[str] = _ASIDE) -> list[etree._Element]:
@@ -245,9 +248,11 @@ def _names(prose: str, target: re.Pattern[str], kind: str) -> bool | None:
         chars[start:end] = " " * (end - start)
     masked = _blank(_blank("".join(chars), _BRACKETS), _SLOT)
     cited = [m.start() for m in _CITED.finditer(masked)]
-    if kind == "sibling" and not _OPENER.search(prose):
-        return False if cited else None
     words = [m for m in _CAPITAL.finditer(masked) if not _plain(m.group(), prose[m.end() :])]
+    if kind == "sibling" and not _OPENER.search(prose):
+        verb = _VERB.search(masked)
+        located = [m for m in words if verb is None or m.start() < verb.start()]
+        return False if cited or located else None
     if kind == "heading" and words and not masked[: words[0].start()].strip():
         words = words[1:]
     other = cited + [m.start() for m in words]
@@ -305,9 +310,12 @@ def _for_unit(quote: _Quote, target_eid: str) -> str | None:
         return quote.text
     *above, last = target_eid.lower().split("-")
     word = above[-1] if above and above[-1] in _TOP_UNITS else ""
-    kinds = {word} if word in _WORDED else {word, ""}
+    # A regulation, article or rule is marked up under more than one element name.
+    kinds = {word} if word in _WORDED | {"section", "paragraph"} else None
     matched = [
-        u.text for u in quote.units if u.number == last and u.sub == (not word) and u.kind in kinds
+        u.text
+        for u in quote.units
+        if u.number == last and u.sub == (not word) and (not kinds or u.sub or u.kind in kinds)
     ]
     return matched[0] if len(matched) == 1 else None
 
@@ -363,7 +371,7 @@ def effect_text(
     if None in new:
         return Refused("quoted_unit_differs")
     before = prose[: verb.start()]
-    one_for = action == "substitution" and len(re.findall(rf"\bfor\s+{_Q}", before, re.I)) == 1
+    one_for = action == "substitution" and len(re.findall(r"\bfor\b", before, re.I)) == 1
     old = _FOR_QUOTE.search(before) if one_for else None
     return EffectText(
         old=(quotes[int(old.group(1))].text,) if old else (),
