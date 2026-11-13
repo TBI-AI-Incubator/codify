@@ -33,8 +33,9 @@ class ArchiveChanged(OSError):
     """A member is no longer where its location says: the archive was replaced."""
 
 
-class ArchiveRefused(OSError):
-    """The host answered 429, 403 or a 5xx. Never retried: the caller stops and waits."""
+class ArchiveRefused(Exception):
+    """The host answered 429, 403 or a 5xx. Never retried: the caller stops and waits.
+    Not an OSError, which zipfile would turn into BadZipFile."""
 
     def __init__(self, url: str, status: int) -> None:
         super().__init__(f"{url} answered {status}")
@@ -130,6 +131,7 @@ class _StopOnRefusal(httpx.AsyncBaseTransport):
         await self._inner.aclose()
 
 
+_RANGE_HEADER = re.compile(r"bytes=(\d+)-(\d+)")
 _LOOP: asyncio.AbstractEventLoop | None = None
 _LOOP_LOCK = threading.Lock()
 
@@ -148,6 +150,7 @@ class _PoliteBridge(httpx.BaseTransport):
     so robots.txt, the host's pace and the concurrency cap apply to range reads."""
 
     def __init__(self, transport: PoliteTransport) -> None:
+        self._sem = asyncio.Semaphore(transport.profile.concurrency)
         self._client = httpx.AsyncClient(
             transport=transport,
             follow_redirects=False,
@@ -155,13 +158,37 @@ class _PoliteBridge(httpx.BaseTransport):
         )
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        async def send() -> httpx.Response:
-            return await self._client.request(
-                request.method, str(request.url), headers=request.headers
-            )
+        asked = _RANGE_HEADER.fullmatch(request.headers.get("range", ""))
+        wanted = int(asked.group(2)) - int(asked.group(1)) + 1 if asked else None
 
-        sent = asyncio.run_coroutine_threadsafe(send(), _polite_loop()).result()
-        return httpx.Response(sent.status_code, headers=sent.headers, content=sent.content)
+        async def send() -> httpx.Response:
+            # The permit is held until the body is read or dropped, not only to the headers.
+            async with self._sem:
+                response = await self._client.send(
+                    self._client.build_request(
+                        request.method, str(request.url), headers=request.headers
+                    ),
+                    stream=True,
+                )
+                try:
+                    announced = response.headers.get("content-length")
+                    if (
+                        request.method == "HEAD"
+                        or response.status_code != 206
+                        or announced is None
+                        or int(announced) != wanted
+                    ):
+                        # Anything but the exact range asked for is rejected by the reader
+                        # from its headers; its body is never downloaded.
+                        return httpx.Response(response.status_code, headers=response.headers)
+                    body = await response.aread()
+                    return httpx.Response(
+                        response.status_code, headers=response.headers, content=body
+                    )
+                finally:
+                    await response.aclose()
+
+        return asyncio.run_coroutine_threadsafe(send(), _polite_loop()).result()
 
     def close(self) -> None:
         asyncio.run_coroutine_threadsafe(self._client.aclose(), _polite_loop()).result()

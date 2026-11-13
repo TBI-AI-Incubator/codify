@@ -8,7 +8,7 @@ import random
 import re
 import time
 import zipfile
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import date
 from pathlib import Path
 
@@ -487,3 +487,54 @@ def test_the_estonian_acquirer_is_paced_at_two_at_once_and_thirty_a_minute() -> 
         acquirer.politeness.user_agent
         == "codify-acquire/0.1 (+https://github.com/TBI-AI-Incubator)"
     )
+
+
+class _AsyncUnread(httpx.AsyncByteStream):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        raise AssertionError("a refused answer's body was read")
+        yield b""
+
+
+def test_the_polite_client_never_downloads_a_whole_file_answered_for_a_range() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(200, headers={"content-length": "999"}, stream=_AsyncUnread())
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    with pytest.raises(RangeRefused):
+        RemoteFile(_URL, client=client, attempts=2, backoff=0).read(0, 10)
+
+
+def test_the_polite_client_reads_a_range_it_was_answered_exactly() -> None:
+    data = bytes(range(50))
+    client = _polite(
+        lambda r: (
+            httpx.Response(200, text="User-agent: *\nAllow: /\n")
+            if r.url.path == "/robots.txt"
+            else _ranged(r, data)
+        ),
+        PolitenessProfile(rate_limit_per_minute=None),
+    )
+    assert RemoteFile(_URL, client=client).read(5, 10) == data[5:15]
+
+
+def _ranged(request: httpx.Request, data: bytes) -> httpx.Response:
+    m = _RANGE.fullmatch(request.headers["range"])
+    assert m is not None
+    start, end = int(m.group(1)), int(m.group(2))
+    return httpx.Response(
+        206,
+        headers={"content-range": f"bytes {start}-{end}/{len(data)}"},
+        content=data[start : end + 1],
+    )
+
+
+def test_a_refusal_in_the_trailer_read_keeps_its_type_through_zipfile() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "HEAD":
+            return httpx.Response(200, headers={"content-length": "100000"})
+        return httpx.Response(429)
+
+    with pytest.raises(ArchiveRefused):
+        RemoteFile(_URL, client=_client(handler)).directory()
