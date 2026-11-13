@@ -134,6 +134,16 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _closed_host_circuits() -> Iterator[None]:
+    """Host circuits are process-wide; one test's failing fake host must not trip the next."""
+    from codify.acquisition.politeness import reset_host_circuits
+
+    reset_host_circuits()
+    yield
+    reset_host_circuits()
+
+
+@pytest.fixture(autouse=True)
 def _declared_requirements(request: pytest.FixtureRequest) -> None:
     """Skip where a declared requirement is absent, for the cases the exception
     hooks cannot reach: a caller that takes `None` and answers with a default."""
