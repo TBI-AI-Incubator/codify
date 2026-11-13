@@ -193,9 +193,9 @@ def _gb_fragment(work: str, edition: str | None, fragment: str) -> str:
 
 
 def _gb_fragment_pattern(fragment: str) -> str:
-    """Keyed by kind and depth: `section/13` is depth 1, `section/13/2` depth 2, deeper is 3."""
+    """Keyed by kind and exact depth: `section/13` is depth 1, `section/13/2` depth 2."""
     kind, *rest = fragment.split("/")
-    return f"legislation-gov-uk.fragment.{kind}.{min(len(rest), 3)}"
+    return f"legislation-gov-uk.fragment.{kind}.{len(rest)}"
 
 
 _GB_PROVISIONS = ("section", "article", "regulation", "rule", "schedule")

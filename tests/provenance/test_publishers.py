@@ -293,6 +293,12 @@ def test_a_gb_fragment_is_verified_per_provision_kind(
     assert gb.provision_url("ukpga/1998/42", None, "section/13/2/a") is None
 
 
+def test_a_gb_fragment_deeper_than_its_verified_depth_is_withheld() -> None:
+    gb = PUBLISHERS["legislation-gov-uk"]
+    assert gb.provision_url("ukpga/1998/42", "enacted", "schedule/2/paragraph/6") is not None
+    assert gb.provision_url("ukpga/1998/42", "enacted", "schedule/1/paragraph/1/a") is None
+
+
 def test_celex_ref_keeps_a_consolidated_text_as_the_edition() -> None:
     assert celex_ref("32016R0679") == OfficialRef(publisher="eur-lex", work_id="32016R0679")
     ref = celex_ref("02023R0956-20251020", edition_date="2025-10-20")
