@@ -277,6 +277,9 @@ New, additive:
   rather than its end. The field is last and defaults to False, so an adapter
   that builds `FeedEffect` today is unchanged. `narrows` answers the same for
   one effect type; `state_at` is unchanged.
+- Publisher links: the URL patterns in `PATTERN_VERIFIED` that were checked against
+  a live sample now return links to the publisher's own page and provisions. An
+  unchecked pattern still returns None.
 
 Fixed:
 
