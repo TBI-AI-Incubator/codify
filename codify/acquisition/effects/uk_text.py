@@ -38,6 +38,7 @@ _BRACKETS = re.compile(r"\([^()]*(?:\([^()]*\)[^()]*)*\)")
 # A description in brackets opens lower case; a title's own brackets do not.
 _GLOSS = re.compile(r"\((?=[a-z])[^()]*(?:\([^()]*\)[^()]*)*\)")
 _LONGER_BEFORE = re.compile(r"([A-Z][\w’-]*),?\s+(?:(?:and|of|for)\s+)?$")
+_MENTION = re.compile(r"\breferences?\s+to\s+(?:the\s+)?$", re.I)
 _LONGER_AFTER = re.compile(r"\s*(?:\([A-Z][^)]*\)\s*)?(?:of\s+)?[A-Z][a-z]")
 # An act as an instruction cites one: a titled year, a short form, itself, a numbered instrument.
 _CITED = re.compile(
@@ -117,7 +118,7 @@ def _units(el: etree._Element) -> list[_Unit]:
     lead = ""
     for child in el:
         num = next((c for c in child if _local(c) == "num"), None) if _local(child) else None
-        own = "".join(num.xpath("text()")).strip() if num is not None else ""
+        own = _prose(num, []).strip() if num is not None else ""
         tokens = re.findall(r"[0-9A-Za-z]+", own)
         if tokens:
             text = _squash(f"{lead} {_flat(child)}")
@@ -192,7 +193,8 @@ def _aliases(root: etree._Element, titles: Collection[str]) -> set[str]:
     """Short forms the amending act itself defines for the target and nothing else."""
     title = "|".join(re.escape(t) for t in titles)
     defines = re.compile(
-        rf"{_Q}(\d+){_Q}\s+means\s+the\s+(?P<a>{title})|(?P<b>{title})\s*\({_Q}(\d+){_Q}\)"
+        rf"{_Q}(\d+){_Q}\s+means\s+the\s+(?P<a>{title})(?=\s*(?:\([^)]*\))?\s*(?:[;.,]|$))"
+        rf"|(?P<b>{title})\s*\({_Q}(\d+){_Q}\)"
     )
     ours: collections.Counter[str] = collections.Counter()
     quoted: collections.Counter[str] = collections.Counter()
@@ -231,10 +233,13 @@ def _plain(word: str, after: str = " 1") -> bool:
 
 
 def _part_of_longer_name(prose: str, start: int, end: int) -> bool:
-    """A title or short form that is only the tail or head of another's."""
+    """A title or short form that is only the tail or head of another's, or is
+    only mentioned ("for the reference to the X Act substitute")."""
     before = _LONGER_BEFORE.search(prose[:start]) if prose[start].isupper() else None
-    return (before is not None and not _plain(before.group(1))) or bool(
-        _LONGER_AFTER.match(prose[end:])
+    return (
+        (before is not None and not _plain(before.group(1)))
+        or bool(_LONGER_AFTER.match(prose[end:]))
+        or bool(_MENTION.search(prose[:start]))
     )
 
 
@@ -282,11 +287,6 @@ def _out_of_scope(el: etree._Element, own: str, target: re.Pattern[str]) -> str 
     """Why the nearest text naming an act is not the target's, or None when it is.
     Nearest is the instruction, then back through its section or part, then headings."""
     verdict = _names(own, target, "own")
-    for heading in el.findall("{*}heading") if verdict is None else ():
-        read = _readable(heading)
-        if read is None:
-            return "scope_unreadable"
-        verdict = _names(read[0], target, "heading")
     node, bounded = el, False
     while verdict is None and node.getparent() is not None:
         bounded = bounded or (node.get("name") or _local(node)) in _BOUNDARY
@@ -350,7 +350,14 @@ def effect_text(
         f"(?:{re.escape(n[0].lower())}|{re.escape(n[0].upper())}){re.escape(n[1:])}" for n in named
     )
     target = re.compile(rf"(?<![\w’-])(?:{either})(?![\w’-])")
-    if reason := _out_of_scope(found[0], prose, target):
+    # Scope starts at the paragraph giving the instruction, not at all the pointer holds.
+    told = [
+        (para, text)
+        for para in ([found[0]] if _local(found[0]) == "p" else _own_paragraphs(found[0]))
+        if (text := (_readable(para) or ("",))[0]) and _VERB.search(_GLOSS.sub("", text))
+    ]
+    start, own = told[0] if len(told) == 1 else (found[0], prose)
+    if reason := _out_of_scope(start, own, target):
         return Refused(reason)
     instruction = _SLOT.sub(lambda m: f"“{quotes[int(m.group(1))].text}”", prose)
     prose = _GLOSS.sub("", prose)

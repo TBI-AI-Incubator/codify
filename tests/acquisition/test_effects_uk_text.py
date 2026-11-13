@@ -407,6 +407,10 @@ def _defined(definition: str, instruction: str) -> EffectText | Refused:
             f"In Part 2 references to “the Act” are to the {FERRIES}.",
             "In section 5 of the Act, for “a” substitute “b”.",
         ),
+        (
+            f"“the Acts” means the {LIGHTS} or the {FERRIES}, as the case may be.",
+            "In section 5 of the Acts, for “a” substitute “b”.",
+        ),
     ],
 )
 def test_a_short_form_is_the_targets_only_when_nothing_else_claims_it(
@@ -533,6 +537,58 @@ def test_a_bare_numbered_unit_is_matched_as_the_element_it_is() -> None:
     assert isinstance(got, EffectText) and got.new == ("5 five",)
     assert _quoting(unit("paragraph")) == Refused("quoted_unit_differs")
     assert isinstance(_quoting(unit("paragraph"), "schedule-1-paragraph-5"), EffectText)
+
+
+def test_a_unit_number_is_read_through_inline_markup() -> None:
+    marked = (
+        "<quotedStructure><section><num><b>5</b></num><content><p>five</p></content></section>"
+        "<section><num>6</num><content><p>six</p></content></section></quotedStructure>"
+    )
+    got = _quoting(marked)
+    assert isinstance(got, EffectText) and got.new == ("5 five",)
+    assert _quoting(marked, "section-7") == Refused("quoted_unit_differs")
+
+
+def test_a_title_only_referred_to_is_not_the_act_amended() -> None:
+    doc = _act(
+        '<hcontainer name="schedule" eId="schedule-1">'
+        + _leaves(
+            1,
+            1,
+            f"The {FERRIES} is amended as follows.",
+            f"In section 5, for the reference to the {LIGHTS} substitute “the Board”.",
+        )
+        + "</hcontainer>"
+    )
+    got = effect_text(
+        doc,
+        source_eid="schedule-1-paragraph-2",
+        target_eid="section-5",
+        action="substitution",
+        target_titles=[LIGHTS],
+    )
+    assert got == Refused("names_another_act")
+
+
+def test_scope_starts_at_the_paragraph_giving_the_instruction() -> None:
+    doc = _act(
+        f"""<section eId="section-1"><subsection eId="section-1-1"><content>
+        <p>The {LIGHTS} is repealed.</p></content></subsection>
+        <subsection eId="section-1-2"><content><p>In section 5 of the {FERRIES}, for “a”
+        substitute “b”.</p></content></subsection></section>"""
+    )
+
+    def read(title: str) -> EffectText | Refused:
+        return effect_text(
+            doc,
+            source_eid="section-1",
+            target_eid="section-5",
+            action="substitution",
+            target_titles=[title],
+        )
+
+    assert read(LIGHTS) == Refused("names_another_act")
+    assert isinstance(read(FERRIES), EffectText)
 
 
 def test_no_title_is_no_target() -> None:
