@@ -3,7 +3,11 @@
 Dates are cut dates. A version is released when its tag exists; the first tag is
 the launch tag.
 
-## Unreleased
+## 0.7.0 (2026-11-13)
+
+Six breaks, so the minor moves, as `VERSIONING.md` prescribes while the major
+is zero; the rest is additive. The OECD compendium conversion is in a release
+for the first time.
 
 Breaks, in that the structurer's output changes for documents it already read:
 
