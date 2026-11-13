@@ -39,8 +39,7 @@ def test_every_shipped_adapter_maps_to_a_publisher_or_is_listed_without_one() ->
     assert {p for p in ADAPTER_PUBLISHERS.values() if p} <= set(PUBLISHERS)
 
 
-def test_no_pattern_is_verified_yet_and_every_builder_has_a_flag() -> None:
-    assert not any(PATTERN_VERIFIED.values())
+def test_every_builder_has_a_flag() -> None:
     for key, p in PUBLISHERS.items():
         for kind, builder in (
             ("act", p.act),
@@ -233,6 +232,12 @@ def test_parser_ignores_other_urls(url: str) -> None:
 
 
 @pytest.fixture
+def none_verified(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in PATTERN_VERIFIED:
+        monkeypatch.setitem(PATTERN_VERIFIED, key, False)
+
+
+@pytest.fixture
 def all_verified(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in PATTERN_VERIFIED:
         monkeypatch.setitem(PATTERN_VERIFIED, key, True)
@@ -263,7 +268,7 @@ def test_a_publisher_with_no_such_page_returns_none(all_verified: None) -> None:
 
 
 def test_a_fragment_is_withheld_until_its_pattern_is_verified(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, none_verified: None
 ) -> None:
     rt = PUBLISHERS["riigi-teataja"]
     assert rt.provision_url("5555", "130062026129", "para10") is None
@@ -274,7 +279,9 @@ def test_a_fragment_is_withheld_until_its_pattern_is_verified(
     )
 
 
-def test_a_gb_fragment_is_verified_per_provision_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_gb_fragment_is_verified_per_provision_kind(
+    monkeypatch: pytest.MonkeyPatch, none_verified: None
+) -> None:
     gb = PUBLISHERS["legislation-gov-uk"]
     monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.fragment.section.2", True)
     assert (
@@ -323,7 +330,7 @@ def test_an_acquired_document_carries_its_ids_as_json() -> None:
     }
 
 
-def test_no_page_link_is_given_until_its_pattern_is_verified() -> None:
+def test_no_page_link_is_given_until_its_pattern_is_verified(none_verified: None) -> None:
     gb = PUBLISHERS["legislation-gov-uk"]
     assert gb.act_url("ukpga/1998/42") is None
     assert gb.edition_url("ukpga/1998/42", "enacted") is None
@@ -331,7 +338,9 @@ def test_no_page_link_is_given_until_its_pattern_is_verified() -> None:
     assert gb.page_url("ukpga/1998/42", "enacted") is None
 
 
-def test_the_page_falls_back_from_edition_to_act(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_the_page_falls_back_from_edition_to_act(
+    monkeypatch: pytest.MonkeyPatch, none_verified: None
+) -> None:
     gb = PUBLISHERS["legislation-gov-uk"]
     monkeypatch.setitem(PATTERN_VERIFIED, "legislation-gov-uk.act", True)
     assert gb.page_url("ukpga/1998/42", "enacted") == (
@@ -417,7 +426,7 @@ def test_a_rada_url_keeps_both_language_and_date() -> None:
 
 
 def test_an_oecd_french_edition_never_falls_back_to_the_english_page(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, none_verified: None
 ) -> None:
     monkeypatch.setitem(PATTERN_VERIFIED, "oecd-compendium.act", True)
     oecd = PUBLISHERS["oecd-compendium"]
