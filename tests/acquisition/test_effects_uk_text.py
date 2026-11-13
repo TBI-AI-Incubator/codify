@@ -344,6 +344,7 @@ def test_a_pointer_two_provisions_answer_to_is_refused() -> None:
         "there shall be inserted after “a” the words “b”",
         "there shall be substituted for the word “a” the word “b”",
         "there shall be inserted after the word “a” the words “b”",
+        "after “a” insert or “b”",
     ],
 )
 def test_a_quote_the_instruction_locates_by_is_not_replacement_text(instruction: str) -> None:
@@ -522,7 +523,8 @@ def _quoting(quoted: str, target: str = "section-5") -> EffectText | Refused:
 
 
 def test_marks_inside_a_quoted_element_must_balance() -> None:
-    assert isinstance(_quoting("<quotedText>“beacon”</quotedText>"), EffectText)
+    got = _quoting("<quotedText>“ beacon ”</quotedText>")
+    assert isinstance(got, EffectText) and got.new == ("beacon",)
     assert _quoting("<quotedText>“beacon</quotedText>") == Refused("quotes_unbalanced")
 
 
@@ -609,6 +611,18 @@ def test_scope_starts_at_the_paragraph_giving_the_instruction() -> None:
 
     assert read(LIGHTS) == Refused("names_another_act")
     assert isinstance(read(FERRIES), EffectText)
+
+
+def test_plain_words_may_stand_between_the_verb_and_the_text() -> None:
+    doc = _act(_leaves(1, 1, f"In section 5 of the {LIGHTS}, insert at the end the words— “b”."))
+    read = effect_text(
+        doc,
+        source_eid="schedule-1-paragraph-1",
+        target_eid="section-5",
+        action="insertion",
+        target_titles=[LIGHTS],
+    )
+    assert isinstance(read, EffectText) and read.new == ("b",)
 
 
 def test_no_title_is_no_target() -> None:

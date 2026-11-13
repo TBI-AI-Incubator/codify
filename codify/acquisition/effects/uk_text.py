@@ -1,5 +1,4 @@
 """The text an effect put in place, quoted in the amending provision the feed names.
-
 Attached only when the instruction, its lead-in, an opener before it or a heading
 over it names the act the effect is recorded against; all else is refused by reason.
 """
@@ -25,8 +24,10 @@ _VERB = re.compile(r"\b(substitute|insert|add)(?:d|ed)?\b", re.I)
 _Q = "\x00"
 _SLOT = re.compile(rf"{_Q}(\d+){_Q}")
 _FOR_QUOTE = re.compile(rf"\bfor\s+{_Q}(\d+){_Q}(?:(?!\bfor\b)[^{_Q}])*$", re.I)
-# Words that locate a change; a quote after one is not the text put in.
-_LOCATES = re.compile(r"\b(?:after|before|for|from|to)\b", re.I)
+# All that may stand between the verb and the text it puts in ("insert the following—").
+_LEAD = re.compile(
+    r"(?:\b(?:the|following|italic|headings?|words?|provisions?|text|at|end)\b|[\s,:;—–−-])*", re.I
+)
 # Every way a short form is given a meaning, whatever the meaning.
 _DEFINES = re.compile(
     rf"(?:referred to as|known as|called|cited as|references? to)\s+{_Q}(\d+){_Q}"
@@ -142,7 +143,7 @@ def _prose(el: etree._Element, quotes: list[_Quote]) -> str:
             units = _units(child) if name in _STRUCTURES else []
             text = _squash(_flat(child))
             if name == "quotedText" and text[:1] == "“" and text[-1:] == "”":
-                text = text[1:-1]
+                text = text[1:-1].strip()
             quotes.append(_Quote(text, units))
             parts.append(f"{_Q}{len(quotes) - 1}{_Q}")
         elif name and name not in _NOTES | {"num", "heading"}:
@@ -375,7 +376,7 @@ def effect_text(
     if not after:
         return Refused("no_quoted_text")
     lead, *gaps = _SLOT.sub(_Q, tail).split(_Q)[:-1]
-    if _LOCATES.search(lead) or any(gap.strip(" ,;") for gap in gaps):
+    if not _LEAD.fullmatch(lead) or any(gap.strip(" ,;") for gap in gaps):
         return Refused("quote_not_replacement")
     new = [_for_unit(q, target_eid) for q in after]
     if None in new:
