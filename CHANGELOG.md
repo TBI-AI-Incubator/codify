@@ -284,7 +284,8 @@ New, additive:
   one effect type; `state_at` is unchanged.
 - Publisher links: the URL patterns in `PATTERN_VERIFIED` that were checked against
   a live sample now return links to the publisher's own page and provisions. An
-  unchecked pattern still returns None.
+  unchecked pattern still returns None. A legislation.gov.uk fragment is keyed by
+  its exact depth, so one deeper than any sampled depth gets no link.
 
 Fixed:
 
