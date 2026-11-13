@@ -8,7 +8,7 @@ import random
 import re
 import time
 import zipfile
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from datetime import date
 from pathlib import Path
 
@@ -17,7 +17,7 @@ import pytest
 
 import codify.acquisition.adapters  # noqa: F401
 from codify.acquisition import DocumentRef
-from codify.acquisition.adapters.ee import remote
+from codify.acquisition.adapters.ee import datadump, remote
 from codify.acquisition.adapters.ee.datadump import (
     EeDatadumpAcquirer,
     TooManyMembers,
@@ -26,10 +26,13 @@ from codify.acquisition.adapters.ee.datadump import (
 )
 from codify.acquisition.adapters.ee.remote import (
     ArchiveChanged,
+    ArchiveRefused,
     MemberLocation,
     RangeRefused,
     RemoteFile,
 )
+from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.politeness import PoliteTransport
 from codify.core.security import SSRFBlocked
 from codify.jurisdictions import SourceAdapter
 from tests.acquisition.adapters.test_ee_datadump import _member, _repeal_stub
@@ -372,11 +375,10 @@ async def test_a_located_member_is_fetched_from_the_archive_without_an_index(
 ) -> None:
     members = _members()
     server = _Server(_zip(members))
-    monkeypatch.setattr(remote, "http_client", lambda: _client(server))
-    monkeypatch.setattr(
-        remote, "ssrf_guard", lambda url: None
-    )  # the stand-in host resolves nowhere
-    entry = index_remote_ee_archive(_URL, modified_since=date(2026, 10, 1))["entries"]["101"]
+    entry = index_remote_ee_archive(_URL, modified_since=date(2026, 10, 1), client=_client(server))[
+        "entries"
+    ]["101"]
+    monkeypatch.setattr(datadump, "polite_http_client", lambda profile: _client(server))
     acquirer = EeDatadumpAcquirer(
         SourceAdapter(kind="bulk_xml_archive", name="riigi_teataja_archive"),
         index_path=tmp_path / "absent.json",
@@ -392,3 +394,214 @@ async def test_a_located_member_is_fetched_from_the_archive_without_an_index(
     assert doc.bodies[0].content == members["000000000101.xml"][0]
     assert doc.source_url == "https://www.riigiteataja.ee/akt/101.xml"
     assert doc.frbr_work_uri.endswith("/2026/naidistoetuse-andmise-tingimused-ja-kord")
+
+
+@pytest.fixture(autouse=True)
+def _no_standing_refusal() -> Iterator[None]:
+    remote.reset_archive_refusal()
+    yield
+    remote.reset_archive_refusal()
+
+
+def test_after_a_refusal_no_later_read_is_sent_until_reset() -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(429)
+
+    for _ in range(3):
+        with pytest.raises(ArchiveRefused) as err:
+            RemoteFile(_URL, client=_client(handler), backoff=0).read(0, 10)
+        assert err.value.status == 429
+    assert len(calls) == 1
+    assert remote.archive_refusal() is not None
+    remote.reset_archive_refusal()
+    with pytest.raises(ArchiveRefused):
+        RemoteFile(_URL, client=_client(handler), backoff=0).read(0, 10)
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize("status", [429, 403, 500, 503])
+def test_a_refusal_is_raised_at_the_first_answer_and_not_retried(status: int) -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(status)
+
+    with pytest.raises(ArchiveRefused) as err:
+        RemoteFile(_URL, client=_client(handler), backoff=0).read(0, 10)
+    assert err.value.status == status
+    assert len(calls) == 1
+
+
+def test_a_refused_directory_read_is_raised_typed() -> None:
+    with pytest.raises(ArchiveRefused):
+        RemoteFile(_URL, client=_client(lambda r: httpx.Response(429))).directory()
+
+
+def _polite(handler: object, profile: PolitenessProfile) -> httpx.Client:
+    inner = remote._StopOnRefusal(httpx.MockTransport(handler))  # type: ignore[arg-type]
+    transport = PoliteTransport(profile=profile, inner=inner, resolver=lambda _h: ["93.184.216.34"])
+    return httpx.Client(transport=remote._PoliteBridge(transport), follow_redirects=False)
+
+
+def test_the_polite_client_stops_at_the_first_refusal_and_checks_robots_first() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(429, headers={"retry-after": "1"})
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    with pytest.raises(ArchiveRefused) as err:
+        RemoteFile(_URL, client=client).read(0, 10)
+    assert err.value.status == 429
+    assert seen == ["/robots.txt", "/xml.zip"]
+
+
+def test_the_polite_client_does_not_read_what_robots_disallows() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nDisallow: /\n")
+        raise AssertionError("a disallowed path was requested")
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    with pytest.raises(RangeRefused):
+        RemoteFile(_URL, client=client, attempts=1, backoff=0).read(0, 10)
+
+
+def test_the_estonian_acquirer_is_paced_at_two_at_once_and_thirty_a_minute() -> None:
+    acquirer = EeDatadumpAcquirer(
+        SourceAdapter(kind="bulk_xml_archive", name="riigi_teataja_archive")
+    )
+    assert (
+        acquirer.politeness.concurrency,
+        acquirer.politeness.rate_limit_per_minute,
+    ) == (2, 30)
+    assert acquirer.politeness.robots_respect
+    assert (
+        acquirer.politeness.user_agent
+        == "codify-acquire/0.1 (+https://github.com/TBI-AI-Incubator)"
+    )
+
+
+class _AsyncUnread(httpx.AsyncByteStream):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        raise AssertionError("a refused answer's body was read")
+        yield b""
+
+
+def test_the_polite_client_never_downloads_a_whole_file_answered_for_a_range() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(200, headers={"content-length": "999"}, stream=_AsyncUnread())
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    with pytest.raises(RangeRefused):
+        RemoteFile(_URL, client=client, attempts=2, backoff=0).read(0, 10)
+
+
+def test_the_polite_client_reads_a_range_it_was_answered_exactly() -> None:
+    data = bytes(range(50))
+    client = _polite(
+        lambda r: (
+            httpx.Response(200, text="User-agent: *\nAllow: /\n")
+            if r.url.path == "/robots.txt"
+            else _ranged(r, data)
+        ),
+        PolitenessProfile(rate_limit_per_minute=None),
+    )
+    assert RemoteFile(_URL, client=client).read(5, 10) == data[5:15]
+
+
+def _ranged(request: httpx.Request, data: bytes) -> httpx.Response:
+    m = _RANGE.fullmatch(request.headers["range"])
+    assert m is not None
+    start, end = int(m.group(1)), int(m.group(2))
+    return httpx.Response(
+        206,
+        headers={"content-range": f"bytes {start}-{end}/{len(data)}"},
+        content=data[start : end + 1],
+    )
+
+
+def test_a_refusal_in_the_trailer_read_keeps_its_type_through_zipfile() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "HEAD":
+            return httpx.Response(200, headers={"content-length": "100000"})
+        return httpx.Response(429)
+
+    with pytest.raises(ArchiveRefused):
+        RemoteFile(_URL, client=_client(handler)).directory()
+
+
+def test_the_polite_client_reads_an_exact_range_sent_without_a_length() -> None:
+    data = bytes(range(50))
+
+    async def chunks(body: bytes) -> AsyncIterator[bytes]:
+        yield body[:4]
+        yield body[4:]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        m = _RANGE.fullmatch(request.headers["range"])
+        assert m is not None
+        start, end = int(m.group(1)), int(m.group(2))
+        return httpx.Response(
+            206,
+            headers={"content-range": f"bytes {start}-{end}/{len(data)}"},
+            content=chunks(data[start : end + 1]),
+        )
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    assert RemoteFile(_URL, client=client).read(5, 10) == data[5:15]
+
+
+def test_a_read_waiting_in_the_polite_transport_is_not_sent_after_a_refusal() -> None:
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return httpx.Response(429)
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None, concurrency=1))
+    remote._refuse(_URL, 429)
+    with pytest.raises(ArchiveRefused):
+        client.get(_URL, headers={"range": "bytes=0-9"})
+    assert _URL.rsplit("/", 1)[1] not in sent
+
+
+def test_a_read_queued_behind_one_that_is_refused_never_reaches_the_publisher() -> None:
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    ranges: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        ranges.append(request.headers["range"])
+        await asyncio.sleep(0.4)
+        return httpx.Response(429)
+
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None, concurrency=1))
+
+    def read(start: int) -> None:
+        RemoteFile(_URL, client=client).read(start, 10)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(read, 0)
+        time.sleep(0.15)
+        second = pool.submit(read, 100)
+        for outcome in (first, second):
+            with pytest.raises(ArchiveRefused):
+                outcome.result(timeout=10)
+    assert ranges == ["bytes=0-9"]

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import re
 import struct
+import threading
 import time
 import zipfile
 import zlib
@@ -14,6 +16,7 @@ from types import TracebackType
 import httpx
 
 from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.politeness import PoliteTransport, client_tls_context
 from codify.core.security import ssrf_guard
 
 # zipfile's local file header: signature, five shorts, three longs, name and extra lengths.
@@ -28,6 +31,56 @@ class RangeRefused(OSError):
 
 class ArchiveChanged(OSError):
     """A member is no longer where its location says: the archive was replaced."""
+
+
+class ArchiveRefused(Exception):
+    """The host answered 429, 403 or a 5xx. Never retried: the caller stops and waits.
+    Not an OSError, which zipfile would turn into BadZipFile."""
+
+    def __init__(self, url: str, status: int) -> None:
+        super().__init__(f"{url} answered {status}")
+        self.status = status
+
+
+def refused(status: int) -> bool:
+    return status in (429, 403) or status >= 500
+
+
+_STOP_HOLD_S = 900.0
+# (url, status, until): metadata, not an exception, so no traceback outlives the hold.
+_STOPPED: tuple[str, int, float] | None = None
+
+
+def archive_refusal() -> ArchiveRefused | None:
+    """The refusal holding archive reads in this process, until it lapses or is reset."""
+    global _STOPPED
+    if _STOPPED is None:
+        return None
+    if time.monotonic() >= _STOPPED[2]:
+        _STOPPED = None
+        return None
+    return ArchiveRefused(_STOPPED[0], _STOPPED[1])
+
+
+def reset_archive_refusal() -> None:
+    global _STOPPED
+    _STOPPED = None
+
+
+def _refuse(url: str, status: int) -> ArchiveRefused:
+    """The first refusal holds every later read in the process for fifteen minutes, so a
+    batch in flight sends nothing more to a host that has refused."""
+    global _STOPPED
+    held = archive_refusal()
+    if held is None:
+        _STOPPED = (url, status, time.monotonic() + _STOP_HOLD_S)
+        held = ArchiveRefused(url, status)
+    return held
+
+
+def _raise_if_stopped() -> None:
+    if (held := archive_refusal()) is not None:
+        raise held
 
 
 @dataclass(frozen=True)
@@ -64,6 +117,115 @@ class MemberLocation:
             int(extra["crc"]),
             int(extra["method"]),
         )
+
+
+class _StopOnRefusal(httpx.AsyncBaseTransport):
+    """Under the polite transport, so its own backoff never retries a refusal."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport) -> None:
+        self._inner = inner
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        # After the polite transport's waits, so a refusal recorded meanwhile holds this one back.
+        _raise_if_stopped()
+        response = await self._inner.handle_async_request(request)
+        if refused(response.status_code):
+            # Held before the close yields, so no other read passes the check meanwhile.
+            held = _refuse(str(request.url), response.status_code)
+            await response.aclose()
+            raise held
+        return response
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
+
+_RANGE_HEADER = re.compile(r"bytes=(\d+)-(\d+)")
+_LOOP: asyncio.AbstractEventLoop | None = None
+_LOOP_LOCK = threading.Lock()
+
+
+def _polite_loop() -> asyncio.AbstractEventLoop:
+    global _LOOP
+    with _LOOP_LOCK:
+        if _LOOP is None:
+            _LOOP = asyncio.new_event_loop()
+            threading.Thread(target=_LOOP.run_forever, daemon=True, name="polite-archive").start()
+        return _LOOP
+
+
+class _PoliteBridge(httpx.BaseTransport):
+    """Sends a sync client's requests through the polite transport on a background loop,
+    so robots.txt, the host's pace and the concurrency cap apply to range reads."""
+
+    def __init__(self, transport: PoliteTransport) -> None:
+        self._sem = asyncio.Semaphore(transport.profile.concurrency)
+        self._client = httpx.AsyncClient(
+            transport=transport,
+            follow_redirects=False,
+            timeout=httpx.Timeout(120.0, connect=10.0),
+        )
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        asked = _RANGE_HEADER.fullmatch(request.headers.get("range", ""))
+        wanted = int(asked.group(2)) - int(asked.group(1)) + 1 if asked else None
+
+        async def send() -> httpx.Response:
+            # The permit is held until the body is read or dropped, not only to the headers.
+            async with self._sem:
+                response = await self._client.send(
+                    self._client.build_request(
+                        request.method, str(request.url), headers=request.headers
+                    ),
+                    stream=True,
+                )
+                try:
+                    announced = response.headers.get("content-length")
+                    if (
+                        request.method == "HEAD"
+                        or response.status_code != 206
+                        or (announced is not None and int(announced) != wanted)
+                    ):
+                        # Anything but the exact range asked for is rejected by the reader
+                        # from its headers; its body is never downloaded.
+                        return httpx.Response(response.status_code, headers=response.headers)
+                    if announced is not None:
+                        body = bytearray(await response.aread())
+                    else:
+                        # Unannounced (chunked): read to one byte past the range, which the
+                        # reader's own size check then refuses.
+                        body = bytearray()
+                        async for chunk in response.aiter_raw():
+                            body += chunk
+                            if len(body) > (wanted or 0):
+                                break
+                    return httpx.Response(
+                        response.status_code, headers=response.headers, content=bytes(body)
+                    )
+                finally:
+                    await response.aclose()
+
+        return asyncio.run_coroutine_threadsafe(send(), _polite_loop()).result()
+
+    def close(self) -> None:
+        asyncio.run_coroutine_threadsafe(self._client.aclose(), _polite_loop()).result()
+
+
+_CLIENTS: dict[str, httpx.Client] = {}
+
+
+def polite_http_client(profile: PolitenessProfile) -> httpx.Client:
+    """One sync client per profile for the process, so the concurrency cap and the host's
+    pace hold across every caller; no redirect is followed."""
+    key = profile.model_dump_json()
+    with _LOOP_LOCK:
+        if key not in _CLIENTS:
+            inner = _StopOnRefusal(httpx.AsyncHTTPTransport(verify=client_tls_context()))
+            _CLIENTS[key] = httpx.Client(
+                transport=_PoliteBridge(PoliteTransport(profile=profile, inner=inner)),
+                follow_redirects=False,
+            )
+        return _CLIENTS[key]
 
 
 def http_client() -> httpx.Client:
@@ -120,6 +282,7 @@ class RemoteFile:
             # A replaced file then answers 200, so two versions are never mixed.
             headers["if-range"] = self._validator
         last = "no answer"
+        _raise_if_stopped()
         for attempt in range(self._attempts):
             if attempt:
                 time.sleep(self._backoff * attempt)
@@ -127,6 +290,8 @@ class RemoteFile:
                 with self._client.stream("GET", self.url, headers=headers) as resp:
                     m = _CONTENT_RANGE.fullmatch(resp.headers.get("content-range", ""))
                     sent = resp.headers.get("content-length")
+                    if refused(resp.status_code):
+                        raise _refuse(self.url, resp.status_code)
                     if resp.status_code != 206 or m is None:
                         last = f"status {resp.status_code}"
                     elif (int(m.group(1)), int(m.group(2))) != (start, end):
@@ -144,8 +309,11 @@ class RemoteFile:
 
     def directory(self) -> list[zipfile.ZipInfo]:
         """The archive's members, from its central directory alone."""
+        _raise_if_stopped()
         # The length of the bytes the ranges will read, not of an encoded representation.
         head = self._client.head(self.url, headers={"accept-encoding": "identity"})
+        if refused(head.status_code):
+            raise _refuse(self.url, head.status_code)
         head.raise_for_status()
         self.size = int(head.headers["content-length"])
         self._validator = head.headers.get("last-modified")
@@ -227,8 +395,13 @@ class _RangeIO(io.RawIOBase):
 
 __all__ = [
     "ArchiveChanged",
+    "ArchiveRefused",
+    "archive_refusal",
     "MemberLocation",
     "RangeRefused",
     "RemoteFile",
     "http_client",
+    "polite_http_client",
+    "refused",
+    "reset_archive_refusal",
 ]
