@@ -45,6 +45,32 @@ def refused(status: int) -> bool:
     return status in (429, 403) or status >= 500
 
 
+_STOPPED: ArchiveRefused | None = None
+
+
+def archive_refusal() -> ArchiveRefused | None:
+    """The refusal that stopped archive reads in this process, until reset."""
+    return _STOPPED
+
+
+def reset_archive_refusal() -> None:
+    global _STOPPED
+    _STOPPED = None
+
+
+def _refuse(url: str, status: int) -> ArchiveRefused:
+    """The first refusal stops every later read in the process, so a batch in flight
+    sends nothing more to a host that has refused."""
+    global _STOPPED
+    _STOPPED = _STOPPED or ArchiveRefused(url, status)
+    return _STOPPED
+
+
+def _raise_if_stopped() -> None:
+    if _STOPPED is not None:
+        raise _STOPPED
+
+
 @dataclass(frozen=True)
 class MemberLocation:
     """Where one member's bytes sit, as the central directory records them."""
@@ -91,7 +117,7 @@ class _StopOnRefusal(httpx.AsyncBaseTransport):
         response = await self._inner.handle_async_request(request)
         if refused(response.status_code):
             await response.aclose()
-            raise ArchiveRefused(str(request.url), response.status_code)
+            raise _refuse(str(request.url), response.status_code)
         return response
 
     async def aclose(self) -> None:
@@ -198,6 +224,7 @@ class RemoteFile:
             # A replaced file then answers 200, so two versions are never mixed.
             headers["if-range"] = self._validator
         last = "no answer"
+        _raise_if_stopped()
         for attempt in range(self._attempts):
             if attempt:
                 time.sleep(self._backoff * attempt)
@@ -206,7 +233,7 @@ class RemoteFile:
                     m = _CONTENT_RANGE.fullmatch(resp.headers.get("content-range", ""))
                     sent = resp.headers.get("content-length")
                     if refused(resp.status_code):
-                        raise ArchiveRefused(self.url, resp.status_code)
+                        raise _refuse(self.url, resp.status_code)
                     if resp.status_code != 206 or m is None:
                         last = f"status {resp.status_code}"
                     elif (int(m.group(1)), int(m.group(2))) != (start, end):
@@ -224,10 +251,11 @@ class RemoteFile:
 
     def directory(self) -> list[zipfile.ZipInfo]:
         """The archive's members, from its central directory alone."""
+        _raise_if_stopped()
         # The length of the bytes the ranges will read, not of an encoded representation.
         head = self._client.head(self.url, headers={"accept-encoding": "identity"})
         if refused(head.status_code):
-            raise ArchiveRefused(self.url, head.status_code)
+            raise _refuse(self.url, head.status_code)
         head.raise_for_status()
         self.size = int(head.headers["content-length"])
         self._validator = head.headers.get("last-modified")
@@ -310,10 +338,12 @@ class _RangeIO(io.RawIOBase):
 __all__ = [
     "ArchiveChanged",
     "ArchiveRefused",
+    "archive_refusal",
     "MemberLocation",
     "RangeRefused",
     "RemoteFile",
     "http_client",
     "polite_http_client",
     "refused",
+    "reset_archive_refusal",
 ]

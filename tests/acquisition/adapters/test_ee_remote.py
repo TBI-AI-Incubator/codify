@@ -396,6 +396,32 @@ async def test_a_located_member_is_fetched_from_the_archive_without_an_index(
     assert doc.frbr_work_uri.endswith("/2026/naidistoetuse-andmise-tingimused-ja-kord")
 
 
+@pytest.fixture(autouse=True)
+def _no_standing_refusal() -> Iterator[None]:
+    remote.reset_archive_refusal()
+    yield
+    remote.reset_archive_refusal()
+
+
+def test_after_a_refusal_no_later_read_is_sent_until_reset() -> None:
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(429)
+
+    for _ in range(3):
+        with pytest.raises(ArchiveRefused) as err:
+            RemoteFile(_URL, client=_client(handler), backoff=0).read(0, 10)
+        assert err.value.status == 429
+    assert len(calls) == 1
+    assert remote.archive_refusal() is not None
+    remote.reset_archive_refusal()
+    with pytest.raises(ArchiveRefused):
+        RemoteFile(_URL, client=_client(handler), backoff=0).read(0, 10)
+    assert len(calls) == 2
+
+
 @pytest.mark.parametrize("status", [429, 403, 500, 503])
 def test_a_refusal_is_raised_at_the_first_answer_and_not_retried(status: int) -> None:
     calls: list[httpx.Request] = []
