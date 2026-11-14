@@ -561,6 +561,7 @@ async def test_search_without_an_embeddings_endpoint_is_503(
     async with _client(runner) as c:
         r = await c.get("/search?q=x&jurisdiction=xa")
         assert (await c.get("/search?q=x&jurisdiction=zz")).status_code == 422
+        assert (await c.get("/search?q=x&jurisdiction=gb%00")).status_code == 422
 
     assert r.status_code == 503
     assert "EMBEDDING_BASE_URL" in r.json()["detail"]

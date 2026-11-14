@@ -2521,7 +2521,10 @@ def resolve_config(country_code: str) -> ResolvedConfig:
     """
     code = country_code.strip().lower()
     path = JURISDICTIONS_DIR / code / "config.json"
-    # A code names one directory under the root: one that escapes it is absent.
+    # A code names one directory under the root: one that escapes it is absent, and
+    # a NUL, which realpath refuses with ValueError, is absent too.
+    if "\x00" in code:
+        return ResolvedConfig(code=code)
     root = os.path.realpath(JURISDICTIONS_DIR)
     real = os.path.realpath(os.path.join(root, code, "config.json"))
     if "/" in code or "\\" in code or not real.startswith(root + os.sep):
