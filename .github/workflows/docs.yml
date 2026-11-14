@@ -1,0 +1,63 @@
+# The documentation site's gates: the build fails on any broken internal link, and the
+# quickstart's commands must still print what the page shows.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**', 'apps/docs/**', 'apps/docs-theme/**', '.github/workflows/docs.yml', 'codify/**', 'contract/**', 'data/jurisdictions/**', 'scripts/run_docs_page.py']
+  pull_request:
+    paths: ['docs/**', 'apps/docs/**', 'apps/docs-theme/**', '.github/workflows/docs.yml', 'codify/**', 'contract/**', 'data/jurisdictions/**', 'scripts/run_docs_page.py']
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/docs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Each page's last-updated date comes from its latest commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      # The generated reference pages must match the code they are read from.
+      - name: Regenerate reference pages
+        working-directory: .
+        run: |
+          uv run --frozen --extra mcp python apps/docs/scripts/generate_reference.py
+          git add -N docs/reference
+          git diff --exit-code -- docs/reference
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      POSTGRES_URL: postgresql://codify:codify@localhost:5432/codify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: 'uv.lock'
+      - run: uv sync --frozen --extra migrations --extra serve
+      - run: docker compose up --build -d --wait postgres
+      - run: uv run --frozen codify migrate
+      - run: uv run --frozen python scripts/run_docs_page.py docs/start/quickstart.md
+      - if: always()
+        run: docker compose down --volumes
