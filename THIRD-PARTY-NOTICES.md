@@ -1,23 +1,19 @@
 # Third-party notices
 
 Codify source is licensed under Apache 2.0. Dependencies, bundled schemas and
-other third-party materials retain their own licences and notices.
+other third-party materials keep their own licences and notices.
 
-The table below records metadata from the local validation environment for the
-runtime and optional migration dependency closure on that platform. It is not a
-cross-platform lockfile, an inventory of a hosted product, or legal clearance.
-Versions and platform-specific dependencies may differ on installation. Review
-the actual distributions and their licence files when redistributing them.
+The two tables below are generated from the lockfiles: `uv.lock` for the Python
+package and `apps/web/pnpm-lock.yaml` for the web app. Versions are the locked
+ones. The licence column repeats what each distribution declares in its own
+metadata. It is an inventory, not legal clearance, and not an inventory of any
+hosted product. An install that resolves its own versions, such as
+`pip install codify-core`, can differ from the lock. Review the distributions
+you redistribute and the licence files inside them.
 
-Licence texts in `licenses/` are retained as supporting notices. In particular,
-Cobalt, Bluebell and PyMeeus declare LGPL terms; psycopg has its own LGPL terms.
-The PostgreSQL development image builds pg_textsearch from pinned source and
-preserves that project's LICENSE and NOTICE in the image. Container base-image
-and operating-system packages have additional notices not enumerated here.
-
-`codify/countries.json` contains country and subdivision names from Unicode
-CLDR 49.0.0, Copyright © 2001–2026 Unicode, Inc., under the Unicode License v3;
-the notice is reproduced in `licenses/Unicode-CLDR.txt`.
+A jurisdiction configuration or this inventory grants no right to redistribute
+source documents. Synthetic fixture material is identified in its files;
+acquired documents require their own rights assessment.
 
 `data/jurisdictions/eu/` quotes short passages of EU legislation (enacting
 formulae and an excerpt of Regulation (EU) 2016/679) from EUR-Lex. Source:
@@ -25,31 +21,55 @@ formulae and an excerpt of Regulation (EU) 2016/679) from EUR-Lex. Source:
 2011/833/EU on the reuse of Commission documents. Only the texts published in
 the Official Journal of the European Union are authentic.
 
-No customer source-document redistribution permission is implied by a
-jurisdiction configuration or by this inventory. Synthetic fixture material is
-identified in its files; acquired documents require their own rights assessment.
+## Licence texts in `licenses/`
 
-## Validated environment metadata
+The texts are kept as supporting notices for the components below.
+
+| File | Kept for |
+| --- | --- |
+| `Apache-2.0.txt` | Dependencies that declare Apache 2.0 |
+| `LGPL-3.0.txt`, `GPL-3.0.txt` | Cobalt, Bluebell and PyMeeus, which declare LGPL 3 terms, and psycopg and psycopg-binary, which declare LGPL 3 only. LGPL 3 is written as a set of permissions added to GPL 3, so both texts are kept |
+| `LGPL-2.1.txt`, `GPL-2.0.txt` | Native libraries inside binary wheels. The licence files in the lxml, NumPy, Pillow and Shapely wheels name components under LGPL 2.1 or GPL 2 terms, for example GEOS in Shapely and iconv in lxml. Which libraries a wheel bundles depends on the platform |
+| `MPL-2.0.txt` | certifi |
+| `PostgreSQL.txt` | libpq, which the psycopg-binary wheel bundles |
+| `pg_textsearch.txt` | pg_textsearch, which the development Postgres image builds from pinned source. The image keeps that project's LICENSE and NOTICE |
+| `Unicode-CLDR.txt` | Country and subdivision names in `codify/countries.json`, taken from Unicode CLDR 49.0.0, Copyright © 2001–2026 Unicode, Inc., under the Unicode License v3 |
+
+The base image and operating-system packages of the development Postgres image
+carry further notices that are not listed here.
+
+## Python package (`uv.lock`)
+
+The closure of the package's dependencies and of its `migrations`, `serve` and
+`mcp` extras, on every platform the lock resolves. The `dev` group is left out.
+Licence metadata is read from the distributions installed from the lock on
+macOS arm64. Three locked packages install only on other platforms
+(`httpx2-jsfetch`, `pywin32`, `tzdata`); their entries repeat the package
+index's metadata for the locked version.
 
 | Distribution | Version | Declared licence metadata |
 | --- | --- | --- |
-| alembic | 1.19.2 | MIT |
+| alembic | 1.20.1 | MIT |
+| annotated-doc | 0.0.5 | MIT |
 | annotated-types | 0.8.0 | MIT |
 | anyio | 4.15.1 | MIT |
-| asyncpg | 0.31.0 | Apache-2.0 |
+| asyncpg | 0.32.0 | Apache-2.0 |
+| attrs | 26.1.0 | MIT |
 | backoff | 2.2.1 | MIT |
 | beautifulsoup4 | 4.15.0 | MIT License |
 | bluebell-akn | 5.0.0 | LGPLv3+ |
-| certifi | 2026.7.22 | MPL-2.0 |
+| certifi | 2026.10.23 | MPL-2.0 |
 | cffi | 2.1.1 | MIT-0 |
 | charset-normalizer | 3.5.1 | MIT |
+| click | 8.5.0 | BSD-3-Clause |
 | cobalt | 9.0.1 | LGPLv3+ |
-| convertdate | 2.4.1 | See installed distribution licence files |
-| cryptography | 50.0.1 | Apache-2.0 OR BSD-3-Clause |
+| convertdate | 2.5.1 | MIT |
+| cryptography | 50.0.2 | Apache-2.0 OR BSD-3-Clause |
 | distro | 1.9.0 | Apache License, Version 2.0 |
-| genai-prices | 0.1.6 | MIT |
+| fastapi | 0.146.0 | MIT |
+| genai-prices | 0.1.9 | MIT |
 | google-auth | 2.58.0 | Apache 2.0 |
-| google-genai | 2.19.0 | Apache-2.0 |
+| google-genai | 2.31.0 | Apache-2.0 |
 | googleapis-common-protos | 1.75.3 | Apache-2.0 |
 | greenlet | 3.5.5 | MIT AND PSF-2.0 |
 | griffelib | 2.3.0 | ISC |
@@ -59,76 +79,96 @@ identified in its files; acquired documents require their own rights assessment.
 | httpcore2 | 2.12.0 | BSD-3-Clause |
 | httpx | 0.28.1 | BSD-3-Clause |
 | httpx2 | 2.12.0 | BSD-3-Clause |
+| httpx2-jsfetch | 1.0 | BSD-3-Clause |
 | idna | 3.19 | BSD-3-Clause |
 | iso8601 | 2.1.0 | MIT |
 | jiter | 0.16.0 | MIT |
-| langfuse | 4.15.2 | MIT |
+| jsonschema | 4.26.0 | MIT |
+| jsonschema-specifications | 2025.9.1 | MIT |
+| langfuse | 4.18.0 | MIT |
 | logfire-api | 5.0.0 | MIT |
 | lxml | 6.1.3 | BSD-3-Clause |
-| Mako | 1.4.1 | MIT |
+| Mako | 1.4.2 | MIT |
 | MarkupSafe | 3.0.3 | BSD-3-Clause |
-| numpy | 2.5.3 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
-| openai | 3.3.1 | Apache-2.0 |
-| opentelemetry-api | 1.44.0 | Apache-2.0 |
-| opentelemetry-exporter-otlp-proto-common | 1.44.0 | Apache-2.0 |
-| opentelemetry-exporter-otlp-proto-http | 1.44.0 | Apache-2.0 |
-| opentelemetry-proto | 1.44.0 | Apache-2.0 |
-| opentelemetry-sdk | 1.44.0 | Apache-2.0 |
-| opentelemetry-semantic-conventions | 0.65b0 | Apache-2.0 |
+| mcp | 2.3.0 | MIT |
+| mcp-types | 2.3.0 | MIT |
+| numpy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 |
+| openai | 3.35.1 | Apache-2.0 |
+| opentelemetry-api | 1.45.1 | Apache-2.0 |
+| opentelemetry-exporter-http-transport | 0.66b1 | Apache-2.0 |
+| opentelemetry-exporter-otlp-common | 0.66b1 | Apache-2.0 |
+| opentelemetry-exporter-otlp-proto-common | 1.45.1 | Apache-2.0 |
+| opentelemetry-exporter-otlp-proto-http | 1.45.1 | Apache-2.0 |
+| opentelemetry-proto | 1.45.1 | Apache-2.0 |
+| opentelemetry-sdk | 1.45.1 | Apache-2.0 |
+| opentelemetry-semantic-conventions | 0.66b1 | Apache-2.0 |
 | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | pdf2image | 1.17.0 | MIT |
-| pgvector | 0.5.0 | MIT |
-| pillow | 12.3.0 | MIT-CMU |
+| pgvector | 0.5.1 | MIT |
+| pillow | 13.0.0 | MIT-CMU |
 | protobuf | 7.36.1 | 3-Clause BSD License |
 | psycopg | 3.3.5 | LGPL-3.0-only |
 | psycopg-binary | 3.3.5 | LGPL-3.0-only |
-| pyasn1 | 0.6.4 | BSD-2-Clause |
+| pyasn1 | 0.6.5 | BSD-2-Clause |
 | pyasn1_modules | 0.4.2 | BSD |
 | pycparser | 3.0 | BSD-3-Clause |
-| pydantic | 2.13.5 | MIT |
-| pydantic-ai-slim | 1.107.5 | MIT |
-| pydantic_core | 2.46.5 | MIT |
-| pydantic-graph | 1.107.5 | MIT |
-| pydantic-settings | 2.15.0 | MIT |
+| pydantic | 2.14.1 | MIT |
+| pydantic-ai-slim | 2.53.0 | MIT |
+| pydantic-graph | 2.53.0 | MIT |
+| pydantic-settings | 2.16.0 | MIT |
+| pydantic_core | 2.50.1 | MIT |
+| PyJWT | 2.15.0 | MIT |
 | PyMeeus | 0.5.12 | LGPLv3 |
-| pypdf | 6.18.1 | BSD-3-Clause |
+| pypdf | 6.21.4 | BSD-3-Clause |
 | PyStemmer | 3.1.0 | MIT, BSD |
-| python-dotenv | 1.2.3 | BSD-3-Clause |
+| python-dotenv | 1.2.4 | BSD-3-Clause |
+| python-multipart | 0.0.32 | Apache-2.0 |
+| pywin32 | 312 | PSF |
 | PyYAML | 6.0.3 | MIT |
-| regex | 2026.9.10 | Apache-2.0 AND CNRI-Python |
+| referencing | 0.37.0 | MIT |
+| regex | 2026.9.29 | Apache-2.0 AND CNRI-Python |
 | requests | 2.34.2 | Apache-2.0 |
-| shapely | 2.1.2 | BSD 3-Clause |
+| rpds-py | 2026.6.3 | MIT |
+| shapely | 2.2.0 | BSD-3-Clause |
 | sniffio | 1.3.1 | MIT OR Apache-2.0 |
 | soupsieve | 2.9.2 | MIT |
 | SQLAlchemy | 2.0.52 | MIT |
-| sqlmodel | 0.0.42 | MIT |
+| sqlmodel | 0.0.48 | MIT |
+| sse-starlette | 3.4.11 | BSD-3-Clause |
+| starlette | 1.6.0 | BSD-3-Clause |
 | structlog | 26.1.0 | MIT OR Apache-2.0 |
 | tenacity | 9.1.4 | Apache 2.0 |
-| tiktoken | 0.14.0 | See installed distribution licence files |
+| tiktoken | 0.14.0 | MIT License |
 | truststore | 0.10.4 | MIT |
-| typing_extensions | 4.16.0 | PSF-2.0 |
 | typing-inspection | 0.4.4 | MIT |
-| urllib3 | 2.7.0 | MIT |
+| typing_extensions | 4.16.0 | PSF-2.0 |
+| tzdata | 2026.3 | Apache-2.0 |
+| urllib3 | 2.8.0 | MIT |
+| uvicorn | 0.54.0 | BSD-3-Clause |
 | websockets | 16.1.1 | BSD-3-Clause |
 | wrapt | 2.4.0 | BSD-2-Clause |
 
-## Web app (`apps/web`) production dependencies
+## Web app (`apps/web/pnpm-lock.yaml`)
 
-Recorded from `pnpm licenses list --prod` in the validation environment, the same
-caveats as above. The Geist and Noto fonts are bundled under the SIL Open Font
-Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
+Production dependencies, as `pnpm licenses list --prod` reports them for an
+install of the lockfile. The Geist and Noto fonts come from the `@fontsource`
+packages under the SIL Open Font Licence 1.1. The flag images under
+`apps/web/public/flags` are from the Circle Flags project under MIT; their
+notice is `apps/web/public/flags/NOTICE`.
 
 | Package | Version | Declared licence metadata |
 | --- | --- | --- |
-| @ai-sdk/gateway | 4.0.64 | Apache-2.0 |
-| @ai-sdk/provider | 4.0.8 | Apache-2.0 |
-| @ai-sdk/provider-utils | 5.0.30 | Apache-2.0 |
-| @babel/runtime | 7.29.7 | MIT |
-| @base-ui/react | 1.8.0 | MIT |
-| @base-ui/utils | 0.4.0 | MIT |
-| @codemirror/language | 6.12.4 | MIT |
-| @codemirror/state | 6.7.5 | MIT |
-| @codemirror/view | 6.43.12 | MIT |
+| @ai-sdk/gateway | 4.0.127 | Apache-2.0 |
+| @ai-sdk/provider | 4.0.34 | Apache-2.0 |
+| @ai-sdk/provider-utils | 5.0.69 | Apache-2.0 |
+| @babel/runtime | 7.29.10 | MIT |
+| @babel/runtime | 8.0.8 | MIT |
+| @base-ui/react | 1.9.0 | MIT |
+| @base-ui/utils | 0.5.0 | MIT |
+| @codemirror/language | 6.13.1 | MIT |
+| @codemirror/state | 6.7.6 | MIT |
+| @codemirror/streamparser | 6.0.0 | MIT |
+| @codemirror/view | 6.43.15 | MIT |
 | @floating-ui/core | 1.8.0 | MIT |
 | @floating-ui/dom | 1.8.0 | MIT |
 | @floating-ui/react-dom | 2.1.9 | MIT |
@@ -138,15 +178,15 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | @fontsource/noto-sans | 5.3.0 | OFL-1.1 |
 | @fontsource/noto-sans-arabic | 5.3.0 | OFL-1.1 |
 | @fontsource/noto-sans-hebrew | 5.3.0 | OFL-1.1 |
-| @lezer/common | 1.5.2 | MIT |
-| @lezer/highlight | 1.2.3 | MIT |
-| @lezer/lr | 1.4.10 | MIT |
+| @lezer/common | 1.5.3 | MIT |
+| @lezer/highlight | 1.2.5 | MIT |
+| @lezer/lr | 1.4.11 | MIT |
 | @mapbox/jsonlint-lines-primitives | 2.0.3 | MIT |
 | @mapbox/point-geometry | 1.1.0 | ISC |
-| @mapbox/tiny-sdf | 2.2.0 | BSD-2-Clause |
+| @mapbox/tiny-sdf | 2.3.0 | BSD-2-Clause |
 | @mapbox/unitbezier | 1.0.0 | BSD-2-Clause |
 | @mapbox/vector-tile | 3.0.0 | BSD-3-Clause |
-| @maplibre/geojson-vt | 6.1.1 | ISC |
+| @maplibre/geojson-vt | 6.3.0 | ISC |
 | @maplibre/maplibre-gl-style-spec | 26.4.4 | ISC |
 | @maplibre/mlt | 1.3.0 | (MIT OR Apache-2.0) |
 | @maplibre/vt-pbf | 4.3.2 | MIT |
@@ -169,8 +209,8 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | @radix-ui/react-use-layout-effect | 1.1.4 | MIT |
 | @remix-run/route-pattern | 0.22.1 | MIT |
 | @standard-schema/spec | 1.1.0 | MIT |
-| @tanstack/query-core | 5.103.1 | MIT |
-| @tanstack/react-query | 5.103.1 | MIT |
+| @tanstack/query-core | 5.104.5 | MIT |
+| @tanstack/react-query | 5.104.5 | MIT |
 | @types/debug | 4.1.13 | MIT |
 | @types/estree | 1.0.9 | MIT |
 | @types/estree-jsx | 1.0.5 | MIT |
@@ -180,14 +220,16 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | @types/ms | 2.1.0 | MIT |
 | @types/react | 19.3.0 | MIT |
 | @types/react-dom | 19.3.0 | MIT |
-| @types/unist | 2.0.11, 3.0.3 | MIT |
+| @types/unist | 2.0.11 | MIT |
+| @types/unist | 3.0.3 | MIT |
 | @ungap/structured-clone | 1.4.0 | ISC |
 | @vercel/oidc | 3.2.0 | Apache-2.0 |
 | @workflow/serde | 4.1.0 | Apache-2.0 |
-| ai | 7.0.79 | Apache-2.0 |
+| ai | 7.0.154 | Apache-2.0 |
 | aria-hidden | 1.2.6 | MIT |
-| attr-accept | 4.0.0 | MIT |
+| attr-accept | 4.0.1 | MIT |
 | bail | 2.0.2 | MIT |
+| bidi-js | 1.1.0 | MIT |
 | ccount | 2.0.1 | MIT |
 | character-entities | 2.0.2 | MIT |
 | character-entities-html4 | 2.1.0 | MIT |
@@ -206,7 +248,7 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | detect-node-es | 1.1.0 | MIT |
 | devlop | 1.1.0 | MIT |
 | diacritics | 1.3.0 | MIT |
-| earcut | 3.2.3 | ISC |
+| earcut | 3.2.4 | ISC |
 | escape-string-regexp | 5.0.0 | MIT |
 | estree-util-is-identifier-name | 3.0.0 | MIT |
 | eventsource-parser | 3.1.1 | MIT |
@@ -219,7 +261,7 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | html-parse-stringify | 4.0.1 | MIT |
 | html-url-attributes | 3.0.1 | MIT |
 | i18n-iso-countries | 7.14.0 | MIT |
-| i18next | 26.4.2 | MIT |
+| i18next | 26.5.3 | MIT |
 | inline-style-parser | 0.2.7 | MIT |
 | is-alphabetical | 2.0.1 | MIT |
 | is-alphanumerical | 2.0.1 | MIT |
@@ -230,8 +272,8 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | json-stringify-pretty-compact | 4.0.0 | MIT |
 | kdbush | 4.1.0 | ISC |
 | longest-streak | 3.1.0 | MIT |
-| lucide-react | 1.47.0 | ISC |
-| maplibre-gl | 6.4.1 | BSD-3-Clause |
+| lucide-react | 1.60.0 | ISC |
+| maplibre-gl | 6.15.0 | BSD-3-Clause |
 | markdown-table | 3.0.4 | MIT |
 | mdast-util-find-and-replace | 3.0.2 | MIT |
 | mdast-util-from-markdown | 2.0.3 | MIT |
@@ -286,27 +328,28 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | property-information | 7.2.0 | MIT |
 | protocol-buffers-schema | 3.6.1 | MIT |
 | quickselect | 3.0.0 | ISC |
-| react | 19.3.0 | MIT |
+| react | 19.3.1 | MIT |
 | react-circle-flags | 0.0.30 | MIT |
-| react-dom | 19.3.0 | MIT |
-| react-dropzone | 20.1.2 | MIT |
-| react-i18next | 17.0.14 | MIT |
+| react-dom | 19.3.1 | MIT |
+| react-dropzone | 20.1.4 | MIT |
+| react-i18next | 17.1.0 | MIT |
 | react-markdown | 10.1.0 | MIT |
 | react-remove-scroll | 2.7.2 | MIT |
 | react-remove-scroll-bar | 2.3.8 | MIT |
-| react-router | 8.4.0 | MIT |
+| react-router | 8.5.0 | MIT |
 | react-style-singleton | 2.2.3 | MIT |
 | remark-gfm | 4.0.1 | MIT |
 | remark-parse | 11.0.0 | MIT |
 | remark-rehype | 11.1.2 | MIT |
 | remark-stringify | 11.0.0 | MIT |
+| require-from-string | 2.0.2 | MIT |
 | reselect | 5.3.0 | MIT |
 | resolve-protobuf-schema | 2.1.0 | MIT |
 | scheduler | 0.28.0 | MIT |
 | sonner | 2.0.8 | MIT |
 | space-separated-tokens | 2.0.2 | MIT |
 | stringify-entities | 4.0.4 | MIT |
-| style-mod | 4.1.3 | MIT |
+| style-mod | 4.1.4 | MIT |
 | style-to-js | 1.1.21 | MIT |
 | style-to-object | 1.0.14 | MIT |
 | supports-color | 10.2.2 | MIT |
@@ -317,7 +360,7 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | tslib | 2.8.1 | 0BSD |
 | tw-animate-css | 1.4.0 | MIT |
 | typescript | 6.0.3 | Apache-2.0 |
-| undici | 7.29.1 | MIT |
+| undici | 7.30.1 | MIT |
 | unified | 11.0.5 | MIT |
 | unist-util-is | 6.0.1 | MIT |
 | unist-util-position | 5.0.0 | MIT |
@@ -330,5 +373,5 @@ Licence 1.1; the country flag SVGs come with `react-circle-flags` under MIT.
 | vfile | 6.0.3 | MIT |
 | vfile-message | 4.0.3 | MIT |
 | w3c-keyname | 2.2.8 | MIT |
-| zod | 3.25.76 | MIT |
+| zod | 4.6.7 | MIT |
 | zwitch | 2.0.4 | MIT |

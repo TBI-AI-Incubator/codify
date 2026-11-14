@@ -1,18 +1,19 @@
 # Security reporting
 
-Where to report: open a private report through the repository's Security tab
-("Report a vulnerability"), or email liam.wilkinson@institute.global. Either route
-reaches the maintainers only; nothing is public until a fix is out.
+Report privately through the repository's Security tab ("Report a
+vulnerability"), never in a public issue. Send the class of problem and a
+minimal, non-destructive way to reproduce it against a local install. Leave out
+credentials, personal data, customer documents and exploit code aimed at a
+running system.
 
-What to send: a description of the class of problem and a minimal, non-destructive
-way to reproduce it against a local install.
+Supported releases: `main` and the latest minor release on PyPI. Fixes land on
+`main` first and ship in the next release; the advisory names the fixed version.
 
-What not to send: credentials, personal data, customer documents, or exploit code
-aimed at a running system. Do not open a public issue for a suspected vulnerability.
+`codify serve`, `codify mcp --http` and the web app have no authentication:
+anyone who reaches them can read every stored law and trigger model calls billed
+to you. Both servers bind to `127.0.0.1` unless given `--host`.
+[Security](docs/project/security.md) in the documentation says what the core
+protects against and what it leaves to your deployment.
 
-Supported release: `main`, and the latest minor on PyPI once one is published.
-Fixes land on `main` first and ship in the next release; the advisory names the
-fixed version.
-
-Keep model-provider and database credentials outside source control, and never
+Keep model-provider and database credentials out of source control, and never
 expose the development Compose database beyond your own machine.

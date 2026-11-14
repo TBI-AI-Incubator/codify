@@ -4,124 +4,66 @@
 [![PyPI](https://img.shields.io/pypi/v/codify-core)](https://pypi.org/project/codify-core/)
 [![Python](https://img.shields.io/pypi/pyversions/codify-core)](https://pypi.org/project/codify-core/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
-[![Akoma Ntoso](https://img.shields.io/badge/Akoma%20Ntoso-3.0-lightgrey)](http://akomantoso.info/?page_id=27)
 
-Codify Core converts legal documents into structured data that you can inspect,
-search and reuse. It accepts PDFs, text and existing
-[Akoma Ntoso XML](http://akomantoso.info/?page_id=27), an open standard for legal documents.
+Codify turns a country's legislation into structured, citable, machine-readable law. It
+reads scanned gazettes, PDFs, plain text and publisher XML, writes
+[Akoma Ntoso](docs/concepts/akoma-ntoso.md) XML (the OASIS standard for legal
+documents), and stores, searches and serves the result through a command line, an HTTP
+API, an MCP server for AI agents and a local web app.
 
-![A synthetic law shown as a scanned page, a readable document and structured Akoma Ntoso XML.](docs/images/codify-overview.png)
+Rules in a per-jurisdiction config find each law's structure and give every provision
+an identifier built from its place in the law. A model you choose reads scanned pages,
+reads the title, date and number that build the law's identifier, and fills in the
+text. Every run keeps its evidence (page images, transcribed text, detected markers,
+findings and a grade) so you can check the result against the source.
 
-*Illustrative example using synthetic legislation; the OCR score shown is not a benchmark.*
+This repository is the open-source core, on PyPI as `codify-core` under the Apache 2.0
+licence. It runs on your own machines without the hosted Codify Platform.
 
-A structured document keeps its articles, sections, tables and references identifiable.
-You can search individual provisions, link to them and compare them with another document.
-Each ingestion includes the extracted text and validation findings so you can check the
-result against its source.
+## Try it
 
-Use Codify Core through Python, the command line, a local web app, REST or MCP.
-It is Apache-2.0 licensed and runs independently of **Codify Platform**, the hosted
-application. Model-assisted features require a configured model endpoint; the default
-example uses Gemini, and a compatible gateway can be configured instead.
-
-## Quick start
-
-You need Python 3.12 or newer, [uv](https://docs.astral.sh/uv/) and access to an
-OpenAI-compatible chat endpoint. For PDFs that need page rendering or OCR, install
-Poppler (`brew install poppler` on macOS or `apt install poppler-utils` on Debian/Ubuntu).
+You need Python 3.12 or newer, [uv](https://docs.astral.sh/uv/) and Git. This step
+needs no model and no API key:
 
 ```bash
 git clone https://github.com/TBI-AI-Incubator/codify.git
 cd codify
 uv sync
-cp .env.example .env
+uv run python -c "from codify.jurisdictions import load_config; print(load_config('xa').name)"
 ```
 
-Set `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` in `.env` for your
-provider. Then process the included synthetic act:
-
-```bash
-uv run codify ingest-one data/fixtures/synthetic/xa/legislation-act-1992.pdf \
-  --jurisdiction xa --out bundle/
+```text
+Atlantis
 ```
 
-This writes files to `bundle/` without using a database. It makes model calls;
-runtime and cost depend on the model and source document. The sample belongs to
-`xa`, a fictional jurisdiction used for testing.
+`xa` is Atlantis, a fictional jurisdiction for examples and tests. From here:
 
-Open `bundle/final.akn.xml` to see the structured document. Check `anchors.jsonl`
-for the detected sections and articles, `coverage.json` for provision counts,
-and `validator.json` for structural findings. The bundle also retains source text,
-page images and run metadata. See [working with documents](docs/usage.md) for the
-file list, troubleshooting and storage commands.
-
-For text files and PDFs with a text layer, `scan-corpus` inspects structural
-anchors without model calls. See the [offline scan example](docs/usage.md#inspect-an-ingestion).
-
-## Choose an interface
-
-| I want to… | Start here |
+| To | Read |
 | --- | --- |
-| Explore the library in Python | [Notebooks](docs/notebooks/README.md), starting with Codify 101 |
-| Process files, store laws, search or compare documents | [Command-line guide](docs/usage.md) |
-| Upload, browse and search in a browser | [Local web app](docs/interfaces.md#web-app) |
-| Connect an application | [REST API](docs/interfaces.md#rest-api) and its OpenAPI schema |
-| Give an agent access to stored laws | [MCP server](docs/interfaces.md#mcp-server) |
+| See what Codify does and where it stops | [What Codify is](docs/start/overview.md) |
+| Take a short act from text to a served law, with no model | [Quickstart](docs/start/quickstart.md) |
+| Install from a checkout or PyPI, and set up PostgreSQL | [Install](docs/start/install.md) |
+| Run a scanned act through the full pipeline with a model | [First ingest](docs/start/first-ingest.md) |
+| Explore the library in Python | [Notebooks](docs/notebooks/README.md) |
 
-For use in another Python project, install `codify-core` with `uv add codify-core`
-or `pip install codify-core`. Optional extras are `serve`, `mcp` and `migrations`.
-`codify migrate`, with the `migrations` extra, creates the core schema in the
-database at `POSTGRES_URL`.
+## Limits
 
-Storage and search use PostgreSQL with pgvector and pg_textsearch. The repository's
-Docker Compose file builds a local instance. Search needs an embeddings endpoint;
-comparison needs chat and embeddings endpoints. The [storage guide](docs/usage.md#store-search-compare)
-explains configuration and loading a bundle.
+- The checks are structural: they do not show a text is complete, current or legally
+  accurate. People who know the law review the output against its source.
+- Scanned pages need a vision-capable model behind an OpenAI-compatible endpoint; there
+  is no built-in OCR engine.
+- `codify serve` and `codify mcp` have no authentication: keep them on localhost or
+  behind a proxy that authenticates. Server ingest runs are held in memory and lost on
+  restart; stored documents stay in PostgreSQL.
+- Alpha: while the major version is 0, a minor release can change output and
+  interfaces. See [VERSIONING.md](VERSIONING.md).
 
-The local servers have **no built-in authentication**. Keep them on localhost or
-behind an authenticated proxy. Ingestion runs are held in memory and lost on a
-server restart; documents already stored in PostgreSQL remain available.
+## Project
 
-## Jurisdictions and output quality
-
-Jurisdiction configurations define document types, numbering, dates and structural
-patterns. Codify detects a document's structure using those rules, then uses a model
-to fill the provision text. Missing or incorrect rules can leave provisions unstructured;
-review the detected anchors as well as the final XML.
-
-The package includes synthetic and public reference configurations. A configuration
-is not a complete legal corpus or a guarantee of extraction quality. To supply your own,
-see [adding a jurisdiction](docs/jurisdictions/adding-a-jurisdiction.md) and
-[custom data roots](docs/usage.md#jurisdictions).
-
-Generated output targets Akoma Ntoso 3.0 and includes structural validation findings.
-It is **not automatically checked against the full OASIS schema on every ingestion**.
-Structural checks do not establish that the text is legally accurate or complete.
-Review important outputs against their sources and test them in the software that
-will consume them. Known differences are documented in the
-[interoperability guide](docs/akn4eu-divergences.md).
-
-## Development
-
-Offline tests need neither a database nor a model API key:
-
-```bash
-uv sync --group dev --extra migrations --extra serve --extra mcp
-uv run pytest tests -m "not integration and not live_llm" -q
-```
-
-Use a disposable database for integration tests: they can write and delete data.
-See the [test guide](docs/offline-suite.md) for setup and the separate tests that
-make paid model calls.
-
-- [Architecture](docs/architecture.md)
-- [OCR and transcription](docs/ocr-cascade.md)
-- [Contributing](CONTRIBUTING.md)
-- [Code of conduct](CODE_OF_CONDUCT.md)
-- [Security policy](SECURITY.md)
-- [Licence](LICENSE)
+- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and
+  [security policy](SECURITY.md)
+- [Changelog](CHANGELOG.md) and [licence](LICENSE)
 
 Codify is built by CentreAI at the
 [Tony Blair Institute for Global Change](https://institute.global).
-For the hosted Codify Platform and more about the project, visit
-[codify.centreai.global](https://codify.centreai.global).
+For the hosted Codify Platform, visit [codify.centreai.global](https://codify.centreai.global).

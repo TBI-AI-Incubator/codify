@@ -4,6 +4,37 @@
 
 Accepted
 
+## Status note, 14 November 2026
+
+The data model is in the core as described. The statements about what reads that
+data describe code that is not in this repository.
+
+| Part of this record | State in the core |
+| --- | --- |
+| Body registry and alias resolution | Present. The loader is `_load_supranational_bodies()` in `codify/jurisdictions_atlas.py`; `codify/jurisdictions.py` re-exports `canonicalise_body` only |
+| `supranational_memberships[]` on a configuration | Present and optional. It defaults to an empty list, and most shipped configurations do not carry it |
+| The validator's `UNKNOWN_BODY` check | Does not exist. An unregistered body is returned unchanged and the configuration loads without a finding |
+| Comparison and lens applicability read the memberships | Not in the core. `codify.compare.comparator.compare` takes two documents and no body, and nothing under `codify/compare`, `codify/lenses` or `codify/frameworks` reads the field |
+| No hardcoded union | Not yet true. `eu` is a literal in format dispatch (`codify/pipeline/formats/__init__.py`) and in citation resolution (`codify/frbr.py`), and the one framework that ships is `data/frameworks/eu-acquis.yaml` |
+
+Of the four wiring steps below, steps 1 and 2 are data changes the loader reads today. Step 3 has
+nothing to attach to in the core. Step 4 needs a configuration with
+`type: "supranational"` for the body before its corpus can be ingested; the
+synthetic `xu` is one, and none ships with the code `eu`. `GET
+/jurisdictions/{code}` on `codify serve` returns the whole configuration,
+memberships included.
+
+Two parts of the model are not described below:
+
+- `direct_effect` is a scale, not a flag: `override`, `direct`,
+  `indirect_transposition`, `procedural`, `operational`, `advisory` or `none`,
+  which is the default. A boolean from an older configuration is read as
+  `direct` or `none`.
+- `binding_regimes[]` records a regime that binds a jurisdiction without
+  membership, such as a treaty framework or a constitutional annex
+  (`BindingRegime` in `codify/jurisdictions_atlas.py`). No shipped
+  configuration uses it yet.
+
 ## Context
 
 The EU-acquis comparison machinery originally assumed its supranational body was
