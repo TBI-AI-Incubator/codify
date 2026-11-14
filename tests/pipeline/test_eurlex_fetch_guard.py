@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from codify.acquisition.base import MissingUserAgent
 from codify.core.security import SSRFBlocked
 from codify.pipeline.fetchers.eurlex import fetch_url
 
@@ -57,3 +58,29 @@ async def test_the_first_hop_is_guarded_too() -> None:
             resolver=_resolver,
             inner=httpx.MockTransport(lambda r: httpx.Response(200)),
         )
+
+
+@pytest.mark.asyncio
+async def test_the_callers_user_agent_is_sent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "eu-test/1 (+https://example.test)")
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.headers["user-agent"])
+        return httpx.Response(200, text="<FORMEX/>")
+
+    await fetch_url("https://public.test/a", resolver=_resolver, inner=httpx.MockTransport(handler))
+    assert sent == ["eu-test/1 (+https://example.test)"]
+
+
+@pytest.mark.asyncio
+async def test_no_request_is_sent_without_a_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT")
+    sent: list[httpx.Request] = []
+    with pytest.raises(MissingUserAgent):
+        await fetch_url(
+            "https://public.test/a",
+            resolver=_resolver,
+            inner=httpx.MockTransport(lambda r: sent.append(r) or httpx.Response(200)),
+        )
+    assert sent == []

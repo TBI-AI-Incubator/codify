@@ -25,7 +25,6 @@ import uuid
 from collections import Counter
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -53,15 +52,6 @@ DOC_PATH = "/ocs-api/public/doc/getLawDoc"
 GAZETTE_NAME = "ราชกิจจานุเบกษา"
 
 logger = structlog.get_logger(__name__)
-
-
-def user_agent() -> str:
-    """The crawler identity this source is sent: the Core release and its home."""
-    try:
-        release = version("codify-core")
-    except PackageNotFoundError:
-        release = "0"
-    return f"Codify/{release} (+https://github.com/TBI-AI-Incubator/codify)"
 
 
 TIMELINE_KINDS = {"1": "original", "2": "amending", "3": "consolidated", "4": "current"}
@@ -226,9 +216,7 @@ class OcsAcquirer(BaseAcquirer):
         dump_dir: Path | None = None,
     ) -> None:
         super().__init__(adapter, client=client)
-        self._client = client or make_polite_client(
-            adapter, user_agent=user_agent(), profile=self.politeness
-        )
+        self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._licence = adapter.licence
         self._title_rule = title_rule
         self._session = str(uuid.uuid4())

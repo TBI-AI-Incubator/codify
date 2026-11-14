@@ -17,7 +17,6 @@ from codify.acquisition.adapters.pt.dre import (
     DATA,
     DETAIL,
     FRAG,
-    USER_AGENT,
     DiarioAcquirer,
     DrItemMissing,
     SiteChanged,
@@ -32,6 +31,7 @@ from codify.acquisition.adapters.pt.dre_akn import (
     to_akn,
     to_bluebell,
 )
+from codify.acquisition.base import MissingUserAgent
 from codify.acquisition.politeness import PoliteTransport
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.events import Complete, Failed
@@ -577,15 +577,22 @@ async def test_saved_answers_are_read_before_the_network(tmp_path: Path) -> None
     assert second.fetched_at <= first.fetched_at
 
 
-def test_the_client_is_polite_and_never_faster_than_the_gazette_allows() -> None:
+def test_the_client_is_polite_and_never_faster_than_the_gazette_allows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "pt-test/1 (+https://example.test)")
     fast = SourceAdapter(kind="json_portal", name="dre", rate_limit_per_minute=600)
     acquirer = DiarioAcquirer(fast)
     assert isinstance(acquirer._client._transport, PoliteTransport)
     assert acquirer.politeness.rate_limit_per_minute == 40
     assert acquirer.politeness.concurrency == 1
-    assert acquirer._client._transport.profile.user_agent == USER_AGENT
-    assert USER_AGENT.startswith("Codify/")
-    assert USER_AGENT.endswith(" (+https://github.com/TBI-AI-Incubator/codify)")
+    assert acquirer._client._transport.profile.user_agent == "pt-test/1 (+https://example.test)"
+
+
+def test_the_client_needs_the_callers_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT")
+    with pytest.raises(MissingUserAgent):
+        DiarioAcquirer(SourceAdapter(kind="json_portal", name="dre"))
 
 
 def test_json_portal_resolves_by_jurisdiction() -> None:
