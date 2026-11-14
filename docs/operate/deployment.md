@@ -162,6 +162,20 @@ The figure's three limits are constants in the code, not settings: `concurrency`
 - **Know what leaves the machine.** The figure under [The idea in brief](#the-idea-in-brief) shows where your documents go. Two calls it leaves out: `POST /runs/ingest-url` makes the HTTP server fetch the act from EUR-Lex ([`codify/serve/app.py`](../../codify/serve/app.py)), and `codify load --embed` sends every provision to your embeddings endpoint ([`codify/cli_store.py`](../../codify/cli_store.py)). Langfuse's record of an ingest also carries its jurisdiction and resulting work URI, and its source path is the full path (for an upload, the temporary path) ([`codify/core/tracing.py`](../../codify/core/tracing.py), [`codify/pipeline/formats/pdf.py`](../../codify/pipeline/formats/pdf.py), [Models and costs](models-and-costs.md)).
 - **Report vulnerabilities** as [Security](../project/security.md) describes.
 
+## Keep everything in-country
+
+Only the settings below send data off the machine. Point each at a service inside your network, or leave it unset ([environment reference](../reference/environment.md)).
+
+| Setting | What it sends | When unset |
+| --- | --- | --- |
+| `LLM_BASE_URL` | Page images and text of each PDF ingest; provisions for `codify compare` and the MCP compare tool. `LLM_OCR_MODEL` and `LLM_CONTENT_FILTER_FALLBACK_MODEL` name other models on this endpoint | XML ingest, loading and reading work; PDF ingest and comparison stop |
+| `EMBEDDING_BASE_URL` | Every provision on `load --embed` and server ingest; every search query | Falls back to `LLM_BASE_URL`; with neither, search stops and the server stores documents unsearchable |
+| `AZURE_OPENAI_ENDPOINT` with `AZURE_OPENAI_API_KEY` | The whole PDF, from `codify ingest-one` | No second OCR engine; an `LLM_OCR_MODEL` that names it fails with `azure_foundry_ocr not configured` |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST` | Each model call's model, tokens and cost; each ingest's source path, jurisdiction and work URI; no prompts or replies | No tracing. With keys set and no host, the Langfuse SDK sends to its cloud service: set `LANGFUSE_HOST` (or `LANGFUSE_BASE_URL`, which wins) to your own Langfuse |
+| `ACQUISITION_USER_AGENT` | Requests to official publishers, from the acquisition commands and `POST /runs/ingest-url`; no stored law | Every such request stops before it is sent |
+
+A model server of your own must support the routes in [Models and costs](models-and-costs.md#what-an-endpoint-must-support).
+
 ## What can go wrong
 
 | What you see | Cause | What to do |

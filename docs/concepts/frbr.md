@@ -203,6 +203,23 @@ An empty segment raises `UncitableFrbrUri` and stops the ingest: a stored identi
 
 Loading the worked example twice gives the same `version_id`. To store a corrected text of the same expression, see [Amendments and versions](../guide/amendments-and-versions.md).
 
+## Cite a provision
+
+Cite at the level the claim needs. On the worked example, section 12 has the eId `part_IV__sec_12`:
+
+| To cite | Form | Example |
+| --- | --- | --- |
+| The law, in every version | Work URI | `/akn/xa/act/1992/7` |
+| Its text as it stood on a date | Expression URI | `/akn/xa/act/1992/7/eng@1992-05-02` |
+| One provision, in whichever text applies | Work URI, `#`, eId | `/akn/xa/act/1992/7#part_IV__sec_12` |
+| One provision's wording on a date | Expression URI, `#`, eId | `/akn/xa/act/1992/7/eng@1992-05-02#part_IV__sec_12` |
+
+An eId names the same provision in every expression, so the work form survives amendment and the expression form pins the wording ([Amendments and versions](../guide/amendments-and-versions.md)).
+
+For the text in force on a date, take the version with the latest expression date not after it, in the law's authoritative language and leaving out `.1`, `.2` patch versions: the rule Codify applies when it resolves references between laws ([`codify/storage/resolve_refs.py`](../../codify/storage/resolve_refs.py)). `GET /laws/{law_id}/versions` lists each version's `expression_uri`; take the date from the URI. A search match gives `work_uri`, `eid` and `version_id`, and that version's `expression_uri` completes the citation.
+
+`parse_source_ref` below reads all four forms. Codify does not resolve them: the server looks laws up by id ([Status](#status)). It neither writes nor parses the naming convention's portion form, `/akn/xa/act/1992/7/eng@1992-05-02/!main~part_IV__sec_12`.
+
 ## Reading URIs
 
 ```python

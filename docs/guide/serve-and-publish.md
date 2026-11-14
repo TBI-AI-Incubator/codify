@@ -90,6 +90,23 @@ curl -s localhost:8000/versions/20cb9d70-142f-47fc-993b-98d884a79ad8 | jq -r .ak
 
 `GET /versions/{id}/document` returns the reader's tree; the [HTTP API reference](../reference/http-api.md) lists every route and field.
 
+### Serve another system
+
+Other systems call the same routes through your authenticating proxy, which forwards only the routes you publish ([Deployment](../operate/deployment.md#security)). Bind the server to the private interface the proxy uses:
+
+```bash
+uv run codify serve --host 10.0.0.5 --port 8000
+```
+
+Find a law by title with `q`, or search its provisions. Each search match carries `work_uri`, `eid`, `version_id` and `law_id`, enough to [cite the provision](../concepts/frbr.md#cite-a-provision) and fetch its version:
+
+```bash
+curl "localhost:8000/laws?jurisdiction=xa&q=legislation"
+curl "localhost:8000/search?q=right%20of%20access&jurisdiction=xa&k=5"
+```
+
+`/search` needs an embeddings endpoint and answers `503` without one. Generate the caller's client from `contract/openapi.json` ([Keep the contract](#keep-the-contract)).
+
 ### Ingest a document through the server
 
 `POST /runs/ingest` takes a multipart form (file, jurisdiction, optional title) and answers `202` at once with a background run.
