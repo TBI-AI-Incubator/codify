@@ -86,6 +86,8 @@ def test_padding_does_not_let_a_longer_number_match() -> None:
         ("under Directive 95/46/EC", "/akn/eu/act/dir/1995/46", True),
         ("Regulation (EEC) No 2913/92", "/akn/eu/act/reg/1992/2913", True),
         ("CELEX 32016R0679", "/akn/eu/act/reg/2016/679", True),
+        # The CELEX type letter must match: R is a regulation, not a directive.
+        ("CELEX 31995R0046", "/akn/eu/act/dir/1995/46", False),
         ("Directive 95/460/EC", "/akn/eu/act/dir/1995/46", False),
         ("on 1 May 95, item 46", "/akn/eu/act/dir/1995/46", False),
         # Outside EU works a fraction or a date is not a citation.

@@ -7,6 +7,8 @@ import re
 
 from codify.agents.tools.frbr import construct_frbr_uri
 
+# Class token on the refs this module's pass mints: the amendment passes leave them alone.
+EU_CITATION_CLASS = "eu-citation"
 _KINDS = {"regulation": "regulation", "directive": "directive", "decision": "decision"}
 _CELEX_KINDS = {"R": "regulation", "L": "directive", "D": "decision"}
 _MARKS = frozenset({"EU", "EC", "EEC", "EURATOM", "ECSC", "CFSP", "JHA", "CE"})

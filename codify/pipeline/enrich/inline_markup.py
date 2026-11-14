@@ -23,7 +23,7 @@ from codify.frbr import default_token, law_number_token, token_country, token_fa
 from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config, load_short_titles
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.eid import build_term_map, resolve_informal_reference
-from codify.pipeline.enrich.eu_citations import CITATION, work_uri
+from codify.pipeline.enrich.eu_citations import CITATION, EU_CITATION_CLASS, work_uri
 
 if TYPE_CHECKING:
     from codify.core.llm import LLMClient
@@ -852,26 +852,39 @@ def _mark_eu_citations(root: etree._Element, body: etree._Element, *, eu_text: b
     return sum(_mark_eu_citations_in(p, own, eu_text) for p in paragraphs)
 
 
-def _mark_eu_citations_in(p: etree._Element, own: str | None, eu_text: bool) -> int:
+# Inline formatting a citation may sit in or straddle ("Directive <i>95/46/EC</i>").
+_EU_CITATION_INLINE = frozenset({"i", "b", "u", "span", "inline", "sup", "sub", "term", "def"})
+
+
+def _mark_eu_citations_in(
+    el: etree._Element, own: str | None, eu_text: bool, prefix: list[str] | None = None
+) -> int:
     """One paragraph, slot by slot, so a list split by a footnote marker keeps its head."""
-    prefix = ""
+    seen = prefix if prefix is not None else [""]
 
     def make(m: re.Match[str]) -> etree._Element | None:
-        uri = work_uri(m, prefix + m.string[: m.start()], eu_text=eu_text)
-        return None if uri is None or uri == own else _derived_ref(uri)
+        uri = work_uri(m, seen[0] + m.string[: m.start()], eu_text=eu_text)
+        if uri is None or uri == own:
+            return None
+        ref = _derived_ref(uri)
+        ref.set("class", f"{DERIVED_REF_CLASS} {EU_CITATION_CLASS}")
+        return ref
 
-    count = 0
-    slots: list[etree._Element | None] = [None, *p]
-    for child in slots:
-        if child is None:
-            text = p.text or ""
-            count += _wrap_in_text_attr(p, "text", CITATION, make)
-        else:
-            if isinstance(child.tag, str) and etree.QName(child).localname != "authorialNote":
-                prefix += "".join(child.itertext())
-            text = child.tail or ""
-            count += _wrap_in_tail(p, child, CITATION, make)
-        prefix += text
+    # Taken first: the refs this inserts are text already counted.
+    children = list(el)
+    text = el.text or ""
+    count = _wrap_in_text_attr(el, "text", CITATION, make)
+    seen[0] += text
+    for child in children:
+        if isinstance(child.tag, str):
+            name = etree.QName(child).localname
+            if name in _EU_CITATION_INLINE:
+                count += _mark_eu_citations_in(child, own, eu_text, seen)
+            elif name != "authorialNote":
+                seen[0] += "".join(child.itertext())
+        text = child.tail or ""
+        count += _wrap_in_tail(el, child, CITATION, make)
+        seen[0] += text
     return count
 
 
@@ -916,6 +929,8 @@ def _classify_amendment_refs(body: etree._Element, country: str) -> int:
                 continue  # internal refs aren't the amended work
             if "amendment" in (ref.get("class") or ""):
                 continue
+            if EU_CITATION_CLASS in (ref.get("class") or "").split():
+                continue  # names an act, never this paragraph's amended work
             # Appended, not replaced: this ref may already carry the marker
             # saying this pass minted it, and overwriting it filed a minted
             # amendment reference as publisher-authored.
@@ -960,7 +975,10 @@ def _mark_scoped_amendments(body: etree._Element) -> int:
         text = "".join(p.itertext())
         if _SCOPE_OPENER.search(text):
             refs = [
-                r for r in p.iter(f"{{{AKN_NS}}}ref") if not (r.get("href") or "").startswith("#")
+                r
+                for r in p.iter(f"{{{AKN_NS}}}ref")
+                if not (r.get("href") or "").startswith("#")
+                and EU_CITATION_CLASS not in (r.get("class") or "").split()
             ]
             if refs:
                 scope_href = refs[0].get("href")

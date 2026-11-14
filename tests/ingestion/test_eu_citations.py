@@ -7,7 +7,7 @@ from lxml import etree
 
 from codify.akn import AKN_NS, NS
 from codify.akn.references import DERIVED_REF_CLASS
-from codify.pipeline.enrich.eu_citations import CITATION, work_uri
+from codify.pipeline.enrich.eu_citations import CITATION, EU_CITATION_CLASS, work_uri
 from codify.pipeline.enrich.inline_markup import emit_inline_markup
 
 
@@ -83,6 +83,9 @@ def _act(body: str, preamble: str = "") -> str:
 <preamble>{preamble}</preamble><body>{body}</body></act></akomaNtoso>"""
 
 
+_MINTED = f"{DERIVED_REF_CLASS} {EU_CITATION_CLASS}"
+
+
 def _refs(xml: str) -> list[etree._Element]:
     return etree.fromstring(xml.encode()).findall(".//akn:ref", NS)
 
@@ -97,8 +100,8 @@ async def test_recitals_and_body_are_marked_and_the_act_itself_is_not() -> None:
     )
     refs = _refs(await emit_inline_markup(xml, "eu", "regulation"))
     assert [(r.get("href"), r.get("class")) for r in refs] == [
-        ("/akn/eu/act/reg/2001/45", DERIVED_REF_CLASS),
-        ("/akn/eu/act/dir/1995/46", DERIVED_REF_CLASS),
+        ("/akn/eu/act/reg/2001/45", _MINTED),
+        ("/akn/eu/act/dir/1995/46", _MINTED),
     ]
 
 
@@ -116,15 +119,27 @@ async def test_a_list_split_by_a_footnote_keeps_its_head() -> None:
     ]
 
 
-async def test_a_citation_in_an_amending_paragraph_stays_a_citation() -> None:
-    """The amendment pass reads a footnote's "amending Directive X" as an amendment by this act."""
+async def test_a_citation_in_an_amending_paragraph_stays_a_citation_on_every_run() -> None:
+    """The amendment pass reads a footnote's "amending Directive X" as an amendment by this act;
+    a refresh re-enriches the stored, already-marked document."""
     xml = _act(
         '<article eId="art_1"><paragraph eId="art_1__para_1"><content><p>'
         "Directive 2001/83/EC is amended as follows, amending Directive 2003/35/EC.</p>"
         "</content></paragraph></article>"
     )
-    refs = _refs(await emit_inline_markup(xml, "eu", "regulation"))
-    assert [r.get("class") for r in refs] == [DERIVED_REF_CLASS, DERIVED_REF_CLASS]
+    once = await emit_inline_markup(xml, "eu", "regulation")
+    twice = await emit_inline_markup(once, "eu", "regulation")
+    assert [r.get("class") for r in _refs(twice)] == [_MINTED, _MINTED]
+
+
+async def test_a_citation_in_inline_formatting_is_marked() -> None:
+    xml = _act(
+        '<article eId="art_1"><paragraph eId="art_1__para_1"><content><p>'
+        "Under <i>Directive 95/46/EC</i> and Regulation <i>(EU) 2016/680</i>.</p>"
+        "</content></paragraph></article>"
+    )
+    hrefs = [r.get("href") for r in _refs(await emit_inline_markup(xml, "eu", "regulation"))]
+    assert hrefs == ["/akn/eu/act/dir/1995/46", "/akn/eu/act/reg/2016/680"]
 
 
 async def test_an_article_of_another_act_is_not_a_self_link() -> None:
