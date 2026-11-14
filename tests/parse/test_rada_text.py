@@ -76,3 +76,9 @@ def test_a_later_unit_lands_as_an_attachment() -> None:
 def test_an_empty_text_is_refused() -> None:
     with pytest.raises(ValueError):
         _parse("\n \n")
+
+
+def test_an_act_with_no_units_keeps_its_lines_as_a_flat_body() -> None:
+    root = _akn("ЗАКОН УКРАЇНИ\nПро ратифікацію Угоди\nРатифікувати Угоду, підписану 1 січня.\n")
+    assert root.findall(f".//{_NS}article") == []
+    assert "Ратифікувати Угоду" in "".join(root.find(f".//{_NS}body").itertext())

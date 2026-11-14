@@ -281,6 +281,7 @@ class RadaHtmlParser:
         return {"title": title, "language": "ukr"}
 
 
+_NO_ANCHORS = "no structural anchors found"
 # A form-feed line between two units of one source.
 UNIT_BREAK = "\n\f\n"
 
@@ -297,7 +298,16 @@ class RadaTextParser(RadaHtmlParser):
         paras = [_line_para(line) for line in units[0].splitlines() if line.strip()]
         if not paras:
             raise ValueError("no text lines found")
-        parsed = self._parse_paras(paras, config=config, doctype=doctype)
+        try:
+            parsed = self._parse_paras(paras, config=config, doctype=doctype)
+        except ValueError as exc:
+            if not str(exc).startswith(_NO_ANCHORS):
+                raise
+            # A single-operative act, such as a ratification, has no units to find.
+            body = "\n".join(f"  {p.text}" for p in paras)
+            parsed = StructuredParse(
+                bluebell_text=f"BODY\n{body}\n", metadata=self._metadata(paras)
+            )
         schedules = [s for s in map(_schedule, units[1:]) if s]
         if schedules:
             parsed.bluebell_text = "\n\n".join([parsed.bluebell_text.rstrip("\n"), *schedules])
