@@ -646,7 +646,7 @@ export interface components {
             month_names?: string[];
             /**
              * New Year Day
-             * @description Day of `new_year_month` on which the local year begins, for month-sensitive conversions. Unset means the first of the month.
+             * @description Day the local year begins in its new-year month, for month-sensitive conversions of a date on the Gregorian grid. Unset keeps the calendar's built-in boundary, a band of days around the new year within which the day does not decide the year. A date on the calendar's own grid always uses the built-in boundary.
              */
             new_year_day?: number | null;
             /**
