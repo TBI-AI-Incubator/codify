@@ -380,6 +380,10 @@ async def test_a_failed_embed_fails_the_run_and_stores_nothing(
             rid = await _enqueue(c, title=title)
             events = _sse((await c.get(f"/runs/{rid}/stream")).text)
             assert "stored" not in [k for k, _ in events], events
+            failed = [e for k, e in events if k == "failed"]
+            assert [(e["stage"], e["error"]) for e in failed] == [
+                ("persist", "RuntimeError: embeddings endpoint down")
+            ], events
             assert (await c.get(f"/runs/{rid}")).json()["status"] == "failed"
             laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()
             assert laws["items"] == []

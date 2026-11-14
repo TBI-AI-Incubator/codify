@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.jurisdictions import JurisdictionConfig
-from codify.pipeline.events import Complete
+from codify.pipeline.events import Complete, Failed
 from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored
 from codify.serve.schemas import (
     Cancelled,
@@ -114,9 +114,17 @@ def _ingest_runner(
                     if embedder is not None:
                         from codify.storage.embeddings import embed_and_stamp
 
-                        await embed_and_stamp(
-                            session, version_id, client=embedder, path_context=False
-                        )
+                        try:
+                            await embed_and_stamp(
+                                session, version_id, client=embedder, path_context=False
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            await session.rollback()
+                            logger.warning(
+                                "embed_failed", version_id=str(version_id), error=str(exc)
+                            )
+                            yield Failed(stage="persist", error=f"{type(exc).__name__}: {exc}")
+                            return
                     await session.commit()
                 yield Stored(version_id=version_id, law_id=law_id)
             yield event
