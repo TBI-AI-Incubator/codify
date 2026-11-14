@@ -976,8 +976,13 @@ SCHEMA_ONLY = "postgresql://schema-only"  # the schema needs no database, like -
 
 def test_the_committed_openapi_schema_matches_the_server() -> None:
     """`codify serve --openapi > contract/openapi.json` after any route change."""
-    live = json.dumps(create_app(database=SCHEMA_ONLY).openapi(), indent=2, sort_keys=True) + "\n"
-    assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
+    committed = OPENAPI.read_text()
+    live = create_app(database=SCHEMA_ONLY).openapi()
+    # A release bumps the version without touching the contract.
+    live["info"]["version"] = json.loads(committed)["info"]["version"]
+    assert committed == json.dumps(live, indent=2, sort_keys=True) + "\n", (
+        "regenerate contract/openapi.json"
+    )
 
 
 def test_the_schema_carries_the_package_version() -> None:

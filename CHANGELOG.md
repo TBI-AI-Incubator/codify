@@ -64,7 +64,8 @@ Fixed:
   it listens on by default, `http://127.0.0.1:8001/mcp`. It used to show the web
   app's own origin, where nothing serves MCP.
 - The OpenAPI schema's `info.version` is the package version. It was FastAPI's
-  default, `0.1.0`, so `contract/openapi.json` is now regenerated at each release.
+  default, `0.1.0`. The drift test ignores it, so a release needs no
+  regeneration of `contract/openapi.json`.
 
 ## 0.7.0 (2026-11-13)
 
