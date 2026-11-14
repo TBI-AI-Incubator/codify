@@ -357,13 +357,13 @@
       "name": "eu-sparql",
       "base_url": "http://publications.europa.eu/webapi/rdf/sparql",
       "rate_limit_per_minute": 8,
-      "licence": "EU-RU/2011/833"
+      "licence": "Decision 2011/833/EU"
     },
     {
       "kind": "bulk_xml_archive",
       "name": "eu-datadump",
       "base_url": "https://datadump.publications.europa.eu/server/download-requests/download?formatCode=FMX&languageIso2Code=en",
-      "licence": "EU-RU/2011/833"
+      "licence": "Decision 2011/833/EU"
     }
   ],
   "frbr": {
@@ -451,9 +451,9 @@
   },
   "validation": {
     "status": "draft",
-    "documents_examined": 6,
+    "documents_examined": 5,
     "bluebell_tested": false,
-    "unresolved_ambiguities": 5,
+    "unresolved_ambiguities": 7,
     "note": "AKN4EU profile is well-documented. Recital/citation post-processing needed. 24-language parallel expressions."
   },
   "tier": 2,

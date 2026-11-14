@@ -12,15 +12,15 @@
 - **Head of state role**: No single head of state. Acts are adopted jointly by the European Parliament and the Council (OLP), or by the Council alone (consultation/consent procedures), or by the Commission (delegated/implementing acts). No presidential signature or royal assent equivalent -- adoption is by institutional vote. Publication in the Official Journal is the equivalent of promulgation.
 - **Official languages**: 24 equally authentic languages. Every binding legal act is published in all 24 languages simultaneously, and all 24 versions are equally authoritative -- there is no "original" and no "translation". This is established by Regulation No 1/1958 (as amended). The 24 languages are: Bulgarian (bg), Croatian (hr), Czech (cs), Danish (da), Dutch (nl), English (en), Estonian (et), Finnish (fi), French (fr), German (de), Greek (el), Hungarian (hu), Irish (ga), Italian (it), Latvian (lv), Lithuanian (lt), Maltese (mt), Polish (pl), Portuguese (pt), Romanian (ro), Slovak (sk), Slovenian (sl), Spanish (es), Swedish (sv).
 - **Calendar system**: Gregorian (sole).
-- **Official gazette**: Official Journal of the European Union (OJ). Published daily (Monday-Friday, plus weekends/holidays in urgent cases) in all 24 official languages. Two series: **L series** (Legislation -- regulations, directives, decisions) and **C series** (Information and Notices -- preparatory acts, announcements, summaries of judgments). Since 1 July 2013, only the electronic edition of the OJ (e-OJ) is authentic (Regulation (EU) No 216/2013). Accessible via EUR-Lex (eur-lex.europa.eu). Since 1 October 2023, ELI identifiers are mandatory in OJ L series references.
+- **Official gazette**: Official Journal of the European Union (OJ). Published daily (Monday-Friday, plus weekends/holidays in urgent cases) in all 24 official languages. Two series: **L series** (Legislation -- regulations, directives, decisions) and **C series** (Information and Notices -- preparatory acts, announcements, summaries of judgments). Since 1 July 2013, only the electronic edition of the OJ (e-OJ) is authentic (Regulation (EU) No 216/2013). Accessible via EUR-Lex (eur-lex.europa.eu). Since 1 October 2023 the L series is published act by act: each act is its own OJ issue, cited by year and number (for example OJ L, 2025/1784, 10.9.2025).
 
-## Digital Presence: Tier 1
+## Digital Presence: Tier 2
 
-The EU institutions maintain AKN4EU v3.0 (April 2020) as the common structured format for EU legislative documents; the Publications Office describes it as a working version not yet fully implemented, so EUR-Lex does not yet serve acts in it. EUR-Lex provides all EU legislation in multiple formats (HTML, PDF, XML). The Publications Office of the EU manages the CELLAR repository with FRBR-compliant metadata using the Common Data Model (CDM) ontology. ELI (European Legislation Identifier) provides persistent HTTP URIs for all legislation. The AKN4EU profile is managed by the Interinstitutional Metadata and Formats Committee (IMFC), chaired by the Publications Office.
+The EU institutions maintain AKN4EU v3.0 (April 2020) as the common structured format for EU legislative documents; the Publications Office describes it as a working version not yet fully implemented, so EUR-Lex does not yet serve acts in it. EUR-Lex provides all EU legislation in HTML, PDF and Formex XML, not Akoma Ntoso, hence Tier 2. The Publications Office of the EU manages the CELLAR repository with FRBR-compliant metadata using the Common Data Model (CDM) ontology. ELI (European Legislation Identifier) provides persistent HTTP URIs for all legislation. The AKN4EU profile is managed by the Interinstitutional Metadata and Formats Committee (IMFC), chaired by the Publications Office.
 
 ## ISO Codes
 
-- **Country**: `eu` (user-assigned under ISO 3166-1; not an officially assigned country code but widely used for EU institutions including by ELI and AKN4EU)
+- **Country**: `eu` (exceptionally reserved in ISO 3166-1 for the European Union; not an officially assigned country code, but the code AKN4EU uses in its FRBR URIs)
 - **Languages** (ISO 639-1 two-letter / ISO 639-3 three-letter):
 
 | Language   | ISO 639-1 | ISO 639-3 | EUR-Lex code |
@@ -61,7 +61,7 @@ The EU institutions maintain AKN4EU v3.0 (April 2020) as the common structured f
   - **Implementing acts**: `Commission Implementing Regulation (EU) YYYY/NNNN`
 - **CELEX numbering**: The EU's unique document identification system. Structure: `{sector}{year}{type}{number}`.
   - **Sectors**: 1 (Treaties), 2 (International agreements), 3 (Legislation), 4 (Complementary legislation), 5 (Preparatory acts), 6 (Case-law), 7 (National transposition), 8 (National case law), 9 (Parliamentary questions), 0 (Consolidated texts), C (OJ C series), E (EFTA documents).
-  - **Document type codes** (sector 3): `R` (Regulation), `L` (Directive), `D` (Decision), `H` (Recommendation), `O` (Opinion), `Q` (Institutional rules), `X` (Other acts), `A` (Common position under former Art. 189b EC), `G` (Resolution), `S` (ECSC Decision, historical), `M` (Non-opposition to notified concentration), `J` (Non-opposition to notified state aid), `F` (Coordinated act, international agreement).
+  - **Document type codes** (sector 3): `R` (Regulation), `L` (Directive), `D` (Decision), `H` (Recommendation), `A` (Opinion), `O` (ECB guideline), `G` (Resolution), `C` (Declaration), `Q` (Institutional arrangements and rules of procedure), `X` (Other acts), `E` (CFSP common position or joint action), `F` (Framework decision or common position in police and judicial cooperation in criminal matters, e.g. `32002F0584`), `S` (ECSC decision, historical), `M` (Merger control decision).
   - **Examples**: `32016R0679` = Sector 3 (Legislation), 2016 (year), R (Regulation), 0679 (number) = GDPR. `32000L0060` = Water Framework Directive.
 - **Dual numbering?**: Yes. Each act has both a formal citation number (e.g., `(EU) 2016/679`) and a CELEX number (e.g., `32016R0679`). The CELEX number is the canonical machine identifier in EUR-Lex; the formal citation is the human-readable legal reference. ELI URIs provide a third identification layer.
 - **Article numbering**: Arabic numerals, continuous throughout the act. Articles are not restarted per chapter. Articles may be grouped into Parts, Titles, Chapters, and Sections.
@@ -112,7 +112,7 @@ Store the CELEX number as `<FRBRalias name="celex">` in metadata. The CELEX-to-F
 | ------------ | ------------- | -------------------------- |
 | `32016R0679` | 3/2016/R/0679 | `/akn/eu/act/reg/2016/679` |
 | `32000L0060` | 3/2000/L/0060 | `/akn/eu/act/dir/2000/60`  |
-| `32019D0496` | 3/2019/D/0496 | `/akn/eu/act/dec/2019/496` |
+| `32011D0833` | 3/2011/D/0833 | `/akn/eu/act/dec/2011/833` |
 
 ### Sample URIs (from examined documents)
 
@@ -121,7 +121,7 @@ Store the CELEX number as `<FRBRalias name="celex">` in metadata. The CELEX-to-F
 | GDPR (Regulation (EU) 2016/679)            | 32016R0679 | eli/reg/2016/679/oj  | `/akn/eu/act/reg/2016/679`     |
 | Water Framework Directive (2000/60/EC)     | 32000L0060 | eli/dir/2000/60/oj   | `/akn/eu/act/dir/2000/60`      |
 | AI Act (Regulation (EU) 2024/1689)         | 32024R1689 | eli/reg/2024/1689/oj | `/akn/eu/act/reg/2024/1689`    |
-| ELI Decision (2012/496/EU)                 | 32012D0496 | eli/dec/2012/496/oj  | `/akn/eu/act/dec/2012/496`     |
+| Commission reuse Decision 2011/833/EU      | 32011D0833 | eli/dec/2011/833/oj  | `/akn/eu/act/dec/2011/833`     |
 | DSA (Regulation (EU) 2022/2065)            | 32022R2065 | eli/reg/2022/2065/oj | `/akn/eu/act/reg/2022/2065`    |
 | Machinery Regulation (EU) 2023/1230        | 32023R1230 | eli/reg/2023/1230/oj | `/akn/eu/act/reg/2023/1230`    |
 | CSRD (Directive (EU) 2022/2464)            | 32022L2464 | eli/dir/2022/2464/oj | `/akn/eu/act/dir/2022/2464`    |
@@ -139,9 +139,9 @@ Store the CELEX number as `<FRBRalias name="celex">` in metadata. The CELEX-to-F
 
 | Local Term (EN)         | AKN Element    | Level           | eId Abbreviation | ELI Abbreviation | Notes                                                                                                                                                                          |
 | ----------------------- | -------------- | --------------- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Part                    | `part`         | Higher division | `part`           | `prt`            | Roman numeral numbering: PART ONE, PART TWO. Used in large acts (e.g., GDPR uses no Parts; AI Act uses Titles). Less common than Title.                                        |
-| Title                   | `title`        | Higher division | `title`          | `ttl`            | Roman numeral numbering: TITLE I, TITLE II. Primary higher division in most EU acts. Heading on separate line.                                                                 |
-| Chapter                 | `chapter`      | Higher division | `chap`           | `chp`            | Roman numeral numbering: CHAPTER I, CHAPTER II. Groups articles within a Title. Heading on separate line.                                                                      |
+| Part                    | `part`         | Higher division | `part`           | `prt`            | Roman numeral numbering: PART ONE, PART TWO. Used in very large instruments (e.g. the TFEU). Rare in secondary law.                                                         |
+| Title                   | `title`        | Higher division | `title`          | `ttl`            | Roman numeral numbering: TITLE I, TITLE II. Used above Chapters in larger instruments. Heading on separate line.                                                               |
+| Chapter                 | `chapter`      | Higher division | `chap`           | `chp`            | Roman numeral numbering: CHAPTER I, CHAPTER II. The usual top division in modern acts (GDPR, AI Act, DSA). Heading on separate line.                                         |
 | Section                 | `section`      | Higher division | `sec`            | `sec`            | Arabic numeral numbering: Section 1, Section 2. Subdivides Chapters. Used within Chapters when further grouping is needed.                                                     |
 | Subsection              | `subsection`   | Higher division | `subsec`         | --               | Rare. Subdivides Sections.                                                                                                                                                     |
 | Article                 | `article`      | **Basic unit**  | `art`            | `art`            | Arabic numerals, continuous throughout the act. The fundamental citable provision. Heading below article number. Cited as "Article 5".                                         |
@@ -178,7 +178,10 @@ Title I, Chapter II, Article 6(1), first subparagraph:
 Title I, Chapter II, Article 6(1)(a):
   title_1__chap_2__art_6__para_1__point_a
 
-Title I, Chapter II, Article 6(1)(a)(i):
+Title I, Chapter II, Article 6(1)(a)(i) (a point nested in a point):
+  title_1__chap_2__art_6__para_1__point_a__point_i
+
+Title I, Chapter II, Article 6(1)(a), first indent:
   title_1__chap_2__art_6__para_1__point_a__indent_1
 
 Chapter I, Article 1:
@@ -321,8 +324,8 @@ Acting in accordance with the ordinary legislative procedure,"
 | Local Term   | Bluebell Keyword | Notes                                                                                      |
 | ------------ | ---------------- | ------------------------------------------------------------------------------------------ |
 | Part         | `PART`           | Higher division, rare                                                                      |
-| Title        | `TITLE`          | Primary higher division                                                                    |
-| Chapter      | `CHAPTER`        | Groups articles within titles                                                              |
+| Title        | `TITLE`          | Higher division above chapters, in larger instruments                                      |
+| Chapter      | `CHAPTER`        | Usual top division in modern acts                                                          |
 | Section      | `SECTION`        | Subdivides chapters (used as higher division, NOT as basic unit)                           |
 | Article      | `ARTICLE`        | Basic unit                                                                                 |
 | Paragraph    | `PARAGRAPH`      | Level 1 subdivision -- 1., 2., 3.                                                          |
@@ -488,7 +491,7 @@ CHAPTER XI - FINAL PROVISIONS
 
 ## Codify Maturity Target
 
-- **Initial**: Level 1 -- Valid AKN structure + FRBR identification + publication metadata. Despite the EU being Tier 1, the initial goal is to produce AKN from EUR-Lex source material that passes validation.
+- **Initial**: Level 1 -- Valid AKN structure + FRBR identification + publication metadata. Although the source is structured XML, the initial goal is to produce AKN from EUR-Lex source material that passes validation.
 - **Target**: Level 3 -- Add lifecycle events (entry into force, application dates, amendment chains) and analysis metadata. The EU has rich amendment histories that make this achievable.
 - **Stretch**: Level 5 -- Full AKN naming convention compliance with cross-document `href` linking, given the EU's dense web of cross-references between acts.
 
@@ -501,12 +504,12 @@ CHAPTER XI - FINAL PROVISIONS
 | #   | Document                                          | Type                                                       | CELEX      | Key observations                                                                                                                                                                |
 | --- | ------------------------------------------------- | ---------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Regulation (EU) 2016/679 (GDPR)                   | Complex regulation, 99 articles, 11 chapters, 173 recitals | 32016R0679 | Full hierarchy: Chapter > (Section) > Article > Paragraph > Point. Extensive use of definitions in Article 4 as numbered points. Concluding formula: "binding in its entirety". |
-| 2   | Regulation (EU) 2024/1689 (AI Act)                | Complex regulation, 113 articles, 13 titles, annexes       | 32024R1689 | Uses Titles (not Chapters) as primary grouping. Multiple Annexes with complex internal structure. Demonstrates Title > Chapter > Section > Article pattern.                     |
+| 2   | Regulation (EU) 2024/1689 (AI Act)                | Complex regulation, 113 articles, 13 chapters, 13 annexes  | 32024R1689 | Chapters as the top division, with Sections inside some (Chapter III). Annexes with complex internal structure. Chapter > Section > Article pattern.                           |
 | 3   | Directive (EU) 2024/1760 (CSDDD)                  | Directive, amending pattern                                | 32024L1760 | Demonstrates directive concluding formula: "addressed to the Member States". Amending references to prior directives.                                                           |
 | 4   | Regulation (EU) 2022/2065 (DSA)                   | Complex regulation, 93 articles, 5 chapters                | 32022R2065 | Chapter > Section > Article pattern. Extensive cross-references to GDPR.                                                                                                        |
-| 5   | Commission Implementing Regulation (EU) 2025/1784 | Implementing regulation                                    | 32025R1784 | Single-institution enacting formula ("HAS ADOPTED"). Shorter structure without higher divisions.                                                                                |
+| 5   | Commission Implementing Regulation (EU) 2025/1784 | Implementing regulation (feed additive authorisation)      | 32025R1784 | Single-institution enacting formula ("HAS ADOPTED"). Shorter structure without higher divisions.                                                                                |
 
-**Note**: Documents examined via EUR-Lex web search results and structured knowledge. EUR-Lex provides all documents in HTML and PDF; no OCR was required. The structural observations are verified against the publicly available text of each act.
+**Note**: The counts and formulas above were checked against the English XHTML text of each act from the Publications Office's Cellar repository. No OCR was required.
 
 ### FRBR URI Test
 
@@ -528,8 +531,7 @@ Every structural element observed across examined documents maps to an AKN eleme
 
 | Element observed                       | AKN mapping               | Status    |
 | -------------------------------------- | ------------------------- | --------- |
-| Title I, Title II (AI Act)             | `title`                   | Confirmed |
-| Chapter I, Chapter II (GDPR, DSA)      | `chapter`                 | Confirmed |
+| Chapter I, Chapter II (GDPR, AI Act, DSA) | `chapter`              | Confirmed |
 | Section 1, Section 2 (DSA Chapter III) | `section` (as higher div) | Confirmed |
 | Article 1, 2, 3...                     | `article`                 | Confirmed |
 | 1., 2., 3. paragraphs                  | `paragraph`               | Confirmed |
@@ -579,9 +581,9 @@ No `hcontainer` needed for any observed structural element.
 
 ### 1. Country Code for EU (MEDIUM priority)
 
-**Problem**: The EU is not a country and has no officially assigned ISO 3166-1 alpha-2 code. `EU` is reserved by ISO 3166/MA for "European Union" but is in the "exceptionally reserved" category, not formally assigned. AKN4EU and ELI both use `eu` in practice. The AKN Naming Convention requires a two-letter ISO 3166-1 code.
+**Problem**: The EU is not a country and has no officially assigned ISO 3166-1 alpha-2 code. `EU` is exceptionally reserved by the ISO 3166 Maintenance Agency for the European Union, not formally assigned. AKN4EU uses `eu` in practice; ELI URIs for EU acts carry no jurisdiction segment. The AKN Naming Convention requires a two-letter ISO 3166-1 code.
 
-**Recommendation**: Use `eu` as the jurisdiction code, following AKN4EU and ELI precedent. This is the universally adopted convention. Document that it is an exceptionally reserved code, not a standard country code.
+**Recommendation**: Use `eu` as the jurisdiction code, following AKN4EU precedent. This is the universally adopted convention. Document that it is an exceptionally reserved code, not a standard country code.
 
 ### 2. Recital Modelling in Bluebell (HIGH priority)
 
@@ -621,23 +623,24 @@ No `hcontainer` needed for any observed structural element.
 
 ## Notes
 
-- The EU is a Tier 1 jurisdiction with existing AKN work (AKN4EU v3.0). This profile documents the existing conventions rather than inventing new ones. Codify's pipeline for EU legislation should aim for AKN4EU compatibility.
+- The EU is a Tier 2 jurisdiction (EUR-Lex publishes Formex XML) with existing AKN work in AKN4EU v3.0. This profile documents the existing conventions rather than inventing new ones. Codify's pipeline for EU legislation should aim for AKN4EU compatibility.
 - AKN4EU v3.0 was adopted 17 April 2020 by the Interinstitutional Metadata and Formats Committee (IMFC). It is based on OASIS AKN 1.0 and covers acts adopted through the ordinary legislative procedure (regulations, directives, decisions) and legislative proposals. It includes a Common Vocabulary (CoV) mapping between EU structural/semantic concepts and AKN elements.
 - EUR-Lex provides legislation in structured formats (HTML, PDF, FORMEX XML). The CELLAR repository uses the Common Data Model (CDM), an FRBR-compliant OWL ontology. FORMEX (Formalized Exchange of Electronic Publications) is the legacy XML format being replaced by AKN4EU.
+- ELI was introduced by the Council conclusions inviting the introduction of the European Legislation Identifier (OJ C 325, 26.10.2012).
 - The Interinstitutional Style Guide (style-guide.europa.eu) governs drafting conventions for all EU institutions. The Joint Practical Guide for legislative drafting provides detailed structural rules.
 - "Comitology" refers to the committee procedure system for adopting implementing acts. The Commission consults committees of Member State representatives before adopting implementing acts (Regulation (EU) No 182/2011). Delegated acts are subject to ex-post control (Parliament/Council can object or revoke the delegation).
 - Post-Brexit, English remains an official EU language (Ireland and Malta also designate English). EU legislation continues to be published in all 24 languages.
 - EU acts are published in the OJ L series. Since 1 October 2023, the OJ L series is no longer divided into L I (legislative acts) and L II (non-legislative acts) -- all acts appear in a single L series with document metadata indicating the act type.
-- The EU legal order has a hierarchy of norms: Treaties (primary law) > General principles of EU law > International agreements > Legislative acts (regulations, directives, decisions adopted by OLP) > Delegated acts > Implementing acts. This hierarchy is important for understanding the relationship between document types but does not affect the AKN structural modelling.
+- The EU legal order has a hierarchy of norms: primary law (the Treaties, the Charter of Fundamental Rights and the general principles of EU law) > international agreements > secondary law. Delegated and implementing acts are non-legislative acts subordinate to the legislative act that empowers them. This hierarchy is important for understanding the relationship between document types but does not affect the AKN structural modelling.
 
 ## Quality Checklist
 
-- [x] **At least 3 real documents examined** -- 5 documents: GDPR (Regulation), AI Act (Regulation), CSDDD (Directive), DSA (Regulation), Commission Implementing Regulation 2025/1784. All examined via EUR-Lex structured content.
-- [x] **Hierarchy mapping tested** -- every structural element in examined documents maps to an AKN element (Title, Chapter, Section, Article, Paragraph, Subparagraph, Point, Indent, Recital, Citation, Annex).
+- [x] **At least 3 real documents examined** -- 5 documents: GDPR (Regulation), AI Act (Regulation), CSDDD (Directive), DSA (Regulation), Commission Implementing Regulation 2025/1784.
+- [x] **Hierarchy mapping tested** -- every structural element in examined documents maps to an AKN element (Chapter, Section, Article, Paragraph, Subparagraph, Point, Indent, Recital, Citation, Annex).
 - [x] **FRBR URIs constructed** for each sample document plus cross-referenced documents (9 URIs including expression-level examples).
 - [x] **Enacting formula recorded** verbatim -- OLP regulations ("HAVE ADOPTED THIS REGULATION:"), OLP directives ("HAVE ADOPTED THIS DIRECTIVE:"), OLP decisions ("HAVE ADOPTED THIS DECISION:"), Commission single-institution acts ("HAS ADOPTED THIS REGULATION:"), and concluding formulas for all three binding act types.
 - [x] **Numbering conventions documented** for acts (post-2015 and pre-2015 formats, CELEX system), articles (continuous Arabic), subdivisions (paragraphs, subparagraphs, points, indents), recitals, and citations.
-- [x] **Institutional TLCs identified** -- 25 entities covering all 7 core institutions, advisory bodies, key roles, the Official Journal, and the Treaties.
+- [x] **Institutional TLCs identified** -- 25 entities in the table above (plus the Codify source entry; the config carries the five core ones) covering all 7 core institutions, advisory bodies, key roles, the Official Journal, and the Treaties.
 - [ ] **Bluebell test passed** -- sample text prepared but not yet run through parser. One sample input provided (GDPR excerpt). Key compatibility issues flagged (recital handling, citation handling, concluding formula).
 - [x] **Amendment patterns documented** -- insertion, substitution, deletion, addition, annex amendment, point-level amendment. Cross-reference format documented. Consolidated text practice noted.
 - [x] **Ambiguities flagged** -- 7 items with priority levels and recommendations.
