@@ -82,3 +82,5 @@ def test_an_act_with_no_units_keeps_its_lines_as_a_flat_body() -> None:
     root = _akn("ЗАКОН УКРАЇНИ\nПро ратифікацію Угоди\nРатифікувати Угоду, підписану 1 січня.\n")
     assert root.findall(f".//{_NS}article") == []
     assert "Ратифікувати Угоду" in "".join(root.find(f".//{_NS}body").itertext())
+    # Under a section, so the stored document keeps it as a provision.
+    assert len(root.findall(f".//{_NS}body/{_NS}section")) == 1

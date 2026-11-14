@@ -70,10 +70,10 @@ async def replace_registry_records(
 
     Each record is stored with `source` set; a row this read no longer names loses it, and a
     row holding another register's record keeps that one."""
-    # Two replacements of one register would otherwise commit a mixture of both reads.
+    # One replacement per jurisdiction at a time: no mixed reads, no crossed row locks.
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
-        {"k": f"registry_records:{jurisdiction_id}:{source}"},
+        {"k": f"registry_records:{jurisdiction_id}"},
     )
     await session.execute(
         text(

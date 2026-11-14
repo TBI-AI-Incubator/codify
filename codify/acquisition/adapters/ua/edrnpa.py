@@ -164,11 +164,13 @@ def ref_candidates(card: Card) -> list[str]:
     y2 = y4[2:]
     publisher, kind = joined(card, "publisher"), joined(card, "type")
     out: list[str] = []
-    registered = card.get("reg_number") or []
-    year = (first(card, "reg_date") or adopted)[-2:]
     # A registered act's own registration comes first: its number may be another issuer's.
-    if registered and (m := re.match(r"(\d+)", registered[0])):
-        out.append(f"z{int(m[1]):04d}-{year}")
+    dates = card.get("reg_date") or []
+    for i, registered in enumerate(card.get("reg_number") or []):
+        if m := re.match(r"(\d+)", registered):
+            when = (dates[i] if i < len(dates) else "") or adopted
+            out.append(f"z{int(m[1]):04d}-{when[-2:]}")
+            break
     if number:
         out.append(number)
         if m := re.fullmatch(r"(\d+[а-яіїєґ]?)-([IVX]+)", number):

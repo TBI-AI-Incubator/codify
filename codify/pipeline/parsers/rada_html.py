@@ -304,9 +304,9 @@ class RadaTextParser(RadaHtmlParser):
             if not str(exc).startswith(_NO_ANCHORS):
                 raise
             # A single-operative act, such as a ratification, has no units to find.
-            body = "\n".join(f"  {p.text}" for p in paras)
             parsed = StructuredParse(
-                bluebell_text=f"BODY\n{body}\n", metadata=self._metadata(paras)
+                bluebell_text=_one_section("BODY", [p.text for p in paras]),
+                metadata=self._metadata(paras),
             )
         schedules = [s for s in map(_schedule, units[1:]) if s]
         if schedules:
@@ -331,7 +331,12 @@ def _schedule(unit: str) -> str:
     lines = [" ".join(line.split()) for line in unit.splitlines() if line.strip()]
     if not lines:
         return ""
-    return "\n".join([f"SCHEDULE {lines[0]}", *(f"  {line}" for line in lines[1:])]) + "\n"
+    return _one_section(f"SCHEDULE {lines[0]}", lines[1:])
+
+
+def _one_section(head: str, lines: list[str]) -> str:
+    """Lines under one section, so a text with no units of its own keeps provisions."""
+    return "\n".join([head, "  SECTION 1", *(f"    {line}" for line in lines)]) + "\n"
 
 
 def _main() -> None:
