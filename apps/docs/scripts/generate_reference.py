@@ -383,10 +383,20 @@ def mcp_page() -> tuple[str, str]:
 
 
 def _split_params(inner: str) -> list[str]:
-    """Split a rendered parameter list on its top-level commas."""
-    parts, depth, start = [], 0, 0
+    """Split a rendered parameter list on its top-level commas, outside quoted defaults."""
+    parts, depth, start, quote, escaped = [], 0, 0, "", False
     for i, ch in enumerate(inner):
-        if ch in "([{":
+        if quote:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == quote:
+                quote = ""
+            continue
+        if ch in "'\"":
+            quote = ch
+        elif ch in "([{":
             depth += 1
         elif ch in ")]}":
             depth -= 1
