@@ -109,7 +109,7 @@ def test_the_database_url_takes_the_asyncpg_driver(
 def test_an_embeddings_endpoint_is_required_and_named(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+    for name in ("EMBEDDING_BASE_URL", "LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(SystemExit, match="EMBEDDING_BASE_URL"):
         cli_store._embedding_client()
@@ -153,6 +153,22 @@ async def _delete_law_of(version_id: uuid.UUID) -> None:
         await s.execute(delete(Law).where(Law.id == law_id))
         await s.commit()
     await engine.dispose()
+
+
+@pytest.mark.integration
+def test_migrate_runs_the_packaged_chain_without_an_ini(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wheel carries the scripts and no `alembic.ini`; this database is already at head."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    monkeypatch.chdir(tmp_path)
+    code, out = _run(["migrate"])
+
+    ini = Path(__file__).parent.parent / "alembic.ini"
+    head = ScriptDirectory.from_config(Config(str(ini))).get_current_head()
+    assert (code, out.strip()) == (0, f"database is at {head}")
 
 
 @pytest.mark.integration

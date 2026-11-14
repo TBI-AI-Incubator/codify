@@ -10,16 +10,19 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from codify.core.tracing import error_fields
 from codify.jurisdictions import JurisdictionConfig
-from codify.pipeline.events import Complete
-from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored
+from codify.pipeline.events import Complete, Failed
+from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored, describe_failure
 from codify.serve.schemas import (
     Cancelled,
     Health,
@@ -38,6 +41,7 @@ from codify.serve.schemas import (
 from codify.settings import database_url
 from codify.storage.documents import VersionDocument
 
+logger = structlog.get_logger()
 SessionFactory = Callable[[], AsyncSession]
 _LIMIT = Query(50, ge=1, le=500)
 _OFFSET = Query(0, ge=0)
@@ -54,7 +58,7 @@ class _Clients:
 
         # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
         if "llm" not in self._built:
-            self._built["llm"] = _llm_client(None) if _env("LITELLM_BASE_URL") else None
+            self._built["llm"] = _llm_client(None) if _env("LLM_BASE_URL") else None
         return self._built["llm"]
 
     def embeddings(self) -> Any:
@@ -101,6 +105,27 @@ def _ingest_runner(
                         akn_xml=event.akn_xml,
                     )
                     law_id = (await get_version(session, version_id)).law_id  # type: ignore[union-attr]
+                    try:
+                        embedder = clients.embeddings()
+                    except SystemExit as exc:
+                        embedder = None
+                        logger.warning(
+                            "stored_unsearchable", version_id=str(version_id), fix=str(exc)
+                        )
+                    if embedder is not None:
+                        from codify.storage.embeddings import embed_and_stamp
+
+                        try:
+                            await embed_and_stamp(
+                                session, version_id, client=embedder, path_context=False
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            await session.rollback()
+                            logger.warning(
+                                "embed_failed", version_id=str(version_id), **error_fields(exc)
+                            )
+                            yield Failed(stage="persist", error=describe_failure(exc))
+                            return
                     await session.commit()
                 yield Stored(version_id=version_id, law_id=law_id)
             yield event
@@ -142,7 +167,9 @@ def create_app(
         await clients.close()
         await engine.dispose()
 
-    app = FastAPI(title="codify", docs_url="/docs", lifespan=lifespan)
+    app = FastAPI(
+        title="codify", version=package_version("codify-core"), docs_url="/docs", lifespan=lifespan
+    )
     app.state.sessions = sessions
     app.state.runs = runs
     app.state.uploads = Path(uploads.name)
@@ -335,8 +362,15 @@ def create_app(
 
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> RunSnapshot:
+        from codify.jurisdictions import resolve_config
         from codify.pipeline.formats import looks_like_eu
 
+        if not resolve_config("eu").found:
+            raise HTTPException(
+                422,
+                "URL ingest needs the eu jurisdiction config, which is not installed "
+                "(GET /jurisdictions lists the installed configs)",
+            )
         # The EU lane is the only one that fetches; every other lane reads a path.
         if not looks_like_eu(str(body.url)) or body.jurisdiction.strip().lower() != "eu":
             raise HTTPException(

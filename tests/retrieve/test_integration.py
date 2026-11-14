@@ -36,8 +36,8 @@ async def session() -> AsyncIterator[AsyncSession]:
 @pytest.fixture
 async def embedding_client() -> EmbeddingClient:
     return EmbeddingClient(
-        base_url=os.getenv("LITELLM_BASE_URL", "http://localhost:4000/v1"),
-        api_key=os.getenv("LITELLM_API_KEY", "sk-codify-dev"),
+        base_url=os.getenv("LLM_BASE_URL", "http://localhost:4000/v1"),
+        api_key=os.getenv("LLM_API_KEY", "sk-codify-dev"),
         model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-2"),
     )
 

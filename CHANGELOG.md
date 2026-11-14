@@ -21,6 +21,11 @@ Breaks:
   accepts an EUR-Lex or Publications Office URL under `eu` without a data root.
 - The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
   pages.
+- `LITELLM_BASE_URL` is now `LLM_BASE_URL`, `LITELLM_API_KEY` is `LLM_API_KEY`,
+  `LITELLM_MODEL` is `LLM_MODEL`, `LITELLM_OCR_MODEL` is `LLM_OCR_MODEL` and
+  `LITELLM_CONTENT_FILTER_FALLBACK_MODEL` is `LLM_CONTENT_FILTER_FALLBACK_MODEL`.
+  `LITELLM_MASTER_KEY` is no longer read as the API key; set `LLM_API_KEY`.
+  The old names are not read as a fallback.
 
 New, additive:
 
@@ -35,6 +40,37 @@ New, additive:
   instruction, its lead-in, an opener before it or a heading over it names the
   affected act by title or by a short form the amending act defines, and
   returns `Refused(reason)` otherwise. Nothing calls it yet.
+- `codify.cli.build_parser()` returns the `codify` argument parser, so a command
+  reference can be generated from it. `main` behaves as before.
+- `codify migrate` applies the core migrations to the database at `POSTGRES_URL`.
+  It reads the chain from the installed package, so it works from a wheel, which
+  carries no `alembic.ini`. It needs the `migrations` extra.
+- The jurisdiction config models carry their field explanations as schema
+  descriptions, so `JurisdictionConfig.model_json_schema()` and
+  `contract/openapi.json` describe 107 more fields. Names, defaults and
+  validation are unchanged.
+
+Fixed:
+
+- `ingest-one` stops before any work, with exit code 2, when `LLM_BASE_URL`
+  is unset, and names the variables to set. It used to call
+  `http://localhost:4000/v1`, a gateway this repository does not start, so the
+  first error was a failed connection on every page.
+- `POST /runs/ingest-url` refuses with a 422 that names the `eu` jurisdiction
+  config when it is not installed, before it reads the URL. The web Ingest screen
+  offers a source URL only when that config is installed and selected.
+- A document ingested through `codify serve` is embedded before the run
+  succeeds, when an embeddings endpoint is set (`EMBEDDING_BASE_URL` or
+  `LLM_BASE_URL`), so search finds it; an embedding failure fails the run.
+  Without an endpoint it is stored unembedded and the server logs
+  `stored_unsearchable` with the variable to set. Served ingests used to be
+  stored unembedded, so search never found them.
+- The web app's MCP dialog gives the `codify mcp --http` command and the address
+  it listens on by default, `http://127.0.0.1:8001/mcp`. It used to show the web
+  app's own origin, where nothing serves MCP.
+- The OpenAPI schema's `info.version` is the package version. It was FastAPI's
+  default, `0.1.0`. The drift test ignores it, so a release needs no
+  regeneration of `contract/openapi.json`.
 
 ## 0.7.0 (2026-11-13)
 

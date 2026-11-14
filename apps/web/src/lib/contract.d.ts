@@ -331,6 +331,7 @@ export interface components {
             coverage_note?: string | null;
             /**
              * Description
+             * @description Free-text description of the source, often including its provenance.
              * @default
              */
             description: string;
@@ -354,6 +355,7 @@ export interface components {
             protocol: "http" | "rest" | "odata" | "sru" | "oai_pmh" | "soap" | "sparql" | "bulk_dump";
             /**
              * Requires Token
+             * @description True for a source that needs an access token: `effective_tier` skips it when the token's environment variable is unset, unless `fallback_format` declares a usable downgrade.
              * @default false
              */
             requires_token: boolean;
@@ -366,9 +368,15 @@ export interface components {
         };
         /** AmendmentConfig */
         AmendmentConfig: {
-            /** Amending Body Structure */
+            /**
+             * Amending Body Structure
+             * @description Body shape of an amending instrument. `two_pasal_roman`: the host instrument numbers its own articles in Roman numerals, so an Arabic-numbered article after them is quoted amending text.
+             */
             amending_body_structure?: string | null;
-            /** Amendment Item Kind */
+            /**
+             * Amendment Item Kind
+             * @description Hierarchy element that numbers each amendment an amending article makes. What follows it belongs to the amended statute, so it does not compete in the host's numbering; empty leaves the pass inert.
+             */
             amendment_item_kind?: string | null;
             /** Cross Reference Format */
             cross_reference_format?: string | null;
@@ -376,7 +384,10 @@ export interface components {
             phrasing?: string | null;
             /** Style */
             style?: string | null;
-            /** Trigger Phrases */
+            /**
+             * Trigger Phrases
+             * @description Lead-in phrases marking an embedded amendment article: a number following one of these plus a colon is quoted content, not a new top-level article.
+             */
             trigger_phrases?: string[];
         } & {
             [key: string]: unknown;
@@ -389,20 +400,29 @@ export interface components {
         AttachmentCaption: {
             /**
              * Always Opens
+             * @description True where no table in the body carries this caption, so a line that opens with it always begins the attachment.
              * @default false
              */
             always_opens: boolean;
-            /** Caption */
+            /**
+             * Caption
+             * @description Caption that opens the attachment. Captions are centred in the source, so the match tolerates a wide indent.
+             */
             caption: string;
-            /** Hierarchy */
+            /**
+             * Hierarchy
+             * @description Levels the attachment's own content uses, since an annex can be a lettered outline rather than the article hierarchy of its body. Empty uses the body's levels, or none.
+             */
             hierarchy?: components["schemas"]["HierarchyEntry"][];
             /**
              * Normative
+             * @description False for an attachment with no normative force, such as an explanatory memorandum, which cannot serve as a legal basis.
              * @default true
              */
             normative: boolean;
             /**
              * Prefix
+             * @description True where the caption opens a longer title on the same line ("SCHEDULE of fees…"), so the caption need only begin the line. The line is the heading.
              * @default false
              */
             prefix: boolean;
@@ -447,7 +467,10 @@ export interface components {
             reporting_cadence?: ("monthly" | "quarterly" | "six_monthly" | "annual" | "ad_hoc") | null;
             /** Superseded Subjects */
             superseded_subjects?: string[];
-            /** Territories */
+            /**
+             * Territories
+             * @description Territorial scope, typically set for UN Security Council resolutions and other time-bounded regimes; absent for permanent treaty frameworks.
+             */
             territories?: string[];
         };
         /** Body_ingest_runs_ingest_post */
@@ -476,11 +499,20 @@ export interface components {
          *                     mid-April new year).
          */
         CalendarConversion: {
-            /** Date Cues */
+            /**
+             * Date Cues
+             * @description Phrases that introduce the date a document was made. A dated line elsewhere in the text is some other instrument's.
+             */
             date_cues?: string[];
-            /** Epoch Year */
+            /**
+             * Epoch Year
+             * @description Integer added to the local year to give the Gregorian year (for example -543 for the Buddhist calendar, or 1911 where year 1 is 1912 CE). None for calendars without a fixed offset, such as hijri, ethiopian, era_table and bikram_samvat.
+             */
             epoch_year?: number | null;
-            /** Eras */
+            /**
+             * Eras
+             * @description Era table for an era-based calendar, for example [{"name": "Reiwa", "start": "2019-05-01"}].
+             */
             eras?: {
                 [key: string]: unknown;
             }[] | null;
@@ -491,25 +523,41 @@ export interface components {
             kind: "epoch_offset" | "era_table" | "hijri_lunar" | "hijri_solar" | "ethiopian" | "buddhist" | "bikram_samvat";
             /**
              * Month Day Is Gregorian
+             * @description Whether the months and days coincide with the Gregorian ones, so only the year converts. False for any calendar with a grid of its own.
              * @default false
              */
             month_day_is_gregorian: boolean;
-            /** Month Names */
+            /**
+             * Month Names
+             * @description Month names in the local calendar's own order, index 0 = month 1. Present only where a dated line is read off the source text.
+             */
             month_names?: string[];
             /** New Year Day */
             new_year_day?: number | null;
-            /** New Year Month */
+            /**
+             * New Year Month
+             * @description Gregorian month in which the local year begins, for conversions that depend on the month (Bikram Samvat begins in mid-April).
+             */
             new_year_month?: number | null;
-            /** New Year Reform Year */
+            /**
+             * New Year Reform Year
+             * @description First local year that began on 1 January. Before it the year began in `new_year_month`, so a date in an earlier month falls in the next Gregorian year.
+             */
             new_year_reform_year?: number | null;
             /**
              * Note
              * @default
              */
             note: string;
-            /** Offset */
+            /**
+             * Offset
+             * @description For month-sensitive conversions: the years to subtract from the local year before the new-year day; on or after it, `offset + 1`.
+             */
             offset?: number | null;
-            /** Year Particles */
+            /**
+             * Year Particles
+             * @description Words marking a year as belonging to this calendar ("B.E.", "A.H.").
+             */
             year_particles?: string[];
         };
         /** Cancelled */
@@ -552,6 +600,7 @@ export interface components {
             pattern: string;
             /**
              * Pattern Flags
+             * @description Regex flags for `pattern`, for example "i" for case-insensitive matching.
              * @default
              */
             pattern_flags: string;
@@ -580,7 +629,10 @@ export interface components {
              * @default 5000
              */
             max_total: number;
-            /** Output */
+            /**
+             * Output
+             * @description Path of the basket file discovery writes, relative to the repository root.
+             */
             output?: string | null;
             /** Queries */
             queries?: {
@@ -589,7 +641,10 @@ export interface components {
         };
         /** DisplayConfig */
         DisplayConfig: {
-            /** Amendment Markers */
+            /**
+             * Amendment Markers
+             * @description The pair of strings a publisher prints around amended words; square brackets are the commonest.
+             */
             amendment_markers?: string[];
             /**
              * Font Preference
@@ -628,7 +683,10 @@ export interface components {
             akn_element: string;
             /** Akn Subtype */
             akn_subtype?: string | null;
-            /** Authoritative Language */
+            /**
+             * Authoritative Language
+             * @description Authoritative language for this class, for legal systems whose classes are enacted in different languages. None falls back to the jurisdiction's.
+             */
             authoritative_language?: string | null;
             /**
              * Basic Unit
@@ -642,7 +700,10 @@ export interface components {
             bluebell_compatible: boolean;
             /** Direct Effect */
             direct_effect?: boolean | null;
-            /** Extends */
+            /**
+             * Extends
+             * @description Another class of this jurisdiction whose fields this one lays over. One level.
+             */
             extends?: string | null;
             /** Frbr Subtype */
             frbr_subtype?: string | null;
@@ -661,20 +722,28 @@ export interface components {
             note: string;
             /**
              * Number Has Year Prefix
+             * @description True where a printed serial may open with the instrument's year; a matching year prefix is kept out of the URI number.
              * @default false
              */
             number_has_year_prefix: boolean;
             /**
              * Number Source
+             * @description "title_identity" makes the URI number the title digest, never a stated serial, for classes whose serials repeat across issuers. "stated" uses the printed serial.
              * @default stated
              * @enum {string}
              */
             number_source: "stated" | "title_identity";
             /** Prompt Variant */
             prompt_variant?: string | null;
-            /** Search Rank */
+            /**
+             * Search Rank
+             * @description Rank of the class in the legal hierarchy, used to order a title search: higher outranks lower on a close match, and unset means no weighting. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions.
+             */
             search_rank?: number | null;
-            /** Short Label */
+            /**
+             * Short Label
+             * @description Compact label for the class in the interface and in PDF exports. Falls back to the title-cased doctype when unset.
+             */
             short_label?: string | null;
         } & {
             [key: string]: unknown;
@@ -865,6 +934,7 @@ export interface components {
         };
         /** FrbrConfig */
         FrbrConfig: {
+            /** @description Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion. */
             calendar_conversion?: components["schemas"]["CalendarConversion"] | null;
             /** Country Code */
             country_code: string;
@@ -894,6 +964,7 @@ export interface components {
             sample_uris?: unknown[] | {
                 [key: string]: string;
             } | null;
+            /** @description Declared where instruments carry no number and the title is the identity. */
             title_identity?: components["schemas"]["TitleIdentity"] | null;
             /** Uri Patterns */
             uri_patterns?: {
@@ -968,10 +1039,14 @@ export interface components {
             akn_name?: string | null;
             /** Bluebell Keyword */
             bluebell_keyword?: ("BOOK" | "PART" | "TITLE" | "SUBTITLE" | "TOME" | "CHAPTER" | "SUBCHAPTER" | "SECTION" | "SUBSECTION" | "DIVISION" | "SUBDIVISION" | "SUBPART" | "ARTICLE" | "PARAGRAPH" | "SUBPARAGRAPH" | "CLAUSE" | "SUBCLAUSE" | "POINT" | "INDENT" | "ALINEA" | "RULE" | "SUBRULE" | "PROVISO" | "TRANSITIONAL" | "CROSSHEADING" | "PART_HEADING") | null;
-            /** Captions */
+            /**
+             * Captions
+             * @description The closed caption vocabulary a `caption` level answers to.
+             */
             captions?: string[];
             /**
              * Eid Abbrev
+             * @description Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (an hcontainer, or two local terms on one element) or where the publisher's own AKN uses another prefix.
              * @default
              */
             eid_abbrev: string;
@@ -982,11 +1057,17 @@ export interface components {
             level: "higher" | "basic" | "subdivision" | "grouping" | "presentational";
             /** Local Term */
             local_term: string;
-            /** Local Terms */
+            /**
+             * Local Terms
+             * @description The level's local names, keyed by ISO 639-3 language code, or by "script:<ISO 15924 code>" for a script variant.
+             */
             local_terms?: {
                 [key: string]: string;
             } | null;
-            /** Marker Form */
+            /**
+             * Marker Form
+             * @description For genres whose levels carry no keyword, such as a judgment that numbers its paragraphs "[1.1]" and never names the level. Unset keeps keyword matching.
+             */
             marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "alphanumeric_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic" | "upper_roman_title") | null;
             /**
              * Note
@@ -1153,18 +1234,30 @@ export interface components {
         };
         /** JurisdictionConfig */
         JurisdictionConfig: {
-            /** Adoption Markers */
+            /**
+             * Adoption Markers
+             * @description Phrases declaring the instrument adopts another body's numbered text, which every count over the document must read as an attachment, not its own structure.
+             */
             adoption_markers?: string[];
             /** Akn Profile */
             akn_profile?: string | null;
-            /** Akn Sources */
+            /**
+             * Akn Sources
+             * @description Hand-curated list of upstream sources. Read alongside `source_adapters`; `effective_tier` considers both.
+             */
             akn_sources?: components["schemas"]["AknSource"][];
             amendments?: components["schemas"]["AmendmentConfig"] | null;
-            /** Attachments */
+            /**
+             * Attachments
+             * @description Captions opening an attachment, whose numbering restarts the body's.
+             */
             attachments?: components["schemas"]["AttachmentCaption"][];
             /** Authoritative Language */
             authoritative_language?: string | null;
-            /** Binding Regimes */
+            /**
+             * Binding Regimes
+             * @description Non-membership binding regimes (treaty frameworks, bilateral regimes, constitutional annexes), which are not memberships.
+             */
             binding_regimes?: components["schemas"]["BindingRegime"][];
             /**
              * Calendar
@@ -1172,7 +1265,10 @@ export interface components {
              * @enum {string}
              */
             calendar: "gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual";
-            /** Closing Phrases */
+            /**
+             * Closing Phrases
+             * @description `LegalEra.closing_phrases` for a jurisdiction that declares no eras. An era's own list wins where it declares one.
+             */
             closing_phrases?: string[];
             /** Code */
             code: string;
@@ -1203,28 +1299,47 @@ export interface components {
              *     source declares a `fallback_format`, whose tier contributes instead.
              */
             readonly effective_tier: (1 | 2 | 3 | 4 | 5) | null;
-            /** Enacting Formula Markers */
+            /**
+             * Enacting Formula Markers
+             * @description Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it.
+             */
             enacting_formula_markers?: string[];
             /** Enacting Formulae */
             enacting_formulae?: components["schemas"]["EnactingFormula"][];
-            /** Footnote Markers */
+            /**
+             * Footnote Markers
+             * @description `LegalEra.footnote_markers` for a jurisdiction that declares no eras. An era's own list wins where it declares one.
+             */
             footnote_markers?: string[];
             frbr?: components["schemas"]["FrbrConfig"] | null;
-            /** Furniture Inline Patterns */
+            /**
+             * Furniture Inline Patterns
+             * @description Page furniture that shares a line with real content, such as a portal credit or a stamped URL, so it is removed from the line rather than discarding the line. Narrower than `ocr_header_patterns`, which also matches the real title on page one.
+             */
             furniture_inline_patterns?: string[];
-            /** Furniture Line Patterns */
+            /**
+             * Furniture Line Patterns
+             * @description Page furniture whose whole line can be discarded: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one; only this set is safe for whole-line removal.
+             */
             furniture_line_patterns?: string[];
             identification?: components["schemas"]["IdentificationConfig"] | null;
             /** Languages */
             languages: string[];
-            /** Legal Eras */
+            /**
+             * Legal Eras
+             * @description Drafting periods, so quality is reported per era rather than per corpus; empty means one undivided population. Distinct from `CalendarConversion.eras`, which is a regnal year table.
+             */
             legal_eras?: components["schemas"]["LegalEra"][];
-            /** Lexicon Words */
+            /**
+             * Lexicon Words
+             * @description Legal vocabulary particular to this jurisdiction, folded into the language's word list when a page is scored. A term naming one jurisdiction is that jurisdiction's data, not the language's.
+             */
             lexicon_words?: string[];
             /** Members */
             members?: string[];
             /**
              * Min Anchor Coverage
+             * @description Minimum ratio of captured structural anchors to marker literals in the source; ingest fails below it, so a partial AKN cannot ship. The default 0.80 tolerates in-prose cross-references, and 0.0 disables the check.
              * @default 0.8
              */
             min_anchor_coverage: number;
@@ -1234,36 +1349,61 @@ export interface components {
             name_en?: string | null;
             /** Name Local */
             name_local?: string | null;
-            /** Name Translations */
+            /**
+             * Name Translations
+             * @description Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language. Mirrors `Law.title_translations`.
+             */
             name_translations?: {
                 [key: string]: string;
             };
             /**
              * Note
+             * @description Free-text note at the jurisdiction level for cross-cutting guidance.
              * @default
              */
             note: string;
             numbering?: components["schemas"]["NumberingConfig"] | null;
-            /** Ocr Header Patterns */
+            /**
+             * Ocr Header Patterns
+             * @description Running header and footer text that leaks into article bodies during OCR, stripped from paragraphs before translation so the model never sees it. Regex strings, so a profile author can add patterns without touching Python.
+             */
             ocr_header_patterns?: string[];
-            /** Opening Material Terminators */
+            /**
+             * Opening Material Terminators
+             * @description Phrases the recitals precede, after which any further pre-body text is stray page text.
+             */
             opening_material_terminators?: string[];
-            /** Placeholders */
+            /**
+             * Placeholders
+             * @description Whole-string markers for missing or struck content, beyond the platform default.
+             */
             placeholders?: components["schemas"]["PlaceholderMarker"][];
-            /** Pool Excluded Refers To */
+            /**
+             * Pool Excluded Refers To
+             * @description `refersTo` values marking a duty on someone other than the instrument's subjects. Units at or under a marked element stay readable but are not embedded or assessed.
+             */
             pool_excluded_refers_to?: string[];
             /**
              * Public Reference
+             * @description True where the config ships in the open core. Defaults to false, so a jurisdiction joins the open set only by a deliberate edit.
              * @default false
              */
             public_reference: boolean;
-            /** Residual Legal Systems */
+            /**
+             * Residual Legal Systems
+             * @description Foreign legal corpora still residually applicable here, such as pre-independence or occupying-power law left in force, so amendment and consolidation tooling can trace layered systems.
+             */
             residual_legal_systems?: components["schemas"]["ResidualLaw"][];
+            /** @description Where one source holds several instruments, how their openings are read. */
             segmentation?: components["schemas"]["SegmentationConfig"] | null;
-            /** Source Adapters */
+            /**
+             * Source Adapters
+             * @description Structured acquisition adapters for this jurisdiction, read by `codify.acquisition`.
+             */
             source_adapters?: components["schemas"]["SourceAdapter"][];
             /**
              * Source Truncation Floor
+             * @description Share of a document's contents listing that may lack a body before the source is treated as truncated. Off by default (0.0), since a threshold has to be set for each series from that series' own documents.
              * @default 0
              */
             source_truncation_floor: number;
@@ -1276,10 +1416,14 @@ export interface components {
             supranational_memberships?: components["schemas"]["SupranationalMembership"][];
             /**
              * Synthetic
+             * @description True for a fictional jurisdiction authored as synthetic test material. It is discovered and validated like any other config but kept out of the derived registry and the world atlas, which list real jurisdictions only.
              * @default false
              */
             synthetic: boolean;
-            /** Tier */
+            /**
+             * Tier
+             * @description Availability tier of the jurisdiction's statute base: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base.
+             */
             tier?: (1 | 2 | 3 | 4 | 5) | null;
             /** Tradition */
             tradition: ("civil_law" | "common_law" | "islamic" | "customary" | "hindu" | "confucian" | "jewish" | "socialist" | "sui_generis")[];
@@ -1377,11 +1521,20 @@ export interface components {
          *     spelled ``from`` in the config files.
          */
         LegalEra: {
-            /** Authority Patterns */
+            /**
+             * Authority Patterns
+             * @description How this era's offices are named in provision text, to flag provisions for review. A match means the office is named, not that it is granted a power; opt-in per era, since an era ending does not abolish its authorities.
+             */
             authority_patterns?: string[];
-            /** Calendar */
+            /**
+             * Calendar
+             * @description The calendar this era's instruments are dated in, where it differs from the jurisdiction's current one. None means it does not differ. Same closed set as the jurisdiction's own field, so the two cannot drift apart.
+             */
             calendar?: ("gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual") | null;
-            /** Closing Phrases */
+            /**
+             * Closing Phrases
+             * @description Phrases opening the attestation that closes a document of this era, so the promulgation and signature stop being read as the last article's text. Era-scoped because the wording follows the enacting authority.
+             */
             closing_phrases?: string[];
             /**
              * Document Class
@@ -1393,7 +1546,10 @@ export interface components {
              * @default
              */
             enacting_authority: string;
-            /** Footnote Markers */
+            /**
+             * Footnote Markers
+             * @description Regex for how a footnote marker opens in this era. The modern set uses superscripts and the older ones a parenthesised numeral; declaring only one form silently drops the other era.
+             */
             footnote_markers?: string[];
             /** From */
             from?: string | null;
@@ -1417,7 +1573,10 @@ export interface components {
             act_citation_alt?: string | null;
             /** Article Numbering */
             article_numbering?: string | null;
-            /** Citations */
+            /**
+             * Citations
+             * @description Citation pattern per instrument type, keyed by type, so a jurisdiction declares its own without a dedicated field for each.
+             */
             citations?: {
                 [key: string]: string;
             };
@@ -1431,12 +1590,19 @@ export interface components {
             note?: string | null;
             /**
              * Numbers Unique Across Years
+             * @description Whether an instrument number identifies a work without its year. False for most jurisdictions, which restart numbering each year; true lets a year-less citation resolve on the number alone, and is a claim about the whole series, not just the documents held.
              * @default false
              */
             numbers_unique_across_years: boolean;
-            /** Series Citation Connectors */
+            /**
+             * Series Citation Connectors
+             * @description Regex fragments that may sit between a series name and its number.
+             */
             series_citation_connectors?: string[];
-            /** Series Citations */
+            /**
+             * Series Citations
+             * @description Instruments cited by a never-reused series number and no year. Order matters: full names before abbreviations, so the full form wraps first.
+             */
             series_citations?: components["schemas"]["SeriesCitation"][];
         } & {
             [key: string]: unknown;
@@ -1496,7 +1662,10 @@ export interface components {
             source_jurisdiction: string;
             /** Subjects */
             subjects?: string[];
-            /** Superseded By */
+            /**
+             * Superseded By
+             * @description Superseding acts (as FRBR URIs or free-text citations).
+             */
             superseded_by?: string[];
             /** Territories */
             territories?: string[];
@@ -1580,17 +1749,35 @@ export interface components {
          *     source holds. Absent means the jurisdiction declares none, and nothing splits.
          */
         SegmentationConfig: {
-            /** Act Heading Patterns */
+            /**
+             * Act Heading Patterns
+             * @description Regexes matched at a line start; a `number` group, where present, is the label.
+             */
             act_heading_patterns?: string[];
-            /** Contents Keywords */
+            /**
+             * Contents Keywords
+             * @description Headings of a contents listing, matched case-insensitively at a line start.
+             */
             contents_keywords?: string[];
-            /** Issue Heading Patterns */
+            /**
+             * Issue Heading Patterns
+             * @description The level above acts: a gazette issue within a bound volume.
+             */
             issue_heading_patterns?: string[];
-            /** Printed Page Pattern */
+            /**
+             * Printed Page Pattern
+             * @description A printed page number in a page's running header or footer; its first participating group is the number.
+             */
             printed_page_pattern?: string | null;
-            /** Skip Heading Patterns */
+            /**
+             * Skip Heading Patterns
+             * @description Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.
+             */
             skip_heading_patterns?: string[];
-            /** Trailing Section Patterns */
+            /**
+             * Trailing Section Patterns
+             * @description Whole lines that open a trailing section which is never ingested: nothing is read from there on.
+             */
             trailing_section_patterns?: string[];
         };
         /**
@@ -1600,7 +1787,10 @@ export interface components {
         SeriesCitation: {
             /** Doctype */
             doctype: string;
-            /** Name */
+            /**
+             * Name
+             * @description Regex for the instrument's name or abbreviation, matched case-insensitively.
+             */
             name: string;
         };
         /**
@@ -1639,7 +1829,10 @@ export interface components {
              * @default
              */
             notes: string;
-            /** Parser */
+            /**
+             * Parser
+             * @description Registered structured parser (in `codify.pipeline.parsers`) that converts this adapter's main body deterministically. None sends it through the general structuring lane.
+             */
             parser?: string | null;
             /** Rate Limit Per Minute */
             rate_limit_per_minute?: number | null;
@@ -1655,6 +1848,7 @@ export interface components {
         StructuringConfig: {
             /**
              * Body Opens With Container
+             * @description True where the drafting standard puts every article inside a container, so an article before the first one is a citation in the opening material. Some laws cite the constitution that way in the legal-basis recital.
              * @default false
              */
             body_opens_with_container: boolean;
@@ -1670,24 +1864,33 @@ export interface components {
             citation_lead_ins?: string[];
             /**
              * Citation Subjects
-             * @description How an instrument refers to itself when it declares its short name (`This Act`). Required alongside `citation_lead_ins`: the same phrasing names the schools and offices a law creates, so an unanchored clause takes the school's name for the law's.
+             * @description How an instrument refers to itself when declaring its short name (`This Act`). Required with `citation_lead_ins`, because the same phrasing names bodies a law creates, and without it a law could take a school's or office's name as its own.
              */
             citation_subjects?: string[];
-            /** Citation Successors */
+            /**
+             * Citation Successors
+             * @description Words that, following a marker's number on its own line, make the line a citation list rather than a provision ("Article 5 to Article 9 apply").
+             */
             citation_successors?: string[];
-            /** Classification Rules */
+            /**
+             * Classification Rules
+             * @description Deterministic classification rules, evaluated in descending priority before the model is asked. `prompt_additions` carries only style hints the rules cannot express.
+             */
             classification_rules?: components["schemas"]["ClassificationRule"][];
             /**
              * Designation Rule
-             * @description Derives a short name from the title's own grammar where the tradition declares no short title. EU acts are cited by form and number.
+             * @description Derives a short name from the title's own grammar where the legal tradition declares no short title. `eu_instrument` cites an act by its form and number.
              */
             designation_rule?: "eu_instrument" | null;
             /**
              * Example Markers
-             * @description Lead-ins that introduce specimen legislation in a drafting manual (`Contoh`), whose markers are displayed rather than enacted.
+             * @description Lead-ins that introduce specimen legislation in a drafting manual ("Example"), whose markers are displayed rather than enacted.
              */
             example_markers?: string[];
-            /** Insertion Suffixes */
+            /**
+             * Insertion Suffixes
+             * @description Words after a marker's number that mark an inserted unit ("5 bis"), mapped to the eId form. One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.
+             */
             insertion_suffixes?: {
                 [key: string]: string;
             };
@@ -1698,19 +1901,27 @@ export interface components {
             long_title_lead_ins?: string[];
             /**
              * Marker Boundary
+             * @description `line_anchored` where the drafting standard puts the marker on its own line and the sources keep it, so a mid-sentence citation cannot anchor.
              * @default relaxed
              * @enum {string}
              */
             marker_boundary: "relaxed" | "line_anchored";
             /**
              * Marker Order
+             * @description `number_first` where the number precedes the keyword (as in "15. §").
              * @default keyword_first
              * @enum {string}
              */
             marker_order: "keyword_first" | "number_first";
-            /** Marker Tolerances */
+            /**
+             * Marker Tolerances
+             * @description OCR damage the sources carry, tolerated for this jurisdiction only so parsing elsewhere is unchanged. `missing_separator` accepts a keyword run into its number, as in "Article24".
+             */
             marker_tolerances?: ("missing_separator" | "keyword_glyph" | "digit_glyph" | "split_number")[];
-            /** Ordinal Words */
+            /**
+             * Ordinal Words
+             * @description Ordinal words used as container numbers (as in "Part One"). Declared in the source's own casing; matching is case-sensitive.
+             */
             ordinal_words?: {
                 [key: string]: number;
             };
@@ -1718,16 +1929,26 @@ export interface components {
             prompt_additions?: string | null;
             /** Prompt Variant */
             prompt_variant?: string | null;
-            /** Prose Precursors */
+            /**
+             * Prose Precursors
+             * @description Words ending the previous line when a citation wraps onto the next, which a boundary rule cannot see. Empty falls back to the script pack's list.
+             */
             prose_precursors?: string[];
             /**
              * Recurring Furniture
+             * @description True where the layout engine files footnotes and page-top captions as header or footer, so only text repeated across pages counts as running header or footer, and a block opening on a marker is a note.
              * @default false
              */
             recurring_furniture: boolean;
-            /** Reference Nouns */
+            /**
+             * Reference Nouns
+             * @description Words that introduce a citation's number ("Article 41 paragraph (3)"). A line ending in one makes the bracketed number on the next line part of the citation, not a marker opening a new provision.
+             */
             reference_nouns?: string[];
-            /** Sameline Precursors */
+            /**
+             * Sameline Precursors
+             * @description Precursors that mark a citation only when adjacent on the same line.
+             */
             sameline_precursors?: string[];
         } & {
             [key: string]: unknown;
@@ -1738,6 +1959,7 @@ export interface components {
             body: string;
             /**
              * Direct Effect
+             * @description How strongly the body's law takes effect, from override (strongest) to none. Legacy boolean values are read as "direct" or "none".
              * @default none
              * @enum {string}
              */
@@ -1748,28 +1970,52 @@ export interface components {
             direct_effect_note?: string | null;
             /** Excluded Instruments */
             excluded_instruments?: string[];
-            /** Excluded Subjects */
+            /**
+             * Excluded Subjects
+             * @description Subject areas the member has opted out of.
+             */
             excluded_subjects?: string[];
-            /** Member Since */
+            /**
+             * Member Since
+             * @description Date membership began, as a loose string, since some sources give only a year such as "1999".
+             */
             member_since?: string | null;
-            /** Member Until */
+            /**
+             * Member Until
+             * @description Date membership ended, as an ISO 8601 date; set only when status is "former".
+             */
             member_until?: string | null;
             /**
              * Note
              * @default
              */
             note: string;
-            /** Protocol References */
+            /**
+             * Protocol References
+             * @description The treaties or protocols that create the carve-outs, as free text (for example "Protocol 21 TFEU").
+             */
             protocol_references?: string[];
-            /** Rejoined On */
+            /**
+             * Rejoined On
+             * @description Date a former member rejoined after its membership lapsed; `member_since` keeps the original date.
+             */
             rejoined_on?: string | null;
-            /** Status */
+            /**
+             * Status
+             * @description Membership status; absent means "member".
+             */
             status?: ("member" | "suspended" | "former" | "candidate" | "potential_candidate" | "associate" | "observer" | "special_status" | "never_member") | null;
             /** Superseded Subjects */
             superseded_subjects?: string[];
-            /** Suspension Periods */
+            /**
+             * Suspension Periods
+             * @description History of suspensions and reinstatements, including repeated cycles and a suspension still in force (`suspended_until` unset).
+             */
             suspension_periods?: components["schemas"]["SuspensionPeriod"][];
-            /** Transposition Required */
+            /**
+             * Transposition Required
+             * @description Whether the body's instruments need transposing into national law: a boolean, or a list of the instrument types that do (for example ["directive"]).
+             */
             transposition_required?: boolean | string[] | null;
         } & {
             [key: string]: unknown;
@@ -1790,13 +2036,20 @@ export interface components {
             reason: string;
             /**
              * Scope
+             * @description What the suspension withdraws: all rights, or only decision-making, voting or attendance at meetings. Defaults to full withdrawal.
              * @default full
              * @enum {string}
              */
             scope: "full" | "decision_making" | "meetings" | "voting";
-            /** Suspended From */
+            /**
+             * Suspended From
+             * @description Start of the suspension, as an ISO 8601 date.
+             */
             suspended_from: string;
-            /** Suspended Until */
+            /**
+             * Suspended Until
+             * @description End of the suspension, as an ISO 8601 date; None while still suspended.
+             */
             suspended_until?: string | null;
         };
         /** TLCEntry */
@@ -1806,7 +2059,10 @@ export interface components {
              * @enum {string}
              */
             class: "TLCPerson" | "TLCOrganization" | "TLCRole" | "TLCObject" | "TLCConcept" | "TLCEvent" | "TLCLocation" | "TLCProcess" | "TLCTerm" | "TLCReference";
-            /** Eid */
+            /**
+             * Eid
+             * @description An NCName-compatible identifier; camelCase and hyphenated forms are both accepted, and an empty one is refused.
+             */
             eId: string;
             /** Href */
             href: string;
@@ -1824,13 +2080,25 @@ export interface components {
          *     Every field is a literal `codify.frbr.identity_from_title` reads.
          */
         TitleIdentity: {
-            /** Consolidation Markers */
+            /**
+             * Consolidation Markers
+             * @description Parenthetical words marking a re-publication; an edition number after one is the edition folded in, not this document's.
+             */
             consolidation_markers?: string[];
-            /** Edition Markers */
+            /**
+             * Edition Markers
+             * @description Words inside a parenthetical naming this instrument's edition, spelling variants included; the first is canonical and is what a slug carries.
+             */
             edition_markers?: string[];
-            /** Strip Prefixes */
+            /**
+             * Strip Prefixes
+             * @description Document-kind words opening a short title, longest first.
+             */
             strip_prefixes?: string[];
-            /** Year Particles */
+            /**
+             * Year Particles
+             * @description Words marking the year that follows as the instrument's own.
+             */
             year_particles?: string[];
         };
         /** ValidationConfig */
@@ -1849,7 +2117,10 @@ export interface components {
             documents_examined: number;
             /** Documents Examined Note */
             documents_examined_note?: string | null;
-            /** Laws Africa Reference */
+            /**
+             * Laws Africa Reference
+             * @description Whether Laws.Africa covers this jurisdiction: a URL to its collection, or a bare flag.
+             */
             laws_africa_reference?: string | boolean | null;
             /**
              * Note

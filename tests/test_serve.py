@@ -27,6 +27,7 @@ from fastapi import FastAPI  # noqa: E402
 
 from codify.serve import create_app  # noqa: E402, needs the serve extra
 from codify.serve.runs import RunTable  # noqa: E402
+from tests.test_cli_store import _embedded_at, _FixedVectors  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-atlantis-1992.akn.xml"
 
@@ -106,9 +107,18 @@ async def test_a_runner_that_ends_without_a_verdict_is_a_failure() -> None:
     assert "without Complete or Failed" in state["error"]
 
 
-async def test_a_runner_that_raises_fails_the_run_not_the_server() -> None:
+@pytest.mark.parametrize(
+    ("raised", "error"),
+    [
+        (FileNotFoundError("no such file"), "FileNotFoundError: no such file"),
+        (ValueError("echoed: Invented Widgets Act"), "ValueError"),
+    ],
+)
+async def test_a_runner_that_raises_fails_the_run_not_the_server(
+    raised: Exception, error: str
+) -> None:
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
-        raise ValueError("no such file")
+        raise raised
         yield  # unreachable; makes this an async generator
 
     async with _client(runner) as c:
@@ -118,7 +128,7 @@ async def test_a_runner_that_raises_fails_the_run_not_the_server() -> None:
         assert (await c.get("/health")).status_code == 200
 
     assert state["status"] == "failed"
-    assert state["error"] == "ValueError: no such file"
+    assert state["error"] == error
 
 
 async def test_a_run_can_be_cancelled_mid_stream() -> None:
@@ -323,6 +333,7 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
 
     monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     title = f"Served {uuid.uuid4().hex[:8]}"
 
     app = create_app()
@@ -344,10 +355,59 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
             "7",
         )
         assert version["akn_xml"].startswith("<akomaNtoso")
+        assert await _embedded_at(uuid.UUID(version["id"])) is not None  # so search finds it
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.id == uuid.UUID(law["id"])))
             await s.commit()
+        await app.state.sessions.kw["bind"].dispose()
+
+
+@pytest.mark.integration
+async def test_a_failed_embed_fails_the_run_and_stores_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stored but unsearchable would read as a success; the provider's echo stays out."""
+    from structlog.testing import capture_logs
+
+    import codify.pipeline
+    from codify import cli_store
+    from codify.embed.client import EmbeddingError
+
+    sentinel = "Article 7 of the Invented Widgets Act"
+
+    class _Down(_FixedVectors):
+        async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
+            raise EmbeddingError(f"400 Bad Request: could not embed {sentinel!r}")
+
+    async def fake_ingest(*_: Any, **__: Any) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _Down)
+    title = f"Unembedded {uuid.uuid4().hex[:8]}"
+
+    app = create_app()
+    try:
+        with capture_logs() as logs:
+            async with _client(None, app) as c:
+                rid = await _enqueue(c, title=title)
+                stream = (await c.get(f"/runs/{rid}/stream")).text
+                snapshot = (await c.get(f"/runs/{rid}")).text
+                events = _sse(stream)
+                assert "stored" not in [k for k, _ in events], events
+                failed = [e for k, e in events if k == "failed"]
+                assert [(e["stage"], e["error"]) for e in failed] == [
+                    ("persist", "EmbeddingError")
+                ], events
+                assert (await c.get(f"/runs/{rid}")).json()["status"] == "failed"
+                laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()
+                assert laws["items"] == []
+        assert any(log["event"] == "embed_failed" for log in logs), logs
+        for surface in (repr(logs), stream, snapshot):
+            assert "Invented Widgets" not in surface
+    finally:
         await app.state.sessions.kw["bind"].dispose()
 
 
@@ -385,20 +445,26 @@ async def test_finished_runs_beyond_keep_are_forgotten_oldest_first() -> None:
 @pytest.mark.integration
 async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     """The native-AKN lane is deterministic; an unset gateway must not stop it."""
+    from structlog.testing import capture_logs
+
     from codify.serve.app import _ingest_runner
     from codify.storage.models import Law
 
-    monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
     app = _app(None)
-    events = [
-        e
-        async for e in _ingest_runner(app.state.sessions, app.state.clients)(
-            {"source": str(FIXTURE), "jurisdiction": "xa"}
-        )
-    ]
+    with capture_logs() as logs:
+        events = [
+            e
+            async for e in _ingest_runner(app.state.sessions, app.state.clients)(
+                {"source": str(FIXTURE), "jurisdiction": "xa"}
+            )
+        ]
 
     try:
         assert events[-1].kind == "complete", events[-1]
+        # Stored, but without embeddings search cannot find it, and the log says so.
+        assert [e["event"] for e in logs if e["log_level"] == "warning"] == ["stored_unsearchable"]
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.frbr_work_uri == "/akn/xa/act/1992/7"))
@@ -486,7 +552,7 @@ async def test_out_of_range_paging_and_k_are_422_not_500() -> None:
 async def test_search_without_an_embeddings_endpoint_is_503(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+    for name in ("EMBEDDING_BASE_URL", "LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
 
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
@@ -584,6 +650,26 @@ async def test_ingest_url_is_the_eu_lane_only() -> None:
         await c.get(f"/runs/{r.json()['id']}/stream")
 
     assert seen == [{"source": url, "jurisdiction": "eu", "title": None}]
+
+
+async def test_ingest_url_names_a_missing_eu_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from codify import jurisdictions
+
+    root = tmp_path / "jurisdictions"
+    shutil.copytree(jurisdictions.JURISDICTIONS_DIR, root)
+    shutil.rmtree(root / "eu")
+    monkeypatch.setattr(jurisdictions, "JURISDICTIONS_DIR", root)
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    url = "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679"
+    async with _client(runner) as c:
+        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "EU"})
+        assert r.status_code == 422 and "eu jurisdiction config" in r.json()["detail"]
+        assert (await c.get("/runs")).json() == []
 
 
 async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -827,6 +913,7 @@ async def test_an_untitled_ingest_takes_the_title_the_pipeline_read(
 
     monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     app = create_app()
     async with _client(None, app) as c:
         rid = await _enqueue(c)
@@ -930,7 +1017,7 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
             _Chat.built += 1
             self.client = _Transport()
 
-    monkeypatch.setenv("LITELLM_BASE_URL", "http://gateway.test")
+    monkeypatch.setenv("LLM_BASE_URL", "http://gateway.test")
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: _Chat())
     clients = _Clients()
 
@@ -946,8 +1033,20 @@ SCHEMA_ONLY = "postgresql://schema-only"  # the schema needs no database, like -
 
 def test_the_committed_openapi_schema_matches_the_server() -> None:
     """`codify serve --openapi > contract/openapi.json` after any route change."""
-    live = json.dumps(create_app(database=SCHEMA_ONLY).openapi(), indent=2, sort_keys=True) + "\n"
-    assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
+    committed = OPENAPI.read_text()
+    live = create_app(database=SCHEMA_ONLY).openapi()
+    # A release bumps the version without touching the contract.
+    live["info"]["version"] = json.loads(committed)["info"]["version"]
+    assert committed == json.dumps(live, indent=2, sort_keys=True) + "\n", (
+        "regenerate contract/openapi.json"
+    )
+
+
+def test_the_schema_carries_the_package_version() -> None:
+    from importlib.metadata import version
+
+    info = create_app(database=SCHEMA_ONLY).openapi()["info"]
+    assert info["version"] == version("codify-core")
 
 
 def test_every_success_response_names_a_schema() -> None:

@@ -63,7 +63,7 @@ jobs:
           "
       # Closed port: a call escaping the fakes fails rather than reaching a provider.
       - env:
-          LITELLM_BASE_URL: http://127.0.0.1:1
+          LLM_BASE_URL: http://127.0.0.1:1
           EMBEDDING_BASE_URL: http://127.0.0.1:1
         run: uv run --frozen pytest tests -m "not integration and not live_llm" -q
 
@@ -74,7 +74,7 @@ jobs:
       POSTGRES_URL: postgresql://codify:codify@localhost:5432/codify
       # An unreachable database fails the run instead of skipping it.
       REQUIRE_DB: '1'
-      LITELLM_BASE_URL: http://127.0.0.1:1
+      LLM_BASE_URL: http://127.0.0.1:1
       EMBEDDING_BASE_URL: http://127.0.0.1:1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -37,7 +37,7 @@ uv sync
 cp .env.example .env
 ```
 
-Set `LITELLM_BASE_URL`, `LITELLM_API_KEY` and `LITELLM_MODEL` in `.env` for your
+Set `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` in `.env` for your
 provider. Then process the included synthetic act:
 
 ```bash
@@ -70,6 +70,8 @@ anchors without model calls. See the [offline scan example](docs/usage.md#inspec
 
 For use in another Python project, install `codify-core` with `uv add codify-core`
 or `pip install codify-core`. Optional extras are `serve`, `mcp` and `migrations`.
+`codify migrate`, with the `migrations` extra, creates the core schema in the
+database at `POSTGRES_URL`.
 
 Storage and search use PostgreSQL with pgvector and pg_textsearch. The repository's
 Docker Compose file builds a local instance. Search needs an embeddings endpoint;

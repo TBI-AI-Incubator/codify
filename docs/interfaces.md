@@ -21,7 +21,7 @@ After the quick start, start the database from the repository root:
 ```bash
 docker compose up -d --wait postgres
 uv sync --extra migrations
-uv run --extra migrations alembic -c alembic.ini upgrade head
+uv run --extra migrations codify migrate
 ```
 
 Check that `POSTGRES_URL` points to this local database before applying migrations.
