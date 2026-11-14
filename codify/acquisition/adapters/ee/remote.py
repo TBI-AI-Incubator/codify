@@ -217,6 +217,7 @@ _CLIENTS: dict[str, httpx.Client] = {}
 def polite_http_client(profile: PolitenessProfile) -> httpx.Client:
     """One sync client per profile for the process, so the concurrency cap and the host's
     pace hold across every caller; no redirect is followed."""
+    profile = profile.model_copy(update={"user_agent": require_user_agent(profile.user_agent)})
     key = profile.model_dump_json()
     with _LOOP_LOCK:
         if key not in _CLIENTS:
