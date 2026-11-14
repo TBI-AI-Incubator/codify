@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="1013" viewBox="0 0 358 1013" role="img" aria-label="A Codify deployment: a browser and an AI agent reach a reverse proxy with sign-in, the only part that authenticates, which forwards to the web app, codify serve and codify mcp on a private network beside PostgreSQL; dashed arrows show what leaves the network: the chat model, embeddings, tracing if set, and Azure OCR from the command line only.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="0" width="171" height="40" rx="3" class="s box"/>
+<text x="12" y="17">Browser</text>
+<text x="12" y="32" class="note">people reading the law</text>
+<path d="M85 40 L85 70" class="s" marker-end="url(#arrow)"/>
+<rect x="187" y="0" width="171" height="40" rx="3" class="s box"/>
+<text x="199" y="17">AI agent</text>
+<text x="199" y="32" class="note">an MCP client</text>
+<path d="M272 40 L272 70" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="72" width="358" height="56" rx="3" class="em box"/>
+<text x="12" y="89" class="em">Reverse proxy with sign-in</text>
+<text x="12" y="104" class="note">Yours to provide, and the only</text>
+<text x="12" y="120" class="note">part that authenticates</text>
+<rect x="28" y="160" width="290" height="72" rx="3" class="s box"/>
+<text x="40" y="177">Web app</text>
+<text x="306" y="177" class="code" text-anchor="end">/</text>
+<text x="40" y="192" class="code">apps/web/dist/</text>
+<text x="40" y="208" class="note">Static files,</text>
+<text x="40" y="224" class="note">keeps nothing</text>
+<rect x="28" y="248" width="290" height="104" rx="3" class="s box"/>
+<text x="40" y="265">HTTP server</text>
+<text x="306" y="265" class="code" text-anchor="end">/api/proxy/*</text>
+<text x="40" y="280" class="code">codify serve</text>
+<text x="40" y="296" class="code">127.0.0.1:8000</text>
+<text x="40" y="312" class="note">Runs in memory, uploads</text>
+<text x="40" y="328" class="note">in a temporary directory,</text>
+<text x="40" y="344" class="note">gone after a restart</text>
+<rect x="28" y="368" width="290" height="88" rx="3" class="s box"/>
+<text x="40" y="385">MCP server</text>
+<text x="306" y="385" class="code" text-anchor="end">/mcp</text>
+<text x="40" y="400" class="code">codify mcp --http</text>
+<text x="40" y="416" class="code">127.0.0.1:8001</text>
+<text x="40" y="432" class="note">Sessions in memory,</text>
+<text x="40" y="448" class="note">gone after a restart</text>
+<path d="M12 128 L12 388" class="s"/>
+<path d="M12 180 L26 180" class="s" marker-end="url(#arrow)"/>
+<path d="M12 268 L26 268" class="s" marker-end="url(#arrow)"/>
+<path d="M12 388 L26 388" class="s" marker-end="url(#arrow)"/>
+<path d="M318 268 L334 268" class="s"/>
+<path d="M318 388 L334 388" class="s"/>
+<path d="M334 268 L334 470" class="s" marker-end="url(#arrow)"/>
+<rect x="28" y="472" width="318" height="72" rx="3" class="s box"/>
+<text x="40" y="489">PostgreSQL</text>
+<text x="40" y="504" class="code">POSTGRES_URL</text>
+<text x="40" y="520" class="note">All stored law, the only state</text>
+<text x="40" y="536" class="note">that survives a restart</text>
+<text x="28" y="572" class="micro">Private network</text>
+<text x="28" y="588" class="note">Both servers bind 127.0.0.1 by default</text>
+<rect x="0" y="144" width="358" height="460" rx="3" class="s2 dash"/>
+<text x="28" y="628" class="micro">Leaves your network</text>
+<rect x="28" y="644" width="318" height="56" rx="3" class="s box"/>
+<text x="40" y="661">Chat model</text>
+<text x="334" y="661" class="code" text-anchor="end">LLM_BASE_URL</text>
+<text x="40" y="676" class="note">Page images and text of each PDF ingest;</text>
+<text x="40" y="692" class="note">each MCP comparison's provisions</text>
+<rect x="28" y="716" width="318" height="40" rx="3" class="s box"/>
+<text x="40" y="733">Embeddings</text>
+<text x="334" y="733" class="code" text-anchor="end">EMBEDDING_BASE_URL</text>
+<text x="40" y="748" class="note">Each search query and each MCP comparison</text>
+<rect x="28" y="772" width="318" height="56" rx="3" class="s box"/>
+<text x="40" y="789">Tracing, if set</text>
+<text x="334" y="789" class="code" text-anchor="end">LANGFUSE_HOST</text>
+<text x="40" y="804" class="note">Each call's model, tokens and cost; each</text>
+<text x="40" y="820" class="note">ingest's source path. No prompts or replies.</text>
+<path d="M12 604 L12 792" class="s2 dash"/>
+<path d="M12 664 L26 664" class="s2 dash" marker-end="url(#arrow2)"/>
+<path d="M12 736 L26 736" class="s2 dash" marker-end="url(#arrow2)"/>
+<path d="M12 792 L26 792" class="s2 dash" marker-end="url(#arrow2)"/>
+<text x="0" y="856" class="micro">From the command line</text>
+<rect x="0" y="868" width="358" height="40" rx="3" class="s box"/>
+<text x="12" y="885">Command line</text>
+<text x="346" y="885" class="code" text-anchor="end">codify ingest-one</text>
+<text x="12" y="900" class="note">Also sends to the chat model and tracing</text>
+<path d="M179 908 L179 938" class="s2 dash" marker-end="url(#arrow2)"/>
+<rect x="0" y="940" width="358" height="72" rx="3" class="s box"/>
+<text x="12" y="957">Azure OCR, if set</text>
+<text x="12" y="972" class="code">AZURE_OPENAI_ENDPOINT</text>
+<text x="12" y="988" class="note">The whole PDF, for a layout pass.</text>
+<text x="12" y="1004" class="note">The servers never call it.</text>
+</svg>
