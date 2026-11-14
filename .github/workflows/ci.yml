@@ -1,4 +1,4 @@
-# The open repository's CI; the split carries it to the root.
+# CI for this repository.
 name: CI
 
 on:
@@ -23,7 +23,7 @@ jobs:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: 'uv.lock'
-      # --config: in pyproject.toml these would govern the monorepo's copy too.
+      # --config: lint settings live in open-repo-ruff.toml.
       - run: uv run --frozen --with 'ruff==0.15.12' ruff check --config open-repo-ruff.toml .
       - run: uv run --frozen --with 'ruff==0.15.12' ruff format --check --config open-repo-ruff.toml .
 

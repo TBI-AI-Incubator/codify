@@ -211,7 +211,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored instruments (a framework directive, a directly-applicable regulation and an amending directive) round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN structured as numbered articles and paragraphs (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored instruments (a framework directive, a directly-applicable regulation and an amending directive) round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN structured as numbered articles and paragraphs."
   },
   "tier": 5,
   "status": "stub",

@@ -126,7 +126,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN."
   },
   "tier": 5,
   "status": "stub",
