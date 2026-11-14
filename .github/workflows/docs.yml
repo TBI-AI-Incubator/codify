@@ -35,7 +35,7 @@ jobs:
       - name: Regenerate reference pages
         working-directory: .
         run: |
-          uv run --frozen --extra mcp python apps/docs/scripts/generate_reference.py
+          uv run --frozen --extra mcp --extra serve python apps/docs/scripts/generate_reference.py
           git add -N docs/reference
           git diff --exit-code -- docs/reference
       - run: corepack enable

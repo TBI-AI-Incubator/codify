@@ -14,7 +14,7 @@ pnpm build
 
 The sections `start`, `guide`, `concepts`, `reference`, `operate`, `open-core` and `project`, the decision records in `docs/decisions`, and the landing page `docs/index.mdx`. Other folders under `docs/` stay on GitHub only. Files whose names start with `_` are skipped.
 
-Six reference pages (`cli`, `http-api`, `mcp-tools`, `python-api`, `jurisdiction-config`, `environment`) are generated from the code; regenerate them from the repository root with `uv run --extra mcp python apps/docs/scripts/generate_reference.py`, adding `--core <path>` to read another checkout. CI fails when they drift.
+Six reference pages (`cli`, `http-api`, `mcp-tools`, `python-api`, `jurisdiction-config`, `environment`) are generated from the code; regenerate them from the repository root with `uv run --extra mcp --extra serve python apps/docs/scripts/generate_reference.py`, adding `--core <path>` to read another checkout. CI fails when they drift.
 
 To add a page, write `docs/<section>/<slug>.md` with a `title`, `description` and `sidebar.order`. Its place in the sidebar is set in [`src/sidebar.mjs`](src/sidebar.mjs); a page not listed there goes to the end of its section.
 

@@ -1,6 +1,6 @@
 """Write the generated pages under docs/reference/ from a core checkout's code.
 
-Run with that checkout's environment: `uv run --extra mcp python apps/docs/scripts/generate_reference.py [--core PATH]`.
+Run with that checkout's environment: `uv run --extra mcp --extra serve python apps/docs/scripts/generate_reference.py [--core PATH]`.
 """
 
 # ruff: noqa: E501  (page prose and descriptions read better unbroken)
@@ -26,7 +26,7 @@ import yaml
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 OUT = REPO / "docs" / "reference"
-REGEN = "uv run --extra mcp python apps/docs/scripts/generate_reference.py"
+REGEN = "uv run --extra mcp --extra serve python apps/docs/scripts/generate_reference.py"
 
 
 # Markdown helpers
