@@ -51,8 +51,20 @@ New, additive:
   descriptions, so `JurisdictionConfig.model_json_schema()` and
   `contract/openapi.json` describe 107 more fields. Names, defaults and
   validation are unchanged.
+- The deterministic inline-markup passes read EU act citations in English text
+  ("Regulation (EU) 2016/679", "Directives 79/117/EEC and 91/414/EEC",
+  "32016R0679") in the preamble, body and annexes into derived references to
+  `/akn/eu/act/reg|dir|dec/{year}/{number}`. A number with no EU marker
+  ("Decision No 1/2019 of the Joint Committee") is left alone, except a year-first
+  one in an EU document, and an act's citation of itself is skipped. For an EU
+  work the resolver also accepts a two-digit-year pair ("95/46") or a CELEX
+  number as naming the act. `refresh_references_for_version` stores them for
+  documents already held.
 
 Fixed:
+
+- "Article 5 of Regulation (EU) No 1303/2013" no longer links to Article 5 of the
+  citing document.
 
 - `ingest-one` stops before any work, with exit code 2, when `LLM_BASE_URL`
   is unset, and names the variables to set. It used to call
