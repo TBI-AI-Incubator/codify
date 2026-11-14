@@ -101,8 +101,8 @@ uv run codify serve --host 10.0.0.5 --port 8000
 Find a law by title with `q`, or search its provisions. Each search match carries `work_uri`, `eid`, `version_id` and `law_id`, enough to [cite the provision](../concepts/frbr.md#cite-a-provision) and fetch its version:
 
 ```bash
-curl "localhost:8000/laws?jurisdiction=xa&q=legislation"
-curl "localhost:8000/search?q=right%20of%20access&jurisdiction=xa&k=5"
+curl "10.0.0.5:8000/laws?jurisdiction=xa&q=legislation"
+curl "10.0.0.5:8000/search?q=right%20of%20access&jurisdiction=xa&k=5"
 ```
 
 `/search` needs an embeddings endpoint and answers `503` without one. Generate the caller's client from `contract/openapi.json` ([Keep the contract](#keep-the-contract)).
