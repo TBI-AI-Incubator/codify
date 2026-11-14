@@ -26,11 +26,10 @@ _TOKEN_PRICES: dict[str, tuple[float, float]] = {
     "gpt-6.1-sol": (0.000002, 0.00001),
 }
 
-# USD per page on the meter this subscription bills: "OCR 4 DZ Pages", SE
-# Central, $4.40 per 1K. The zone selects the meter, so re-check on a move;
-# the global meter is $4.00.
+# USD per page at the provider's global list rate; a deployment billed on another
+# meter replaces its entry here.
 _PAGE_PRICES: dict[str, float] = {
-    "mistral-ocr-4-0": 0.0044,
+    "mistral-ocr-4-0": 0.004,
 }
 
 

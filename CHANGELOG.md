@@ -12,6 +12,8 @@ Breaks:
   `make_polite_client`; without one, building an acquirer's client raises
   `MissingUserAgent` before any request is sent. Adapters whose source requires a
   fixed agent keep sending it.
+- The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
+  pages.
 
 New, additive:
 
