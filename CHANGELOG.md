@@ -5,6 +5,16 @@ the launch tag.
 
 ## Unreleased
 
+Breaks:
+
+- Acquisition no longer sends a default User-Agent. Set `ACQUISITION_USER_AGENT`
+  to an identity naming you and a contact, or pass `user_agent` to
+  `make_polite_client`; without one, building an acquirer's client raises
+  `MissingUserAgent` before any request is sent. Adapters whose source requires a
+  fixed agent keep sending it.
+- The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
+  pages.
+
 New, additive:
 
 - Reads from a published Riigi Teataja archive go through the polite transport:

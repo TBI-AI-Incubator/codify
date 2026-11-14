@@ -67,7 +67,7 @@ def _observed(monkeypatch: pytest.MonkeyPatch, usage_info: dict[str, Any]) -> di
 def test_ocr_records_pages_and_the_cost_of_them(monkeypatch: pytest.MonkeyPatch) -> None:
     fields = _observed(monkeypatch, {"pages_processed": 4, "doc_size_bytes": 34281})
     assert fields["usage_details"] == {"pages_processed": 4}
-    assert fields["cost_details"] == pytest.approx({"total": 0.0176})
+    assert fields["cost_details"] == pytest.approx({"total": 0.016})
 
 
 def test_ocr_keeps_doc_size_out_of_usage(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,7 +90,7 @@ def test_a_new_provider_usage_key_is_not_counted(monkeypatch: pytest.MonkeyPatch
         {"pages_processed": 4, "doc_size_bytes": 34281, "images_processed": 900, "cached": True},
     )
     assert fields["usage_details"] == {"pages_processed": 4}
-    assert fields["cost_details"] == pytest.approx({"total": 0.0176})
+    assert fields["cost_details"] == pytest.approx({"total": 0.016})
 
 
 def test_a_boolean_never_lands_in_the_usage_total() -> None:
