@@ -98,7 +98,7 @@ Other systems call the same routes through your authenticating proxy, which forw
 uv run codify serve --host 10.0.0.5 --port 8000
 ```
 
-Find a law by title with `q`, or search its provisions. Each search match carries `work_uri`, `eid`, `version_id` and `law_id`, enough to fetch its version and [cite the provision](../concepts/frbr.md#cite-a-provision) (drop an `__intro`, `__content` or `__wrapup` suffix from `eid` first):
+Find a law by title with `q`, or search its provisions. Each search match carries `work_uri`, `eid`, `version_id` and `law_id`, enough to fetch its version and [cite the provision](../concepts/frbr.md#cite-a-provision) (check an `eid` ending `__intro`, `__content` or `__wrapup` against the version's XML first):
 
 ```bash
 curl "10.0.0.5:8000/laws?jurisdiction=xa&q=legislation"

@@ -218,7 +218,7 @@ An eId names the same provision across expressions until the law is renumbered, 
 
 To choose a text for a date, take the stored version with the latest expression date not after it, in the law's authoritative language and leaving out `.1`, `.2` patch versions. That is the latest text Codify holds, not proof it was in force: a consolidation may be missing, and commencement or repeal is not checked. Codify's reference resolver applies the same date cutoff only to links to recognised publisher addresses, and takes the latest version for `/akn/...` links ([`codify/storage/resolve_refs.py`](../../codify/storage/resolve_refs.py)). `GET /laws/{law_id}/versions` lists each version's `expression_uri`, one page at a time (`cursor`); take the date from the URI.
 
-A search match gives `work_uri`, `eid` and `version_id`, and that version's `expression_uri` completes the citation. A match `eid` ending `__intro`, `__content` or `__wrapup` names a stored slice of an element, not an eId in the XML: cite the element, with the suffix removed.
+A search match gives `work_uri`, `eid` and `version_id`, and that version's `expression_uri` completes the citation. A match `eid` ending `__intro`, `__content` or `__wrapup` may name a stored slice of an element rather than an eId in the XML, though a `wrapUp` element can carry such an eId itself. Check the version's XML: cite the `eid` if an element has it, otherwise the element it belongs to.
 
 `parse_source_ref` below reads all four forms. Codify does not resolve them: the server looks laws up by id ([Status](#status)). It neither writes nor parses the naming convention's portion form, `/akn/xa/act/1992/7/eng@1992-05-02/!main~part_IV__sec_12`.
 
