@@ -60,8 +60,10 @@ def work_uri(m: re.Match[str], before: str, *, eu_text: bool = False) -> str | N
     if lead is None:
         return None
     a, b = m.group("a"), m.group("b")
-    # "No", or a short number before a four-digit year ("58/2003"), puts the number first.
-    number_first = m.group("no") or (len(a) < 4 and len(b) == 4)
+    kind = _KINDS[lead.group("kind").lower()]
+    # Until 2015 a regulation was cited number first ("1408/71", "69/96"), as is anything
+    # after "No"; directives and decisions put the year first.
+    number_first = m.group("no") or (len(a) < 4 and (kind == "regulation" or len(b) == 4))
     pairs = [(a, b), (b, a)] if number_first else [(b, a), (a, b)]
     number, year = next(((n, y) for n, t in pairs if (y := _year(t)) is not None), (a, None))
     marked = (
@@ -72,9 +74,7 @@ def work_uri(m: re.Match[str], before: str, *, eu_text: bool = False) -> str | N
         return None
     if year is None or not number.lstrip("0"):
         return None
-    return construct_frbr_uri(
-        "eu", _KINDS[lead.group("kind").lower()], str(year), number.lstrip("0")
-    )
+    return construct_frbr_uri("eu", kind, str(year), number.lstrip("0"))
 
 
 def _marks_in(listed: str) -> set[str]:
