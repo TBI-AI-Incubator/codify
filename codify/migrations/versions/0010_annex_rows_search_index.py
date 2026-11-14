@@ -1,15 +1,14 @@
 """Index annex_rows for text search, and stamp which tokeniser wrote a row.
 
 The rows carried `search_tokens` from 0004 with nothing indexing them, so finding
-one meant `ILIKE` over `resolved_text`: 4.6s per term over 1.66M rows. Mirrors the
-provisions arm (0123), the tsvector deciding membership and BM25 ranking.
+one meant a sequential `ILIKE` over `resolved_text`. Mirrors the provisions arm,
+the tsvector deciding membership and BM25 ranking.
 
 Without `search_pipeline_version` a tokeniser bump leaves those rows holding
 tokens no query matches and no column to select them by. `smallint`, as provisions.
 
-No GIN on the tsvector, unlike provisions: at 120,244 rows the planner drives both
-plans off the BM25 index, and dropping the GIN changed nothing (1,238ms against
-1,242ms). Add it if a plan is shown that uses it.
+No GIN on the tsvector, unlike provisions: the planner drives both plans off the
+BM25 index. Add it if a plan is shown that uses it.
 
 `k1=1.2, b=0.75` is the title setting rather than the provision one, because a row
 is short and uniform like a title. Unmeasured for rows, so a default, not a win.

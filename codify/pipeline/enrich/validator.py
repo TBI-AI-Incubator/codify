@@ -1047,7 +1047,7 @@ def _check_body_artefacts(root: etree._Element) -> list[dict[str, Any]]:
 # A contiguous leading run of root articles is the faithful "general provisions
 # before Chapter One" shape, and the rank-stack structurer can only orphan a leading
 # prefix. Below this fraction grades warning; interspersed articles or a larger
-# fraction (Customs Code: 99 beside 9+9) stay error. Reparenting would mis-place
+# fraction stay error. Reparenting would mis-place
 # genuine general provisions and, for a dropped heading, fabricate a container.
 _ORPHAN_LEADING_RATIO = 0.20
 
@@ -1058,8 +1058,7 @@ def _check_orphan_articles(root: etree._Element) -> list[dict[str, Any]]:
 
     A small contiguous leading run of root articles (general provisions before the first
     container) is faithful and grades ``warning``. Interspersed root articles, or a large
-    fraction of all articles at root (the Customs Code failure: 99 articles beside 9
-    sections and 9 chapters), stay ``error``. Fires only when containers and root
+    fraction of all articles at root, stay ``error``. Fires only when containers and root
     articles coexist, since a document with none legitimately has articles at root.
     """
     body = main_body(root)
@@ -1120,8 +1119,8 @@ def _check_orphan_articles(root: etree._Element) -> list[dict[str, Any]]:
     ]
 
 
-# Measured over 16,629 versions: 274 one-provision bodies sit under 5,000 chars
-# and are legitimately flat; 10 sit above 10,000 and all should have structure.
+# One-provision bodies above this size should have structure; shorter ones are
+# legitimately flat.
 _STRUCTURELESS_BODY_CHARS = 10_000
 # A stub body carries a heading or a stray line, never a provision's worth of text.
 _EMPTY_BODY_CHARS = 200
@@ -1654,13 +1653,11 @@ def _check_header_coverage(root: etree._Element, source_text: str) -> list[dict[
 
 # A real page yields ~30-50k chars_per_ink; below this floor it had ink and produced
 # no text, meaning a failed OCR read. accept_ratio is not used: a diverted page still
-# yields text (43% of the corpus sits below 0.9 accept), whereas a zero-yield page is
-# rare (~2.4%) and real.
+# yields text, whereas a zero-yield page is rare and real.
 _PAGE_YIELD_FLOOR = 500.0
 # Fraction of the rival's content tokens that must appear in the AKN body for an
-# empty-read page to count as recoverable. Calibrated on two held pages
-# that measured 0.66 and 0.72, so 0.5 clears them with margin while excluding a page
-# whose overlap is only shared boilerplate.
+# empty-read page to count as recoverable. Set to exclude a page whose overlap
+# is only shared boilerplate.
 _PAGE_YIELD_CONTAINMENT_MIN = 0.5
 _AR_DIACRITICS = re.compile(r"[ً-ْـ]")
 

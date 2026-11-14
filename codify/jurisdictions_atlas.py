@@ -4,8 +4,8 @@ Supranational memberships, non-membership binding regimes, and residual legal
 systems: data that describes a jurisdiction's international standing for the
 atlas UI, not config the ingest pipeline consumes. Split out of
 `jurisdictions.py` to keep the structuring config focused. `JurisdictionConfig`
-imports these back for its field annotations; the only runtime consumer is
-`apps/api/api/jurisdictions/router.py`.
+imports these back for its field annotations; the runtime consumer is the host
+application's jurisdictions route.
 """
 
 from __future__ import annotations

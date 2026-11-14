@@ -146,8 +146,7 @@ _DIGIT_PREFIX_MADDA_RE = re.compile(r"([0-9٠-٩۰-۹]+)[ \t]*مادة")
 
 # RTL reorder prefixes headers with a stray `)` on its own line (`)مادة 3`),
 # defeating the regex's column boundary. Stripped before a line-start numbered
-# article keyword; on three measured instruments it cost 21, nine and seven
-# articles.
+# article keyword, which it otherwise hides.
 _STRAY_PAREN_MADDA_RE = re.compile(
     r"(?m)^([^\S\n]{0,8})\)[^\S\n]{0,4}(?=(?:ال)?مادة(?:[^\S\n]|\()*[0-9٠-٩۰-۹])"
 )

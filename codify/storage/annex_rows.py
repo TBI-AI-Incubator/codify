@@ -165,14 +165,13 @@ class TableRowMatch(BaseModel):
     jurisdiction_code: str
 
 
-# Rank in a bounded CTE, then fetch the page's law metadata. Ranking and joining
-# in one statement read 100,000 rows to return 20; bounding first reads 20
-# (120,244 rows, 1,238ms against 13ms). The score is a column, not a window
-# function, which would see every row before the limit applied.
+# Rank in a bounded CTE, then fetch the page's law metadata: ranking and joining
+# in one statement reads every candidate row to return one page. The score is a
+# column, not a window function, which would see every row before the limit applied.
 #
 # Ties are broken after the page is cut, so a tie group on a boundary can shift
-# between requests. Breaking them inside the CTE costs 1.56M buffer hits against
-# 713; keyset pagination on `(score, id)` is the fix if paging goes deep.
+# between requests. Breaking them inside the CTE reads far more; keyset
+# pagination on `(score, id)` is the fix if paging goes deep.
 #
 # Two statements, because a scoped-or-not disjunction cannot use the version index.
 _ROW_RANK_HEAD = """
@@ -241,7 +240,7 @@ async def count_stale_annex_row_tokens(
 
     Reported apart from the provisions count rather than folded into it: this
     migration leaves every existing row unstamped, and a readiness probe that
-    counts provisions alone would say zero stale while 1.66M rows wait.
+    counts provisions alone would say zero stale while annex rows wait.
     """
     row = (
         await session.execute(

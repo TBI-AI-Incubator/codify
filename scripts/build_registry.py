@@ -51,7 +51,7 @@ def build_registry() -> dict:
                 "coverage_status": cfg.coverage_status,
                 "subsumed_by": cfg.subsumed_by,
                 # Whether this config ships in the open core, so the export can
-                # read the registry alone rather than opening all 257 configs.
+                # read the registry alone rather than opening every config.
                 "public_reference": cfg.public_reference,
             }
         )

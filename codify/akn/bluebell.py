@@ -153,7 +153,7 @@ def akn_xml_to_bluebell(akn_xml: str) -> str:
 
     The bundled cobalt XSL emits the next article at the indent of the previous article's
     last paragraph, and round-tripping that through `parse_to_akn` collapses every article
-    whose predecessor had multi-line content: 95 articles to 37 in one case. Walking the
+    whose predecessor had multi-line content. Walking the
     tree and emitting each block at `depth * 2` spaces makes
     `parse_to_akn(akn_xml_to_bluebell(x))` reproduce x's structure exactly.
     """

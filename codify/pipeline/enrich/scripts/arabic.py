@@ -45,9 +45,7 @@ _PROSE_PRECURSORS: tuple[str, ...] = (
     "بند",
     "بنود",
     "مرفق",
-    # Recital/penalty citation forms observed spawning phantom articles in
-    # the v5 review: "ولاسيما المادة (٥٥) منه", "بقوة المادة (41) من
-    # القانون الأساسي", "كل من يخالف المادة (10)".
+    # Recital and penalty citation forms that otherwise spawn phantom articles.
     "ولاسيما",
     "لاسيما",
     "سيما",

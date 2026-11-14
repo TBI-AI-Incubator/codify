@@ -146,7 +146,7 @@ def own_gazette_note(footnotes: list[dict[str, Any]]) -> str:
 def publication_date(info: dict[str, Any], footnotes: list[dict[str, Any]]) -> str:
     """The earlier of the record's date and its own Gazette note's: a consolidation's
     record can carry a later act's date (an Act of 1979 dated 1991)."""
-    # ponytail: a note misdated earlier than the law wins; one in ~3,000 today.
+    # ponytail: a note misdated earlier than the law wins.
     stated = str(info.get("publishDateAd") or "")
     cfg = try_load_config("th")
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None

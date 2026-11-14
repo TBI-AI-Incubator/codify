@@ -110,7 +110,7 @@ async def embed_version_provisions(
     `missing_only` skips a provision that already has a vector under any model.
 
     `path_context` puts the act's title before the section's, which is what a
-    provision otherwise never states: measured at 0.53 to 0.85 on reference
+    provision otherwise never states, and which improves reference
     resolution. Vectors of each construction carry their own model id and sit
     side by side, so the choice is reversible without a migration.
     """

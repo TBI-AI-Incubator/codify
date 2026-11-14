@@ -73,8 +73,7 @@ ARABIC_WORDS = register(
     WordList(
         language="ara",
         letter_re=re.compile(r"[\u0621-\u064a\u066e-\u06d3]"),
-        # Calibrated on tests/fixtures/legibility/marked.jsonl: clean prose
-        # measured 91 to 176 per 1,000.
+        # Floors calibrated on labelled clean and damaged prose.
         prose_floor=80.0,
         lexicon_floor=12.0,
         function_words=frozenset(
@@ -139,8 +138,7 @@ INDONESIAN_WORDS = register(
     WordList(
         language="ind",
         letter_re=_LATIN_RE,
-        # Measured over 61 documents: function words p5 149.5, median 181.6;
-        # lexicon median 56.2, with 5 of 64 under the floor.
+        # Floors calibrated per language, not transferred from another.
         prose_floor=80.0,
         lexicon_floor=12.0,
         function_words=frozenset(
