@@ -34,6 +34,7 @@ def build_frbr_work_uri(
     doctype: str,
     year: int | str,
     number: str,
+    *,
     locality: str | None = None,
 ) -> str
 ```
@@ -53,6 +54,7 @@ def build_frbr_expression_uri(
     work_uri: str,
     language: str,
     date_: date | str | None,
+    *,
     include_time: bool = False,
 ) -> str
 ```
@@ -99,6 +101,7 @@ from codify.pipeline.dating import resolve_dating
 
 def resolve_dating(
     metadata: dict[str, Any],
+    *,
     country: str,
     title: str = '',
     source_text: str = '',
@@ -128,6 +131,7 @@ from codify.pipeline.enrich.anchors import build_anchor_regex
 def build_anchor_regex(
     config: JurisdictionConfig | None,
     doctype: str,
+    *,
     boundary: str | None = None,
 ) -> re.Pattern[str]
 ```
@@ -142,6 +146,7 @@ from codify.pipeline.enrich.anchors import scan_anchors
 def scan_anchors(
     text: str,
     regex: re.Pattern[str],
+    *,
     country: str = '',
     doctype: str = '',
     toc_end: int = 0,
@@ -161,6 +166,7 @@ from codify.acquisition import get_acquirer
 
 def get_acquirer(
     jurisdiction_code: str,
+    *,
     kind: SourceAdapterKind | None = None,
 ) -> Acquirer
 ```
@@ -174,6 +180,7 @@ from codify.acquisition import make_polite_client
 
 def make_polite_client(
     adapter: SourceAdapter,
+    *,
     etag_lookup: EtagLookup | None = None,
     timeout: httpx.Timeout | None = None,
     user_agent: str | None = None,
@@ -189,6 +196,7 @@ def make_polite_client(
 from codify.acquisition import DocumentRef
 
 class DocumentRef(
+    *,
     jurisdiction_code: str,
     doctype: str,
     year: int,
@@ -207,6 +215,7 @@ Identifier for one document at one point in time.
 from codify.acquisition import AcquiredDocument
 
 class AcquiredDocument(
+    *,
     ref: codify.acquisition.base.DocumentRef,
     frbr_work_uri: str,
     expression_uri: str | None = None,
@@ -232,7 +241,7 @@ No docstring.
 ```python
 from codify.acquisition.base import BaseAcquirer
 
-class BaseAcquirer(adapter: object, client: object | None = None)
+class BaseAcquirer(adapter: object, *, client: object | None = None)
 ```
 
 Shared boilerplate for concrete adapters.
@@ -250,6 +259,7 @@ from codify.acquisition.adapters.akn_native import AknNativeAcquirer
 class AknNativeAcquirer(
     jurisdiction_code: str,
     adapter: SourceAdapter,
+    *,
     client: httpx.AsyncClient | None = None,
 )
 ```
@@ -329,7 +339,7 @@ text layer and say why in ``skipped``.
 ```python
 from codify.pipeline.enrich.ocr import page_verdict
 
-def page_verdict(page: PageResult, pack: ScriptPack | None = None) -> PageVerdict
+def page_verdict(page: PageResult, *, pack: ScriptPack | None = None) -> PageVerdict
 ```
 
 The deterministic quality verdict for one page, from what the read left on it.
@@ -357,6 +367,7 @@ from codify.quality.page_read import score_page
 
 def score_page(
     text: str,
+    *,
     ink: float | None = None,
     rival_text: str | None = None,
     divergence_score: float | None = None,
@@ -399,6 +410,7 @@ from codify.pipeline import ingest_document
 def ingest_document(
     source: Path | str,
     jurisdiction_code: str,
+    *,
     llm: 'LLMClient | None' = None,
     model: str | None = None,
     frbr_work_uri: str | None = None,
@@ -424,6 +436,7 @@ from codify.pipeline.formats.pdf import ingest
 def ingest(
     source: Path | str,
     jurisdiction_code: str,
+    *,
     llm: LLMClient,
     model: str | None = None,
     ocr_model: str | None = None,
@@ -452,6 +465,7 @@ from codify.pipeline.segment import segment
 def segment(
     text: str,
     spans: Sequence[PageSpan],
+    *,
     config: JurisdictionConfig,
     furniture: Mapping[int, str] | None = None,
     doctype: str | None = None,
@@ -470,6 +484,7 @@ from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
 
 def text_to_bluebell_verbatim(
     text: str,
+    *,
     country: str,
     doctype: str = 'act',
     scan_text: str | None = None,
@@ -510,6 +525,7 @@ from codify.akn.bluebell import bluebell_to_akn
 
 def bluebell_to_akn(
     text: str,
+    *,
     country: str = 'xx',
     doctype: str = 'act',
     date: str = '2024-01-01',
@@ -534,6 +550,7 @@ from codify.pipeline.enrich.validator import validate_akn
 
 def validate_akn(
     akn_xml: str,
+    *,
     huge_tree: bool = False,
     expected_anchor_summary: dict[str, int] | None = None,
     expected_cover_article_numbers: list[int] | None = None,
@@ -584,6 +601,7 @@ from codify.akn import validate_akn
 def validate_akn(
     xml: str | bytes | etree._Element,
     strict: bool = False,
+    *,
     huge_tree: bool = False,
 ) -> None
 ```
@@ -597,6 +615,7 @@ from codify.quality.structural_quality_grade import structural_quality_grade
 
 def structural_quality_grade(
     findings: list[dict[str, Any]] | None,
+    *,
     degraded: bool = False,
 ) -> StructuralGradeResult
 ```
@@ -613,6 +632,7 @@ from codify.storage.structural_findings import record_findings
 
 async def record_findings(
     session: AsyncSession,
+    *,
     scan_run_id: uuid.UUID,
     version_id: uuid.UUID,
     law_id: uuid.UUID,
@@ -631,6 +651,7 @@ Write one row per check. Re-running a scan run over a version replaces its rows.
 from codify.repair.ops import EditPlan
 
 class EditPlan(
+    *,
     ops: list[typing.Annotated[typing.Union[codify.repair.ops.SetBody, codify.repair.ops.SetNum, codify.repair.ops.SetMoneyNumeral, codify.repair.ops.RenumberSequence, codify.repair.ops.Move, codify.repair.ops.Split, codify.repair.ops.Merge, codify.repair.ops.Delete, codify.repair.ops.Annotate, codify.repair.ops.RestoreFromSource, codify.repair.ops.MoveToConclusions], FieldInfo(annotation=NoneType, required=True, discriminator='op')]] = <factory>,
     reasoning: str = '',
 )
@@ -646,6 +667,7 @@ from codify.repair.edit_ops import apply_plan
 def apply_plan(
     xml: str,
     ops: list[RepairOp],
+    *,
     country: str,
     doctype: str = 'act',
     target_finding: dict[str, Any] | None = None,
@@ -667,6 +689,7 @@ from codify.repair.sandbox import preview_plan
 def preview_plan(
     current_xml: str,
     plan: EditPlan,
+    *,
     country: str,
     doctype: str = 'act',
     target_finding: dict[str, object] | None = None,
@@ -691,6 +714,7 @@ from codify.repair.loop import repair_document
 async def repair_document(
     akn: str,
     findings: list[dict[str, Any]],
+    *,
     agent_run: AgentRun,
     country: str,
     object_key: str,
@@ -808,6 +832,7 @@ from codify.translate import translate_document
 
 async def translate_document(
     source_akn_xml: str,
+    *,
     target_language: str,
     llm: LLMClient,
     concurrency: int = 25,
@@ -852,6 +877,7 @@ def apply_translation_to_akn(
     blocks: list[TranslatedBlock],
     preface_lines: list[str],
     target_language: str | None = None,
+    *,
     preamble_lines: list[str] | None = None,
     conclusions_lines: list[str] | None = None,
     expression_date: str | None = None,
@@ -943,6 +969,7 @@ from codify.storage.repository import save_document
 async def save_document(
     session: AsyncSession,
     doc: Document,
+    *,
     jurisdiction_code: str,
     law_title: str,
     doctype: str = 'act',
@@ -991,6 +1018,7 @@ from codify.storage.embeddings import embed_and_stamp
 async def embed_and_stamp(
     session: AsyncSession,
     version_id: uuid.UUID,
+    *,
     client: EmbeddingClient,
     path_context: bool,
     missing_only: bool = False,
@@ -1009,6 +1037,7 @@ from codify.retrieve.hybrid import retrieve
 async def retrieve(
     session: AsyncSession,
     query: str,
+    *,
     embedding_client: EmbeddingClient,
     jurisdiction_code: str | None = None,
     law_id: uuid.UUID | None = None,
@@ -1040,6 +1069,7 @@ from codify.storage.versions import current_scope
 
 async def current_scope(
     session: AsyncSession,
+    *,
     jurisdictions: Sequence[str] | None = None,
     from_year: int | None = None,
     to_year: int | None = None,
@@ -1057,6 +1087,7 @@ from codify.storage.retrieval import hybrid_search
 
 async def hybrid_search(
     session: AsyncSession,
+    *,
     query_vec: list[float],
     query_text: str,
     version_ids: VersionScope,
@@ -1089,6 +1120,7 @@ Guide: [Serve and publish](../guide/serve-and-publish.md).
 from codify.serve import create_app
 
 def create_app(
+    *,
     runner: Callable[[dict[str, Any]], AsyncIterator[RunEvent]] | None = None,
     database: str | None = None,
 ) -> FastAPI
@@ -1102,6 +1134,7 @@ def create_app(
 from codify.mcp import create_server
 
 def create_server(
+    *,
     sessions: SessionFactory | None = None,
     embedding_client: ClientFactory = _embedding_client,
     llm_client: ClientFactory = _llm_client,
@@ -1122,7 +1155,7 @@ Guide: [Interoperate](../guide/interoperate.md).
 ```python
 from codify.akn import parse_xml
 
-def parse_xml(xml: str | bytes, huge_tree: bool = False) -> etree._Element
+def parse_xml(xml: str | bytes, *, huge_tree: bool = False) -> etree._Element
 ```
 
 Parse document XML with a hardened parser, and refuse a DOCTYPE.
@@ -1179,6 +1212,7 @@ the document: Cobalt rebuilds `@date` from
 from codify.deliverable import build_deliverable
 
 def build_deliverable(
+    *,
     jurisdiction_code: str,
     source_language: str,
     target_languages: list[str],
@@ -1223,6 +1257,7 @@ from codify.core.pricing import cost_details
 def cost_details(
     model: str,
     usage: Mapping[str, int],
+    *,
     batch: bool = False,
 ) -> dict[str, float] | None
 ```

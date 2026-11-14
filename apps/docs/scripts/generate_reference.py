@@ -382,6 +382,21 @@ def mcp_page() -> tuple[str, str]:
 # Python API
 
 
+def _split_params(inner: str) -> list[str]:
+    """Split a rendered parameter list on its top-level commas."""
+    parts, depth, start = [], 0, 0
+    for i, ch in enumerate(inner):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            parts.append(inner[start:i].strip())
+            start = i + 1
+    parts.append(inner[start:].strip())
+    return parts
+
+
 def signature(name: str, obj: object) -> str:
     try:
         sig = inspect.signature(obj)  # type: ignore[arg-type]
@@ -401,10 +416,16 @@ def signature(name: str, obj: object) -> str:
         # A function default prints its memory address; name it instead.
         return Raw(value.__name__) if inspect.isfunction(value) else value
 
-    params = [
-        str(p.replace(annotation=bare(p.annotation), default=shown(p.default)))
-        for p in sig.parameters.values()
-    ]
+    # Re-rendered whole, so the `/` and `*` markers survive as the code states them.
+    plain = sig.replace(
+        parameters=[
+            p.replace(annotation=bare(p.annotation), default=shown(p.default))
+            for p in sig.parameters.values()
+        ],
+        return_annotation=inspect.Signature.empty,
+    )
+    inner = str(plain)[1:-1]
+    params = _split_params(inner) if inner else []
     ret = sig.return_annotation
     ret = (
         ""
