@@ -27,6 +27,12 @@ def _uris(text: str, eu_text: bool = True) -> list[str | None]:
         ("Regulation (EEC) 2092/91", ["/akn/eu/act/reg/1991/2092"]),
         ("Regulation (EC) 2006/2004", ["/akn/eu/act/reg/2004/2006"]),
         ("Regulation (EU) 2019/2088", ["/akn/eu/act/reg/2019/2088"]),
+        ("Regulation (EEC) 2016/92", ["/akn/eu/act/reg/1992/2016"]),
+        ("Regulation (EC) 2016/2004", ["/akn/eu/act/reg/2004/2016"]),
+        (
+            "Regulations (EC) No 1/2005 and (EU) 2016/679",
+            ["/akn/eu/act/reg/2005/1", "/akn/eu/act/reg/2016/679"],
+        ),
         ("Directive 95/46/EC", ["/akn/eu/act/dir/1995/46"]),
         ("Decision No 1082/2013/EU", ["/akn/eu/act/dec/2013/1082"]),
         ("Regulations (EU) No 2018/1883", ["/akn/eu/act/reg/2018/1883"]),

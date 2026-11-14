@@ -62,17 +62,18 @@ def work_uri(m: re.Match[str], before: str, *, eu_text: bool = False) -> str | N
         return None
     a, b = m.group("a"), m.group("b")
     kind = _KINDS[lead.group("kind").lower()]
-    # Until 2015 a regulation was cited number first ("2092/91", "69/96"), as is anything
-    # after "No"; directives and decisions put the year first.
+    own = (_marks(m.group("mark")) | _marks(m.group("suffix"))) & _MARKS
+    marked = own or _marks_in(lead.group("list")) & _MARKS
+    # Until 2015 a regulation was cited number first ("2092/91", "(EEC) 2016/92"), as is
+    # anything after "No"; directives and decisions put the year first.
     if kind == "regulation":
-        number_first = m.group("no") or not (len(a) == 4 and 2015 <= int(a) and _year(a))
+        pre_eu = bool(marked) and "EU" not in marked
+        new_style = len(a) == 4 and 2015 <= int(a) and _year(a) is not None
+        number_first = bool(m.group("no")) or pre_eu or not new_style
     else:
-        number_first = m.group("no") or (len(a) < 4 and len(b) == 4)
+        number_first = bool(m.group("no")) or (len(a) < 4 and len(b) == 4)
     pairs = [(a, b), (b, a)] if number_first else [(b, a), (a, b)]
     number, year = next(((n, y) for n, t in pairs if (y := _year(t)) is not None), (a, None))
-    marked = (
-        _marks(m.group("mark")) | _marks(m.group("suffix")) | _marks_in(lead.group("list"))
-    ) & _MARKS
     # Unmarked "No 1/2019 of the Joint Committee" is another body's; EU text cites its own bare.
     if not (marked or (eu_text and not m.group("no") and len(a) == 4 and year == int(a))):
         return None
