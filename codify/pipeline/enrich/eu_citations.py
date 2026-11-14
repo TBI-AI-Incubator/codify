@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from codify.agents.tools.frbr import construct_frbr_uri
 
@@ -37,7 +38,7 @@ _LEAD_WINDOW = 2000
 
 def _year(token: str) -> int | None:
     n = int(token)
-    if len(token) == 4 and 1952 <= n <= 2099:
+    if len(token) == 4 and 1952 <= n <= date.today().year + 1:
         return n
     # Two-digit years ran until 1998.
     if len(token) == 2 and n >= 52:
@@ -61,9 +62,12 @@ def work_uri(m: re.Match[str], before: str, *, eu_text: bool = False) -> str | N
         return None
     a, b = m.group("a"), m.group("b")
     kind = _KINDS[lead.group("kind").lower()]
-    # Until 2015 a regulation was cited number first ("1408/71", "69/96"), as is anything
+    # Until 2015 a regulation was cited number first ("2092/91", "69/96"), as is anything
     # after "No"; directives and decisions put the year first.
-    number_first = m.group("no") or (len(a) < 4 and (kind == "regulation" or len(b) == 4))
+    if kind == "regulation":
+        number_first = m.group("no") or not (len(a) == 4 and 2015 <= int(a) and _year(a))
+    else:
+        number_first = m.group("no") or (len(a) < 4 and len(b) == 4)
     pairs = [(a, b), (b, a)] if number_first else [(b, a), (a, b)]
     number, year = next(((n, y) for n, t in pairs if (y := _year(t)) is not None), (a, None))
     marked = (
