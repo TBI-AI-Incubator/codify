@@ -304,9 +304,7 @@ class EuDatadumpAcquirer(BaseAcquirer):
             include_counts=include_counts,
         )
         # The archive entry is canonical FMX; derive FRBR URI from the CELEX type.
-        doctype = {"L": "directive", "R": "regulation", "D": "decision"}.get(
-            letter_from_celex(celex), "directive"
-        )
+        doctype = DESCRIPTOR_TO_DOCTYPE.get(letter_from_celex(celex), "directive")
         frbr_work_uri = build_frbr_work_uri("eu", doctype, ref.year, ref.number)
 
         return AcquiredDocument(
@@ -456,6 +454,10 @@ def _inline_included(
             last.tail = (last.tail or "") + tail
         counts["inlined"] += 1
     return counts
+
+
+# CELEX sector-3 descriptor to document class; F is a framework decision.
+DESCRIPTOR_TO_DOCTYPE = {"L": "directive", "R": "regulation", "D": "decision", "F": "decision"}
 
 
 def letter_from_celex(celex: str) -> str:

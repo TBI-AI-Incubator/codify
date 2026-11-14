@@ -12,7 +12,7 @@ from typing import ClassVar, Literal
 import httpx
 import structlog
 
-from codify.acquisition.adapters.eu.datadump import assemble_formex
+from codify.acquisition.adapters.eu.datadump import DESCRIPTOR_TO_DOCTYPE, assemble_formex
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
@@ -45,11 +45,6 @@ _CELEX_RE = re.compile(r"^(\d)?(\d{4})([A-Z]+)(\d+)(?:R\(\d+\)|[A-Z]\d{2})?$")
 # A consolidated text: sector 0, the base act, and the date it is consolidated to.
 _CONSOLIDATED_RE = re.compile(r"^0(\d{4}[A-Z]+\d+)-(\d{4})(\d{2})(\d{2})$")
 _BASE_CELEX_RE = re.compile(r"3\d{4}[A-Z]+\d+")
-_DESCRIPTOR_TO_DOCTYPE = {
-    "L": "directive",
-    "R": "regulation",
-    "D": "decision",
-}
 
 
 def celex_to_frbr(celex: str) -> tuple[str, str]:
@@ -61,7 +56,7 @@ def celex_to_frbr(celex: str) -> tuple[str, str]:
     if not m:
         raise ValueError(f"unrecognised CELEX: {celex!r}")
     _sector, year, descriptor, num = m.groups()
-    doctype = _DESCRIPTOR_TO_DOCTYPE.get(descriptor, descriptor.lower())
+    doctype = DESCRIPTOR_TO_DOCTYPE.get(descriptor, descriptor.lower())
     number = num.lstrip("0") or "0"
     return build_frbr_work_uri("eu", doctype, int(year), number), doctype
 

@@ -740,3 +740,24 @@ def test_the_outcome_of_every_reference_is_counted() -> None:
         include_counts=counts,
     )
     assert counts["inlined"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_framework_decision_from_the_dump_is_a_decision(tmp_path: Path) -> None:
+    """The dump and Cellar must name one work for a CELEX type-F act."""
+    archive = tmp_path / "ACTS_FMX.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr(_MEMBER, _SYNTHETIC_FORMEX)
+    index = tmp_path / "index.json"
+    index.write_text(json.dumps({"archive": str(archive), "entries": {"32008F0913": _MEMBER}}))
+    acquirer = EuDatadumpAcquirer(_adapter(), index_path=index)
+    ref = DocumentRef(
+        jurisdiction_code="eu",
+        doctype="decision",
+        year=2008,
+        number="913",
+        extra={"celex": "32008F0913"},
+    )
+    doc = await acquirer.fetch(ref)
+    acquirer.close()
+    assert doc.frbr_work_uri == "/akn/eu/act/dec/2008/913"
