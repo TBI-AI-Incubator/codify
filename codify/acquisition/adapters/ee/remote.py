@@ -15,7 +15,7 @@ from types import TracebackType
 
 import httpx
 
-from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.base import PolitenessProfile, require_user_agent
 from codify.acquisition.politeness import PoliteTransport, client_tls_context
 from codify.core.security import ssrf_guard
 
@@ -231,7 +231,7 @@ def polite_http_client(profile: PolitenessProfile) -> httpx.Client:
 def http_client() -> httpx.Client:
     """A client with the acquisition user agent that follows no redirect."""
     return httpx.Client(
-        headers={"user-agent": PolitenessProfile().user_agent},
+        headers={"user-agent": require_user_agent()},
         timeout=httpx.Timeout(120.0, connect=10.0),
         follow_redirects=False,
     )

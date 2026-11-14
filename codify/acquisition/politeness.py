@@ -17,7 +17,7 @@ import certifi
 import httpx
 import structlog
 
-from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.base import PolitenessProfile, require_user_agent
 from codify.core.retry_after import parse_retry_after as _parse_retry_after
 from codify.core.security import Resolver, SSRFBlocked, safe_addresses, ssrf_guard
 from codify.jurisdictions import SourceAdapter
@@ -342,7 +342,9 @@ class PoliteTransport(httpx.AsyncBaseTransport):
         inner: httpx.AsyncBaseTransport | None = None,
         resolver: Resolver | None = None,
     ) -> None:
-        self.profile = profile
+        self.profile = profile.model_copy(
+            update={"user_agent": require_user_agent(profile.user_agent)}
+        )
         self.etag_lookup = etag_lookup
         # Guarded at the transport seam so the robots probe, the redirect
         # hops and the main request all share one check.
@@ -357,7 +359,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             transport=self._inner,
             follow_redirects=True,
             # Robots probe identifies like the real requests (WAFs flag default UAs).
-            headers={"user-agent": profile.user_agent},
+            headers={"user-agent": self.profile.user_agent},
         )
 
     async def _take_token(self, host: str) -> None:

@@ -483,10 +483,6 @@ def test_the_estonian_acquirer_is_paced_at_two_at_once_and_thirty_a_minute() -> 
         acquirer.politeness.rate_limit_per_minute,
     ) == (2, 30)
     assert acquirer.politeness.robots_respect
-    assert (
-        acquirer.politeness.user_agent
-        == "codify-acquire/0.1 (+https://github.com/TBI-AI-Incubator)"
-    )
 
 
 class _AsyncUnread(httpx.AsyncByteStream):
