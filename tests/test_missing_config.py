@@ -68,6 +68,11 @@ def test_the_resolver_reports_where_it_looked() -> None:
     assert missing.path is None and missing.sha256 is None
 
 
+def test_a_code_that_is_not_one_directory_name_is_absent() -> None:
+    for code in ("../gb", "gb/..", "..\\gb", "c:gb", "", "-gb"):
+        assert not resolve_config(code).found, code
+
+
 def test_the_digest_tracks_the_file_rather_than_the_code(
     tmp_path: pathlib.Path,
 ) -> None:

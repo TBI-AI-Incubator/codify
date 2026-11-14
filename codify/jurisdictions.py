@@ -2511,6 +2511,9 @@ class ResolvedConfig(BaseModel):
         return self.path is not None
 
 
+_CONFIG_CODE = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
 def resolve_config(country_code: str) -> ResolvedConfig:
     """Identify the config for `country_code` without loading it.
 
@@ -2518,7 +2521,8 @@ def resolve_config(country_code: str) -> ResolvedConfig:
     jurisdiction was missing and where they looked, which a traceback buries.
     """
     code = country_code.strip().lower()
-    if "/" in code or ".." in code:
+    # A code names one directory: anything else (a separator, `..`, a drive) is absent.
+    if not _CONFIG_CODE.fullmatch(code):
         return ResolvedConfig(code=code)
     path = JURISDICTIONS_DIR / code / "config.json"
     if not path.exists():
