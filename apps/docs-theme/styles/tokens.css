@@ -1,0 +1,59 @@
+:root {
+  color-scheme: light dark;
+
+  --cd-paper: #ffffff;
+  --cd-paper-lo: #f5f5f5;
+  --cd-ink: #1d1d1d;
+  --cd-ink-2: #3e3e3e;
+  --cd-ink-3: #6b6b6b;
+  --cd-rule: #d9d9d9;
+  --cd-selection: #e3e3e3;
+  --cd-caution: #7a4b00;
+  --cd-danger: #9c3027;
+
+  --cd-font-text: 'Geist Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cd-font-display: 'Instrument Serif', 'Times New Roman', serif;
+  --cd-font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --cd-radius: 3px;
+  --cd-measure: 68ch;
+  --cd-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --cd-duration: 240ms;
+  /* Multiplies inline translations so they follow the writing direction. */
+  --cd-dir: 1;
+}
+
+/* Nearest dir wins: Starlight's <main> carries the content's own direction. */
+[dir='rtl'] {
+  --cd-dir: -1;
+}
+
+[dir='ltr'] {
+  --cd-dir: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --cd-paper: #131615;
+    --cd-paper-lo: #1c211f;
+    --cd-ink: #f3f4ef;
+    --cd-ink-2: #c7cdc9;
+    --cd-ink-3: #a5afa8;
+    --cd-rule: #3a4540;
+    --cd-selection: #3a4540;
+    --cd-caution: #e0b25c;
+    --cd-danger: #ef9a8f;
+  }
+}
+
+:root[data-theme='dark'] {
+  --cd-paper: #131615;
+  --cd-paper-lo: #1c211f;
+  --cd-ink: #f3f4ef;
+  --cd-ink-2: #c7cdc9;
+  --cd-ink-3: #a5afa8;
+  --cd-rule: #3a4540;
+  --cd-selection: #3a4540;
+  --cd-caution: #e0b25c;
+  --cd-danger: #ef9a8f;
+}

@@ -1,0 +1,120 @@
+---
+interface Props {
+  /** Position on the rail, from 1. */
+  n: number
+  label: string
+  href: string
+  /** One sentence on what the stage does. */
+  does: string
+  /** Name of the artefact the still shows. */
+  file: string
+  /** Short muted films, per theme and rail width, that open and close on the still; the still stays as its text. */
+  films?: { theme: 'light' | 'dark'; size: 'wide' | 'narrow'; src: string }[]
+}
+
+const { n, label, href, does, file, films } = Astro.props
+---
+
+<li class="cd-stage">
+  <p class="cd-stage-head">
+    <span class="cd-stage-n">{n}</span>
+    <a class="cd-stage-link" href={href}>{label}</a>
+    <svg class="cd-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6"></path>
+    </svg>
+  </p>
+  <figure class="cd-still">
+    <slot />
+    {
+      films?.map(({ theme, size, src }) => (
+        <video class="cd-film" data-film-theme={theme} data-film-size={size} src={src} muted playsinline preload="none" aria-hidden="true" tabindex="-1" />
+      ))
+    }
+  </figure>
+  <p class="cd-stage-does">{does}</p>
+  <p class="cd-stage-file">{file}</p>
+</li>
+
+<script>
+  // Plays each stage's film once, one at a time, in rail order, among those in view; the rail's button
+  // pauses or replays them, and reduced motion keeps the stills.
+  const films = [...document.querySelectorAll<HTMLVideoElement>('.cd-film')]
+  const toggle = document.querySelector<HTMLButtonElement>('.cd-films-toggle')
+  const motion = matchMedia('(prefers-reduced-motion: no-preference)')
+  const seen = new Set<HTMLVideoElement>()
+  // Keyed by still, so a theme or width change does not replay a stage.
+  const done = new Set<Element>()
+  let playing: HTMLVideoElement | null = null
+  let paused = false
+
+  const left = () => films.some((film) => !done.has(film.parentElement!))
+  const next = () => {
+    if (toggle) {
+      toggle.hidden = !films.length || !motion.matches
+      toggle.textContent = !paused && left() ? 'Pause films' : 'Play films'
+    }
+    if (playing || paused || !motion.matches) return
+    const film = films.find((f) => seen.has(f) && !done.has(f.parentElement!))
+    if (!film) return
+    playing = film
+    film.currentTime = 0
+    film.play().then(
+      () => film.setAttribute('data-played', ''),
+      () => {
+        playing = null
+      },
+    )
+  }
+
+  for (const film of films) {
+    film.addEventListener('ended', () => {
+      done.add(film.parentElement!)
+      film.removeAttribute('data-played')
+      playing = null
+      next()
+    })
+  }
+
+  toggle?.addEventListener('click', () => {
+    if (!paused && left()) {
+      paused = true
+      playing?.pause()
+    } else {
+      if (!left()) done.clear()
+      paused = false
+      playing?.play()
+    }
+    next()
+  })
+
+  motion.addEventListener('change', () => {
+    if (!motion.matches && playing) {
+      playing.pause()
+      playing.removeAttribute('data-played')
+      playing = null
+    }
+    next()
+  })
+
+  // A film for the other theme or rail width is display: none, so it never counts as in view.
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const { target, isIntersecting } of entries) {
+        const film = target as HTMLVideoElement
+        if (isIntersecting) {
+          seen.add(film)
+          film.preload = 'auto'
+        } else {
+          seen.delete(film)
+          if (film === playing) {
+            film.pause()
+            playing = null
+          }
+        }
+      }
+      next()
+    },
+    { threshold: 0.6 },
+  )
+  for (const film of films) observer.observe(film)
+</script>
