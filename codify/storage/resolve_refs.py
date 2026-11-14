@@ -140,6 +140,15 @@ def _text_names_law(source_text: str, work_uri: str, *titles: str | None) -> str
             on_boundary.format(re.escape(year)), text
         ):
             return "number_and_year"
+        # EU only: a slash pair with a two-digit year ("95/46/EC") or a CELEX number.
+        yy = year[2:]
+        pair = rf"(?:{yy}/{padded}|{padded}/{yy})"
+        celex = rf"3{year}[a-z]{{1,2}}0*{re.escape(number)}"
+        eu = work_uri.startswith("/akn/eu/")
+        if eu and (
+            re.search(on_boundary.format(pair), text) or re.search(on_boundary.format(celex), text)
+        ):
+            return "number_and_year"
     return None
 
 

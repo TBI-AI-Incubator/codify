@@ -80,6 +80,24 @@ def test_padding_does_not_let_a_longer_number_match() -> None:
     assert not _text_names_law("Act No. 105 of 2020", "/akn/xa/act/2020/5", None)
 
 
+@pytest.mark.parametrize(
+    ("text", "uri", "named"),
+    [
+        ("under Directive 95/46/EC", "/akn/eu/act/dir/1995/46", True),
+        ("Regulation (EEC) No 2913/92", "/akn/eu/act/reg/1992/2913", True),
+        ("CELEX 32016R0679", "/akn/eu/act/reg/2016/679", True),
+        ("Directive 95/460/EC", "/akn/eu/act/dir/1995/46", False),
+        ("on 1 May 95, item 46", "/akn/eu/act/dir/1995/46", False),
+        # Outside EU works a fraction or a date is not a citation.
+        ("Pay 5/16 of the fee", "/akn/xe/act/2016/5", False),
+    ],
+)
+def test_a_two_digit_year_pair_or_celex_number_names_the_instrument(
+    text: str, uri: str, named: bool
+) -> None:
+    assert bool(_text_names_law(text, uri, None)) is named
+
+
 def test_the_version_is_ahead_of_the_first_policy() -> None:
     """The selector re-examines rows below this; leaving it at 1 would strand
     every wrong stamp the first policy wrote."""

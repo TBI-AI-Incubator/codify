@@ -23,6 +23,7 @@ from codify.frbr import default_token, law_number_token, token_country, token_fa
 from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config, load_short_titles
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.eid import build_term_map, resolve_informal_reference
+from codify.pipeline.enrich.eu_citations import CITATION, work_uri
 
 if TYPE_CHECKING:
     from codify.core.llm import LLMClient
@@ -50,6 +51,7 @@ _TAIL_EXTERNAL = re.compile(
     r"^(?:that|those|the\s+said)\b"
     r"|(?:Act|Regulations|Order)\s+(?:19|20)\d{2}\b"
     r"|\bthe\s+(?:19|20)\d{2}\s+(?:Act|Regulations)\b"
+    r"|(?:Regulation|Directive|Decision)\s+(?:\([^)]{2,30}\)\s+)?(?:No\s+)?\d{1,4}/\d"
 )
 _TAIL_SELF = re.compile(r"\b(?:this|these)\b")
 
@@ -161,6 +163,11 @@ async def emit_inline_markup(
     # binds following op-paragraphs to that act.
     scope_count = _mark_scoped_amendments(body)
     logger.debug("inline_pass_6_scoped_amendments", country=country, count=scope_count)
+
+    # Pass 7, after pass 5, which reads "amending Directive X" in a footnote as this act amending X.
+    if not skip_external_refs:
+        eu_count = _mark_eu_citations(root, body, eu_text=country == "eu")
+        logger.debug("inline_pass_7_eu_citations", country=country, count=eu_count)
 
     # Inject TLCTerm entries into <references>
     if terms:
@@ -826,6 +833,45 @@ def _mark_title_refs(body: etree._Element, country: str) -> int:
             )
 
         count += _wrap_text_matches(p, _SI_REF, make_si_ref)
+    return count
+
+
+# --- Pass 7: EU act citations -----------------------------------------------
+
+
+def _mark_eu_citations(root: etree._Element, body: etree._Element, *, eu_text: bool) -> int:
+    """Wrap EU act citations in the preamble, body and annexes; an act citing itself is skipped."""
+    work = root.find(".//akn:FRBRWork/akn:FRBRuri", NS)
+    own = work.get("value") if work is not None else None
+    scopes = [
+        root.find(".//akn:preamble", NS),
+        body,
+        root.find(".//akn:attachments", NS),
+    ]
+    paragraphs = {p: None for s in scopes if s is not None for p in s.iter(f"{{{AKN_NS}}}p")}
+    return sum(_mark_eu_citations_in(p, own, eu_text) for p in paragraphs)
+
+
+def _mark_eu_citations_in(p: etree._Element, own: str | None, eu_text: bool) -> int:
+    """One paragraph, slot by slot, so a list split by a footnote marker keeps its head."""
+    prefix = ""
+
+    def make(m: re.Match[str]) -> etree._Element | None:
+        uri = work_uri(m, prefix + m.string[: m.start()], eu_text=eu_text)
+        return None if uri is None or uri == own else _derived_ref(uri)
+
+    count = 0
+    slots: list[etree._Element | None] = [None, *p]
+    for child in slots:
+        if child is None:
+            text = p.text or ""
+            count += _wrap_in_text_attr(p, "text", CITATION, make)
+        else:
+            if isinstance(child.tag, str) and etree.QName(child).localname != "authorialNote":
+                prefix += "".join(child.itertext())
+            text = child.tail or ""
+            count += _wrap_in_tail(p, child, CITATION, make)
+        prefix += text
     return count
 
 
