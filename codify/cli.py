@@ -852,8 +852,8 @@ def _load_env() -> None:
         logging.getLogger("langfuse").setLevel(logging.ERROR)
 
 
-def main(argv: list[str] | None = None) -> int:
-    _load_env()
+def build_parser() -> argparse.ArgumentParser:
+    """The `codify` parser with every subcommand; flag defaults read the environment."""
     parser = argparse.ArgumentParser(
         prog="codify",
         description=__doc__,
@@ -1029,8 +1029,12 @@ def main(argv: list[str] | None = None) -> int:
     from codify.cli_store import register as _register_store
 
     _register_store(sub)
+    return parser
 
-    args = parser.parse_args(argv)
+
+def main(argv: list[str] | None = None) -> int:
+    _load_env()
+    args = build_parser().parse_args(argv)
     # Pipeline logs go to stderr so the manifest on stdout stays machine-readable.
     structlog.configure(logger_factory=structlog.PrintLoggerFactory(file=sys.stderr))
     return int(args.func(args))

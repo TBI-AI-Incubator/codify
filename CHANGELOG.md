@@ -35,6 +35,8 @@ New, additive:
   instruction, its lead-in, an opener before it or a heading over it names the
   affected act by title or by a short form the amending act defines, and
   returns `Refused(reason)` otherwise. Nothing calls it yet.
+- `codify.cli.build_parser()` returns the `codify` argument parser, so a command
+  reference can be generated from it. `main` behaves as before.
 
 ## 0.7.0 (2026-11-13)
 

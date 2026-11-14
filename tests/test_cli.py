@@ -269,6 +269,16 @@ def test_help_keeps_the_docstring_examples_on_their_own_lines(capsys) -> None:  
     assert "\n    codify scan-corpus ~/corpus --jurisdiction xa\n" in out
 
 
+def test_the_parser_is_built_without_running_a_command() -> None:
+    """A reference generator reads the parser, so every subcommand must be on it."""
+    from codify.cli import build_parser
+
+    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    assert {"scan-corpus", "ingest-one", "segment", "load", "search", "serve", "mcp"} <= set(
+        sub.choices
+    )
+
+
 async def test_the_fallback_model_reaches_the_client(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     """Without it a content-filter refusal has nowhere to go, however the client
     compares finish reasons."""
