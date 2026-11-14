@@ -117,7 +117,11 @@ class RadaHtmlParser:
         paras = self._paragraphs(root)
         if not paras:
             raise ValueError("no anchored paragraphs found — not a rada document page")
+        return self._parse_paras(paras, config=config, doctype=doctype)
 
+    def _parse_paras(
+        self, paras: list[_Para], *, config: JurisdictionConfig, doctype: str
+    ) -> StructuredParse:
         text, offsets = self._stream(paras)
         scan_text = self._scan_stream(paras, offsets, len(text))
         bluebell, anchor_summary, eid_to_anchor = text_to_bluebell_verbatim(
@@ -275,6 +279,49 @@ class RadaHtmlParser:
                 title = line
                 break
         return {"title": title, "language": "ukr"}
+
+
+# A form-feed line between two units of one source.
+UNIT_BREAK = "\n\f\n"
+
+
+class RadaTextParser(RadaHtmlParser):
+    """The same conversion for plain text, one paragraph per line, as an open-data export
+    carries it. Each unit after a form-feed line becomes an attachment."""
+
+    name: str = "rada_text"
+    media_suffixes: tuple[str, ...] = (".txt",)
+
+    def parse(self, content: bytes, *, config: JurisdictionConfig, doctype: str) -> StructuredParse:
+        units = content.decode("utf-8").replace("\r\n", "\n").split(UNIT_BREAK)
+        paras = [_line_para(line) for line in units[0].splitlines() if line.strip()]
+        if not paras:
+            raise ValueError("no text lines found")
+        parsed = self._parse_paras(paras, config=config, doctype=doctype)
+        schedules = [s for s in map(_schedule, units[1:]) if s]
+        if schedules:
+            parsed.bluebell_text = "\n\n".join([parsed.bluebell_text.rstrip("\n"), *schedules])
+        return parsed
+
+
+def _line_para(line: str) -> _Para:
+    plain = " ".join(line.split())
+    is_note = bool(_BRACE_NOTE.match(plain))
+    return _Para(
+        anchor=None,
+        text=f"{{{{*{plain}}}}}" if is_note else plain,
+        plain=plain,
+        links=[],
+        is_note=is_note,
+    )
+
+
+def _schedule(unit: str) -> str:
+    """A unit as a Bluebell attachment headed by its first line, its lines verbatim."""
+    lines = [" ".join(line.split()) for line in unit.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    return "\n".join([f"SCHEDULE {lines[0]}", *(f"  {line}" for line in lines[1:])]) + "\n"
 
 
 def _main() -> None:

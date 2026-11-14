@@ -656,6 +656,8 @@ class RegistryWork(SQLModel, table=True):
             PG_UUID(as_uuid=True), ForeignKey("laws.id", ondelete="SET NULL"), nullable=True
         ),
     )
+    # Another register's record of this work, with a `source` key naming that register.
+    record: dict[str, Any] | None = Field(default=None, sa_column=Column(JSONB))
     updated_at: datetime = ts_now()
 
 
