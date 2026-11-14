@@ -49,9 +49,10 @@ def registered_parsers() -> list[str]:
 
 
 def _register_builtin() -> None:
-    from codify.pipeline.parsers.rada_html import RadaHtmlParser
+    from codify.pipeline.parsers.rada_html import RadaHtmlParser, RadaTextParser
 
     register_parser(RadaHtmlParser.name, lambda: RadaHtmlParser())
+    register_parser(RadaTextParser.name, lambda: RadaTextParser())
 
 
 _register_builtin()

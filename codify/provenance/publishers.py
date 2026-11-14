@@ -120,6 +120,7 @@ PATTERN_VERIFIED: dict[str, bool] = {
     "zakon-rada.edition": True,
     "zakon-rada.current": True,
     "zakon-rada.fragment": True,
+    "minjust-edrnpa.act": False,
     "qbz.act": True,
     "ocs.act": True,
     "ocs.edition": True,
@@ -296,6 +297,13 @@ def _rada_page(work_id: str, edition_id: str | None) -> str:
     return f"{_RADA}/laws/show/{lang}{quote(work_id, safe='/')}{ed}"
 
 
+# Ministry of Justice of Ukraine: an open dataset with no page per act
+
+
+def _no_act_page(u: SplitResult) -> ParsedUrl | None:
+    return None
+
+
 # QBZ (Albania)
 
 _QBZ = "https://qbz.gov.al"
@@ -422,6 +430,14 @@ def _build() -> tuple[Publisher, ...]:
             edition=_rada_page,
             current=lambda w, e: _rada_page(w, None),
             fragment=lambda w, e, f: f"{_rada_page(w, e)}#{f}",
+        ),
+        Publisher(
+            "minjust-edrnpa",
+            "Ministry of Justice of Ukraine, Unified State Register of Normative Legal Acts",
+            ("data.gov.ua",),
+            _no_act_page,
+            # The dataset page shows no single act; the record's licence links it instead.
+            act=lambda w, e: None,
         ),
         Publisher(
             "qbz",
