@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 import pytest
 
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 
 
 class _Response:
@@ -34,7 +34,7 @@ def _capture(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             return _Response()
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_: _Client())
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://x/v1",
         api_key="k",
         model="m",

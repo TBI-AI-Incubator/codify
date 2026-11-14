@@ -26,6 +26,8 @@ Breaks:
   `LITELLM_CONTENT_FILTER_FALLBACK_MODEL` is `LLM_CONTENT_FILTER_FALLBACK_MODEL`.
   `LITELLM_MASTER_KEY` is no longer read as the API key; set `LLM_API_KEY`.
   The old names are not read as a fallback.
+- `codify.core.llm.LiteLLMClient` is now `OpenAICompatibleClient`. The old name
+  is not kept as an alias.
 
 New, additive:
 

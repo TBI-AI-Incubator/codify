@@ -323,7 +323,7 @@ class VisionText(str):
         return obj
 
 
-class LiteLLMClient:
+class OpenAICompatibleClient:
     """Single OpenAI-SDK-backed client for an OpenAI-compatible endpoint."""
 
     def __init__(
@@ -739,7 +739,7 @@ def create_llm_client(
     telemetry_mode: Literal["proxy", "direct"] = "proxy",
     fallback_model: str | None = None,
 ) -> LLMClient:
-    return LiteLLMClient(
+    return OpenAICompatibleClient(
         base_url=base_url,
         api_key=api_key,
         model=model,
@@ -753,7 +753,7 @@ def create_llm_client(
 
 __all__ = [
     "LLMClient",
-    "LiteLLMClient",
+    "OpenAICompatibleClient",
     "OcrStatusError",
     "RateLimiter",
     "VisionText",

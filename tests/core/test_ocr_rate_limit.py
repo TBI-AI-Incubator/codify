@@ -11,7 +11,7 @@ import time
 import httpx
 import pytest
 
-from codify.core.llm import LiteLLMClient, OcrStatusError, RateLimiter, _is_transient
+from codify.core.llm import OcrStatusError, OpenAICompatibleClient, RateLimiter, _is_transient
 from codify.pipeline.enrich.ocr import _vision_model
 
 
@@ -118,7 +118,7 @@ def test_a_rate_limited_ocr_call_retries_into_success(monkeypatch: pytest.Monkey
             return _Response(429 if attempts == 1 else 200)
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_: _Client())
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://x/v1",
         api_key="k",
         model="m",
@@ -153,7 +153,7 @@ def test_a_bad_request_fails_fast_instead_of_retrying(monkeypatch: pytest.Monkey
             return _Response()
 
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_: _Client())
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://x/v1",
         api_key="k",
         model="m",
@@ -168,7 +168,9 @@ def test_a_bad_request_fails_fast_instead_of_retrying(monkeypatch: pytest.Monkey
     assert "مادة" not in str(caught.value)
 
 
-def _stub_client(monkeypatch: pytest.MonkeyPatch, status: int) -> tuple[LiteLLMClient, list[int]]:
+def _stub_client(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> tuple[OpenAICompatibleClient, list[int]]:
     calls: list[int] = []
 
     class _Response:
@@ -192,7 +194,7 @@ def _stub_client(monkeypatch: pytest.MonkeyPatch, status: int) -> tuple[LiteLLMC
     # Skip the backoff waits; this is about how many attempts happen, not when.
     monkeypatch.setattr(asyncio, "sleep", lambda _: real_sleep(0))
     return (
-        LiteLLMClient(
+        OpenAICompatibleClient(
             base_url="http://x/v1",
             api_key="k",
             model="m",

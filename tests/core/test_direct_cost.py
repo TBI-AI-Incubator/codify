@@ -12,7 +12,7 @@ from structlog.testing import capture_logs
 
 from codify.core import llm as llm_module
 from codify.core import tracing
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 from codify.core.tracing import record_usage
 
 
@@ -53,7 +53,7 @@ def _observed(monkeypatch: pytest.MonkeyPatch, usage_info: dict[str, Any]) -> di
 
     monkeypatch.setattr(llm_module, "direct_observation", _stub)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_: _Client())
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://x/v1",
         api_key="k",
         model="m",
