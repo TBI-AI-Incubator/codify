@@ -1220,10 +1220,14 @@ Guide: [Models and costs](../operate/models-and-costs.md).
 ```python
 from codify.core.pricing import cost_details
 
-def cost_details(model: str, usage: Mapping[str, int]) -> dict[str, float] | None
+def cost_details(
+    model: str,
+    usage: Mapping[str, int],
+    batch: bool = False,
+) -> dict[str, float] | None
 ```
 
 Cost in USD keyed to match `usage`, or None for a model with no price.
 
 Returning None rather than zero matters: an absent cost reads as unpriced,
-where a zero reads as free.
+where a zero reads as free. `batch` prices a provider batch job's result.
