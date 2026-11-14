@@ -44,7 +44,7 @@ def test_parse_rejects_non_number_words() -> None:
 
 
 class TestMoneyWordMismatch:
-    def test_arb_reg_art8_numeral_words_disagree(self) -> None:
+    def test_numeral_and_words_disagree(self) -> None:
         # Synthetic disagreement: numeral says 500,000, words say 50,000.
         text = "بغرامة لا تقل عن (500,000) خمسون ألف دينار زرزوري أو ما يعادلها"
         found = find_money_word_mismatches(text)

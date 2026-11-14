@@ -68,9 +68,8 @@ class TestSelectFormula:
 
 class TestDoctypeMatches:
     def test_scalar_document_class_matches_only_its_doctype(self):
-        # 68 of 71 configs that set document_class use a scalar (ar's "ley" vs
-        # "dnu"); a scalar must match one doctype, not act as a wildcard, else the
-        # first formula is selected for every doctype.
+        # A scalar document_class (ar's "ley" vs "dnu") must match one doctype,
+        # not act as a wildcard, else the first formula is selected for every doctype.
         from codify.jurisdictions import EnactingFormula
         from codify.pipeline.enrich.enacting import _doctype_matches
 

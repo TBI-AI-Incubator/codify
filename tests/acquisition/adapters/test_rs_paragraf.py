@@ -27,7 +27,7 @@ def _adapter() -> SourceAdapter:
 
 def test_frbr_for_zakon() -> None:
     # zakon is the default act type, so no subtype segment; the canonical /act/
-    # segment is present (D3: routed through build_frbr_work_uri).
+    # segment is present (routed through build_frbr_work_uri).
     assert frbr_for("zakon", 2011, "72") == "/akn/rs/act/2011/72"
     assert frbr_for("uredba", 2019, "5") == "/akn/rs/act/uredba/2019/5"
     assert frbr_for("uredba", 2019, "5") == build_frbr_work_uri("rs", "uredba", 2019, "5")

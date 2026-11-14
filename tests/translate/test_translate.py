@@ -1,4 +1,4 @@
-"""Unit tests for the translation pipeline (post-CDFY-T1).
+"""Unit tests for the translation pipeline.
 
 Covers the audit + notes-merge surface and the end-to-end
 `translate_document` flow with a stubbed LLM. The structural invariant

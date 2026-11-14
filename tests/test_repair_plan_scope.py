@@ -6,9 +6,8 @@ finding. The gate that matters is not what the model can be told, it is what
 the applier accepts, and until now nothing compared a plan's targets to the
 finding that licensed it.
 
-The accept cases are not invented: each is a shape taken from the 391 repair
-proposals on the demo corpus, which the rule was measured against before it
-was written.
+The accept cases are shapes taken from real repair proposals, which the rule
+was checked against before it was written.
 """
 
 from __future__ import annotations

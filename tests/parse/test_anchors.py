@@ -1491,7 +1491,7 @@ def test_two_column_line_marker_not_captured_as_title() -> None:
     assert chapter.heading is None
 
 
-# ── Phantom anchors from amendment lead-ins (v38-I-01 / I-02 root cause) ────
+# ── Phantom anchors from amendment lead-ins ────
 
 
 def test_amendment_verb_leadin_citation_not_promoted_to_anchor() -> None:
@@ -1824,7 +1824,7 @@ class TestWrappedCitationPhantoms:
         assert [a.akn_eid for a in self._scan(text)] == ["art_2"]
 
     def test_wrapped_biquwwa_enactment(self) -> None:
-        # Civil Code: fabricated Article 41 from the Basic Law citation.
+        # A wrapped citation of a constitutional article must not become an anchor.
         text = (
             "وبعد أن أصبح القانون مصدراً بقوة\n"
             "المادة (41) من القانون الأساسي لسنة 2003، صدر القانون التالي:\n"
@@ -2155,7 +2155,7 @@ class TestWave41Residuals:
         assert [a.akn_eid for a in self._scan(text)] == ["art_61", "art_62"]
 
     def test_misread_duplicate_repaired_before_dedup(self) -> None:
-        # ArbReg 39/2004: a second "مادة (١)" that is really article 6 sits
+        # A second "مادة (١)" that is really article 6 sits
         # between 5 and 7; repair must fix it before dedup can collapse it
         # with the genuine article 1.
         text = (
@@ -2242,7 +2242,7 @@ class TestBlankLinePrecursorRelease:
         return scan_anchors(text, rx, country="xx")
 
     def test_dhalika_before_blank_line_releases_marker(self) -> None:
-        # Civil Code: art 812 vanished because art 811 ends "…بغير ذلك".
+        # The next marker must be released when an article ends "…بغير ذلك".
         text = (
             "مادة (811)\n"
             "لا يجوز للوكيل أن يبيع ماله لموكله ما لم يوجد اتفاق يقضي بغير ذلك\n"
@@ -2499,16 +2499,16 @@ class TestMarkerNumberSeparator:
         return [a.number or "" for a in anchors if a.kind == "article"]
 
     def test_an_em_dash_before_the_number_is_a_separator(self) -> None:
-        """The oldest shape in the corpus: 287 markers, none claimed."""
+        """The oldest shape: a dash between keyword and number."""
         assert self._articles("مادة— ٢٧\nنص.\n\nمادة— ٢٨\nنص.\n") == ["٢٧", "٢٨"]
 
     def test_an_unbalanced_closing_paren_is_a_separator(self) -> None:
-        """RTL extraction drops the opener: 269 markers, none claimed."""
+        """RTL extraction drops the opener."""
         assert self._articles("مادة )1\nنص.\n\nالمادة )2\nنص.\n") == ["1", "2"]
 
     def test_a_rubric_fused_to_the_number_still_anchors(self) -> None:
         """A digit followed by an Arabic letter is not a word boundary, which
-        hid the old column layout: 348 articles over 87 documents."""
+        hid the old column layout."""
         text = "مادة  — ٢تفسير اصطلاح\nنص.\n\nمادة  — ٣صلاحية المندوب\nنص.\n"
         assert self._articles(text) == ["٢", "٣"]
 
@@ -2688,8 +2688,7 @@ class TestRecoveryRespectsTheScansRefusals:
         """Nothing in the close set can close a low-9 quote: it pairs with a
         curly quote, not a guillemet. One stray „ from source noise therefore
         masked every marker to the end of the file, and each was dropped as
-        quoted text with no gate tripping. On one long code that was 61% of the
-        document."""
+        quoted text with no gate tripping."""
         text = "مادة (1)\nنص.\n\nسطر فيه ضجيج „ هنا\n\nمادة (2)\nنص.\n\nمادة (3)\nنص.\n"
         assert self._scan(text) == [
             ("article", "1", "regex"),
@@ -2737,7 +2736,7 @@ class TestRecoveryRespectsTheScansRefusals:
 def test_anchor_regex_reproducible_across_hashseeds():
     # The compiled pattern must be identical across processes regardless of
     # PYTHONHASHSEED, equal-length aliases (e.g. PART/Part) previously tied on
-    # set iteration order (#658).
+    # set iteration order.
     import os
     import subprocess
     import sys

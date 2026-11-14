@@ -389,7 +389,7 @@ def test_set_money_numeral_will_not_match_across_a_grouping_separator() -> None:
 
 
 def test_duplicate_number_policy_allows_restore_and_remove() -> None:
-    # #702: a mis-parse duplicate is fixed by SetBody (restore the truncated
+    # A mis-parse duplicate is fixed by SetBody (restore the truncated
     # body) + Move (the real nested unit out) + Delete (the false wrapper), not
     # a cosmetic renumber. Those ops must clear the op-policy gate; the sandbox
     # grounding floor + risk escalation (delete/ungrounded -> high -> queued)
@@ -423,7 +423,7 @@ def test_set_body_reaches_gates_for_duplicate_number() -> None:
 
 
 def test_restore_and_remove_shape_clears_duplicate_number() -> None:
-    # #702: the mis-parse fix (set_body the truncated body + delete the false
+    # The mis-parse fix (set_body the truncated body + delete the false
     # copy) applies as one plan and clears the duplicate, the path the widened
     # policy enables and the agent instructions now describe.
     bb = (

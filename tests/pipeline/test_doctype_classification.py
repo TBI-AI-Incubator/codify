@@ -334,8 +334,7 @@ def test_decomposed_arabic_hamza_is_matched_via_nfc(title: str, expected: str) -
     ],
 )
 def test_subordinate_instruments_get_their_own_class(title: str, expected: str) -> None:
-    """The bulk ingest collapsed nine instrument types into three; each
-    subordinate form now carries its own class and FRBR subtype segment."""
+    """Each subordinate form carries its own class and FRBR subtype segment."""
     assert _cfg().classify_document_class(title=title) == expected
 
 

@@ -254,7 +254,7 @@ def test_join_soft_wraps_does_not_glue_prose_onto_a_table_row():
 
 
 def test_end_to_end_dot_paragraphs_and_bracketed_points_no_dupe_nums():
-    """Bridge test: the W10h structurer-flatten bug, fixed at `nest_enumerated_lines`,
+    """Bridge test: the structurer-flatten bug, fixed at `nest_enumerated_lines`,
     flows correctly through scaffold → assemble → Bluebell → AKN → validate.
 
     The body-fill response carries the UA-style `1. paragraph / 1) 2) point / 2.
@@ -289,7 +289,7 @@ def test_end_to_end_dot_paragraphs_and_bracketed_points_no_dupe_nums():
 
 
 def test_end_to_end_pipe_table_becomes_a_real_table_element():
-    """Bridge test for issue #1168: body-fill transcribes an OCR table verbatim as
+    """Bridge test: body-fill transcribes an OCR table verbatim as
     flat `| cell | cell |` lines (its rule is transcribe, not restructure), so
     pre-fix these landed as six `<p>` paragraphs of literal pipe text. Post-fix
     `nest_pipe_tables` rewrites the run into `TABLE`/`TR`/`TH`/`TC` before Bluebell

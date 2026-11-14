@@ -36,7 +36,7 @@ def test_work_uri_fallback_for_unconfigured() -> None:
 
 def test_work_uri_act_doctype_has_no_subtype() -> None:
     # A plain "act" (or empty) doctype collapses to /akn/{cc}/act/{year}/{number}
-    # with no doubled `act/act`. Load-bearing for the demo seed's base-law shape.
+    # with no doubled `act/act`.
     assert build_frbr_work_uri("zz", "act", 2024, "1") == "/akn/zz/act/2024/1"
     assert build_frbr_work_uri("zz", "", 2024, "1") == "/akn/zz/act/2024/1"
 

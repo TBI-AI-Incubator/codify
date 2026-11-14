@@ -84,9 +84,8 @@ def test_abbreviation_not_treated_as_marker():
 
 def test_dot_paragraphs_with_bracketed_subpoints_nest_correctly():
     """`1.` paragraphs followed by `1) 2) 3)` points must nest the points under
-    the paragraphs, not flatten to one sibling level. UA zakon dominant failure
-    mode (W10h), bracket-form and dot-form must be recognised as different
-    levels even though both carry numeric tokens."""
+    the paragraphs, not flatten to one sibling level: bracket-form and dot-form
+    must be recognised as different levels even though both carry numeric tokens."""
     out = nest_enumerated_lines(
         [
             "1. First paragraph text.",

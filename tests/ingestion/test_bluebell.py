@@ -146,7 +146,7 @@ def test_akn_bluebell_roundtrip_preserves_schedules():
 def test_akn_bluebell_roundtrip_preserves_tables():
     """A `<table>` must survive AKN -> Bluebell -> AKN byte-identical, not
     flatten to prose: that flattening is what breaks the source pane, which
-    re-derives Bluebell from stored AKN on every reopen (issue #1168)."""
+    re-derives Bluebell from stored AKN on every reopen."""
     bluebell_text = """ARTICLE 1 - Schedule
 
   The following schedule:

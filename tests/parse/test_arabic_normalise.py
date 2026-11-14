@@ -200,9 +200,8 @@ class TestStripOCRHeaders:
         assert n == 1
         assert "صفحة 27" not in out
 
-    def test_env_law_art27_specific_concatenated_bleed(self):
-        """The exact shape observed on Env Law Art 27: page number, gazette
-        title fragment, all mashed together into one run."""
+    def test_concatenated_page_number_and_gazette_title_bleed(self):
+        """Page number and gazette title fragment mashed together into one run."""
         import re
 
         patterns = [re.compile(p, re.MULTILINE | re.UNICODE) for p in _GAZETTE_PATTERNS]
@@ -263,8 +262,8 @@ class TestLatinBulletRemap:
 
     _AR_HEADER = "المادة 1\n"
 
-    def test_arb_reg_39_2004_bullet_run(self):
-        """Reviewer defect v38-E-01 verbatim: five sequential markers."""
+    def test_a_run_of_lettered_bullets(self):
+        """Five sequential markers."""
         text = self._AR_HEADER + (
             "v- first item\nw- second item\nc- third item\nh- fourth item\nx- fifth item"
         )
@@ -286,7 +285,7 @@ class TestLatinBulletRemap:
         assert n == 0
 
     def test_tree_gate_applies_arabic_transforms_to_english_fragment(self):
-        """Copilot #1 regression: normalise_arabic_in_tree must decide the
+        """Regression: normalise_arabic_in_tree must decide the
         Arabic gate once from the whole document, so an English `<p>`
         inside an Arabic-language AKN still gets its bullet marker
         rewritten. Otherwise a per-fragment gate silently skips exactly

@@ -72,7 +72,7 @@ def test_ocr_records_pages_and_the_cost_of_them(monkeypatch: pytest.MonkeyPatch)
 
 def test_ocr_keeps_doc_size_out_of_usage(monkeypatch: pytest.MonkeyPatch) -> None:
     # Left in the usage blob it is summed into the token total beside the page
-    # count, which is how a week of OCR read as 73.7M tokens.
+    # count, inflating it.
     fields = _observed(monkeypatch, {"pages_processed": 4, "doc_size_bytes": 34281})
     assert "doc_size_bytes" not in fields["usage_details"]
     assert fields["metadata"] == {"doc_size_bytes": 34281}

@@ -209,7 +209,7 @@ def test_a_general_root_without_articles_is_not_an_act() -> None:
 def trade_secrets_xml() -> Path:
     p = FIXTURES_DIR / "eu" / "2016-943" / "eng.xml"
     if not p.exists():
-        pytest.skip("fixture missing: run apps/api/scripts/run_ingest.py --skip-ingest")
+        pytest.skip("fixture not in this tree")
     return p
 
 
@@ -217,7 +217,7 @@ def trade_secrets_xml() -> Path:
 def procurement_xml() -> Path:
     p = FIXTURES_DIR / "eu" / "2014-24" / "eng.xml"
     if not p.exists():
-        pytest.skip("fixture missing: run apps/api/scripts/run_ingest.py --skip-ingest")
+        pytest.skip("fixture not in this tree")
     return p
 
 
@@ -1619,7 +1619,7 @@ def test_a_real_act_with_a_welded_title_is_repaired() -> None:
     output carries the defect, so the comparison has a case that must differ."""
     fixture = FIXTURES_DIR / "eu" / "2012-687" / "eng.xml"
     if not fixture.exists():
-        pytest.skip("fixture missing: run apps/api/scripts/run_ingest.py --skip-ingest")
+        pytest.skip("fixture not in this tree")
     src = fixture.read_text()
     out = formex_to_akn4eu(src, frbr_work_uri="/akn/eu/act/dec/2012/687")
     headings = re.findall(r"<heading>([^<]*)</heading>", out)

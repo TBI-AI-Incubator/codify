@@ -2,10 +2,9 @@
 
 The corruption that motivated this is a PDF whose glyph mapping does not
 round-trip: the page renders correctly, carries a text layer, and extracts as
-Arabic-looking text with the interior letters wrong. One civil code
-arrived that way and 182 of its 219 pages were accepted, because the particle
-test that had spotted it was ANDed with a definite-article test the corruption
-leaves untouched.
+Arabic-looking text with the interior letters wrong. Most such pages were
+accepted, because the particle test that had spotted it was ANDed with a
+definite-article test the corruption leaves untouched.
 """
 
 from __future__ import annotations
@@ -177,10 +176,9 @@ def test_a_letter_spaced_layer_does_not_anchor_its_own_vision_reread() -> None:
 
 
 # Word splitting: a born-digital layer that encodes a tracked-out label as literal
-# spaces. Invisible to divergence, which scores whole-page token overlap: on the
-# document that motivated this the affected pages measured 0.02 to 0.44, none of
-# them near the 0.5 divert threshold, because the damage is a few words on a page
-# of hundreds. Only a rival that keeps the word whole faults the layer.
+# spaces. Invisible to divergence, which scores whole-page token overlap: affected
+# pages sit well under the divert threshold, because the damage is a few words on
+# a page of hundreds. Only a rival that keeps the word whole faults the layer.
 
 _SPACED_LAYER = "N a m a : Budi Santoso\nA l a m a t : Dulang, RT. 001/RW. 000, Desa Madandan"
 _CLEAN_RIVAL = "Nama : Budi Santoso\nAlamat : Dulang, RT. 001/RW. 000, Desa Madandan"
@@ -201,7 +199,7 @@ def test_the_divergence_score_cannot_see_this() -> None:
 def test_a_deliberately_spaced_heading_keeps_its_layer() -> None:
     """Typographic letter-spacing is the same shape as damage, and the corpus has
     both. The rival is an independent transcription that also reads the heading
-    spaced, which is what PP 28/2011 page 26 does with `U M U M`."""
+    spaced, as a heading set `U M U M` is."""
     layer = "K E T E N T U A N U M U M\nPasal 1 Dalam Peraturan ini yang dimaksud dengan:"
     rival = "## K E T E N T U A N U M U M\n\nPasal 1\n\nDalam Peraturan ini yang dimaksud dengan"
     assert _layer_split_words(layer, rival) == set()
