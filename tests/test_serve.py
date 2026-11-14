@@ -354,6 +354,39 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
         await app.state.sessions.kw["bind"].dispose()
 
 
+@pytest.mark.integration
+async def test_a_failed_embed_fails_the_run_and_stores_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stored but unsearchable would read as a success."""
+    import codify.pipeline
+    from codify import cli_store
+
+    class _Down(_FixedVectors):
+        async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
+            raise RuntimeError("embeddings endpoint down")
+
+    async def fake_ingest(*_: Any, **__: Any) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
+    monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _Down)
+    title = f"Unembedded {uuid.uuid4().hex[:8]}"
+
+    app = create_app()
+    try:
+        async with _client(None, app) as c:
+            rid = await _enqueue(c, title=title)
+            events = _sse((await c.get(f"/runs/{rid}/stream")).text)
+            assert "stored" not in [k for k, _ in events], events
+            assert (await c.get(f"/runs/{rid}")).json()["status"] == "failed"
+            laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()
+            assert laws["items"] == []
+    finally:
+        await app.state.sessions.kw["bind"].dispose()
+
+
 async def test_ingest_url_refuses_anything_but_a_url() -> None:
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
         yield _complete()
