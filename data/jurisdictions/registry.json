@@ -550,6 +550,47 @@
       "public_reference": true
     },
     {
+      "code": "eu",
+      "name": "European Union",
+      "type": "supranational",
+      "tradition": [
+        "sui_generis"
+      ],
+      "languages": [
+        "bul",
+        "ces",
+        "dan",
+        "deu",
+        "ell",
+        "eng",
+        "est",
+        "fin",
+        "fra",
+        "gle",
+        "hrv",
+        "hun",
+        "ita",
+        "lav",
+        "lit",
+        "mlt",
+        "nld",
+        "pol",
+        "por",
+        "ron",
+        "slk",
+        "slv",
+        "spa",
+        "swe"
+      ],
+      "calendar": "gregorian",
+      "tier": 1,
+      "status": "draft",
+      "effective_tier": 1,
+      "coverage_status": "in_scope",
+      "subsumed_by": null,
+      "public_reference": true
+    },
+    {
       "code": "fi",
       "name": "Finland",
       "type": "national",

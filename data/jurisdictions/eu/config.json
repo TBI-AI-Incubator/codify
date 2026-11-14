@@ -1,0 +1,462 @@
+{
+  "code": "eu",
+  "name": "European Union",
+  "type": "supranational",
+  "tradition": [
+    "sui_generis"
+  ],
+  "akn_profile": "AKN4EU",
+  "calendar": "gregorian",
+  "languages": [
+    "bul",
+    "ces",
+    "dan",
+    "deu",
+    "ell",
+    "eng",
+    "est",
+    "fin",
+    "fra",
+    "gle",
+    "hrv",
+    "hun",
+    "ita",
+    "lav",
+    "lit",
+    "mlt",
+    "nld",
+    "pol",
+    "por",
+    "ron",
+    "slk",
+    "slv",
+    "spa",
+    "swe"
+  ],
+  "authoritative_language": null,
+  "members": [
+    "at",
+    "be",
+    "bg",
+    "hr",
+    "cy",
+    "cz",
+    "dk",
+    "ee",
+    "fi",
+    "fr",
+    "de",
+    "gr",
+    "hu",
+    "ie",
+    "it",
+    "lv",
+    "lt",
+    "lu",
+    "mt",
+    "nl",
+    "pl",
+    "pt",
+    "ro",
+    "sk",
+    "si",
+    "es",
+    "se"
+  ],
+  "document_classes": {
+    "regulation": {
+      "label": "Regulation",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "direct_effect": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "local_terms": {
+            "bul": "ЧАСТ",
+            "ell": "ΜΕΡΟΣ"
+          }
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "local_terms": {
+            "bul": "ДЯЛ",
+            "ell": "ΤΙΤΛΟΣ"
+          }
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "local_terms": {
+            "bul": "ГЛАВА",
+            "ell": "ΚΕΦΑΛΑΙΟ"
+          }
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "local_terms": {
+            "bul": "РАЗДЕЛ",
+            "ell": "ΤΜΗΜΑ"
+          }
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "local_terms": {
+            "bul": "Член",
+            "ell": "Άρθρο"
+          }
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "local_terms": {
+            "bul": "параграф",
+            "ell": "παράγραφος"
+          }
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "local_terms": {
+            "bul": "алинея",
+            "ell": "εδάφιο"
+          }
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "local_terms": {
+            "bul": "буква",
+            "ell": "στοιχείο"
+          }
+        },
+        {
+          "local_term": "Indent",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "local_terms": {
+            "bul": "тире",
+            "ell": "περίπτωση"
+          }
+        }
+      ],
+      "hcontainers": []
+    },
+    "directive": {
+      "label": "Directive",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "direct_effect": false,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "local_terms": {
+            "bul": "ЧАСТ",
+            "ell": "ΜΕΡΟΣ"
+          }
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "local_terms": {
+            "bul": "ДЯЛ",
+            "ell": "ΤΙΤΛΟΣ"
+          }
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "local_terms": {
+            "bul": "ГЛАВА",
+            "ell": "ΚΕΦΑΛΑΙΟ"
+          }
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "local_terms": {
+            "bul": "РАЗДЕЛ",
+            "ell": "ΤΜΗΜΑ"
+          }
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "local_terms": {
+            "bul": "Член",
+            "ell": "Άρθρο"
+          }
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "local_terms": {
+            "bul": "параграф",
+            "ell": "παράγραφος"
+          }
+        },
+        {
+          "local_term": "Subparagraph",
+          "akn_element": "subparagraph",
+          "level": "subdivision",
+          "bluebell_keyword": "SUBPARAGRAPH",
+          "local_terms": {
+            "bul": "алинея",
+            "ell": "εδάφιο"
+          }
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "local_terms": {
+            "bul": "буква",
+            "ell": "στοιχείο"
+          }
+        },
+        {
+          "local_term": "Indent",
+          "akn_element": "indent",
+          "level": "subdivision",
+          "bluebell_keyword": "INDENT",
+          "local_terms": {
+            "bul": "тире",
+            "ell": "περίπτωση"
+          }
+        }
+      ],
+      "hcontainers": []
+    },
+    "decision": {
+      "label": "Decision",
+      "akn_element": "act",
+      "bluebell_compatible": true,
+      "direct_effect": true,
+      "basic_unit": "article",
+      "hierarchy": [
+        {
+          "local_term": "Part",
+          "akn_element": "part",
+          "level": "higher",
+          "bluebell_keyword": "PART",
+          "local_terms": {
+            "bul": "ЧАСТ",
+            "ell": "ΜΕΡΟΣ"
+          }
+        },
+        {
+          "local_term": "Title",
+          "akn_element": "title",
+          "level": "higher",
+          "bluebell_keyword": "TITLE",
+          "local_terms": {
+            "bul": "ДЯЛ",
+            "ell": "ΤΙΤΛΟΣ"
+          }
+        },
+        {
+          "local_term": "Chapter",
+          "akn_element": "chapter",
+          "level": "higher",
+          "bluebell_keyword": "CHAPTER",
+          "local_terms": {
+            "bul": "ГЛАВА",
+            "ell": "ΚΕΦΑΛΑΙΟ"
+          }
+        },
+        {
+          "local_term": "Section",
+          "akn_element": "section",
+          "level": "higher",
+          "bluebell_keyword": "SECTION",
+          "local_terms": {
+            "bul": "РАЗДЕЛ",
+            "ell": "ΤΜΗΜΑ"
+          }
+        },
+        {
+          "local_term": "Article",
+          "akn_element": "article",
+          "level": "basic",
+          "bluebell_keyword": "ARTICLE",
+          "local_terms": {
+            "bul": "Член",
+            "ell": "Άρθρο"
+          }
+        },
+        {
+          "local_term": "Paragraph",
+          "akn_element": "paragraph",
+          "level": "subdivision",
+          "bluebell_keyword": "PARAGRAPH",
+          "local_terms": {
+            "bul": "параграф",
+            "ell": "παράγραφος"
+          }
+        },
+        {
+          "local_term": "Point",
+          "akn_element": "point",
+          "level": "subdivision",
+          "bluebell_keyword": "POINT",
+          "local_terms": {
+            "bul": "буква",
+            "ell": "στοιχείο"
+          }
+        }
+      ],
+      "hcontainers": []
+    }
+  },
+  "default_document_class": "regulation",
+  "identification": {
+    "system": "celex",
+    "pattern": "{sector}{year}{type}{number}",
+    "eli_base": "http://data.europa.eu/eli"
+  },
+  "source_adapters": [
+    {
+      "kind": "eurlex_cellar",
+      "name": "eu-sparql",
+      "base_url": "http://publications.europa.eu/webapi/rdf/sparql",
+      "rate_limit_per_minute": 8,
+      "licence": "EU-RU/2011/833"
+    },
+    {
+      "kind": "bulk_xml_archive",
+      "name": "eu-datadump",
+      "base_url": "https://datadump.publications.europa.eu/server/download-requests/download?formatCode=FMX&languageIso2Code=en",
+      "licence": "EU-RU/2011/833"
+    }
+  ],
+  "frbr": {
+    "country_code": "eu",
+    "uri_patterns": {
+      "regulation": "/akn/eu/act/reg/{year}/{number}",
+      "directive": "/akn/eu/act/dir/{year}/{number}",
+      "decision": "/akn/eu/act/dec/{year}/{number}"
+    },
+    "date_calendar": "gregorian"
+  },
+  "numbering": {
+    "act_citation": "Regulation (EU) {year}/{number}",
+    "act_citation_alt": "",
+    "insertion_style": "alphanumeric"
+  },
+  "enacting_formulae": [
+    {
+      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, Having regard to the Treaty on the Functioning of the European Union..., HAVE ADOPTED THIS REGULATION:",
+      "position": "preamble",
+      "era": "olp",
+      "document_class": "regulation"
+    },
+    {
+      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, ... HAVE ADOPTED THIS DIRECTIVE:",
+      "position": "preamble",
+      "era": "olp_directive",
+      "document_class": "directive"
+    },
+    {
+      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, ... HAVE ADOPTED THIS DECISION:",
+      "position": "preamble",
+      "era": "olp_decision",
+      "document_class": "decision"
+    }
+  ],
+  "amendments": {
+    "style": "textual_civil",
+    "phrasing": "Article X is replaced by the following: / Article X is amended as follows:",
+    "cross_reference_format": "celex_and_title"
+  },
+  "core_tlcs": [
+    {
+      "eId": "europeanParliament",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/eu/european-parliament",
+      "showAs": "European Parliament"
+    },
+    {
+      "eId": "council",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/eu/council",
+      "showAs": "Council of the European Union"
+    },
+    {
+      "eId": "commission",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/eu/commission",
+      "showAs": "European Commission"
+    },
+    {
+      "eId": "officialJournal",
+      "class": "TLCObject",
+      "href": "/ontology/obj/eu/official-journal",
+      "showAs": "Official Journal of the European Union"
+    },
+    {
+      "eId": "codify",
+      "class": "TLCOrganization",
+      "href": "/ontology/org/codify",
+      "showAs": "Codify"
+    }
+  ],
+  "structuring": {
+    "designation_rule": "eu_instrument",
+    "prompt_additions": "EU recitals appear as numbered paragraphs in the preamble before 'HAS/HAVE ADOPTED THIS REGULATION/DIRECTIVE/DECISION:'. Citations ('Having regard to...') precede recitals. Both require post-processing to become <recitals>/<citations> elements. SECTION is a higher division above ARTICLE, not the basic unit."
+  },
+  "supranational_memberships": [],
+  "display": {
+    "heading_type": "centered",
+    "heading_case": "upper_case",
+    "script": "latin",
+    "rtl": false,
+    "font_preference": "serif"
+  },
+  "validation": {
+    "status": "draft",
+    "documents_examined": 6,
+    "bluebell_tested": false,
+    "unresolved_ambiguities": 5,
+    "note": "AKN4EU profile is well-documented. Recital/citation post-processing needed. 24-language parallel expressions."
+  },
+  "tier": 1,
+  "status": "draft",
+  "public_reference": true
+}

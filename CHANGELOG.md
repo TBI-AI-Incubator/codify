@@ -12,6 +12,13 @@ Breaks:
   `make_polite_client`; without one, building an acquirer's client raises
   `MissingUserAgent` before any request is sent. Adapters whose source requires a
   fixed agent keep sending it.
+- The Diário da República and Thai OCS adapters and the EUR-Lex URL fetch no
+  longer send a built-in `Codify/<release>` agent; they resolve the caller's the
+  same way. `codify.acquisition.adapters.pt.dre.USER_AGENT` is removed.
+- The `eu` configuration ships, so EU works mint the AKN subtypes
+  `/akn/eu/act/reg|dir|dec/{year}/{number}` rather than
+  `/akn/eu/act/regulation|directive|decision/...`, and `POST /runs/ingest-url`
+  accepts an EUR-Lex or Publications Office URL under `eu` without a data root.
 - The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
   pages.
 

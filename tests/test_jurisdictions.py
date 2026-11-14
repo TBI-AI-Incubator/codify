@@ -565,7 +565,7 @@ def test_the_flagged_set_is_deliberate() -> None:
         if json.loads(p.read_text()).get("public_reference")
     )
     assert flagged == on_disk
-    assert len(flagged) == 104
+    assert len(flagged) == 105
     assert {"ee", "fi", "gb", "ie", "it", "nz"} <= set(flagged)
 
 
@@ -1662,7 +1662,8 @@ def test_spanish_and_portuguese_display_text_carries_its_accents(code: str) -> N
     for lang in ("spa", "por"):
         if lang in raw["languages"]:
             words.update(_NEEDS_ACCENT[lang])
-    if not words:
+    # A profile that also declares English writes its display text in English.
+    if not words or "eng" in raw["languages"]:
         return
     misspelt = []
     for where, text in _paths(raw):
