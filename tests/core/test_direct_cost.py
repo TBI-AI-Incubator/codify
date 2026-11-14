@@ -100,6 +100,12 @@ def test_a_boolean_never_lands_in_the_usage_total() -> None:
     assert observation.fields["usage_details"] == {"pages_processed": 2}
 
 
+def test_a_batch_result_records_the_batch_rate() -> None:
+    observation = _Observation()
+    record_usage(observation, "gemini-3.7-flash", {"input": 1_000_000}, batch=True)
+    assert observation.fields["cost_details"] == pytest.approx({"input": 0.375, "total": 0.375})
+
+
 def test_an_unpriced_model_says_so_once() -> None:
     """A route the table does not know is invisible in cost terms, and reads as
     free. `mistral-ocr-4-1` would route direct and record pages at nothing."""
