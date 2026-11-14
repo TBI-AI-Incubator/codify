@@ -150,12 +150,11 @@ def basic_unit_numbers(root: etree._Element) -> frozenset[str]:
     """The basic units (article/section/rule) as ``"kind:number"`` keys.
 
     Compared as a set, this survives what a per-kind count cannot: re-OCR re-renders
-    lists and regroups chapters, so counts churn and a raw total masks real loss (act
-    2014/23 shed 48 articles while its other counts rose). Digits are normalised across
-    every non-Latin block `codify.lang` folds, so an article and a section both numbered 5 stay
-    two units, and a spelled or Roman number keeps its letters rather than vanishing, in
-    the order written. A
-    named `<hcontainer>` is a basic unit; only the bare Bluebell wrapper is not.
+    lists and regroups chapters, so counts churn and a raw total masks real loss. Digits
+    are normalised across every non-Latin block `codify.lang` folds, so an article and a
+    section both numbered 5 stay two units, and a spelled or Roman number keeps its letters
+    rather than vanishing, in the order written. A named `<hcontainer>` is a basic unit;
+    only the bare Bluebell wrapper is not.
 
     A lone <section> numbered 1 with no article or rule is the structureless fallback and
     contributes nothing, so a candidate replacing it with real articles is not charged

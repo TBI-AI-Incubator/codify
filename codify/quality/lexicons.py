@@ -35,8 +35,7 @@ class WordList:
     # run keeps a bilingual page scored on the language being judged; the default
     # accepts any letter, right for a Latin-script language on a Latin-script page.
     letter_re: re.Pattern[str] | None = None
-    # Floors for `verdict_from_rates`, measured per language and not transferable:
-    # clean Arabic prose runs 91 to 176 per 1,000 where English runs 213 to 433. A
+    # Floors for `verdict_from_rates`, calibrated per language and not transferable. A
     # None lexicon floor means the content-noun tie-break is unusable here, so a
     # low-prose document reports no verdict rather than a wrong one.
     prose_floor: float | None = None

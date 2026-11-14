@@ -228,7 +228,7 @@ def _merge_notes(partials: list[dict[str, Any]], *, target_language: str) -> dic
 
 @dataclass(frozen=True)
 class PinnedTerm:
-    """A partner-supplied rendering that overrides the model for one source term."""
+    """A caller-supplied rendering that overrides the model for one source term."""
 
     source: str
     target: str

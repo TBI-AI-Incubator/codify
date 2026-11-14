@@ -1148,8 +1148,7 @@ class JurisdictionConfig(BaseModel):
     structuring: StructuringConfig | None = None
     supranational_memberships: list[SupranationalMembership] = Field(default_factory=list)
     # Non-membership binding regimes (treaty frameworks, bilateral regimes,
-    # constitutional annexes). Populated in migration for BA, PW, MH, VA
-    # etc., where the existing "membership" modelling was semantically wrong.
+    # constitutional annexes), where membership modelling would be semantically wrong.
     binding_regimes: list[BindingRegime] = Field(default_factory=list)
     # Foreign corpora still residually applicable here: pre-independence or
     # occupying-power law left in force, VA for suppletive Italian law, and so on.

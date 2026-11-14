@@ -891,7 +891,7 @@ def test_the_cpu_bound_passes_run_on_the_pipeline_pool(
 ) -> None:
     """Conversion and validation are the FORMEX lane's whole CPU cost and are
     synchronous. Left on the loop, one large act holds the health probe for its own
-    duration whatever the queues are capped to: 19 to 31 s on the corpus's largest.
+    duration whatever the queues are capped to.
 
     On the pipeline's own pool, not the default executor, which is shared with the
     readiness probe, the PDF export and the OCR crops.
@@ -1574,8 +1574,8 @@ class TestATitleIsJoinedNotConcatenated:
         return [h for h in re.findall(r"<heading>([^<]*)</heading>", out) if "ANNEX" not in h]
 
     def test_a_number_and_its_text_are_separated(self) -> None:
-        """Sibling NO.P and TXT: 15,737 of 15,737 titles in the corpus split this
-        way, so concatenating welded every heading."""
+        """Sibling NO.P and TXT: titles split this way, so concatenating welded
+        every heading."""
         assert self._division_headings(self._WELDED) == ["I. Information regarding X"]
         assert self._group_headings(self._WELDED) == ["I. Information regarding X"]
 

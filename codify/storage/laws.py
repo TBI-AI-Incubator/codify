@@ -46,9 +46,8 @@ SORTS = ("relevance", "title", "year_desc", "year_asc", "ingested")
 # reader named is inside it, bounded so the index keeps doing the ordering.
 RERANK_WINDOW = 200
 
-# One rank step in BM25 units. Measured floor: 0.35 lifts a `qanun` above a
-# `qarar`, 0.2 does not, and recall and MRR are unchanged up to 1.5. No ceiling
-# was found, so this is the smaller intervention rather than the better one.
+# One rank step in BM25 units: the smallest weight that reorders adjacent doctype
+# ranks, the smaller intervention rather than the better one.
 RANK_WEIGHT = 0.35
 
 

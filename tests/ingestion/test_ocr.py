@@ -88,7 +88,7 @@ async def test_extract_promotes_the_rival_when_vision_reads_empty(monkeypatch) -
         return {}, {1: rival}
 
     async def _fake_ocr(*_a: object, **_k: object) -> str:
-        return ""  # vision refuses (content_filter), as on act/1863 pages 69/71
+        return ""  # vision refuses (content_filter)
 
     async def _fake_window(_pdf: bytes, first: int, last: int, _dpi: int) -> dict[int, bytes]:
         return {n: b"\x89PNG" for n in range(first, last + 1)}
@@ -434,7 +434,7 @@ async def test_a_diverted_layer_page_is_never_dropped_when_vision_returns_nothin
         return {}, {1: rival}
 
     async def _fake_ocr(*_a: object, **_k: object) -> str:
-        return ""  # vision refuses, as on act/1863
+        return ""  # vision refuses
 
     async def _fake_window(_pdf: bytes, first: int, last: int, _dpi: int) -> dict[int, bytes]:
         return {n: b"\x89PNG" for n in range(first, last + 1)}
@@ -997,7 +997,7 @@ class TestVisionFanOut:
 
     def test_a_sparse_divert_set_does_not_render_the_whole_span(self) -> None:
         """Chunking by count let pages 1, 50 and 900 render as one 900-page
-        span: an OOM on a 16 GB host, to read three pages. Windows are bounded
+        span, exhausting memory to read three pages. Windows are bounded
         by page distance instead."""
         windows = ocr._render_windows([1, 2, 3, 50, 900])
 
@@ -1090,7 +1090,7 @@ class TestImagePlaceholders:
     """A figure is a region, not a sentence of the law."""
 
     def test_an_image_reference_never_reaches_the_text(self) -> None:
-        """Observed first-line on a 1938 gazette, directly above the law title,
+        """A figure reference on the first line, directly above the law title,
         which is where the masthead defect used to sit."""
         page = "![img-0.jpeg](img-0.jpeg)\n\nالملحق رقم ١\n\n# قانون تمدين الزيت"
 

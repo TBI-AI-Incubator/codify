@@ -292,8 +292,7 @@ def context_tags(context: TelemetryContext) -> list[str]:
     tags = [f"workflow:{context.workflow_kind}"]
     if context.jurisdiction:
         tags.append(f"jurisdiction:{context.jurisdiction}")
-    # The id, not the name: this is what stays stable when a workspace is
-    # renamed. /admin/cost trades it for the name at read time.
+    # The id, not the name: it stays stable when an organisation is renamed.
     if context.org_id:
         tags.append(f"organisation:{context.org_id}")
     return tags

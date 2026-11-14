@@ -2928,7 +2928,7 @@ class TestAmendmentItemScope:
 
 class TestMarkerTolerances:
     """Scanned Bahasa sources lose the space between a marker keyword and
-    its number (`Pasal24`, `Angka22`), over half of all unmatched markers.
+    its number (`Pasal24`, `Angka22`).
     Declared per jurisdiction, so every other compiled pattern is untouched."""
 
     def _scan(self, text: str, country: str = "xl") -> list[StructuralAnchor]:

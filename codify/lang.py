@@ -14,8 +14,7 @@ import structlog
 logger = structlog.get_logger()
 
 # Single source of truth: (639-1, 639-3, lowercase English name) per language
-# the corpus serves (EU official + EEA + candidates + workspace jurisdictions
-# + common neighbours). ISO1_TO_3 / NAME_TO_3 are derived, so the two lookups
+# the configs name, plus common neighbours. ISO1_TO_3 / NAME_TO_3 are derived, so the two lookups
 # cannot drift. Deliberately not pycountry/langcodes: ISO's own name data
 # mis-resolves this vocabulary ("en" fuzzy-matches the En language, "Greek"
 # is named "Modern Greek (1453-)"), and the inputs here are our own closed

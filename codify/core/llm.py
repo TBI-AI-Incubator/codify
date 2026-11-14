@@ -167,9 +167,8 @@ class OcrStatusError(RuntimeError):
 
 class RateLimiter:
     """Caps calls to a requests-per-minute ceiling across concurrent callers,
-    in-process only. The Foundry deployment's limit is per-deployment, so two API
-    replicas each get the full allowance and can overrun it together; a shared
-    limiter would need Redis. Sized from the deployment's stated RPM.
+    in-process only: each replica gets the full allowance, so replicas can overrun
+    a per-deployment limit together, and a shared limiter needs an external store.
     """
 
     def __init__(self, per_minute: int) -> None:

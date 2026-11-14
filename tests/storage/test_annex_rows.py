@@ -106,7 +106,7 @@ async def test_rows_read_back_in_document_order(session: AsyncSession) -> None:
 
 
 async def test_a_table_reads_back_a_page_at_a_time(session: AsyncSession) -> None:
-    """The largest table in the corpus runs to six figures."""
+    """A table can be far larger than a page."""
     version_id = await _a_version(session)
     await index_version_annex_rows(session, version_id)
     await session.flush()

@@ -99,8 +99,8 @@ def _looks_garbled(text: str) -> bool:
     than trust the text layer. Non-Arabic is never flagged.
     """
     text = unicodedata.normalize("NFC", text)
-    # Only the base Arabic block; presentation-form PDFs (U+FB50+) aren't seen
-    # in this corpus and would read as non-Arabic, i.e. left to the normal path.
+    # Only the base Arabic block; presentation forms (U+FB50+) read as non-Arabic
+    # and are left to the normal path.
     arabic = sum(1 for c in text if "؀" <= c <= "ۿ")
     # Guard on chars, not words: garble runs together into few tokens. Share is
     # over non-whitespace, or a spaced two-column extract of the same garble
@@ -508,7 +508,7 @@ def _render_windows(pages: list[int]) -> list[list[int]]:
     """Group diverted pages into windows bounded by page span, not by count.
 
     Chunking by count let a sparse set (pages 1, 50, 900) render the whole span
-    between its ends, which on a 16 GB host is an OOM.
+    between its ends, which can exhaust memory.
     """
     windows: list[list[int]] = []
     for page in pages:
@@ -848,9 +848,9 @@ def _promote_rival_when_empty(page: PageResult) -> PageResult:
 
         A RECITATION refusal on famous legal text returns nothing (`finish_reason`
     `content_filter`), so a scanned page
-        reads as blank though the layout pass already transcribed it. A measured engine
-        A/B put vision ahead wherever both engines read, so this fires only on an empty
-        read, never to override a real one.
+        reads as blank though the layout pass already transcribed it. Vision stays authoritative
+        wherever both engines read, so this fires only on an empty read, never to
+        override a real one.
 
         Recorded rather than hidden: the empty vision read moves into `rival_text`, so
         the `page_reads` row still shows the primary engine returned nothing.

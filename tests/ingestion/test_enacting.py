@@ -53,7 +53,7 @@ class TestSelectFormula:
         assert select_formula("gb", "act", None) is None
 
     def test_missing_jurisdiction_returns_none(self):
-        # jp has no enacting_formulae per the corpus audit
+        # a jurisdiction with no enacting_formulae
         assert select_formula("jp", "act", date(2024, 1, 1)) is None
 
     def test_verified_preferred_on_ties(self):

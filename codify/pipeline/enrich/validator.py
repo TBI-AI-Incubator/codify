@@ -1256,8 +1256,7 @@ _OCR_GARBLE_PATTERNS = ARABIC.garble_patterns
 
 def _check_ocr_garble(root: etree._Element) -> list[dict[str, Any]]:
     """Detect OCR mojibake the body-fill LLM passed through unchanged, such as the
-    duplicated ta-marbuta the modern-Arabic re-ingests leak from the PDF extraction
-    layer. Surfaced as candidates for human review; the fix belongs in extraction or
+    duplicated ta-marbuta that PDF text extraction can leak. Surfaced as candidates for human review; the fix belongs in extraction or
     body-fill normalisation.
     """
     issues: list[dict[str, Any]] = []

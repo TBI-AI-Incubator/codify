@@ -381,7 +381,7 @@ def _alias_terms_for(entry: HierarchyEntry) -> tuple[str, ...]:
 _ARABIC_JOINER_OPT = ARABIC.joiner_opt
 
 
-# Letter-for-letter misreads the vision OCR produces on this corpus, keyed by
+# Letter-for-letter misreads vision OCR can produce, keyed by
 # the true letter: `Pasal` reads `Pasai`, `Angka` reads `Ang)<a` when the
 # ligature breaks. Narrow by evidence; a broad class turns prose into markers.
 _KEYWORD_GLYPHS = {"l": "li1I", "k": "k", "i": "il1"}

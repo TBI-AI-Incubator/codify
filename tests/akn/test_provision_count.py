@@ -120,8 +120,8 @@ def test_a_real_section_alongside_articles_is_a_basic_unit() -> None:
 
 
 def test_a_dropped_number_shows_even_when_the_count_rose() -> None:
-    """act/1863's shape: the re-OCR gained articles overall but dropped specific
-    numbers (296-301). A count rises and hides it; the set difference does not."""
+    """A re-OCR can gain articles overall but drop specific numbers. A count
+    rises and hides it; the set difference does not."""
     baseline = _root("".join(f'<article eId="a{n}"><num>{n}</num></article>' for n in (296, 297)))
     candidate = _root(
         "".join(f'<article eId="a{n}"><num>{n}</num></article>' for n in (400, 401, 402))

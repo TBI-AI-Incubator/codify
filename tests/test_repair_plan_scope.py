@@ -115,9 +115,8 @@ class TestRefusal:
         assert out_of_scope([Unknown()], DUPLICATE)  # type: ignore[list-item]
 
     def test_a_sibling_the_finding_does_not_name_is_refused(self) -> None:
-        """Measured on the corpus: an agent renumbering the neighbouring article
-        as well as the flagged one. Real, applied, and more than the finding
-        licensed, so the narrowing is deliberate."""
+        """An agent renumbering the neighbouring article as well as the flagged one
+        is more than the finding licensed, so the narrowing is deliberate."""
         assert out_of_scope(
             _plan(RenumberSequence(parent_eid="art_2", kind="point", nums=["1", "2"])), DUPLICATE
         )

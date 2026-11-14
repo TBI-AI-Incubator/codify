@@ -116,8 +116,8 @@ async def rows_for_table(
     offset: int = 0,
     limit: int = 200,
 ) -> list[AnnexRow]:
-    """One table's rows in document order. Windowed: the largest table in the
-    corpus runs to six figures, and a reader asks for a page of it."""
+    """One table's rows in document order. Windowed: a table can be very large,
+    and a reader asks for a page of it."""
     return list(
         (
             await session.execute(
