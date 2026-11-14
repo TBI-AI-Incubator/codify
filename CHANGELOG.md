@@ -5,6 +5,16 @@ the launch tag.
 
 ## Unreleased
 
+Breaks:
+
+- Acquisition no longer sends a default User-Agent. Set `ACQUISITION_USER_AGENT`
+  to an identity naming you and a contact, or pass `user_agent` to
+  `make_polite_client`; without one, building an acquirer's client raises
+  `MissingUserAgent` before any request is sent. Adapters whose source requires a
+  fixed agent keep sending it.
+- The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
+  pages.
+
 New, additive:
 
 - Reads from a published Riigi Teataja archive go through the polite transport:
@@ -12,6 +22,12 @@ New, additive:
   `ArchiveRefused` at the first answer and is never retried, and no later read in
   the process is sent for fifteen minutes (or until `reset_archive_refusal()`).
   Pass a client to `index_remote_ee_archive` to read with your own.
+- `codify.acquisition.effects.uk_text.effect_text` reads the text a UK amendment
+  effect put in place: the words or structure quoted in the amending provision
+  the feed names, cut to the unit the effect names. It attaches only where the
+  instruction, its lead-in, an opener before it or a heading over it names the
+  affected act by title or by a short form the amending act defines, and
+  returns `Refused(reason)` otherwise. Nothing calls it yet.
 
 ## 0.7.0 (2026-11-13)
 

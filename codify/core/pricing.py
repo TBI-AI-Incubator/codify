@@ -26,9 +26,10 @@ _TOKEN_PRICES: dict[str, tuple[float, float]] = {
     "gpt-6.1-sol": (0.000002, 0.00001),
 }
 
-# USD per page. The billing zone selects the rate, so re-check when a deployment moves.
+# USD per page at the provider's global list rate; a deployment billed on another
+# meter replaces its entry here.
 _PAGE_PRICES: dict[str, float] = {
-    "mistral-ocr-4-0": 0.0044,
+    "mistral-ocr-4-0": 0.004,
 }
 
 

@@ -8,16 +8,9 @@ from codify.core.pricing import cost_details
 
 
 def test_ocr_is_priced_per_page_not_per_token() -> None:
-    # Priced per page; the page count is the only usage key that bills.
+    # The global list rate, and the page count is the only usage key that bills.
     assert cost_details("mistral-ocr-4-0", {"pages_processed": 4}) == pytest.approx(
-        {"total": 0.0176}
-    )
-
-
-def test_ocr_page_rate_is_pinned() -> None:
-    """Pins the per-page rate so a silent change fails here."""
-    assert cost_details("mistral-ocr-4-0", {"pages_processed": 3031}) == pytest.approx(
-        {"total": 13.3364}
+        {"total": 0.016}
     )
 
 

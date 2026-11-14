@@ -31,7 +31,7 @@ from codify.acquisition.adapters.ee.remote import (
     RangeRefused,
     RemoteFile,
 )
-from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.base import MissingUserAgent, PolitenessProfile
 from codify.acquisition.politeness import PoliteTransport
 from codify.core.security import SSRFBlocked
 from codify.jurisdictions import SourceAdapter
@@ -483,10 +483,6 @@ def test_the_estonian_acquirer_is_paced_at_two_at_once_and_thirty_a_minute() -> 
         acquirer.politeness.rate_limit_per_minute,
     ) == (2, 30)
     assert acquirer.politeness.robots_respect
-    assert (
-        acquirer.politeness.user_agent
-        == "codify-acquire/0.1 (+https://github.com/TBI-AI-Incubator)"
-    )
 
 
 class _AsyncUnread(httpx.AsyncByteStream):
@@ -605,3 +601,17 @@ def test_a_read_queued_behind_one_that_is_refused_never_reaches_the_publisher() 
             with pytest.raises(ArchiveRefused):
                 outcome.result(timeout=10)
     assert ranges == ["bytes=0-9"]
+
+
+def test_the_shared_polite_client_follows_the_user_agent_variable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = PolitenessProfile(rate_limit_per_minute=None)
+    monkeypatch.setattr(remote, "_CLIENTS", {})
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "first/1 (+https://example.test)")
+    first = remote.polite_http_client(profile)
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "second/1 (+https://example.test)")
+    assert remote.polite_http_client(profile) is not first
+    monkeypatch.delenv("ACQUISITION_USER_AGENT")
+    with pytest.raises(MissingUserAgent):
+        remote.polite_http_client(profile)
