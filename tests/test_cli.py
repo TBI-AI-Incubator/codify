@@ -21,7 +21,7 @@ from codify.pipeline.enrich.structure import ScanTrace
 @pytest.fixture(autouse=True)
 def _a_chat_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """`ingest-one` refuses to start without one; the closed port answers nothing."""
-    monkeypatch.setenv("LITELLM_BASE_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:1")
 
 
 def _trace(coverage: AnchorCoverage | None) -> ScanTrace:
@@ -271,7 +271,7 @@ async def test_ingest_one_refuses_to_start_without_a_chat_endpoint(  # type: ign
     """Unset, it used to call a local gateway nobody had started."""
     from codify import cli
 
-    monkeypatch.delenv("LITELLM_BASE_URL")
+    monkeypatch.delenv("LLM_BASE_URL")
     monkeypatch.setattr(cli, "create_llm_client", lambda **_: pytest.fail("built a client"))
     source = tmp_path / "act.txt"
     source.write_text("1. Short title.\n")
@@ -287,7 +287,7 @@ async def test_ingest_one_refuses_to_start_without_a_chat_endpoint(  # type: ign
     )
 
     assert await cli._run(args) == 2
-    assert "LITELLM_BASE_URL" in capsys.readouterr().err
+    assert "LLM_BASE_URL" in capsys.readouterr().err
     assert not out.exists()
 
 
@@ -354,7 +354,7 @@ def test_the_fallback_flag_defaults_to_the_environment(monkeypatch) -> None:  # 
     from codify import cli
 
     captured: list[argparse.Namespace] = []
-    monkeypatch.setenv("LITELLM_CONTENT_FILTER_FALLBACK_MODEL", "env-fallback")
+    monkeypatch.setenv("LLM_CONTENT_FILTER_FALLBACK_MODEL", "env-fallback")
     monkeypatch.setattr(cli, "_load_env", lambda: None)
     monkeypatch.setattr(cli.asyncio, "run", lambda coro: coro.close() or 0)
     monkeypatch.setattr(cli, "_run", lambda a: captured.append(a) or _noop())

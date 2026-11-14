@@ -1,4 +1,4 @@
-"""LLM client Protocol + LiteLLM-backed implementation."""
+"""LLM client Protocol + OpenAI-compatible implementation."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ _SchemaT = TypeVar("_SchemaT", bound=BaseModel)
 
 
 class LLMClient(Protocol):
-    """Common interface for LLM backends, addressed via the LiteLLM gateway."""
+    """Common interface for LLM backends behind an OpenAI-compatible endpoint."""
 
     async def chat(
         self, prompt: str, system: str | None = None, model: str | None = None
@@ -324,7 +324,7 @@ class VisionText(str):
 
 
 class LiteLLMClient:
-    """Single OpenAI-SDK-backed client pointed at a LiteLLM gateway."""
+    """Single OpenAI-SDK-backed client for an OpenAI-compatible endpoint."""
 
     def __init__(
         self,
@@ -350,7 +350,7 @@ class LiteLLMClient:
         # Gemini's filter false-fires on benign legal prose and `safety_settings`
         # cannot disable it. Empty disables the retry.
         self.fallback_model = fallback_model
-        # Direct OCR endpoint URL: this route is called directly, not through the proxy.
+        # Direct OCR endpoint URL: this route is called directly, not through the gateway.
         self.azure_foundry_ocr_url = azure_foundry_ocr_url
         self.azure_foundry_ocr_key = azure_foundry_ocr_key
         self._ocr_limiter = RateLimiter(azure_foundry_ocr_rpm)
@@ -655,7 +655,7 @@ class LiteLLMClient:
         pdf: bytes | None = None,
         model: str,
     ) -> list[dict[str, Any]]:
-        """Azure Foundry Mistral OCR, called directly (LiteLLM proxy bypassed).
+        """Azure Foundry Mistral OCR, called directly (gateway bypassed).
 
         Give one of image OR pdf. PDF path sends the whole document in a single
         call, which is faster and higher-quality than per-page rendering: the

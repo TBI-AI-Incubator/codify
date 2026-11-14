@@ -21,6 +21,11 @@ Breaks:
   accepts an EUR-Lex or Publications Office URL under `eu` without a data root.
 - The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
   pages.
+- `LITELLM_BASE_URL` is now `LLM_BASE_URL`, `LITELLM_API_KEY` is `LLM_API_KEY`,
+  `LITELLM_MODEL` is `LLM_MODEL`, `LITELLM_OCR_MODEL` is `LLM_OCR_MODEL` and
+  `LITELLM_CONTENT_FILTER_FALLBACK_MODEL` is `LLM_CONTENT_FILTER_FALLBACK_MODEL`.
+  `LITELLM_MASTER_KEY` is no longer read as the API key; set `LLM_API_KEY`.
+  The old names are not read as a fallback.
 
 New, additive:
 
@@ -47,7 +52,7 @@ New, additive:
 
 Fixed:
 
-- `ingest-one` stops before any work, with exit code 2, when `LITELLM_BASE_URL`
+- `ingest-one` stops before any work, with exit code 2, when `LLM_BASE_URL`
   is unset, and names the variables to set. It used to call
   `http://localhost:4000/v1`, a gateway this repository does not start, so the
   first error was a failed connection on every page.
@@ -56,7 +61,7 @@ Fixed:
   offers a source URL only when that config is installed and selected.
 - A document ingested through `codify serve` is embedded before the run
   succeeds, when an embeddings endpoint is set (`EMBEDDING_BASE_URL` or
-  `LITELLM_BASE_URL`), so search finds it; an embedding failure fails the run.
+  `LLM_BASE_URL`), so search finds it; an embedding failure fails the run.
   Without an endpoint it is stored unembedded and the server logs
   `stored_unsearchable` with the variable to set. Served ingests used to be
   stored unembedded, so search never found them.

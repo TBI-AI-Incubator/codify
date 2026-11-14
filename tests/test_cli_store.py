@@ -109,7 +109,7 @@ def test_the_database_url_takes_the_asyncpg_driver(
 def test_an_embeddings_endpoint_is_required_and_named(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+    for name in ("EMBEDDING_BASE_URL", "LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     with pytest.raises(SystemExit, match="EMBEDDING_BASE_URL"):
         cli_store._embedding_client()

@@ -6,7 +6,7 @@ runs one document through the pipeline and writes a bundle: page images, every
 anchor with its producing pass, the coverage measurement with both number sets,
 the pre-body-fill scaffold, the final AKN and the validator findings. Every
 artifact is captured from the run, not recomputed. It needs a chat model behind
-an OpenAI-compatible endpoint (`LITELLM_BASE_URL` and `LITELLM_API_KEY`, read
+an OpenAI-compatible endpoint (`LLM_BASE_URL` and `LLM_API_KEY`, read
 from the environment or the nearest `.env`) and writes no database.
 
     codify scan-corpus ~/corpus --jurisdiction xa
@@ -84,7 +84,7 @@ def _render_pages(pdf_bytes: bytes, out: Path) -> list[str]:
 def _foundry_ocr_url() -> str | None:
     """The direct Azure Foundry Mistral OCR endpoint, derived as the API derives it.
 
-    Mistral OCR bypasses the proxy, and the env var carries a LiteLLM path
+    Mistral OCR bypasses the proxy, and the env var carries a gateway path
     suffix, so the root is taken from the endpoint and the Mistral path appended.
     """
     from urllib.parse import urlparse
@@ -197,10 +197,10 @@ async def _run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    base_url = os.environ.get("LITELLM_BASE_URL")
+    base_url = os.environ.get("LLM_BASE_URL")
     if not base_url:
         print(
-            "no chat endpoint: set LITELLM_BASE_URL (and LITELLM_API_KEY) to an "
+            "no chat endpoint: set LLM_BASE_URL (and LLM_API_KEY) to an "
             "OpenAI-compatible endpoint, in the environment or the nearest .env",
             file=sys.stderr,
         )
@@ -216,13 +216,7 @@ async def _run(args: argparse.Namespace) -> int:
 
     llm = create_llm_client(
         base_url=base_url,
-        # Matches the gateway's own default (docker-compose.yaml): `docker
-        # compose` reads .env without exporting it to a later `uv run`.
-        api_key=(
-            os.environ.get("LITELLM_API_KEY")
-            or os.environ.get("LITELLM_MASTER_KEY")
-            or "sk-codify-dev"
-        ),
+        api_key=os.environ.get("LLM_API_KEY") or "sk-codify-dev",
         model=args.model,
         azure_foundry_ocr_url=_foundry_ocr_url(),
         azure_foundry_ocr_key=os.environ.get("AZURE_OPENAI_API_KEY") or None,
@@ -902,17 +896,17 @@ def build_parser() -> argparse.ArgumentParser:
     one.add_argument("--out", required=True, help="bundle directory to write")
     one.add_argument(
         "--model",
-        default=os.environ.get("LITELLM_MODEL", "gemini-3.7-flash"),
+        default=os.environ.get("LLM_MODEL", "gemini-3.7-flash"),
         help="body-fill model (default: %(default)s); the manifest records which model ran",
     )
     one.add_argument(
         "--ocr-model",
-        default=os.environ.get("LITELLM_OCR_MODEL", ""),
+        default=os.environ.get("LLM_OCR_MODEL", ""),
         help="transcription engine; empty is the vision route on the body-fill model",
     )
     one.add_argument(
         "--fallback-model",
-        default=os.environ.get("LITELLM_CONTENT_FILTER_FALLBACK_MODEL", ""),
+        default=os.environ.get("LLM_CONTENT_FILTER_FALLBACK_MODEL", ""),
         help="model retried on any content-filter refusal (pages, metadata, body-fill); "
         "empty disables",
     )

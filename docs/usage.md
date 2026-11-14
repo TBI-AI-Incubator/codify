@@ -59,7 +59,7 @@ database: the commands below apply migrations and write records.
 
 Before using `--embed` or `search`, configure an OpenAI-compatible embeddings endpoint. `EMBEDDING_BASE_URL`,
 `EMBEDDING_API_KEY` and `EMBEDDING_MODEL` select it. The URL and key fall back to
-`LITELLM_BASE_URL` and `LITELLM_API_KEY`; the default embedding model is
+`LLM_BASE_URL` and `LLM_API_KEY`; the default embedding model is
 `gemini-embedding-2`, not the chat model. Choose a model your endpoint supports.
 
 ```bash
@@ -102,10 +102,10 @@ your environment. See [`.env.example`](../.env.example) for the default setup.
 
 | Variable                                | Purpose                                                                                      |
 | --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `LITELLM_BASE_URL`                      | Base URL for the OpenAI-compatible chat endpoint                                             |
-| `LITELLM_API_KEY`                       | API key for the chat endpoint                                                                |
-| `LITELLM_MODEL`                         | Default model used for body fill (overridden by `--model`)                                   |
-| `LITELLM_CONTENT_FILTER_FALLBACK_MODEL` | Model retried on any content-filter refusal: pages, metadata, body-fill (`--fallback-model`) |
+| `LLM_BASE_URL`                          | Base URL for the OpenAI-compatible chat endpoint                                             |
+| `LLM_API_KEY`                           | API key for the chat endpoint                                                                |
+| `LLM_MODEL`                             | Default model used for body fill (overridden by `--model`)                                   |
+| `LLM_CONTENT_FILTER_FALLBACK_MODEL`     | Model retried on any content-filter refusal: pages, metadata, body-fill (`--fallback-model`) |
 | `POSTGRES_URL`                          | Postgres connection string for migrations and tests (defaults to local Compose service)      |
 | `AZURE_OPENAI_ENDPOINT`                 | Endpoint for the optional secondary Azure AI Foundry OCR engine                              |
 | `AZURE_OPENAI_API_KEY`                  | API key for the optional Azure OCR engine                                                    |

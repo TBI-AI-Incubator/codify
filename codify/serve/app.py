@@ -57,7 +57,7 @@ class _Clients:
 
         # The XML lanes need no model; without one a PDF fails at dispatch, and says so.
         if "llm" not in self._built:
-            self._built["llm"] = _llm_client(None) if _env("LITELLM_BASE_URL") else None
+            self._built["llm"] = _llm_client(None) if _env("LLM_BASE_URL") else None
         return self._built["llm"]
 
     def embeddings(self) -> Any:

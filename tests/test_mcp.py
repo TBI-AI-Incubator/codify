@@ -112,7 +112,7 @@ async def test_every_tool_says_what_it_returns() -> None:
 async def test_search_without_an_embeddings_endpoint_is_a_tool_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+    for name in ("EMBEDDING_BASE_URL", "LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
 
     result = await _call(
@@ -462,7 +462,7 @@ def _two_stored_fixtures(monkeypatch: pytest.MonkeyPatch) -> tuple[Version, Vers
 async def test_compare_without_a_chat_endpoint_is_a_tool_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
     left, right = _two_stored_fixtures(monkeypatch)
 
     result = await _call(
@@ -473,7 +473,7 @@ async def test_compare_without_a_chat_endpoint_is_a_tool_error(
     )
 
     assert result.is_error
-    assert "LITELLM_BASE_URL" in result.content[0].text
+    assert "LLM_BASE_URL" in result.content[0].text
 
 
 async def test_compare_over_the_provision_cap_is_refused_before_any_model(

@@ -430,7 +430,7 @@ async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.Monkey
     from codify.serve.app import _ingest_runner
     from codify.storage.models import Law
 
-    monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
     app = _app(None)
     with capture_logs() as logs:
@@ -532,7 +532,7 @@ async def test_out_of_range_paging_and_k_are_422_not_500() -> None:
 async def test_search_without_an_embeddings_endpoint_is_503(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("EMBEDDING_BASE_URL", "LITELLM_BASE_URL"):
+    for name in ("EMBEDDING_BASE_URL", "LLM_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
 
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
@@ -997,7 +997,7 @@ async def test_one_chat_client_serves_every_run_and_closes_at_shutdown(
             _Chat.built += 1
             self.client = _Transport()
 
-    monkeypatch.setenv("LITELLM_BASE_URL", "http://gateway.test")
+    monkeypatch.setenv("LLM_BASE_URL", "http://gateway.test")
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: _Chat())
     clients = _Clients()
 

@@ -37,7 +37,7 @@ uv sync
 cp .env.example .env
 ```
 
-Set `LITELLM_BASE_URL`, `LITELLM_API_KEY` and `LITELLM_MODEL` in `.env` for your
+Set `LLM_BASE_URL`, `LLM_API_KEY` and `LLM_MODEL` in `.env` for your
 provider. Then process the included synthetic act:
 
 ```bash

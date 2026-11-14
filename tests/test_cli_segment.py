@@ -34,7 +34,7 @@ RULES = {**SEGMENTATION, "printed_page_pattern": r"^Page (\d+)$"}
 @pytest.fixture(autouse=True)
 def _a_chat_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     """`ingest-one` refuses to start without one; the closed port answers nothing."""
-    monkeypatch.setenv("LITELLM_BASE_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:1")
 
 
 @pytest.fixture(autouse=True)

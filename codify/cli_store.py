@@ -39,16 +39,15 @@ def _env(*names: str) -> str | None:
 
 
 def _embedding_client() -> Any:
-    """Embeddings client from `EMBEDDING_*`, else the `LITELLM_*` chat settings."""
+    """Embeddings client from `EMBEDDING_*`, else the `LLM_*` chat settings."""
     from codify.embed.client import EmbeddingClient
 
-    base_url = _env("EMBEDDING_BASE_URL", "LITELLM_BASE_URL")
+    base_url = _env("EMBEDDING_BASE_URL", "LLM_BASE_URL")
     if not base_url:
-        raise SystemExit("set EMBEDDING_BASE_URL (or LITELLM_BASE_URL) to an embeddings endpoint")
+        raise SystemExit("set EMBEDDING_BASE_URL (or LLM_BASE_URL) to an embeddings endpoint")
     return EmbeddingClient(
         base_url=base_url,
-        api_key=_env("EMBEDDING_API_KEY", "LITELLM_API_KEY", "LITELLM_MASTER_KEY")
-        or "sk-codify-dev",
+        api_key=_env("EMBEDDING_API_KEY", "LLM_API_KEY") or "sk-codify-dev",
         model=_env("EMBEDDING_MODEL") or _DEFAULT_EMBEDDING_MODEL,
     )
 
@@ -56,13 +55,13 @@ def _embedding_client() -> Any:
 def _llm_client(model: str | None) -> Any:
     from codify.core.llm import LiteLLMClient
 
-    base_url = _env("LITELLM_BASE_URL")
+    base_url = _env("LLM_BASE_URL")
     if not base_url:
-        raise SystemExit("set LITELLM_BASE_URL to an OpenAI-compatible chat endpoint")
+        raise SystemExit("set LLM_BASE_URL to an OpenAI-compatible chat endpoint")
     return LiteLLMClient(
         base_url=base_url,
-        api_key=_env("LITELLM_API_KEY", "LITELLM_MASTER_KEY") or "sk-codify-dev",
-        model=model or _env("LITELLM_MODEL") or "gemini-3.7-flash",
+        api_key=_env("LLM_API_KEY") or "sk-codify-dev",
+        model=model or _env("LLM_MODEL") or "gemini-3.7-flash",
         telemetry_mode="direct",
     )
 
