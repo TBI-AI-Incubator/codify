@@ -583,7 +583,7 @@
         "swe"
       ],
       "calendar": "gregorian",
-      "tier": 1,
+      "tier": 2,
       "status": "draft",
       "effective_tier": 1,
       "coverage_status": "in_scope",
