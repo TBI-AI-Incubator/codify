@@ -7,13 +7,33 @@ const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/
 /** Drops each `<style>` element and rejects a figure that still carries a style, a script or an event handler. */
 export function dropStyles(svg, path = 'figure') {
   let out = svg
-  for (let start; (start = out.indexOf('<style')) >= 0; ) {
-    const end = out.indexOf('</style>', start)
-    if (end < 0) break
-    out = out.slice(0, start) + out.slice(end + '</style>'.length).trimStart()
+  // Repeat until stable: dropping one style can splice the text around it into another.
+  for (let prev; prev !== out; ) {
+    prev = out
+    const kept = []
+    let at = 0
+    for (let start; (start = out.indexOf('<style', at)) >= 0; ) {
+      const end = out.indexOf('</style>', start)
+      if (end < 0) break
+      kept.push(out.slice(at, start))
+      at = end + '</style>'.length
+      while (at < out.length && /\s/.test(out[at])) at++
+    }
+    out = kept.join('') + out.slice(at)
   }
-  if (/<(style|script)\b|<[^>]*\son[a-z]+\s*=/i.test(out)) throw new Error(`${path}: a figure may not carry a style, a script or an event handler`)
+  if (/<(style|script)\b/i.test(out) || hasHandler(out)) throw new Error(`${path}: a figure may not carry a style, a script or an event handler`)
   return out
+}
+
+// Each tag is scanned once, from its `<` to the next `>`, so the check stays linear.
+function hasHandler(svg) {
+  for (let start = svg.indexOf('<'); start >= 0; ) {
+    const end = svg.indexOf('>', start)
+    if (/\son[a-z]+\s*=/i.test(svg.slice(start, end < 0 ? undefined : end))) return true
+    if (end < 0) return false
+    start = svg.indexOf('<', end)
+  }
+  return false
 }
 
 /** A figure SVG ready to inline: no XML prolog or standalone style, ids prefixed so two copies never clash. */

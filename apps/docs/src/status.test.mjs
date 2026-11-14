@@ -13,3 +13,7 @@ test('other bold text is left alone', () => {
   assert.equal(statusHtml('Available soon'), null)
   assert.equal(statusHtml('available'), null)
 })
+
+test('a label naming an inherited property is left alone', () => {
+  for (const label of ['constructor', '__proto__', 'toString']) assert.equal(statusHtml(label), null)
+})

@@ -18,3 +18,11 @@ test('a figure carrying a script, a leftover style or an event handler is reject
 test('figure text is escaped for both element content and attributes', () => {
   assert.equal(esc(`a & <b> "c" 'd'`), 'a &amp; &lt;b&gt; &quot;c&quot; &#39;d&#39;')
 })
+
+test('a pathological figure is checked in linear time', () => {
+  const t = performance.now()
+  assert.equal(dropStyles('<'.repeat(200_000) + ' x'), '<'.repeat(200_000) + ' x')
+  assert.throws(() => dropStyles('<'.repeat(200_000) + ' onx=1'))
+  dropStyles('<svg>' + '<style></style>'.repeat(50_000) + '</svg>')
+  assert.ok(performance.now() - t < 1000)
+})

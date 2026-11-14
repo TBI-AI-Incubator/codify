@@ -6,7 +6,7 @@ const ICONS = {
 
 /** A bold status label with its icon in front; the words stay, so the icon is never the only signal. */
 export function statusHtml(label) {
-  const hit = ICONS[label]
+  const hit = Object.hasOwn(ICONS, label) ? ICONS[label] : null
   if (!hit) return null
   const [colour, paths] = hit
   // Inline, not flex: the label must share the surrounding text's baseline.

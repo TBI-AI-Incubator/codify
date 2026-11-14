@@ -61,7 +61,7 @@ const { n, label, href, does, file, films } = Astro.props
     film.play().then(
       () => film.setAttribute('data-played', ''),
       () => {
-        playing = null
+        if (playing === film) playing = null
       },
     )
   }
@@ -108,6 +108,7 @@ const { n, label, href, does, file, films } = Astro.props
           seen.delete(film)
           if (film === playing) {
             film.pause()
+            film.removeAttribute('data-played')
             playing = null
           }
         }
