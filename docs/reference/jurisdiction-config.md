@@ -14,55 +14,55 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `code` | string | required |  |
-| `name` | string | required |  |
-| `name_local` | string or null | `null` |  |
-| `name_en` | string or null | `null` |  |
-| `name_translations` | map of string to string | `{}` | Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language. Mirrors `Law.title_translations`. |
-| `type` | `"national"` or `"supranational"` or `"subnational"` or `"crown_dependency"` | `"national"` |  |
-| `tradition` | list of `"civil_law"` or `"common_law"` or `"islamic"` or `"customary"` or `"hindu"` or `"confucian"` or `"jewish"` or `"socialist"` or `"sui_generis"` | required |  |
-| `calendar` | `"gregorian"` or `"lunar_hijri"` or `"solar_hijri"` or `"ethiopian"` or `"japanese_era"` or `"minguo"` or `"buddhist_era"` or `"dual"` | `"gregorian"` |  |
-| `languages` | list of string | required |  |
-| `authoritative_language` | string or null | `null` |  |
-| `document_classes` | map of string to [DocumentClass](#documentclass) | `{}` |  |
-| `default_document_class` | string | `"act"` |  |
-| `frbr` | [FrbrConfig](#frbrconfig) or null | `null` |  |
-| `numbering` | [NumberingConfig](#numberingconfig) or null | `null` |  |
-| `enacting_formulae` | list of [EnactingFormula](#enactingformula) | `[]` |  |
+| `code` | string | required | The jurisdiction code, such as `xa`. |
+| `name` | string | required | The jurisdiction's name. |
+| `name_local` | string or null | `null` | The jurisdiction's name in its own language. |
+| `name_en` | string or null | `null` | The jurisdiction's name in English. |
+| `name_translations` | map of string to string | `{}` | Localised jurisdiction names keyed by ISO 639-3 language code, in the same shape as a law's title translations. The pipeline does not read it. |
+| `type` | `"national"` or `"supranational"` or `"subnational"` or `"crown_dependency"` | `"national"` | Whether the jurisdiction is national, supranational, subnational or a crown dependency. |
+| `tradition` | list of `"civil_law"` or `"common_law"` or `"islamic"` or `"customary"` or `"hindu"` or `"confucian"` or `"jewish"` or `"socialist"` or `"sui_generis"` | required | The legal traditions the jurisdiction draws on. At least one is required. |
+| `calendar` | `"gregorian"` or `"lunar_hijri"` or `"solar_hijri"` or `"ethiopian"` or `"japanese_era"` or `"minguo"` or `"buddhist_era"` or `"dual"` | `"gregorian"` | The calendar the jurisdiction's instruments are dated in. |
+| `languages` | list of string | required | Languages of the jurisdiction's texts, as ISO 639-3 codes. Where there is only one, it is used for a document whose language is not detected. |
+| `authoritative_language` | string or null | `null` | The language whose text is legally authoritative, used when a document's own language cannot be detected. |
+| `document_classes` | map of string to [DocumentClass](#documentclass) | `{}` | The instrument types the jurisdiction issues, keyed by doctype. |
+| `default_document_class` | string | `"act"` | The doctype used when no classification rule matches. It must be a key of `document_classes`. |
+| `frbr` | [FrbrConfig](#frbrconfig) or null | `null` | How the jurisdiction's FRBR URIs are minted. |
+| `numbering` | [NumberingConfig](#numberingconfig) or null | `null` | How instruments are numbered and cited. |
+| `enacting_formulae` | list of [EnactingFormula](#enactingformula) | `[]` | Enacting formulae to inject when the source carries none, chosen by doctype and date. |
 | `enacting_formula_markers` | list of string | `[]` | Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it. |
 | `adoption_markers` | list of string | `[]` | Phrases declaring the instrument adopts another body's numbered text, which every count over the document must read as an attachment, not its own structure. |
 | `opening_material_terminators` | list of string | `[]` | Phrases the recitals precede, after which any further pre-body text is stray page text. |
 | `attachments` | list of [AttachmentCaption](#attachmentcaption) | `[]` | Captions opening an attachment, whose numbering restarts the body's. |
-| `placeholders` | list of [PlaceholderMarker](#placeholdermarker) | `[]` | Whole-string markers for missing or struck content, beyond the platform default. |
+| `placeholders` | list of [PlaceholderMarker](#placeholdermarker) | `[]` | Whole-string markers for missing or struck content, checked in addition to the built-in placeholder pattern. |
 | `pool_excluded_refers_to` | list of string | `[]` | `refersTo` values marking a duty on someone other than the instrument's subjects. Units at or under a marked element stay readable but are not embedded or assessed. |
 | `segmentation` | [SegmentationConfig](#segmentationconfig) or null | `null` | Where one source holds several instruments, how their openings are read. |
-| `amendments` | [AmendmentConfig](#amendmentconfig) or null | `null` |  |
-| `core_tlcs` | list of [TLCEntry](#tlcentry) | `[]` |  |
-| `structuring` | [StructuringConfig](#structuringconfig) or null | `null` |  |
-| `supranational_memberships` | list of [SupranationalMembership](#supranationalmembership) | `[]` |  |
+| `amendments` | [AmendmentConfig](#amendmentconfig) or null | `null` | How amending instruments are drafted. |
+| `core_tlcs` | list of [TLCEntry](#tlcentry) | `[]` | Recurring persons, bodies and concepts, written to a document's `references` block when the document refers to them by eId. |
+| `structuring` | [StructuringConfig](#structuringconfig) or null | `null` | Settings for marker detection, classification and the structurer. |
+| `supranational_memberships` | list of [SupranationalMembership](#supranationalmembership) | `[]` | Supranational bodies the jurisdiction belongs to. Recorded for reference; the pipeline does not read it. |
 | `binding_regimes` | list of [BindingRegime](#bindingregime) | `[]` | Non-membership binding regimes (treaty frameworks, bilateral regimes, constitutional annexes), which are not memberships. |
 | `residual_legal_systems` | list of [ResidualLaw](#residuallaw) | `[]` | Foreign legal corpora still residually applicable here, such as pre-independence or occupying-power law left in force, so amendment and consolidation tooling can trace layered systems. |
 | `legal_eras` | list of [LegalEra](#legalera) | `[]` | Drafting periods, so quality is reported per era rather than per corpus; empty means one undivided population. Distinct from `CalendarConversion.eras`, which is a regnal year table. |
-| `display` | [DisplayConfig](#displayconfig) or null | `null` |  |
-| `validation` | [ValidationConfig](#validationconfig) or null | `null` |  |
+| `display` | [DisplayConfig](#displayconfig) or null | `null` | How the jurisdiction's texts are written and displayed. |
+| `validation` | [ValidationConfig](#validationconfig) or null | `null` | How far the config has been checked against real documents. Recorded for reference; the pipeline does not read it. |
 | `ocr_header_patterns` | list of string | `[]` | Running header and footer text that leaks into article bodies during OCR, stripped from paragraphs before translation so the model never sees it. Regex strings, so a profile author can add patterns without touching Python. |
 | `furniture_inline_patterns` | list of string | `[]` | Page furniture that shares a line with real content, such as a portal credit or a stamped URL, so it is removed from the line rather than discarding the line. Narrower than `ocr_header_patterns`, which also matches the real title on page one. |
 | `lexicon_words` | list of string | `[]` | Legal vocabulary particular to this jurisdiction, folded into the language's word list when a page is scored. A term naming one jurisdiction is that jurisdiction's data, not the language's. |
 | `furniture_line_patterns` | list of string | `[]` | Page furniture whose whole line can be discarded: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one; only this set is safe for whole-line removal. |
-| `closing_phrases` | list of string | `[]` | `LegalEra.closing_phrases` for a jurisdiction that declares no eras. An era's own list wins where it declares one. |
+| `closing_phrases` | list of string | `[]` | Phrases opening the closing attestation in any era. Attestation detection reads them together with every era's `closing_phrases`; the per-era region vocabulary uses an era's own list instead where it declares one. |
 | `footnote_markers` | list of string | `[]` | `LegalEra.footnote_markers` for a jurisdiction that declares no eras. An era's own list wins where it declares one. |
 | `min_anchor_coverage` | number | `0.8` | Minimum ratio of captured structural anchors to marker literals in the source; ingest fails below it, so a partial AKN cannot ship. The default 0.80 tolerates in-prose cross-references, and 0.0 disables the check. |
 | `source_truncation_floor` | number | `0.0` | Share of a document's contents listing that may lack a body before the source is treated as truncated. Off by default (0.0), since a threshold has to be set for each series from that series' own documents. |
 | `source_adapters` | list of [SourceAdapter](#sourceadapter) | `[]` | Structured acquisition adapters for this jurisdiction, read by `codify.acquisition`. |
 | `akn_sources` | list of [AknSource](#aknsource) | `[]` | Hand-curated list of upstream sources. Read alongside `source_adapters`; `effective_tier` considers both. |
-| `members` | list of string | `[]` |  |
-| `akn_profile` | string or null | `null` |  |
-| `identification` | [IdentificationConfig](#identificationconfig) or null | `null` |  |
+| `members` | list of string | `[]` | For a supranational jurisdiction, the codes of its members. Recorded for reference; the pipeline does not read it. |
+| `akn_profile` | string or null | `null` | Name of the AKN profile the jurisdiction's publisher uses. Recorded for reference; the pipeline does not read it. |
+| `identification` | [IdentificationConfig](#identificationconfig) or null | `null` | The jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it. |
 | `note` | string | `""` | Free-text note at the jurisdiction level for cross-cutting guidance. |
 | `tier` | `1` or `2` or `3` or `4` or `5` or null | `null` | Availability tier of the jurisdiction's statute base: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base. |
-| `status` | `"production"` or `"draft"` or `"stub"` or null | `null` |  |
-| `coverage_status` | `"in_scope"` or `"subsumed"` or `"no_corpus"` or `"deferred"` | `"in_scope"` |  |
-| `subsumed_by` | string or null | `null` |  |
+| `status` | `"production"` or `"draft"` or `"stub"` or null | `null` | How far the config has been validated, as listed in the registry. |
+| `coverage_status` | `"in_scope"` or `"subsumed"` or `"no_corpus"` or `"deferred"` | `"in_scope"` | Whether the jurisdiction has its own corpus: `in_scope`, `subsumed` into another jurisdiction's, `no_corpus` or `deferred`. |
+| `subsumed_by` | string or null | `null` | The code of the jurisdiction whose corpus covers this one. Required when `coverage_status` is `subsumed` and refused otherwise. |
 | `synthetic` | boolean | `false` | True for a fictional jurisdiction authored as synthetic test material. It is discovered and validated like any other config but kept out of the derived registry and the world atlas, which list real jurisdictions only. |
 | `public_reference` | boolean | `false` | True where the config ships in the open core. Defaults to false, so a jurisdiction joins the open set only by a deliberate edit. |
 
@@ -72,24 +72,24 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `label` | string | required |  |
+| `label` | string | required | Display name of the class, such as "Act" or "Regulation". |
 | `short_label` | string or null | `null` | Compact label for the class in the interface and in PDF exports. Falls back to the title-cased doctype when unset. |
-| `akn_element` | string | `"act"` |  |
-| `bluebell_compatible` | boolean | `true` |  |
-| `basic_unit` | string | `"section"` |  |
+| `akn_element` | string | `"act"` | The AKN document element for the class, such as `act`. `doc` or `statement` selects an open structure rather than the legislative hierarchy. |
+| `bluebell_compatible` | boolean | `true` | Whether the class can be expressed in Bluebell. Recorded for reference; the pipeline does not read it. |
+| `basic_unit` | string | `"section"` | The element that carries the class's numbered provisions, such as `section` or `article`. It is given to the structurer and used by the anchor coverage check. |
 | `number_has_year_prefix` | boolean | `false` | True where a printed serial may open with the instrument's year; a matching year prefix is kept out of the URI number. |
 | `number_source` | `"stated"` or `"title_identity"` | `"stated"` | "title_identity" makes the URI number the title digest, never a stated serial, for classes whose serials repeat across issuers. "stated" uses the printed serial. |
-| `hierarchy` | list of [HierarchyEntry](#hierarchyentry) | `[]` |  |
-| `hcontainers` | list of [HContainer](#hcontainer) | `[]` |  |
-| `direct_effect` | boolean or null | `null` |  |
-| `note` | string | `""` |  |
+| `hierarchy` | list of [HierarchyEntry](#hierarchyentry) | `[]` | The class's structural levels. Higher levels must come before the basic unit and its subdivisions. |
+| `hcontainers` | list of [HContainer](#hcontainer) | `[]` | Containers with no AKN element of their own, structured under a proxy keyword and renamed to `hcontainer` afterwards. |
+| `direct_effect` | boolean or null | `null` | Whether instruments of this class apply without domestic transposition. Only a supranational jurisdiction may set it to true. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 | `extends` | string or null | `null` | Another class of this jurisdiction whose fields this one lays over. One level. |
 | `search_rank` | integer or null | `null` | Rank of the class in the legal hierarchy, used to order a title search: higher outranks lower on a close match, and unset means no weighting. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions. |
-| `akn_subtype` | string or null | `null` |  |
-| `local_label` | string or null | `null` |  |
-| `prompt_variant` | string or null | `null` |  |
-| `frbr_subtype` | string or null | `null` |  |
-| `authoritative_language` | string or null | `null` | Authoritative language for this class, for legal systems whose classes are enacted in different languages. None falls back to the jurisdiction's. |
+| `akn_subtype` | string or null | `null` | AKN subtype for the class. Recorded for reference; the pipeline does not read it. |
+| `local_label` | string or null | `null` | The class's name in the local language. Recorded for reference; the pipeline does not read it. |
+| `prompt_variant` | string or null | `null` | Name of a structuring prompt variant for the class. Recorded for reference; the pipeline does not read it. |
+| `frbr_subtype` | string or null | `null` | FRBR subtype of the class's works, returned by the MCP `get_jurisdiction` tool. URI minting does not read it: it uses the doctype or `uri_patterns`. |
+| `authoritative_language` | string or null | `null` | Authoritative language for this class, for legal systems whose classes are enacted in different languages. Recorded for reference; the pipeline reads only the jurisdiction's. |
 
 ## FrbrConfig
 
@@ -97,18 +97,18 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `country_code` | string | required |  |
+| `country_code` | string | required | The country segment of minted FRBR URIs: usually the jurisdiction code, different for a subdivision homed under its parent. |
 | `title_identity` | [TitleIdentity](#titleidentity) or null | `null` | Declared where instruments carry no number and the title is the identity. |
-| `uri_patterns` | map of string to string | `{}` |  |
-| `date_calendar` | `"gregorian"` or `"lunar_hijri"` or `"solar_hijri"` or `"ethiopian"` or `"japanese_era"` or `"minguo"` or `"buddhist_era"` or `"dual"` | `"gregorian"` |  |
-| `date_calendar_note` | string or null | `null` |  |
+| `uri_patterns` | map of string to string | `{}` | FRBR work URI template per doctype, using `{year}` and `{number}`. A doctype without one gets the canonical default. |
+| `date_calendar` | `"gregorian"` or `"lunar_hijri"` or `"solar_hijri"` or `"ethiopian"` or `"japanese_era"` or `"minguo"` or `"buddhist_era"` or `"dual"` | `"gregorian"` | The calendar the jurisdiction's FRBR dates are given in. Recorded for reference; the pipeline does not read it. |
+| `date_calendar_note` | string or null | `null` | Free-text note on `date_calendar`. Recorded for reference; the pipeline does not read it. |
 | `calendar_conversion` | [CalendarConversion](#calendarconversion) or null | `null` | Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion. |
-| `note` | string or null | `null` |  |
-| `notes` | list of string or string or null | `null` |  |
-| `number_format` | string or map of string to string or null | `null` |  |
-| `number_note` | string or null | `null` |  |
-| `number_extraction` | string or map of string to any or null | `null` |  |
-| `sample_uris` | list of any or map of string to string or null | `null` |  |
+| `note` | string or null | `null` | Free-text note for config authors. The pipeline does not read it. |
+| `notes` | list of string or string or null | `null` | Free-text note for config authors. The pipeline does not read it. |
+| `number_format` | string or map of string to string or null | `null` | How instrument numbers are written. Recorded for reference; the pipeline does not read it. |
+| `number_note` | string or null | `null` | Free-text note on instrument numbering. Recorded for reference; the pipeline does not read it. |
+| `number_extraction` | string or map of string to any or null | `null` | How an instrument number is found in the source. Recorded for reference; the pipeline does not read it. |
+| `sample_uris` | list of any or map of string to string or null | `null` | Example FRBR URIs for the jurisdiction. Recorded for reference; the pipeline does not read it. |
 
 ## NumberingConfig
 
@@ -116,14 +116,14 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `act_citation` | string or null | `null` |  |
-| `act_citation_alt` | string or null | `null` |  |
-| `insertion_style` | string or null | `null` |  |
-| `note` | string or null | `null` |  |
-| `insertion_example` | string or null | `null` |  |
-| `insertion_note` | string or null | `null` |  |
-| `article_numbering` | string or null | `null` |  |
-| `citations` | map of string to string | `{}` | Citation pattern per instrument type, keyed by type, so a jurisdiction declares its own without a dedicated field for each. |
+| `act_citation` | string or null | `null` | Citation pattern for acts. Reference resolution reads every `<class>_citation` field, and needs the default class's, to tell which instrument type a citation names. |
+| `act_citation_alt` | string or null | `null` | An alternative citation form for acts. Recorded for reference; the pipeline does not read it. |
+| `insertion_style` | string or null | `null` | How inserted units are numbered. `slash_alpha` lets a marker number carry a slash and capital letter, as in "5/A". |
+| `note` | string or null | `null` | Free-text note for config authors. The pipeline does not read it. |
+| `insertion_example` | string or null | `null` | An example of an inserted unit's number. Recorded for reference; the pipeline does not read it. |
+| `insertion_note` | string or null | `null` | Free-text note on how inserted units are numbered. Recorded for reference; the pipeline does not read it. |
+| `article_numbering` | string or null | `null` | How articles are numbered. Recorded for reference; the pipeline does not read it. |
+| `citations` | map of string to string | `{}` | Citation pattern per instrument type, keyed by type. Recorded for reference; the pipeline does not read it. |
 | `numbers_unique_across_years` | boolean | `false` | Whether an instrument number identifies a work without its year. False for most jurisdictions, which restart numbering each year; true lets a year-less citation resolve on the number alone, and is a claim about the whole series, not just the documents held. |
 | `series_citations` | list of [SeriesCitation](#seriescitation) | `[]` | Instruments cited by a never-reused series number and no year. Order matters: full names before abbreviations, so the full form wraps first. |
 | `series_citation_connectors` | list of string | `["No\\.?", "Nos\\.?", "Numbered"]` | Regex fragments that may sit between a series name and its number. |
@@ -134,19 +134,19 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `text` | string or null | `null` |  |
-| `position` | string | `"preamble"` |  |
-| `era` | string | `""` |  |
-| `from` | date or null | `null` |  |
-| `to` | date or null | `null` |  |
-| `note` | string | `""` |  |
-| `document_class` | string or list of string or null | `null` |  |
-| `language` | string or null | `null` |  |
-| `transliteration` | string or null | `null` |  |
-| `instrument_type` | string or null | `null` |  |
-| `applies_to` | list of any or string or null | `null` |  |
-| `verified` | boolean | `false` |  |
-| `enacting_body_tlc` | string or null | `null` |  |
+| `text` | string or null | `null` | Wording injected into the preamble as the enacting formula when the source has none. Text with an unfilled template slot is never injected. |
+| `position` | string | `"preamble"` | Where the formula sits in the document. Recorded for reference; the pipeline does not read it. |
+| `era` | string | `""` | Label of the period the formula belongs to, recorded in the ingest log. |
+| `from` | date or null | `null` | First date the formula applies to, inclusive. A bounded formula is never applied to a document without a date. |
+| `to` | date or null | `null` | First date the formula no longer applies to, exclusive. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
+| `document_class` | string or list of string or null | `null` | The doctype, or list of doctypes, the formula applies to. Unset applies it to every doctype. |
+| `language` | string or null | `null` | Language of the formula's text. Recorded for reference; the pipeline does not read it. |
+| `transliteration` | string or null | `null` | A transliteration of the formula's text. Recorded for reference; the pipeline does not read it. |
+| `instrument_type` | string or null | `null` | The instrument type the formula belongs to. Recorded for reference; the pipeline does not read it. |
+| `applies_to` | list of any or string or null | `null` | What the formula applies to. Recorded for reference; the pipeline does not read it. |
+| `verified` | boolean | `false` | Whether the wording has been checked against source documents. A verified formula is preferred over an unverified one that also matches. |
+| `enacting_body_tlc` | string or null | `null` | eId of the TLC entry naming the enacting body. Recorded for reference; the pipeline does not read it. |
 
 ## AttachmentCaption
 
@@ -172,8 +172,8 @@ struck, and the AKN status the unit should carry for it.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `pattern` | string | required |  |
-| `status` | `"incomplete"` or `"removed"` or `"editorial"` | `"incomplete"` |  |
+| `pattern` | string | required | Regex matched against a unit's whole text. |
+| `status` | `"incomplete"` or `"removed"` or `"editorial"` | `"incomplete"` | The AKN `status` a unit matching `pattern` carries. |
 
 ## SegmentationConfig
 
@@ -197,9 +197,9 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `style` | string or null | `null` |  |
-| `phrasing` | string or null | `null` |  |
-| `cross_reference_format` | string or null | `null` |  |
+| `style` | string or null | `null` | How the jurisdiction drafts amendments. Recorded for reference; the pipeline does not read it. |
+| `phrasing` | string or null | `null` | A phrase that marks a paragraph as an amendment instruction, in addition to the built-in English cues, so its references are classed as amendments. |
+| `cross_reference_format` | string or null | `null` | How amendments cite the provisions they change. Recorded for reference; the pipeline does not read it. |
 | `trigger_phrases` | list of string | `[]` | Lead-in phrases marking an embedded amendment article: a number following one of these plus a colon is quoted content, not a new top-level article. |
 | `amending_body_structure` | string or null | `null` | Body shape of an amending instrument. `two_pasal_roman`: the host instrument numbers its own articles in Roman numerals, so an Arabic-numbered article after them is quoted amending text. |
 | `amendment_item_kind` | string or null | `null` | Hierarchy element that numbers each amendment an amending article makes. What follows it belongs to the amended statute, so it does not compete in the host's numbering; empty leaves the pass inert. |
@@ -211,10 +211,10 @@ Rejects unknown keys.
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `eId` | string | required | An NCName-compatible identifier; camelCase and hyphenated forms are both accepted, and an empty one is refused. |
-| `class` | `"TLCPerson"` or `"TLCOrganization"` or `"TLCRole"` or `"TLCObject"` or `"TLCConcept"` or `"TLCEvent"` or `"TLCLocation"` or `"TLCProcess"` or `"TLCTerm"` or `"TLCReference"` | required |  |
-| `href` | string | required |  |
-| `showAs` | string | required |  |
-| `note` | string | `""` |  |
+| `class` | `"TLCPerson"` or `"TLCOrganization"` or `"TLCRole"` or `"TLCObject"` or `"TLCConcept"` or `"TLCEvent"` or `"TLCLocation"` or `"TLCProcess"` or `"TLCTerm"` or `"TLCReference"` | required | The AKN TLC element the entry becomes, such as `TLCOrganization`. |
+| `href` | string | required | The URI the entry refers to, written to its `href` attribute. |
+| `showAs` | string | required | The display name written to the entry's `showAs` attribute. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 
 ## StructuringConfig
 
@@ -222,8 +222,8 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `prompt_variant` | string or null | `null` |  |
-| `prompt_additions` | string or null | `null` |  |
+| `prompt_variant` | string or null | `null` | Name of a structuring prompt variant. Recorded for reference; the pipeline does not read it. |
+| `prompt_additions` | string or null | `null` | Jurisdiction-specific guidance appended to the structurer's context, for style hints the deterministic rules cannot express. |
 | `classification_rules` | list of [ClassificationRule](#classificationrule) | `[]` | Deterministic classification rules, evaluated in descending priority before the model is asked. `prompt_additions` carries only style hints the rules cannot express. |
 | `marker_boundary` | `"relaxed"` or `"line_anchored"` | `"relaxed"` | `line_anchored` where the drafting standard puts the marker on its own line and the sources keep it, so a mid-sentence citation cannot anchor. |
 | `marker_order` | `"keyword_first"` or `"number_first"` | `"keyword_first"` | `number_first` where the number precedes the keyword (as in "15. §"). |
@@ -249,20 +249,20 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `body` | string | required |  |
+| `body` | string | required | Code of the body, canonicalised against the supranational body registry. |
 | `direct_effect` | `"override"` or `"direct"` or `"indirect_transposition"` or `"procedural"` or `"operational"` or `"advisory"` or `"none"` | `"none"` | How strongly the body's law takes effect, from override (strongest) to none. Legacy boolean values are read as "direct" or "none". |
-| `superseded_subjects` | list of string | `[]` |  |
-| `note` | string | `""` |  |
+| `superseded_subjects` | list of string | `[]` | Subject areas where the body's law displaces domestic law. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 | `member_since` | string or null | `null` | Date membership began, as a loose string, since some sources give only a year such as "1999". |
-| `direct_effect_note` | string or null | `null` |  |
-| `direct_effect_instruments` | list of string | `[]` |  |
+| `direct_effect_note` | string or null | `null` | Free-text note on `direct_effect`. |
+| `direct_effect_instruments` | list of string | `[]` | The body's instrument types that have direct effect. |
 | `transposition_required` | boolean or list of string or null | `null` | Whether the body's instruments need transposing into national law: a boolean, or a list of the instrument types that do (for example ["directive"]). |
 | `status` | `"member"` or `"suspended"` or `"former"` or `"candidate"` or `"potential_candidate"` or `"associate"` or `"observer"` or `"special_status"` or `"never_member"` or null | `null` | Membership status; absent means "member". |
 | `member_until` | string or null | `null` | Date membership ended, as an ISO 8601 date; set only when status is "former". |
 | `rejoined_on` | string or null | `null` | Date a former member rejoined after its membership lapsed; `member_since` keeps the original date. |
 | `suspension_periods` | list of [SuspensionPeriod](#suspensionperiod) | `[]` | History of suspensions and reinstatements, including repeated cycles and a suspension still in force (`suspended_until` unset). |
 | `excluded_subjects` | list of string | `[]` | Subject areas the member has opted out of. |
-| `excluded_instruments` | list of string | `[]` |  |
+| `excluded_instruments` | list of string | `[]` | Instruments of the body the member does not apply. |
 | `protocol_references` | list of string | `[]` | The treaties or protocols that create the carve-outs, as free text (for example "Protocol 21 TFEU"). |
 
 ## BindingRegime
@@ -275,16 +275,16 @@ jurisdiction but are not memberships in an international organisation.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `code` | string | required |  |
-| `kind` | `"treaty_framework"` or `"bilateral_regime"` or `"constitutional_annex"` or `"security_council_resolution"` | required |  |
-| `direct_effect` | `"override"` or `"direct"` or `"indirect_transposition"` or `"procedural"` or `"operational"` or `"advisory"` or `"none"` | `"none"` |  |
-| `superseded_subjects` | list of string | `[]` |  |
-| `note` | string | `""` |  |
+| `code` | string | required | Code of the regime, canonicalised against the supranational body registry. |
+| `kind` | `"treaty_framework"` or `"bilateral_regime"` or `"constitutional_annex"` or `"security_council_resolution"` | required | What kind of regime it is. |
+| `direct_effect` | `"override"` or `"direct"` or `"indirect_transposition"` or `"procedural"` or `"operational"` or `"advisory"` or `"none"` | `"none"` | How strongly the regime's instruments take effect, from override to none. |
+| `superseded_subjects` | list of string | `[]` | Subject areas where the regime's rules displace domestic law. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 | `territories` | list of string | `[]` | Territorial scope, typically set for UN Security Council resolutions and other time-bounded regimes; absent for permanent treaty frameworks. |
-| `in_force_from` | string or null | `null` |  |
-| `in_force_until` | string or null | `null` |  |
-| `renewable` | boolean | `false` |  |
-| `reporting_cadence` | `"monthly"` or `"quarterly"` or `"six_monthly"` or `"annual"` or `"ad_hoc"` or null | `null` |  |
+| `in_force_from` | string or null | `null` | Date the regime took effect, as an ISO date. |
+| `in_force_until` | string or null | `null` | Date the regime ends or ended, as an ISO date. |
+| `renewable` | boolean | `false` | Whether the regime can be renewed. |
+| `reporting_cadence` | `"monthly"` or `"quarterly"` or `"six_monthly"` or `"annual"` or `"ad_hoc"` or null | `null` | How often the regime requires reports. |
 
 ## ResidualLaw
 
@@ -306,15 +306,15 @@ find the source corpus.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `source_jurisdiction` | string | required |  |
-| `label` | string | required |  |
-| `scope` | `"territorial"` or `"subject_matter"` or `"personal_status"` or `"general"` | required |  |
-| `territories` | list of string | `[]` |  |
-| `subjects` | list of string | `[]` |  |
-| `in_force_from` | date or null | `null` |  |
-| `in_force_until` | date or null | `null` |  |
+| `source_jurisdiction` | string | required | Code of the jurisdiction whose corpus applies. It must have a config. |
+| `label` | string | required | Display name of the residual corpus. |
+| `scope` | `"territorial"` or `"subject_matter"` or `"personal_status"` or `"general"` | required | What the residual law applies to: a territory, subjects, personal status or everything. |
+| `territories` | list of string | `[]` | Territories the residual law applies in, when `scope` is territorial. |
+| `subjects` | list of string | `[]` | Subject areas the residual law applies to, when `scope` is subject_matter. |
+| `in_force_from` | date or null | `null` | Date the residual law began to apply. |
+| `in_force_until` | date or null | `null` | Date the residual law stopped applying. |
 | `superseded_by` | list of string | `[]` | Superseding acts (as FRBR URIs or free-text citations). |
-| `note` | string | `""` |  |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 
 ## LegalEra
 
@@ -328,13 +328,13 @@ spelled ``from`` in the config files.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `id` | string | required |  |
-| `label` | string | `""` |  |
-| `from` | string or null | `null` |  |
-| `to` | string or null | `null` |  |
+| `id` | string | required | Identifier of the era, used to report structural quality per era. |
+| `label` | string | `""` | Display name of the era, given to the metadata extractor with its calendar. |
+| `from` | string or null | `null` | First date of the era, as an ISO date, inclusive. Unset leaves it open. |
+| `to` | string or null | `null` | Last date of the era, as an ISO date, inclusive. Unset leaves it open. |
 | `calendar` | `"gregorian"` or `"lunar_hijri"` or `"solar_hijri"` or `"ethiopian"` or `"japanese_era"` or `"minguo"` or `"buddhist_era"` or `"dual"` or null | `null` | The calendar this era's instruments are dated in, where it differs from the jurisdiction's current one. None means it does not differ. Same closed set as the jurisdiction's own field, so the two cannot drift apart. |
-| `enacting_authority` | string | `""` |  |
-| `document_class` | string | `""` |  |
+| `enacting_authority` | string | `""` | The body that enacted instruments in this era. Recorded for reference; the pipeline does not read it. |
+| `document_class` | string | `""` | The document class typical of the era. Recorded for reference; the pipeline does not read it. |
 | `closing_phrases` | list of string | `[]` | Phrases opening the attestation that closes a document of this era, so the promulgation and signature stop being read as the last article's text. Era-scoped because the wording follows the enacting authority. |
 | `footnote_markers` | list of string | `[]` | Regex for how a footnote marker opens in this era. The modern set uses superscripts and the older ones a parenthesised numeral; declaring only one form silently drops the other era. |
 | `authority_patterns` | list of string | `[]` | How this era's offices are named in provision text, to flag provisions for review. A match means the office is named, not that it is granted a power; opt-in per era, since an era ending does not abolish its authorities. |
@@ -345,11 +345,11 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `heading_type` | string | `"marginal_note"` |  |
-| `heading_case` | string | `"title_case"` |  |
-| `script` | string | `"latin"` |  |
-| `rtl` | boolean | `false` |  |
-| `font_preference` | string | `"serif"` |  |
+| `heading_type` | string | `"marginal_note"` | How provision headings are printed. Declaring `marginal_note` explicitly also scans for basic units whose heading is printed as a marginal note. |
+| `heading_case` | string | `"title_case"` | How headings are cased. Recorded for reference; the pipeline does not read it. |
+| `script` | string | `"latin"` | The writing system of the jurisdiction's texts, which selects the script pack used for normalisation and marker matching. |
+| `rtl` | boolean | `false` | Whether the script runs right to left. Recorded for reference; the pipeline does not read it. |
+| `font_preference` | string | `"serif"` | Preferred font style for display. Recorded for reference; the pipeline does not read it. |
 | `amendment_markers` | list of string | `["[", "]"]` | The pair of strings a publisher prints around amended words; square brackets are the commonest. |
 
 ## ValidationConfig
@@ -358,13 +358,13 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `status` | `"production"` or `"draft"` or `"stub"` | `"draft"` |  |
-| `documents_examined` | integer | `0` |  |
-| `bluebell_tested` | boolean | `false` |  |
-| `unresolved_ambiguities` | integer | `0` |  |
-| `note` | string | `""` |  |
-| `documents_examined_note` | string or null | `null` |  |
-| `ambiguities` | list of string | `[]` |  |
+| `status` | `"production"` or `"draft"` or `"stub"` | `"draft"` | How far the config has been validated: `production`, `draft` or `stub`. |
+| `documents_examined` | integer | `0` | How many source documents the config was checked against. |
+| `bluebell_tested` | boolean | `false` | Whether the config's structure has been tested through Bluebell. |
+| `unresolved_ambiguities` | integer | `0` | How many open questions about the config remain. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
+| `documents_examined_note` | string or null | `null` | Free-text note on the documents examined. |
+| `ambiguities` | list of string | `[]` | The open questions about the config, as free text. |
 | `laws_africa_reference` | string or boolean or null | `null` | Whether Laws.Africa covers this jurisdiction: a URL to its collection, or a bare flag. |
 
 ## SourceAdapter
@@ -378,18 +378,18 @@ tokens resolve from the env var named by auth_env_var, never stored here.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `kind` | `"akn_native"` or `"eurlex_cellar"` or `"html_portal"` or `"pdf_gazette"` or `"paragraf_propisi"` or `"sparql"` or `"bulk_xml_archive"` or `"gazette_xml"` or `"json_portal"` or `"oecd_compendium"` | required |  |
-| `name` | string | required |  |
-| `base_url` | string or null | `null` |  |
-| `url_template` | string or null | `null` |  |
-| `auth_scheme` | `"none"` or `"token"` or `"bearer"` or `"oauth"` | `"none"` |  |
-| `auth_env_var` | string | `""` |  |
+| `kind` | `"akn_native"` or `"eurlex_cellar"` or `"html_portal"` or `"pdf_gazette"` or `"paragraf_propisi"` or `"sparql"` or `"bulk_xml_archive"` or `"gazette_xml"` or `"json_portal"` or `"oecd_compendium"` | required | Which acquirer handles this source. |
+| `name` | string | required | Name of the source, used in log lines and errors. |
+| `base_url` | string or null | `null` | Root URL requests are made against. Unset uses the acquirer's default. |
+| `url_template` | string or null | `null` | Template for one document's URL, for acquirers that build it from the FRBR URI. |
+| `auth_scheme` | `"none"` or `"token"` or `"bearer"` or `"oauth"` | `"none"` | How requests are authenticated. Anything but `none` needs `auth_env_var`. |
+| `auth_env_var` | string | `""` | Name of the environment variable holding the credential. The credential itself is never stored in the config. |
 | `parser` | string or null | `null` | Registered structured parser (in `codify.pipeline.parsers`) that converts this adapter's main body deterministically. None sends it through the general structuring lane. |
-| `rate_limit_per_minute` | integer or null | `null` |  |
-| `robots_respect` | boolean | `true` |  |
-| `licence` | string or null | `null` |  |
-| `notes` | string | `""` |  |
-| `discovery` | [DiscoveryConfig](#discoveryconfig) or null | `null` |  |
+| `rate_limit_per_minute` | integer or null | `null` | Most requests per minute sent to the source's host. Unset leaves the acquirer's own default. |
+| `robots_respect` | boolean | `true` | Whether requests honour the host's robots.txt. |
+| `licence` | string or null | `null` | Licence the source publishes under, recorded on fetched documents by the acquirers that carry it. |
+| `notes` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
+| `discovery` | [DiscoveryConfig](#discoveryconfig) or null | `null` | How the source lists documents, for acquirers that support discovery. |
 
 ## AknSource
 
@@ -404,19 +404,19 @@ configs without `format`/`protocol` default to PDF over HTTP.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `name` | string | required |  |
-| `url_template` | string | required |  |
-| `format` | `"akn_xml"` or `"akn_xml_v2"` or `"bespoke_xml"` or `"structured_html"` or `"html"` or `"pdf"` or `"pdf_scanned"` or `"docx"` or `"rtf"` or `"json"` or `"csv"` or `"rdf"` | `"pdf"` |  |
-| `protocol` | `"http"` or `"rest"` or `"odata"` or `"sru"` or `"oai_pmh"` or `"soap"` or `"sparql"` or `"bulk_dump"` | `"http"` |  |
-| `coverage` | `"complete"` or `"partial"` or `"stub"` or `"unknown"` | `"unknown"` |  |
-| `coverage_note` | string or null | `null` |  |
-| `schema_id` | string or null | `null` |  |
-| `schema_url` | string or null | `null` |  |
-| `license` | string or null | `null` |  |
-| `auth_scheme` | `"none"` or `"token"` or `"bearer"` or `"api_key"` or `"operator_code"` or `"basic"` or `"soap_session"` or `"email_registration"` | `"none"` |  |
-| `auth_env_var` | string | `""` |  |
+| `name` | string | required | Name of the source. |
+| `url_template` | string | required | URL of the source, or a template for one document's URL. |
+| `format` | `"akn_xml"` or `"akn_xml_v2"` or `"bespoke_xml"` or `"structured_html"` or `"html"` or `"pdf"` or `"pdf_scanned"` or `"docx"` or `"rtf"` or `"json"` or `"csv"` or `"rdf"` | `"pdf"` | The format the source serves, which sets its tier in `effective_tier`. Defaults to PDF. |
+| `protocol` | `"http"` or `"rest"` or `"odata"` or `"sru"` or `"oai_pmh"` or `"soap"` or `"sparql"` or `"bulk_dump"` | `"http"` | How documents are fetched from the source. Defaults to HTTP. Recorded for reference; the pipeline does not read it. |
+| `coverage` | `"complete"` or `"partial"` or `"stub"` or `"unknown"` | `"unknown"` | How much of the statute base the source holds. Recorded for reference; the pipeline does not read it. |
+| `coverage_note` | string or null | `null` | Free-text note on `coverage`. Recorded for reference; the pipeline does not read it. |
+| `schema_id` | string or null | `null` | Identifier of the schema the source's documents follow. Recorded for reference; the pipeline does not read it. |
+| `schema_url` | string or null | `null` | URL of the schema the source's documents follow. Recorded for reference; the pipeline does not read it. |
+| `license` | string or null | `null` | Licence the source publishes under. Recorded for reference; the pipeline does not read it. |
+| `auth_scheme` | `"none"` or `"token"` or `"bearer"` or `"api_key"` or `"operator_code"` or `"basic"` or `"soap_session"` or `"email_registration"` | `"none"` | How requests to the source are authenticated. |
+| `auth_env_var` | string | `""` | Name of the environment variable holding the credential. The credential itself is never stored in the config. |
 | `requires_token` | boolean | `false` | True for a source that needs an access token: `effective_tier` skips it when the token's environment variable is unset, unless `fallback_format` declares a usable downgrade. |
-| `fallback_format` | `"akn_xml"` or `"akn_xml_v2"` or `"bespoke_xml"` or `"structured_html"` or `"html"` or `"pdf"` or `"pdf_scanned"` or `"docx"` or `"rtf"` or `"json"` or `"csv"` or `"rdf"` or null | `null` |  |
+| `fallback_format` | `"akn_xml"` or `"akn_xml_v2"` or `"bespoke_xml"` or `"structured_html"` or `"html"` or `"pdf"` or `"pdf_scanned"` or `"docx"` or `"rtf"` or `"json"` or `"csv"` or `"rdf"` or null | `null` | The format still available when the source's credential is unset, so `effective_tier` can count it at that format. |
 | `description` | string | `""` | Free-text description of the source, often including its provenance. |
 
 ## IdentificationConfig
@@ -425,9 +425,9 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `system` | string | `""` |  |
-| `pattern` | string | `""` |  |
-| `eli_base` | string | `""` |  |
+| `system` | string | `""` | Name of the jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it. |
+| `pattern` | string | `""` | Pattern of identifiers in that scheme. Recorded for reference; the pipeline does not read it. |
+| `eli_base` | string | `""` | Base URI of the jurisdiction's European Legislation Identifiers. Recorded for reference; the pipeline does not read it. |
 
 ## HierarchyEntry
 
@@ -435,15 +435,15 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `local_term` | string | required |  |
-| `akn_element` | `"book"` or `"part"` or `"title"` or `"subtitle"` or `"tome"` or `"chapter"` or `"subchapter"` or `"section"` or `"subsection"` or `"division"` or `"subdivision"` or `"subpart"` or `"article"` or `"paragraph"` or `"subparagraph"` or `"clause"` or `"subclause"` or `"point"` or `"indent"` or `"alinea"` or `"rule"` or `"subrule"` or `"item"` or `"attachment"` or `"hcontainer"` or `"proviso"` | required |  |
-| `level` | `"higher"` or `"basic"` or `"subdivision"` or `"grouping"` or `"presentational"` | required |  |
-| `bluebell_keyword` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` or null | `null` |  |
-| `numbering` | string or null | `null` |  |
+| `local_term` | string | required | The level's name as the source prints it, such as "Article" or "Chapter". Marker detection and the eId builder match it in the text. |
+| `akn_element` | `"book"` or `"part"` or `"title"` or `"subtitle"` or `"tome"` or `"chapter"` or `"subchapter"` or `"section"` or `"subsection"` or `"division"` or `"subdivision"` or `"subpart"` or `"article"` or `"paragraph"` or `"subparagraph"` or `"clause"` or `"subclause"` or `"point"` or `"indent"` or `"alinea"` or `"rule"` or `"subrule"` or `"item"` or `"attachment"` or `"hcontainer"` or `"proviso"` | required | The AKN element this level becomes, such as `article` or `chapter`. |
+| `level` | `"higher"` or `"basic"` or `"subdivision"` or `"grouping"` or `"presentational"` | required | Where the level sits: `higher` containers, the single `basic` unit and its `subdivision`s are ordered; `grouping` and `presentational` levels may appear anywhere. |
+| `bluebell_keyword` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` or null | `null` | The Bluebell keyword for this level. Unset uses the AKN element name in capitals. |
+| `numbering` | string or null | `null` | How the level is numbered, such as arabic or roman. Recorded for reference; the pipeline does not read it. |
 | `eid_abbrev` | string | `""` | Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (an hcontainer, or two local terms on one element) or where the publisher's own AKN uses another prefix. |
-| `note` | string | `""` |  |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 | `local_terms` | map of string to string or null | `null` | The level's local names, keyed by ISO 639-3 language code, or by "script:&lt;ISO 15924 code&gt;" for a script variant. |
-| `akn_name` | string or null | `null` |  |
+| `akn_name` | string or null | `null` | The element name a publisher's own AKN uses in hyphenated eIds for this level (`section` in `section-55-2`), where it differs from `akn_element`. |
 | `marker_form` | `"caption"` or `"bracketed_decimal"` or `"upper_letter_period"` or `"upper_roman_period"` or `"lower_letter_period"` or `"arabic_period"` or `"alphanumeric_period"` or `"arabic_closing_paren"` or `"lower_letter_closing_paren"` or `"parenthesized_arabic"` or `"upper_roman_title"` or null | `null` | For genres whose levels carry no keyword, such as a judgment that numbers its paragraphs "[1.1]" and never names the level. Unset keeps keyword matching. |
 | `captions` | list of string | `[]` | The closed caption vocabulary a `caption` level answers to. |
 
@@ -453,18 +453,18 @@ Accepts unknown keys and keeps them.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `local_term` | string | required |  |
-| `name` | string | required |  |
-| `description` | string | `""` |  |
-| `bluebell_proxy` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` | `"SUBSECTION"` |  |
-| `requires_postprocessing` | boolean | `true` |  |
-| `note` | string | `""` |  |
-| `numbering` | string or null | `null` |  |
-| `label` | string or null | `null` |  |
-| `akn_element` | `"book"` or `"part"` or `"title"` or `"subtitle"` or `"tome"` or `"chapter"` or `"subchapter"` or `"section"` or `"subsection"` or `"division"` or `"subdivision"` or `"subpart"` or `"article"` or `"paragraph"` or `"subparagraph"` or `"clause"` or `"subclause"` or `"point"` or `"indent"` or `"alinea"` or `"rule"` or `"subrule"` or `"item"` or `"attachment"` or `"hcontainer"` or `"proviso"` or null | `null` |  |
-| `level` | string or null | `null` |  |
-| `position` | string or null | `null` |  |
-| `bluebell_keyword` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` or null | `null` |  |
+| `local_term` | string | required | Heading text that identifies the container: a proxy element whose heading starts with it, ignoring case, is renamed to an `hcontainer`. |
+| `name` | string | required | The `name` attribute the resulting `hcontainer` carries. |
+| `description` | string | `""` | Free-text description of the container. Recorded for reference; the pipeline does not read it. |
+| `bluebell_proxy` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` | `"SUBSECTION"` | The Bluebell keyword the structurer uses for this container before it is renamed. |
+| `requires_postprocessing` | boolean | `true` | Whether the proxy element is renamed to an `hcontainer` after structuring. False leaves it as the proxy element. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
+| `numbering` | string or null | `null` | How the container is numbered. Recorded for reference; the pipeline does not read it. |
+| `label` | string or null | `null` | Display label for the container. Recorded for reference; the pipeline does not read it. |
+| `akn_element` | `"book"` or `"part"` or `"title"` or `"subtitle"` or `"tome"` or `"chapter"` or `"subchapter"` or `"section"` or `"subsection"` or `"division"` or `"subdivision"` or `"subpart"` or `"article"` or `"paragraph"` or `"subparagraph"` or `"clause"` or `"subclause"` or `"point"` or `"indent"` or `"alinea"` or `"rule"` or `"subrule"` or `"item"` or `"attachment"` or `"hcontainer"` or `"proviso"` or null | `null` | The AKN element the container corresponds to, where one exists. Recorded for reference; the pipeline does not read it. |
+| `level` | string or null | `null` | Where the container sits in the hierarchy. Recorded for reference; the pipeline does not read it. |
+| `position` | string or null | `null` | Where the container appears in the document. Recorded for reference; the pipeline does not read it. |
+| `bluebell_keyword` | `"BOOK"` or `"PART"` or `"TITLE"` or `"SUBTITLE"` or `"TOME"` or `"CHAPTER"` or `"SUBCHAPTER"` or `"SECTION"` or `"SUBSECTION"` or `"DIVISION"` or `"SUBDIVISION"` or `"SUBPART"` or `"ARTICLE"` or `"PARAGRAPH"` or `"SUBPARAGRAPH"` or `"CLAUSE"` or `"SUBCLAUSE"` or `"POINT"` or `"INDENT"` or `"ALINEA"` or `"RULE"` or `"SUBRULE"` or `"PROVISO"` or `"TRANSITIONAL"` or `"CROSSHEADING"` or `"PART_HEADING"` or null | `null` | A Bluebell keyword for the container. Recorded for reference; the pipeline does not read it. |
 
 ## TitleIdentity
 
@@ -500,18 +500,18 @@ kind selects which optional fields apply:
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `kind` | `"epoch_offset"` or `"era_table"` or `"hijri_lunar"` or `"hijri_solar"` or `"ethiopian"` or `"buddhist"` or `"bikram_samvat"` | required |  |
+| `kind` | `"epoch_offset"` or `"era_table"` or `"hijri_lunar"` or `"hijri_solar"` or `"ethiopian"` or `"buddhist"` or `"bikram_samvat"` | required | Which conversion applies; it selects the optional fields that are read. |
 | `epoch_year` | integer or null | `null` | Integer added to the local year to give the Gregorian year (for example -543 for the Buddhist calendar, or 1911 where year 1 is 1912 CE). None for calendars without a fixed offset, such as hijri, ethiopian, era_table and bikram_samvat. |
 | `eras` | list of map of string to any or null | `null` | Era table for an era-based calendar, for example [{"name": "Reiwa", "start": "2019-05-01"}]. |
 | `new_year_month` | integer or null | `null` | Gregorian month in which the local year begins, for conversions that depend on the month (Bikram Samvat begins in mid-April). |
-| `new_year_day` | integer or null | `null` |  |
+| `new_year_day` | integer or null | `null` | Day the local year begins in its new-year month, for month-sensitive conversions of a date on the Gregorian grid. Unset keeps the calendar's built-in boundary, a band of days around the new year within which the day does not decide the year. A date on the calendar's own grid always uses the built-in boundary. |
 | `offset` | integer or null | `null` | For month-sensitive conversions: the years to subtract from the local year before the new-year day; on or after it, `offset + 1`. |
 | `month_names` | list of string | `[]` | Month names in the local calendar's own order, index 0 = month 1. Present only where a dated line is read off the source text. |
 | `month_day_is_gregorian` | boolean | `false` | Whether the months and days coincide with the Gregorian ones, so only the year converts. False for any calendar with a grid of its own. |
 | `date_cues` | list of string | `[]` | Phrases that introduce the date a document was made. A dated line elsewhere in the text is some other instrument's. |
 | `year_particles` | list of string | `[]` | Words marking a year as belonging to this calendar ("B.E.", "A.H."). |
 | `new_year_reform_year` | integer or null | `null` | First local year that began on 1 January. Before it the year began in `new_year_month`, so a date in an earlier month falls in the next Gregorian year. |
-| `note` | string | `""` |  |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 
 ## SeriesCitation
 
@@ -522,7 +522,7 @@ A citation naming an instrument by series number alone ("Act No. 386").
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | string | required | Regex for the instrument's name or abbreviation, matched case-insensitively. |
-| `doctype` | string | required |  |
+| `doctype` | string | required | The doctype whose FRBR work URI a matched citation links to. |
 
 ## ClassificationRule
 
@@ -543,14 +543,14 @@ signal          what `pattern` is tested against
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `signal` | `"date_range"` or `"preamble_match"` or `"issuer_role"` or `"gazette_series"` or `"title_regex"` | required |  |
-| `pattern` | string | `""` |  |
+| `signal` | `"date_range"` or `"preamble_match"` or `"issuer_role"` or `"gazette_series"` or `"title_regex"` | required | Which part of the document `pattern` is tested against. |
+| `pattern` | string | `""` | Regex tested against the signal's text. Unused for `date_range`. |
 | `pattern_flags` | string | `""` | Regex flags for `pattern`, for example "i" for case-insensitive matching. |
-| `target_document_class` | string | required |  |
-| `priority` | integer | `0` |  |
-| `date_from` | date or null | `null` |  |
-| `date_until` | date or null | `null` |  |
-| `note` | string | `""` |  |
+| `target_document_class` | string | required | The document class assigned when the rule matches. It must be a key of `document_classes`. |
+| `priority` | integer | `0` | Rules are tried from highest priority to lowest; the first match wins. |
+| `date_from` | date or null | `null` | First document date the rule applies to, inclusive. A rule with a date bound is skipped for a document without a date. |
+| `date_until` | date or null | `null` | Last document date the rule applies to, inclusive. |
+| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
 
 ## SuspensionPeriod
 
@@ -566,7 +566,7 @@ right shape because a jurisdiction can cycle through multiple suspensions.
 | --- | --- | --- | --- |
 | `suspended_from` | string | required | Start of the suspension, as an ISO 8601 date. |
 | `suspended_until` | string or null | `null` | End of the suspension, as an ISO 8601 date; None while still suspended. |
-| `reason` | string | `""` |  |
+| `reason` | string | `""` | Why the suspension was imposed, as free text. |
 | `scope` | `"full"` or `"decision_making"` or `"meetings"` or `"voting"` | `"full"` | What the suspension withdraws: all rights, or only decision-making, voting or attendance at meetings. Defaults to full withdrawal. |
 
 ## DiscoveryConfig
@@ -579,6 +579,6 @@ the portal mechanics (request shape, facets) stay in the adapter.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
-| `queries` | map of string to string | `{}` |  |
-| `max_total` | integer | `5000` |  |
+| `queries` | map of string to string | `{}` | Discovery query per doctype, in the portal's own query syntax. |
+| `max_total` | integer | `5000` | Most documents one discovery run returns, unless the caller sets a limit. |
 | `output` | string or null | `null` | Path of the basket file discovery writes, relative to the repository root. |

@@ -145,7 +145,7 @@ codify scan-corpus [-h] --jurisdiction JURISDICTION [--per-document PER_DOCUMENT
 | `--per-document PER_DOCUMENT` | string |  | write one JSON row per document to this path |
 | `--check BASELINE` | string |  | compare against a pinned baseline; exit 1 naming every drifted key |
 | `--containment` | flag |  | report which passes this sweep read the motivating document for; exit 1 when one was missed, so a zero firing count is not mistaken for evidence the pass is dead |
-| `--include-derived` | flag |  | also score our own exports (`<stem>.ar/.en/.he`), excluded by default |
+| `--include-derived` | flag |  | also score files named as language exports (`<stem>.<lang>`), excluded by default |
 
 ## Store and search
 

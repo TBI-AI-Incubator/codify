@@ -14,15 +14,19 @@ Guide: [Write a jurisdiction config](../guide/write-a-jurisdiction-config.md).
 
 ### `GET /jurisdictions`
 
+Every jurisdiction with an installed configuration: its code, name and languages.
+
 | Status | Meaning | Body |
 | --- | --- | --- |
 | `200` | Successful Response | `application/json` array of [JurisdictionSummary](#jurisdictionsummary) |
 
 ### `GET /jurisdictions/{code}`
 
+The full configuration the pipeline reads for this jurisdiction. 404 when none is installed or it does not load.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `code` | path | string | required |  |
+| `code` | path | string | required | Jurisdiction code, such as `xa`. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -31,11 +35,13 @@ Guide: [Write a jurisdiction config](../guide/write-a-jurisdiction-config.md).
 
 ### `GET /jurisdictions/{code}/laws`
 
+Stored laws of one jurisdiction, newest year first. 404 for an unknown code.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `code` | path | string | required |  |
-| `limit` | query | integer | `50` | min `1`, max `500` |
-| `offset` | query | integer | `0` | min `0` |
+| `code` | path | string | required | Jurisdiction code, such as `xa`. |
+| `limit` | query | integer | `50` | Most laws to return. min `1`, max `500` |
+| `offset` | query | integer | `0` | Laws to skip before the page starts. min `0` |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -48,11 +54,15 @@ Guide: [Serve and publish](../guide/serve-and-publish.md).
 
 ### `GET /runs`
 
+Runs this server process holds, newest first. Runs are kept in memory and lost on restart.
+
 | Status | Meaning | Body |
 | --- | --- | --- |
 | `200` | Successful Response | `application/json` array of [RunSnapshot](#runsnapshot) |
 
 ### `POST /runs/ingest`
+
+Starts a run that converts the uploaded file to Akoma Ntoso and stores it. 429 when the run queue is full.
 
 Request body (`multipart/form-data`): [Body_ingest_runs_ingest_post](#body_ingest_runs_ingest_post).
 
@@ -63,6 +73,8 @@ Request body (`multipart/form-data`): [Body_ingest_runs_ingest_post](#body_inges
 
 ### `POST /runs/ingest-url`
 
+Starts a run that fetches and ingests an EUR-Lex or Publications Office URL under the `eu` jurisdiction, the only lane that fetches. 422 for any other URL or jurisdiction.
+
 Request body (`application/json`): [IngestUrl](#ingesturl).
 
 | Status | Meaning | Body |
@@ -72,9 +84,11 @@ Request body (`application/json`): [IngestUrl](#ingesturl).
 
 ### `GET /runs/{run_id}`
 
+One run's status and events so far.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `run_id` | path | string (uuid) | required |  |
+| `run_id` | path | string (uuid) | required | Run id, as returned when the run was started. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -83,9 +97,11 @@ Request body (`application/json`): [IngestUrl](#ingesturl).
 
 ### `POST /runs/{run_id}/cancel`
 
+Cancels a queued or running run. 409 when the run is unknown or has already finished.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `run_id` | path | string (uuid) | required |  |
+| `run_id` | path | string (uuid) | required | Run id, as returned when the run was started. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -94,9 +110,11 @@ Request body (`application/json`): [IngestUrl](#ingesturl).
 
 ### `POST /runs/{run_id}/retry`
 
+Starts a new run with the finished run's inputs; the old run keeps its outcome. 409 for an unknown or unfinished run, 429 when the queue is full.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `run_id` | path | string (uuid) | required |  |
+| `run_id` | path | string (uuid) | required | Run id, as returned when the run was started. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -105,9 +123,11 @@ Request body (`application/json`): [IngestUrl](#ingesturl).
 
 ### `GET /runs/{run_id}/stream`
 
+Server-sent events: every event so far, then each new one, then an `end` event when the run finishes.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `run_id` | path | string (uuid) | required |  |
+| `run_id` | path | string (uuid) | required | Run id, as returned when the run was started. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -120,14 +140,16 @@ Guide: [Serve and publish](../guide/serve-and-publish.md).
 
 ### `GET /laws`
 
+Stored laws, newest year first, filtered by jurisdiction, doctype, year or a title query. A title query orders results by how well the title matches.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `jurisdiction` | query | string or null |  |  |
-| `doctype` | query | string or null |  |  |
-| `year` | query | integer or null |  |  |
-| `q` | query | string or null |  |  |
-| `limit` | query | integer | `50` | min `1`, max `500` |
-| `offset` | query | integer | `0` | min `0` |
+| `jurisdiction` | query | string or null |  | Jurisdiction code. Unset lists every jurisdiction. |
+| `doctype` | query | string or null |  | Document class, such as `act`. |
+| `year` | query | integer or null |  | Year of the law. |
+| `q` | query | string or null |  | Title query. When set, results are ordered by title match. |
+| `limit` | query | integer | `50` | Most laws to return. min `1`, max `500` |
+| `offset` | query | integer | `0` | Laws to skip before the page starts. min `0` |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -136,9 +158,11 @@ Guide: [Serve and publish](../guide/serve-and-publish.md).
 
 ### `GET /laws/{law_id}`
 
+One law with every stored version, without the XML.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `law_id` | path | string (uuid) | required |  |
+| `law_id` | path | string (uuid) | required | Law id, as returned by the law listing. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -147,11 +171,13 @@ Guide: [Serve and publish](../guide/serve-and-publish.md).
 
 ### `GET /laws/{law_id}/versions`
 
+One page of a law's versions, without the XML. Pass `next_cursor` back as `cursor` for the next page.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `law_id` | path | string (uuid) | required |  |
-| `limit` | query | integer | `100` | min `1`, max `500` |
-| `cursor` | query | string (uuid) or null |  |  |
+| `law_id` | path | string (uuid) | required | Law id, as returned by the law listing. |
+| `limit` | query | integer | `100` | Most versions to return. min `1`, max `500` |
+| `cursor` | query | string (uuid) or null |  | The `next_cursor` of the previous page. Unset starts at the first. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -164,9 +190,11 @@ Guide: [Amendments and versions](../guide/amendments-and-versions.md).
 
 ### `GET /versions/{version_id}`
 
+One version with its Akoma Ntoso XML.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `version_id` | path | string (uuid) | required |  |
+| `version_id` | path | string (uuid) | required | Version id, as listed under its law. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -179,7 +207,7 @@ The version as the reader's section tree, not as AKN.
 
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `version_id` | path | string (uuid) | required |  |
+| `version_id` | path | string (uuid) | required | Version id, as listed under its law. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -192,12 +220,14 @@ Guide: [Search](../guide/search.md).
 
 ### `GET /search`
 
+Hybrid (lexical and vector) search over one jurisdiction's provisions, best match first. 503 when no embeddings endpoint is configured.
+
 | Parameter | In | Type | Default | Description |
 | --- | --- | --- | --- | --- |
-| `q` | query | string | required |  |
-| `jurisdiction` | query | string | required |  |
-| `k` | query | integer | `10` | min `1`, max `100` |
-| `language` | query | string or null |  |  |
+| `q` | query | string | required | The search text. |
+| `jurisdiction` | query | string | required | Jurisdiction code, such as `xa`. |
+| `k` | query | integer | `10` | Most matches to return. min `1`, max `100` |
+| `language` | query | string or null |  | ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it. |
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -209,6 +239,8 @@ Guide: [Search](../guide/search.md).
 Guide: [Serve and publish](../guide/serve-and-publish.md).
 
 ### `GET /health`
+
+Answers without touching the database.
 
 | Status | Meaning | Body |
 | --- | --- | --- |
@@ -222,9 +254,9 @@ Every schema a route takes or returns. [JurisdictionConfig](jurisdiction-config.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `file` | file | required |  |
-| `jurisdiction` | string | required |  |
-| `title` | string or null |  |  |
+| `file` | file | required | The source document, such as a PDF. |
+| `jurisdiction` | string | required | Jurisdiction code, such as `xa`. |
+| `title` | string or null |  | Title to store the law under. Unset uses the title read from it. |
 
 ### Cancelled
 
@@ -456,7 +488,7 @@ A footnote bound to the provision it annotates, not part of its prose.
 
 ### LawSummary
 
-The listing row, without the hosted platform's lens and translation fields.
+One law in a listing: its identity, FRBR work URI and latest expression date.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |

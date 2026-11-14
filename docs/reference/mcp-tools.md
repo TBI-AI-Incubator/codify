@@ -16,10 +16,10 @@ Hybrid (lexical and vector) search over the provisions of one jurisdiction. Retu
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `query` | string | required |  |
-| `jurisdiction` | string | required |  |
-| `language` | string or null | `null` |  |
-| `k` | integer | `10` | min `1`, max `100` |
+| `query` | string | required | The search text. |
+| `jurisdiction` | string | required | Jurisdiction code, such as `xa`. |
+| `language` | string or null | `null` | ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it. |
+| `k` | integer | `10` | Most matches to return. min `1`, max `100` |
 
 Returns a JSON object.
 
@@ -29,12 +29,12 @@ Stored laws, newest year first, filtered by jurisdiction, doctype, year or a tit
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `jurisdiction` | string or null | `null` |  |
-| `doctype` | string or null | `null` |  |
-| `year` | integer or null | `null` |  |
-| `q` | string or null | `null` |  |
-| `limit` | integer | `50` | min `1`, max `500` |
-| `offset` | integer | `0` | min `0` |
+| `jurisdiction` | string or null | `null` | Jurisdiction code. Unset lists every jurisdiction. |
+| `doctype` | string or null | `null` | Document class, such as `act`. |
+| `year` | integer or null | `null` | Year of the law. |
+| `q` | string or null | `null` | Title query. When set, results are ordered by title match. |
+| `limit` | integer | `50` | Most laws to return. min `1`, max `500` |
+| `offset` | integer | `0` | Laws to skip before the page starts. min `0` |
 
 Returns a JSON object.
 
@@ -44,7 +44,7 @@ One law by id. Returns its title, doctype, year, number, work URI, jurisdiction 
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `law_id` | string | required |  |
+| `law_id` | string | required | Law id, as returned by `list_laws`. |
 
 Returns a JSON object.
 
@@ -54,8 +54,8 @@ One version by id. Returns its expression URI, language, dates and quality grade
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `version_id` | string | required |  |
-| `include_xml` | boolean | `false` |  |
+| `version_id` | string | required | Version id, as returned by `get_law`. |
+| `include_xml` | boolean | `false` | Also return the Akoma Ntoso XML, cut at the size cap. |
 
 Returns a JSON object.
 
@@ -73,7 +73,7 @@ One jurisdiction's configuration by code. Returns its names, legal tradition, ca
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `code` | string | required |  |
+| `code` | string | required | Jurisdiction code, such as `xa`. |
 
 Returns a JSON object.
 
@@ -83,7 +83,7 @@ Compare two stored versions: each provision of the reference is assessed against
 
 | Parameter | Type | Default | Description |
 | --- | --- | --- | --- |
-| `reference_version_id` | string | required |  |
-| `domestic_version_id` | string | required |  |
+| `reference_version_id` | string | required | Version id of the reference text, such as a directive. |
+| `domestic_version_id` | string | required | Version id of the domestic text assessed against it. |
 
 Returns a JSON object.
