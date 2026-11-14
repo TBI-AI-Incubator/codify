@@ -107,9 +107,18 @@ async def test_a_runner_that_ends_without_a_verdict_is_a_failure() -> None:
     assert "without Complete or Failed" in state["error"]
 
 
-async def test_a_runner_that_raises_fails_the_run_not_the_server() -> None:
+@pytest.mark.parametrize(
+    ("raised", "error"),
+    [
+        (FileNotFoundError("no such file"), "FileNotFoundError: no such file"),
+        (ValueError("echoed: Invented Widgets Act"), "ValueError"),
+    ],
+)
+async def test_a_runner_that_raises_fails_the_run_not_the_server(
+    raised: Exception, error: str
+) -> None:
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
-        raise ValueError("no such file")
+        raise raised
         yield  # unreachable; makes this an async generator
 
     async with _client(runner) as c:
@@ -119,7 +128,7 @@ async def test_a_runner_that_raises_fails_the_run_not_the_server() -> None:
         assert (await c.get("/health")).status_code == 200
 
     assert state["status"] == "failed"
-    assert state["error"] == "ValueError: no such file"
+    assert state["error"] == error
 
 
 async def test_a_run_can_be_cancelled_mid_stream() -> None:
@@ -358,13 +367,18 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
 async def test_a_failed_embed_fails_the_run_and_stores_nothing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Stored but unsearchable would read as a success."""
+    """Stored but unsearchable would read as a success; the provider's echo stays out."""
+    from structlog.testing import capture_logs
+
     import codify.pipeline
     from codify import cli_store
+    from codify.embed.client import EmbeddingError
+
+    sentinel = "Article 7 of the Invented Widgets Act"
 
     class _Down(_FixedVectors):
         async def embed_documents(self, items: list[tuple[str, str]]) -> list[list[float]]:
-            raise RuntimeError("embeddings endpoint down")
+            raise EmbeddingError(f"400 Bad Request: could not embed {sentinel!r}")
 
     async def fake_ingest(*_: Any, **__: Any) -> AsyncIterator[IngestionEvent]:
         yield _complete()
@@ -376,17 +390,23 @@ async def test_a_failed_embed_fails_the_run_and_stores_nothing(
 
     app = create_app()
     try:
-        async with _client(None, app) as c:
-            rid = await _enqueue(c, title=title)
-            events = _sse((await c.get(f"/runs/{rid}/stream")).text)
-            assert "stored" not in [k for k, _ in events], events
-            failed = [e for k, e in events if k == "failed"]
-            assert [(e["stage"], e["error"]) for e in failed] == [
-                ("persist", "RuntimeError: embeddings endpoint down")
-            ], events
-            assert (await c.get(f"/runs/{rid}")).json()["status"] == "failed"
-            laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()
-            assert laws["items"] == []
+        with capture_logs() as logs:
+            async with _client(None, app) as c:
+                rid = await _enqueue(c, title=title)
+                stream = (await c.get(f"/runs/{rid}/stream")).text
+                snapshot = (await c.get(f"/runs/{rid}")).text
+                events = _sse(stream)
+                assert "stored" not in [k for k, _ in events], events
+                failed = [e for k, e in events if k == "failed"]
+                assert [(e["stage"], e["error"]) for e in failed] == [
+                    ("persist", "EmbeddingError")
+                ], events
+                assert (await c.get(f"/runs/{rid}")).json()["status"] == "failed"
+                laws = (await c.get("/laws", params={"jurisdiction": "xa", "q": title})).json()
+                assert laws["items"] == []
+        assert any(log["event"] == "embed_failed" for log in logs), logs
+        for surface in (repr(logs), stream, snapshot):
+            assert "Invented Widgets" not in surface
     finally:
         await app.state.sessions.kw["bind"].dispose()
 

@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from codify.core.tracing import error_fields
 from codify.pipeline.events import Complete, Failed, IngestionEvent
 
 Status = Literal["queued", "running", "succeeded", "failed", "cancelled"]
@@ -30,6 +31,14 @@ class Stored(BaseModel):
 
 RunEvent = IngestionEvent | Stored
 Runner = Callable[[dict[str, Any]], AsyncIterator[RunEvent]]
+
+
+def describe_failure(exc: BaseException) -> str:
+    """The exception for a run's error, without any provider echo of the document."""
+    fields = error_fields(exc)
+    return (
+        f"{fields['error_type']}: {fields['error']}" if "error" in fields else fields["error_type"]
+    )
 
 
 @dataclass
@@ -198,7 +207,7 @@ class RunTable:
             run.status = "cancelled"
         elif (exc := task.exception()) is not None:
             run.status = "failed"
-            run.error = f"{type(exc).__name__}: {exc}"
+            run.error = describe_failure(exc)
         else:
             run.status = task.result()
         run.completed_at = datetime.now(UTC)

@@ -19,9 +19,10 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from codify.core.tracing import error_fields
 from codify.jurisdictions import JurisdictionConfig
 from codify.pipeline.events import Complete, Failed
-from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored
+from codify.serve.runs import QueueFull, Run, RunEvent, RunTable, Stored, describe_failure
 from codify.serve.schemas import (
     Cancelled,
     Health,
@@ -121,9 +122,9 @@ def _ingest_runner(
                         except Exception as exc:  # noqa: BLE001
                             await session.rollback()
                             logger.warning(
-                                "embed_failed", version_id=str(version_id), error=str(exc)
+                                "embed_failed", version_id=str(version_id), **error_fields(exc)
                             )
-                            yield Failed(stage="persist", error=f"{type(exc).__name__}: {exc}")
+                            yield Failed(stage="persist", error=describe_failure(exc))
                             return
                     await session.commit()
                 yield Stored(version_id=version_id, law_id=law_id)
