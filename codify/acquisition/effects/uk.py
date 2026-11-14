@@ -191,7 +191,10 @@ def parse_effects_csv(text: str, dates: dict[str, str]) -> FeedResult:
                 narrowed=narrows(raw_type),
                 # The sidecar first: the export's own column is blank on every
                 # row it serves, so the column is a fallback, not the source.
-                in_force_date=_parse_date(dates.get(pid) or row.get("IF Date", "")),
+                # The export writes `key-<hex>`; the dates pass keys on the bare hex.
+                in_force_date=_parse_date(
+                    dates.get(pid.removeprefix("key-")) or row.get("IF Date", "")
+                ),
                 applied=_truthy(row.get("Amendment applied to Database", "")),
                 is_meta=bool(_META_MARK.search(raw_type)),
             )

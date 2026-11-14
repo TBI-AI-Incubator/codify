@@ -35,6 +35,22 @@ def test_the_sidecar_dates_the_row() -> None:
     assert result.dated == 1
 
 
+def test_the_live_export_id_joins_the_sidecar() -> None:
+    """The export writes ids as `key-<hex>` and the feed's dates are keyed bare."""
+    head = (
+        "ID,Affected Legislation,Affected Provision(s),Type of Effect,Affected Extent,"
+        "Affecting Extent,Affecting Legislation,Affecting Provision,RA Date,IF Date,Sav,U,R,"
+        "Notes,Amendment applied to Database\n"
+    )
+    row = (
+        '"key-abc123","2018 c. 012","s. 65 heading",'
+        '"word substituted","","","2026 SI0386","Sch. 2 para. 23(2)(3)","","","","","","","Y"\n'
+    )
+    result = parse_effects_csv(head + row, {"abc123": "2026-04-06"})
+    assert result.effects[0].in_force_date == date(2026, 4, 6)
+    assert result.effects[0].publisher_id == "key-abc123"
+
+
 def test_without_the_sidecar_the_row_is_undated_and_counted() -> None:
     """The export leaves the column blank on every row it serves, so a loader
     that skips the second pass stores a corpus nobody can read on a date."""
