@@ -57,11 +57,8 @@ def build_frbr_expression_uri(
 ) -> str
 ```
 
-Build a date-only Expression URI, or a canonical UTC timestamp when `include_time`.
-
-An empty string is no date, same as None. It is falsy but not None, so the
-`is None` test alone emitted a trailing bare `@` and minted an expression URI
-no row would ever match. Timestamp mode emits `YYYY-MM-DDTHH:MM:SS.ffffffZ`.
+`<work>/<language>@<date>`, with no `@` for a None or empty date. With `include_time`
+the date must be a timezone-aware XSD dateTime, written in UTC with microseconds.
 
 ### `is_citable_work_uri`
 
@@ -71,13 +68,8 @@ from codify.frbr import is_citable_work_uri
 def is_citable_work_uri(uri: str) -> bool
 ```
 
-Whether a stored work URI names a real year and number.
-
-`build_frbr_work_uri` mints `/akn/xz/act/0001/draft-<sha>` when neither resolved;
-writing that back replaces a real enactment date with year 1 and a real number
-with a content hash. Year and number are shape-checked rather than compared,
-without which `/akn/xz/act/2008/` and `//` both pass. `0000` is refused because
-XSD 1.0 has no year zero.
+Whether a work URI ends in a four-digit year and a number. Refuses year `0000`, a
+missing segment and the draft URIs `build_frbr_work_uri` mints (`.../0001/draft-<sha>`).
 
 ### `year_from_calendar`
 
@@ -225,7 +217,8 @@ class AcquiredDocument(
 )
 ```
 
-No docstring.
+One document an acquirer fetched: its FRBR identity, one or more bodies (the main
+text has role `primary`) and the source, licence and publication details that came with it.
 
 ### `BaseAcquirer`
 
@@ -709,7 +702,9 @@ async def repair_document(
 ) -> RepairOutcome
 ```
 
-No docstring.
+Run the repair agent once per actionable validator finding, applying each accepted
+plan to the AKN in turn. High-risk plans are queued for approval instead of applied;
+the outcome carries the final AKN, finding counts before and after, and each disposition.
 
 ### `build_agent`
 
@@ -719,7 +714,8 @@ from codify.repair.agent import build_agent
 def build_agent(model: Model, store: EvidenceStore) -> Agent[RepairDeps, EditPlan]
 ```
 
-No docstring.
+Build the AKN repair agent: it reads evidence through the registered tools and
+finishes by submitting an edit plan, which is validated before it is accepted.
 
 ## Amendments and versions
 
@@ -826,7 +822,9 @@ async def translate_document(
 ) -> TranslationResult
 ```
 
-No docstring.
+Translate an AKN document into `target_language`, unit by unit, keeping its structure
+and eIds. Returns the translated AKN with notes, an audit record and flags for anything
+skipped, stripped or under-translated; `judge_enabled` adds a scored sample and repair pass.
 
 ### `walk_source`
 

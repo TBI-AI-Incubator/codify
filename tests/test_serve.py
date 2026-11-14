@@ -561,6 +561,7 @@ async def test_search_without_an_embeddings_endpoint_is_503(
     async with _client(runner) as c:
         r = await c.get("/search?q=x&jurisdiction=xa")
         assert (await c.get("/search?q=x&jurisdiction=zz")).status_code == 422
+        assert (await c.get("/search?q=x&jurisdiction=gb%00")).status_code == 422
 
     assert r.status_code == 503
     assert "EMBEDDING_BASE_URL" in r.json()["detail"]
@@ -1063,6 +1064,15 @@ def test_every_success_response_names_a_schema() -> None:
                 schema = ok["content"]["application/json"]["schema"]
                 ref = schema.get("$ref") or schema.get("items", {}).get("$ref", "")
                 assert ref.startswith("#/components/schemas/"), f"{method} {path}: {schema}"
+
+
+def test_every_route_and_parameter_is_described() -> None:
+    paths = create_app(database=SCHEMA_ONLY).openapi()["paths"]
+    for path, ops in paths.items():
+        for method, op in ops.items():
+            assert op.get("summary") and op.get("description"), f"{method} {path}"
+            for param in op.get("parameters", []):
+                assert param.get("description"), f"{method} {path} {param['name']}"
 
 
 def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -> None:

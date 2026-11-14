@@ -103,6 +103,9 @@ async def repair_document(
     on_progress: ProgressHook | None = None,
     on_settled: SettledHook | None = None,
 ) -> RepairOutcome:
+    """Run the repair agent once per actionable validator finding, applying each accepted
+    plan to the AKN in turn. High-risk plans are queued for approval instead of applied;
+    the outcome carries the final AKN, finding counts before and after, and each disposition."""
     spans = spans_from_json(raw_spans)
     if eid_page is None:
         eid_page = (

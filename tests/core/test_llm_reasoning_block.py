@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from structlog.testing import capture_logs
 
-from codify.core.llm import LiteLLMClient, _strip_reasoning
+from codify.core.llm import OpenAICompatibleClient, _strip_reasoning
 from codify.translate.translate import translate_title
 
 
@@ -19,8 +19,8 @@ def _resp(content: str | None) -> MagicMock:
 
 
 @pytest.fixture
-def client() -> LiteLLMClient:
-    c = LiteLLMClient(base_url="http://x/v1", api_key="k", model="deepseek-r1")
+def client() -> OpenAICompatibleClient:
+    c = OpenAICompatibleClient(base_url="http://x/v1", api_key="k", model="deepseek-r1")
     c.client = MagicMock()
     c.client.chat = MagicMock()
     c.client.chat.completions = MagicMock()
@@ -28,20 +28,22 @@ def client() -> LiteLLMClient:
     return c
 
 
-async def test_chat_drops_a_leading_reasoning_block(client: LiteLLMClient) -> None:
+async def test_chat_drops_a_leading_reasoning_block(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp(
         "<think>\nThe title names a tax act.\n</think>\n\nIncome Tax Act"
     )
     assert await client.chat("translate this title") == "Income Tax Act"
 
 
-async def test_chat_keeps_an_answer_without_a_reasoning_block(client: LiteLLMClient) -> None:
+async def test_chat_keeps_an_answer_without_a_reasoning_block(
+    client: OpenAICompatibleClient,
+) -> None:
     client.client.chat.completions.create.return_value = _resp("  Income Tax Act\n")
     # Unchanged: callers strip their own whitespace.
     assert await client.chat("translate this title") == "  Income Tax Act\n"
 
 
-async def test_a_translated_title_carries_no_reasoning(client: LiteLLMClient) -> None:
+async def test_a_translated_title_carries_no_reasoning(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp(
         '<think>\n"Tuloverolaki" is the Income Tax Act.\n</think>\n\n"Income Tax Act"'
     )
@@ -49,14 +51,16 @@ async def test_a_translated_title_carries_no_reasoning(client: LiteLLMClient) ->
     assert title == "Income Tax Act"
 
 
-async def test_chat_json_parses_after_a_leading_reasoning_block(client: LiteLLMClient) -> None:
+async def test_chat_json_parses_after_a_leading_reasoning_block(
+    client: OpenAICompatibleClient,
+) -> None:
     client.client.chat.completions.create.return_value = _resp(
         '<think>Two units, both sections.</think>{"units": 2}'
     )
     assert await client.chat_json("count the units") == {"units": 2}
 
 
-async def test_chat_json_refuses_a_reply_of_reasoning_alone(client: LiteLLMClient) -> None:
+async def test_chat_json_refuses_a_reply_of_reasoning_alone(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("<think>Two units.</think>")
     # Invalid, not an empty object; with no answer, the error shows the reply.
     with capture_logs() as logs, pytest.raises(ValueError) as raised:
@@ -67,7 +71,7 @@ async def test_chat_json_refuses_a_reply_of_reasoning_alone(client: LiteLLMClien
     ]
 
 
-async def test_chat_json_names_the_answer_that_failed(client: LiteLLMClient) -> None:
+async def test_chat_json_names_the_answer_that_failed(client: OpenAICompatibleClient) -> None:
     # A long block would otherwise fill the preview and hide the broken answer.
     client.client.chat.completions.create.return_value = _resp(
         "<think>" + "Count the units. " * 50 + '</think>{"units": 2'
@@ -79,7 +83,7 @@ async def test_chat_json_names_the_answer_that_failed(client: LiteLLMClient) -> 
 
 
 async def test_chat_json_still_reads_no_content_as_an_empty_object(
-    client: LiteLLMClient,
+    client: OpenAICompatibleClient,
 ) -> None:
     client.client.chat.completions.create.return_value = _resp(None)
     assert await client.chat_json("count the units") == {}

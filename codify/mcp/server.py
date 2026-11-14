@@ -52,9 +52,11 @@ _JURISDICTION_FIELDS = {
 }
 _DOCUMENT_CLASS_FIELDS = {"label", "short_label", "akn_element", "basic_unit", "frbr_subtype"}
 
-_Limit = Annotated[int, Field(ge=1, le=500)]
-_Offset = Annotated[int, Field(ge=0)]
-_K = Annotated[int, Field(ge=1, le=100)]
+_Limit = Annotated[int, Field(ge=1, le=500, description="Most laws to return.")]
+_Offset = Annotated[int, Field(ge=0, description="Laws to skip before the page starts.")]
+_K = Annotated[int, Field(ge=1, le=100, description="Most matches to return.")]
+_Jurisdiction = Annotated[str, Field(description="Jurisdiction code, such as `xa`.")]
+_VersionId = Annotated[str, Field(description="Version id, as returned by `get_law`.")]
 
 
 def _embedding_client() -> Any:
@@ -151,7 +153,16 @@ def create_server(
         "score and text."
     )
     async def search_provisions(
-        query: str, jurisdiction: str, language: str | None = None, k: _K = 10
+        query: Annotated[str, Field(description="The search text.")],
+        jurisdiction: _Jurisdiction,
+        language: Annotated[
+            str | None,
+            Field(
+                description="ISO 639-3 code of the expression to search. Unset searches each "
+                "law's original language; a law without that expression falls back to it."
+            ),
+        ] = None,
+        k: _K = 10,
     ) -> dict[str, Any]:
         from codify.retrieve.hybrid import retrieve
 
@@ -184,10 +195,15 @@ def create_server(
         "year or a title query. Returns a page of law summaries with their ids."
     )
     async def list_laws(
-        jurisdiction: str | None = None,
-        doctype: str | None = None,
-        year: int | None = None,
-        q: str | None = None,
+        jurisdiction: Annotated[
+            str | None, Field(description="Jurisdiction code. Unset lists every jurisdiction.")
+        ] = None,
+        doctype: Annotated[str | None, Field(description="Document class, such as `act`.")] = None,
+        year: Annotated[int | None, Field(description="Year of the law.")] = None,
+        q: Annotated[
+            str | None,
+            Field(description="Title query. When set, results are ordered by title match."),
+        ] = None,
         limit: _Limit = 50,
         offset: _Offset = 0,
     ) -> dict[str, Any]:
@@ -213,7 +229,9 @@ def create_server(
         description="One law by id. Returns its title, doctype, year, number, work URI, "
         "jurisdiction and every stored version (without the XML)."
     )
-    async def get_law(law_id: str) -> dict[str, Any]:
+    async def get_law(
+        law_id: Annotated[str, Field(description="Law id, as returned by `list_laws`.")],
+    ) -> dict[str, Any]:
         from codify.storage import list_versions
         from codify.storage.laws import get_law_with_jurisdiction
 
@@ -245,7 +263,12 @@ def create_server(
         "quality grade; with include_xml, the Akoma Ntoso XML too, cut at the size cap "
         "and flagged when cut."
     )
-    async def get_version(version_id: str, include_xml: bool = False) -> dict[str, Any]:
+    async def get_version(
+        version_id: _VersionId,
+        include_xml: Annotated[
+            bool, Field(description="Also return the Akoma Ntoso XML, cut at the size cap.")
+        ] = False,
+    ) -> dict[str, Any]:
         from codify.storage import get_version, get_version_akn_length
 
         key = _id(version_id, "version")
@@ -284,7 +307,7 @@ def create_server(
         description="One jurisdiction's configuration by code. Returns its names, legal "
         "tradition, calendar, languages and document classes."
     )
-    async def get_jurisdiction(code: str) -> dict[str, Any]:
+    async def get_jurisdiction(code: _Jurisdiction) -> dict[str, Any]:
         from codify.jurisdictions import JURISDICTIONS_DIR, JurisdictionConfigError, load_config
 
         if not JURISDICTIONS_DIR.exists():
@@ -308,7 +331,12 @@ def create_server(
         "provision's eId."
     )
     async def compare_versions(
-        reference_version_id: str, domestic_version_id: str
+        reference_version_id: Annotated[
+            str, Field(description="Version id of the reference text, such as a directive.")
+        ],
+        domestic_version_id: Annotated[
+            str, Field(description="Version id of the domestic text assessed against it.")
+        ],
     ) -> dict[str, Any]:
         from codify.akn.io import parse_akn
         from codify.compare.comparator import compare

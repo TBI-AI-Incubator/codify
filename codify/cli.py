@@ -886,7 +886,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument(
         "--include-derived",
         action="store_true",
-        help="also score our own exports (`<stem>.ar/.en/.he`), excluded by default",
+        help="also score files named as language exports (`<stem>.<lang>`), excluded by default",
     )
     scan.set_defaults(func=_run_scan_corpus)
 

@@ -53,12 +53,12 @@ def _embedding_client() -> Any:
 
 
 def _llm_client(model: str | None) -> Any:
-    from codify.core.llm import LiteLLMClient
+    from codify.core.llm import OpenAICompatibleClient
 
     base_url = _env("LLM_BASE_URL")
     if not base_url:
         raise SystemExit("set LLM_BASE_URL to an OpenAI-compatible chat endpoint")
-    return LiteLLMClient(
+    return OpenAICompatibleClient(
         base_url=base_url,
         api_key=_env("LLM_API_KEY") or "sk-codify-dev",
         model=model or _env("LLM_MODEL") or "gemini-3.7-flash",

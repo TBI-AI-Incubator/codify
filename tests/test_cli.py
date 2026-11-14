@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from codify.cli import _by_pass, _clear_bundle, _coverage_json, _foundry_ocr_url
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 from codify.pipeline.enrich.anchors import AnchorCoverage, StructuralAnchor
 from codify.pipeline.enrich.structure import ScanTrace
 
@@ -261,7 +261,9 @@ async def test_the_client_is_built_off_the_proxy(monkeypatch, tmp_path: Path) ->
         await cli._run(args)
     assert seen["telemetry_mode"] == "direct"
     # The mode is only worth pinning because of what it drops from the request.
-    direct = LiteLLMClient(base_url="http://x/v1", api_key="k", model="m", telemetry_mode="direct")
+    direct = OpenAICompatibleClient(
+        base_url="http://x/v1", api_key="k", model="m", telemetry_mode="direct"
+    )
     assert direct._body() == {}
 
 
