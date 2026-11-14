@@ -29,7 +29,7 @@ from codify.acquisition.adapters.th.ocs import (
     section_text,
 )
 from codify.acquisition.adapters.th.ocs_akn import UnmappedUnit, to_akn, to_bluebell
-from codify.acquisition.base import DiscoveryQuery
+from codify.acquisition.base import DiscoveryQuery, MissingUserAgent
 from codify.acquisition.politeness import PoliteTransport
 from codify.frbr import TITLE_DIGEST_PREFIX, identity_from_code
 from codify.jurisdictions import SourceAdapter, TitleIdentity
@@ -257,14 +257,18 @@ def test_registers_json_portal() -> None:
     assert "json_portal" in registered_kinds()
 
 
-def test_default_client_is_polite() -> None:
+def test_default_client_is_polite(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "th-test/1 (+https://example.test)")
     acquirer = OcsAcquirer(_adapter(), title_rule=RULE)
     assert isinstance(acquirer._client._transport, PoliteTransport)
     assert acquirer.politeness.rate_limit_per_minute == 12
-    sent = acquirer._client._transport.profile.user_agent
-    assert sent.startswith("Codify/") and sent.endswith(
-        "(+https://github.com/TBI-AI-Incubator/codify)"
-    )
+    assert acquirer._client._transport.profile.user_agent == "th-test/1 (+https://example.test)"
+
+
+def test_the_client_needs_the_callers_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT")
+    with pytest.raises(MissingUserAgent):
+        OcsAcquirer(_adapter(), title_rule=RULE)
 
 
 def test_section_text_joins_split_spans_and_keeps_paragraphs() -> None:

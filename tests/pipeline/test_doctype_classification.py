@@ -675,3 +675,33 @@ class TestTheTitleFallbackDeclines:
             "Undang-Undang Nomor 8 Tahun 1991",
         )
         assert got == "32"
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Directive (EU) 2019/790 of the European Parliament and of the Council", "directive"),
+        ("Council Directive 93/13/EEC of 5 April 1993 on unfair terms", "directive"),
+        ("Commission Implementing Decision (EU) 2021/914 of 4 June 2021", "decision"),
+        ("Council Framework Decision 2008/913/JHA of 28 November 2008", "decision"),
+        ("Regulation (EU) 2016/679 repealing Directive 95/46/EC", "regulation"),
+    ],
+)
+def test_eu_instruments_classify_by_title(title: str, expected: str) -> None:
+    """Without these rules a directive defaulted to a regulation's work URI."""
+    cfg = load_config("eu")
+    assert cfg is not None
+    assert resolve_doctype(cfg, title=title, raw_date="", year="2019", source="") == expected
+
+
+def test_a_framework_decision_is_one_work_by_title_and_by_celex() -> None:
+    from codify.acquisition.adapters.eu.cellar import celex_to_frbr
+    from codify.frbr import build_frbr_work_uri
+
+    cfg = load_config("eu")
+    assert cfg is not None
+    title = "Council Framework Decision 2008/913/JHA of 28 November 2008"
+    doctype = resolve_doctype(cfg, title=title, raw_date="", year="2008", source="")
+    by_celex, celex_doctype = celex_to_frbr("32008F0913")
+    assert celex_doctype == doctype
+    assert by_celex == build_frbr_work_uri("eu", doctype, 2008, "913")

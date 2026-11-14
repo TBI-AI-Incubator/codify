@@ -19,6 +19,12 @@ and operating-system packages have additional notices not enumerated here.
 CLDR 49.0.0, Copyright © 2001–2026 Unicode, Inc., under the Unicode License v3;
 the notice is reproduced in `licenses/Unicode-CLDR.txt`.
 
+`data/jurisdictions/eu/` quotes short passages of EU legislation (enacting
+formulae and an excerpt of Regulation (EU) 2016/679) from EUR-Lex. Source:
+© European Union, https://eur-lex.europa.eu, reused under Commission Decision
+2011/833/EU on the reuse of Commission documents. Only the texts published in
+the Official Journal of the European Union are authentic.
+
 No customer source-document redistribution permission is implied by a
 jurisdiction configuration or by this inventory. Synthetic fixture material is
 identified in its files; acquired documents require their own rights assessment.

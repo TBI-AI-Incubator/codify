@@ -565,7 +565,7 @@ def test_the_flagged_set_is_deliberate() -> None:
         if json.loads(p.read_text()).get("public_reference")
     )
     assert flagged == on_disk
-    assert len(flagged) == 104
+    assert len(flagged) == 105
     assert {"ee", "fi", "gb", "ie", "it", "nz"} <= set(flagged)
 
 
@@ -1662,7 +1662,8 @@ def test_spanish_and_portuguese_display_text_carries_its_accents(code: str) -> N
     for lang in ("spa", "por"):
         if lang in raw["languages"]:
             words.update(_NEEDS_ACCENT[lang])
-    if not words:
+    # A profile that also declares English writes its display text in English.
+    if not words or "eng" in raw["languages"]:
         return
     misspelt = []
     for where, text in _paths(raw):
@@ -1702,3 +1703,10 @@ def test_no_hierarchy_term_is_a_placeholder(code: str) -> None:
                 if not letters or lone or token:
                     placeholders.append((doctype, entry.local_term, form))
     assert not placeholders, (code, placeholders)
+
+
+def test_the_eu_cellar_source_rates_as_structured_xml() -> None:
+    """Cellar supplies Formex, not AKN, so it cannot lift the EU to tier 1."""
+    cfg = load_config("eu")
+    assert cfg is not None
+    assert cfg.effective_tier == 2

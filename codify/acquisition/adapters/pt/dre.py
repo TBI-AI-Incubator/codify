@@ -10,7 +10,6 @@ import os
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
@@ -37,13 +36,6 @@ from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_expression_uri, build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
 from codify.provenance import OfficialRef, official_ref_from_url
-
-try:
-    _RELEASE = version("codify-core")
-except PackageNotFoundError:
-    _RELEASE = "0"
-
-USER_AGENT = f"Codify/{_RELEASE} (+https://github.com/TBI-AI-Incubator/codify)"
 
 ELI_BASE = "https://data.dre.pt/eli"
 GAZETTE_NAME = "Diário da República"
@@ -135,12 +127,8 @@ class DiarioAcquirer(BaseAcquirer):
         super().__init__(adapter, client=client)
         # Never faster than one request each 1.5 s, whatever the config asks.
         rate = min(self.politeness.rate_limit_per_minute or self.DEFAULT_RATE, self.DEFAULT_RATE)
-        self.politeness = self.politeness.model_copy(
-            update={"rate_limit_per_minute": rate, "user_agent": USER_AGENT}
-        )
-        self._client = client or make_polite_client(
-            adapter, user_agent=USER_AGENT, profile=self.politeness
-        )
+        self.politeness = self.politeness.model_copy(update={"rate_limit_per_minute": rate})
+        self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._licence = adapter.licence
         self._cache = cache_dir
         self._module_version: str | None = None
@@ -485,7 +473,6 @@ __all__ = [
     "ELI_BASE",
     "GAZETTE_NAME",
     "SiteChanged",
-    "USER_AGENT",
     "api_version",
     "number_and_year",
     "work_eli",

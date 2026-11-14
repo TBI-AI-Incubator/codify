@@ -562,20 +562,28 @@ async def test_an_unknown_or_uncanonical_jurisdiction_is_422_or_folded() -> None
 
 
 async def test_ingest_url_is_the_eu_lane_only() -> None:
-    """Only the EU lane fetches; core ships no eu config, so here the pair fails at
-    the config, and under CODIFY_DATA_ROOT with one it runs."""
+    """Only the EU lane fetches. The runner is a fake, so nothing is fetched."""
+    seen: list[dict[str, Any]] = []
 
-    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+    async def runner(p: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        seen.append(p)
         yield _complete()
 
-    url = "https://eur-lex.europa.eu/a.xml"
+    url = "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679"
     async with _client(runner) as c:
         for host_url in (url, "https://publications.europa.eu/a.xml"):
             r = await c.post("/runs/ingest-url", json={"url": host_url, "jurisdiction": "xa"})
             assert r.status_code == 422 and "publications.europa.eu" in r.json()["detail"]
-        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "EU"})
-        assert r.status_code == 422 and "no jurisdiction config for 'EU'" in r.json()["detail"]
+        r = await c.post(
+            "/runs/ingest-url", json={"url": "https://example.org/a", "jurisdiction": "eu"}
+        )
+        assert r.status_code == 422
         assert (await c.get("/runs")).json() == []
+        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": " EU "})
+        assert r.status_code == 202, r.text
+        await c.get(f"/runs/{r.json()['id']}/stream")
+
+    assert seen == [{"source": url, "jurisdiction": "eu", "title": None}]
 
 
 async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPatch) -> None:

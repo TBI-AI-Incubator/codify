@@ -889,7 +889,7 @@ class IdentificationConfig(BaseModel):
 # Each kind selects a concrete Acquirer; new values only when one ships.
 SourceAdapterKind = Literal[
     "akn_native",  # Native AKN3 export. legislation.gov.uk, laws.africa.
-    "eurlex_cellar",  # EUR-Lex Cellar (AKN4EU).
+    "eurlex_cellar",  # EUR-Lex Cellar (Formex).
     "html_portal",  # HTML portal, pages + linked PDFs.
     "pdf_gazette",  # PDF gazette (qbz.gov.al, consultoria.gov.do, JORF).
     "paragraf_propisi",  # Paragraf Lex slug-keyed PDFs (rs).
@@ -905,7 +905,7 @@ SourceAdapterKind = Literal[
 # bespoke; Tier 3 unstructured PDFs. Used by JurisdictionConfig.effective_tier.
 _ADAPTER_TIER: dict[SourceAdapterKind, Literal[1, 2, 3]] = {
     "akn_native": 1,
-    "eurlex_cellar": 1,
+    "eurlex_cellar": 2,
     "html_portal": 2,
     "sparql": 2,
     "bulk_xml_archive": 2,

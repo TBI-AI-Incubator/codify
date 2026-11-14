@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import unquote
 
 from lxml import etree
 
@@ -165,6 +166,24 @@ def celex_to_frbr(celex: str) -> str:
     """
     uri, _doctype = _celex_to_frbr_tuple(celex)
     return uri
+
+
+_URL_CELEX_RE = re.compile(r"(?:CELEX:|/celex/)([0-9A-Z()-]+)", re.IGNORECASE)
+# Implementing, delegated and framework acts share their base type's work URI.
+_URL_ELI_RE = re.compile(r"/eli/(dir|reg|dec)(?:_impl|_del|_framw)?/(\d{4})/(\d+)(?:/|$)")
+
+
+def work_uri_from_url(url: str) -> str | None:
+    """The work URI named by an EUR-Lex CELEX or ELI URL, or None."""
+    path = unquote(url)
+    if m := _URL_ELI_RE.search(path):
+        return build_frbr_work_uri("eu", _SUBTYPE_TO_DOCTYPE[m[1]], int(m[2]), m[3])
+    if m := _URL_CELEX_RE.search(path):
+        try:
+            return celex_to_frbr(m[1].upper())
+        except ValueError:
+            return None
+    return None
 
 
 def _strip_foreign_namespaces(root: etree._Element) -> None:
@@ -1959,10 +1978,13 @@ async def ingest(
                     raise ValueError("formex_conversion was given neither a path nor the text")
                 if is_eurlex_html(src):
                     # Pre-FORMEX acts: Cellar's HTML rendering of the OJ text.
-                    if not frbr_work_uri:
+                    html_work = frbr_work_uri or (
+                        work_uri_from_url(source) if isinstance(source, str) else None
+                    )
+                    if not html_work:
                         raise ValueError("an HTML act needs the acquirer's FRBR work URI")
                     return html_to_akn4eu(
-                        src, frbr_work_uri=frbr_work_uri, language=language, provenance=provenance
+                        src, frbr_work_uri=html_work, language=language, provenance=provenance
                     )
                 if _detect_format(src) != "formex":
                     return src
