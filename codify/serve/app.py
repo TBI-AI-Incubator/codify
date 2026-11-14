@@ -10,6 +10,7 @@ import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from importlib.metadata import version as package_version
 from pathlib import Path
 from typing import Any
 
@@ -157,7 +158,9 @@ def create_app(
         await clients.close()
         await engine.dispose()
 
-    app = FastAPI(title="codify", docs_url="/docs", lifespan=lifespan)
+    app = FastAPI(
+        title="codify", version=package_version("codify-core"), docs_url="/docs", lifespan=lifespan
+    )
     app.state.sessions = sessions
     app.state.runs = runs
     app.state.uploads = Path(uploads.name)

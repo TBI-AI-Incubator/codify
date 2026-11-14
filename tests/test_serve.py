@@ -980,6 +980,13 @@ def test_the_committed_openapi_schema_matches_the_server() -> None:
     assert OPENAPI.read_text() == live, "regenerate contract/openapi.json"
 
 
+def test_the_schema_carries_the_package_version() -> None:
+    from importlib.metadata import version
+
+    info = create_app(database=SCHEMA_ONLY).openapi()["info"]
+    assert info["version"] == version("codify-core")
+
+
 def test_every_success_response_names_a_schema() -> None:
     """A UI type is only generated for a response the schema describes."""
     paths = create_app(database=SCHEMA_ONLY).openapi()["paths"]
