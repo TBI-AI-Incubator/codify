@@ -320,7 +320,7 @@ class EuDatadumpAcquirer(BaseAcquirer):
             ],
             source_url=f"datadump://{Path(archive.filename or '').name}!{path}",
             fetched_at=archive_date(self._archive_path),
-            licence="EU-RU/2011/833",
+            licence=DEFAULT_LICENCE,
             official=celex_ref(celex),
             upstream_metadata={
                 "cellar_uuid": path.split("/", 1)[0],
@@ -456,12 +456,14 @@ def _inline_included(
     return counts
 
 
+DEFAULT_LICENCE = "Commission Decision 2011/833/EU"
+
 # CELEX sector-3 descriptor to document class; F is a framework decision.
 DESCRIPTOR_TO_DOCTYPE = {"L": "directive", "R": "regulation", "D": "decision", "F": "decision"}
 
 
 def letter_from_celex(celex: str) -> str:
-    """Extract the sector-3 type letter (L/R/D/H) from a CELEX number."""
+    """Extract the sector-3 type letter (L/R/D/F/G/H) from a CELEX number."""
     # 3{year:4}{letter}{number:4}
     if len(celex) < 6 or not celex.startswith("3"):
         return "L"
@@ -485,14 +487,16 @@ _BIB_NO_DOC = re.compile(
 )
 _TITLE_BLOCK = re.compile(rb"<TI>(.*?)</TI>", re.DOTALL)
 _DOCTYPE_KEYWORD = re.compile(
-    rb"\b(Directive|Regulation|Decision|Recommendation|Resolution)\b", re.IGNORECASE
+    rb"\b(Framework\s+Decision|Directive|Regulation|Decision|Recommendation|Resolution)\b",
+    re.IGNORECASE,
 )
 _LETTER_FOR_KEYWORD = {
     b"directive": "L",
     b"regulation": "R",
     b"decision": "D",
+    b"framework decision": "F",
     b"recommendation": "H",
-    b"resolution": "H",
+    b"resolution": "G",
 }
 _ARCHIVE_LANGUAGE = re.compile(r"^LEG_([A-Z]{2})_", re.IGNORECASE)
 
@@ -510,7 +514,7 @@ def _letter_from_title(head: bytes) -> str | None:
     if title is None:
         return None
     kw = _DOCTYPE_KEYWORD.search(re.sub(rb"<[^>]+>", b" ", title.group(1)))
-    return _LETTER_FOR_KEYWORD.get(kw.group(1).lower()) if kw else None
+    return _LETTER_FOR_KEYWORD.get(re.sub(rb"\s+", b" ", kw.group(1).lower())) if kw else None
 
 
 def _celex_with_reason(content: bytes) -> tuple[str | None, str]:

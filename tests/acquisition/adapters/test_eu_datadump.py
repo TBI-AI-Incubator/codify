@@ -761,3 +761,24 @@ async def test_a_framework_decision_from_the_dump_is_a_decision(tmp_path: Path) 
     doc = await acquirer.fetch(ref)
     acquirer.close()
     assert doc.frbr_work_uri == "/akn/eu/act/dec/2008/913"
+    assert doc.licence == "Commission Decision 2011/833/EU"
+
+
+@pytest.mark.parametrize(
+    ("title", "celex"),
+    [
+        (b"Council Framework <HT>Decision</HT> 2008/913/JHA", "32008F0913"),
+        (b"Council <HT>Decision</HT> 2008/913/EU", "32008D0913"),
+        (b"Council <HT>Resolution</HT> of 28 November 2008", "32008G0913"),
+        (b"Commission <HT>Recommendation</HT> of 28 November 2008", "32008H0913"),
+    ],
+)
+def test_the_index_keys_an_act_by_its_real_celex_type(title: bytes, celex: str) -> None:
+    from codify.acquisition.adapters.eu.datadump import celex_from_formex
+
+    body = (
+        b'<?xml version="1.0"?><ACT><BIB.INSTANCE><NO.DOC TYPE="OJ">'
+        b"<YEAR>2008</YEAR><NO.CURRENT>913</NO.CURRENT></NO.DOC></BIB.INSTANCE>"
+        b"<TITLE><TI>" + title + b"</TI></TITLE></ACT>"
+    )
+    assert celex_from_formex(body) == celex

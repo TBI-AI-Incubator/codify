@@ -12,7 +12,11 @@ from typing import ClassVar, Literal
 import httpx
 import structlog
 
-from codify.acquisition.adapters.eu.datadump import DESCRIPTOR_TO_DOCTYPE, assemble_formex
+from codify.acquisition.adapters.eu.datadump import (
+    DEFAULT_LICENCE,
+    DESCRIPTOR_TO_DOCTYPE,
+    assemble_formex,
+)
 from codify.acquisition.base import (
     AcquiredDocument,
     BaseAcquirer,
@@ -28,7 +32,6 @@ from codify.provenance import celex_ref
 
 CELLAR_BASE = "https://publications.europa.eu/resource/celex"
 SPARQL_ENDPOINT = "http://publications.europa.eu/webapi/rdf/sparql"
-DEFAULT_LICENCE = "EU-RU/2011/833"
 
 logger = structlog.get_logger()
 
