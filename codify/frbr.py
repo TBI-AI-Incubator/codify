@@ -58,14 +58,8 @@ _URI_YEAR_SEGMENT = re.compile(r"[0-9]{4}")
 
 
 def is_citable_work_uri(uri: str) -> bool:
-    """Whether a stored work URI names a real year and number.
-
-    `build_frbr_work_uri` mints `/akn/xz/act/0001/draft-<sha>` when neither resolved;
-    writing that back replaces a real enactment date with year 1 and a real number
-    with a content hash. Year and number are shape-checked rather than compared,
-    without which `/akn/xz/act/2008/` and `//` both pass. `0000` is refused because
-    XSD 1.0 has no year zero.
-    """
+    """Whether a work URI ends in a four-digit year and a number. Refuses year `0000`, a
+    missing segment and the draft URIs `build_frbr_work_uri` mints (`.../0001/draft-<sha>`)."""
     tail = uri.rsplit("/", 2)[-2:]
     if len(tail) != 2:
         return False
@@ -492,11 +486,8 @@ def _assert_citable(uri: str, *, country: str, doctype: str, number: str) -> str
 def build_frbr_expression_uri(
     work_uri: str, language: str, date_: date | str | None, *, include_time: bool = False
 ) -> str:
-    """Build a date-only Expression URI, or a canonical UTC timestamp when `include_time`.
-
-    An empty string is no date, same as None. It is falsy but not None, so the
-    `is None` test alone emitted a trailing bare `@` and minted an expression URI
-    no row would ever match. Timestamp mode emits `YYYY-MM-DDTHH:MM:SS.ffffffZ`."""
+    """`<work>/<language>@<date>`, with no `@` for a None or empty date. With `include_time`
+    the date must be a timezone-aware XSD dateTime, written in UTC with microseconds."""
     if not date_:
         return f"{work_uri}/{language}"
     iso = date_ if isinstance(date_, str) else date_.isoformat()

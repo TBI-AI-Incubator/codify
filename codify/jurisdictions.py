@@ -1356,7 +1356,7 @@ class JurisdictionConfig(BaseModel):
         default_factory=dict,
         description=(
             "Localised jurisdiction names keyed by ISO 639-3 language code, used to render an "
-            "export cover in the target language. Mirrors `Law.title_translations`."
+            "export cover in the target language, in the same shape as a law's title translations."
         ),
     )
     type: JurisdictionType = "national"
@@ -1408,7 +1408,8 @@ class JurisdictionConfig(BaseModel):
     placeholders: list[PlaceholderMarker] = Field(
         default_factory=list,
         description=(
-            "Whole-string markers for missing or struck content, beyond the platform default."
+            "Whole-string markers for missing or struck content, checked in addition to the "
+            "built-in placeholder pattern."
         ),
     )
     pool_excluded_refers_to: list[str] = Field(

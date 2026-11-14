@@ -11,7 +11,7 @@ from pydantic import BaseModel, HttpUrl
 
 
 class LawSummary(BaseModel):
-    """The listing row, without the hosted platform's lens and translation fields."""
+    """One law in a listing: its identity, FRBR work URI and latest expression date."""
 
     id: uuid.UUID
     jurisdiction_code: str

@@ -712,6 +712,9 @@ async def translate_document(
     expression_date: str | None = None,
     pinned_terms: Sequence[PinnedTerm] | None = None,
 ) -> TranslationResult:
+    """Translate an AKN document into `target_language`, unit by unit, keeping its structure
+    and eIds. Returns the translated AKN with notes, an audit record and flags for anything
+    skipped, stripped or under-translated; `judge_enabled` adds a scored sample and repair pass."""
     # Strip gazette running-headers from the source tree where the
     # jurisdiction ships patterns, so the LLM never sees the bleed. The
     # audit's post-translation sweep catches what survives.

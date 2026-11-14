@@ -61,6 +61,9 @@ class Body(BaseModel):
 
 
 class AcquiredDocument(BaseModel):
+    """One document an acquirer fetched: its FRBR identity, one or more bodies (the main
+    text has role `primary`) and the source, licence and publication details that came with it."""
+
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     ref: DocumentRef
