@@ -240,6 +240,13 @@ def register(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     mcp.add_argument("--port", type=int, default=8001)
     mcp.set_defaults(func=_mcp)
 
+    migrate = sub.add_parser(
+        "migrate",
+        help="bring the database at POSTGRES_URL to the current core schema "
+        "(needs the migrations extra)",
+    )
+    migrate.set_defaults(func=_migrate)
+
 
 def _serve(args: argparse.Namespace) -> int:
     try:
@@ -266,4 +273,20 @@ def _mcp(args: argparse.Namespace) -> int:
         server.run("streamable-http", host=args.host, port=args.port)
     else:
         server.run("stdio")
+    return 0
+
+
+def _migrate(args: argparse.Namespace) -> int:
+    try:
+        import psycopg  # noqa: F401, the driver the chain connects with
+        from alembic import command
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+    except ImportError as exc:
+        raise SystemExit(f"{exc}; install the migrations extra: codify-core[migrations]") from exc
+    # A wheel carries the chain but no `alembic.ini`.
+    config = Config()
+    config.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
+    command.upgrade(config, "head")
+    print(f"database is at {ScriptDirectory.from_config(config).get_current_head()}")
     return 0

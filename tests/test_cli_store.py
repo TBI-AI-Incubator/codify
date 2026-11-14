@@ -156,6 +156,22 @@ async def _delete_law_of(version_id: uuid.UUID) -> None:
 
 
 @pytest.mark.integration
+def test_migrate_runs_the_packaged_chain_without_an_ini(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wheel carries the scripts and no `alembic.ini`; this database is already at head."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    monkeypatch.chdir(tmp_path)
+    code, out = _run(["migrate"])
+
+    ini = Path(__file__).parent.parent / "alembic.ini"
+    head = ScriptDirectory.from_config(Config(str(ini))).get_current_head()
+    assert (code, out.strip()) == (0, f"database is at {head}")
+
+
+@pytest.mark.integration
 def test_load_then_search_round_trips(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     title = f"Round trip {uuid.uuid4().hex[:8]}"

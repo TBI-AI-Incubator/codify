@@ -37,6 +37,9 @@ New, additive:
   returns `Refused(reason)` otherwise. Nothing calls it yet.
 - `codify.cli.build_parser()` returns the `codify` argument parser, so a command
   reference can be generated from it. `main` behaves as before.
+- `codify migrate` applies the core migrations to the database at `POSTGRES_URL`.
+  It reads the chain from the installed package, so it works from a wheel, which
+  carries no `alembic.ini`. It needs the `migrations` extra.
 
 Fixed:
 

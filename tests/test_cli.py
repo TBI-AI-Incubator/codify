@@ -306,9 +306,16 @@ def test_the_parser_is_built_without_running_a_command() -> None:
     from codify.cli import build_parser
 
     sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
-    assert {"scan-corpus", "ingest-one", "segment", "load", "search", "serve", "mcp"} <= set(
-        sub.choices
-    )
+    assert {
+        "scan-corpus",
+        "ingest-one",
+        "segment",
+        "load",
+        "search",
+        "serve",
+        "mcp",
+        "migrate",
+    } <= set(sub.choices)
 
 
 async def test_the_fallback_model_reaches_the_client(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
