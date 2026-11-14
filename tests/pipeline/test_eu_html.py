@@ -923,3 +923,25 @@ async def test_an_eu_html_url_without_an_identity_still_fails(
     monkeypatch.setattr(eurlex, "fetch_url", fake_fetch)
     events = [e async for e in dispatch("https://eur-lex.europa.eu/oj/direct-access.html", "eu")]
     assert any("FRBR work URI" in getattr(e, "error", "") for e in events)
+
+
+@pytest.mark.parametrize(
+    ("eli", "celex"),
+    [
+        ("https://eur-lex.europa.eu/eli/reg_impl/2021/914/oj", "32021R0914"),
+        ("https://eur-lex.europa.eu/eli/reg_del/2019/980/oj", "32019R0980"),
+        ("https://eur-lex.europa.eu/eli/dir_impl/2014/42/oj", "32014L0042"),
+        ("https://eur-lex.europa.eu/eli/dir_del/2015/13/oj", "32015L0013"),
+        ("https://eur-lex.europa.eu/eli/dec_impl/2021/914/oj", "32021D0914"),
+        ("https://eur-lex.europa.eu/eli/dec_del/2016/20/oj", "32016D0020"),
+        ("https://eur-lex.europa.eu/eli/dir/1999/999/oj", "31999L0999"),
+    ],
+)
+def test_eli_and_celex_urls_name_the_same_work(eli: str, celex: str) -> None:
+    from codify.pipeline.formats.eu_directive import work_uri_from_url
+
+    by_celex = work_uri_from_url(
+        f"https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:{celex}"
+    )
+    assert by_celex is not None
+    assert work_uri_from_url(eli) == by_celex

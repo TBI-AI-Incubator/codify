@@ -169,7 +169,8 @@ def celex_to_frbr(celex: str) -> str:
 
 
 _URL_CELEX_RE = re.compile(r"(?:CELEX:|/celex/)([0-9A-Z()-]+)", re.IGNORECASE)
-_URL_ELI_RE = re.compile(r"/eli/(dir|reg|dec)/(\d{4})/(\d+)(?:/|$)")
+# Implementing, delegated and framework acts share their base type's work URI.
+_URL_ELI_RE = re.compile(r"/eli/(dir|reg|dec)(?:_impl|_del|_framw)?/(\d{4})/(\d+)(?:/|$)")
 
 
 def work_uri_from_url(url: str) -> str | None:
