@@ -1,0 +1,176 @@
+/* The page body, set like a statute: numbered sections whose number is the anchor. */
+
+.sl-markdown-content :is(h2, h3, h4, h5) {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper.level-h2 {
+  margin-top: 2em;
+}
+
+html[data-has-sidebar] .sl-markdown-content {
+  counter-reset: cd-section;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper:is(.level-h2, .level-h3) {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper.level-h2 {
+  counter-increment: cd-section;
+  counter-reset: cd-subsection;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper.level-h3 {
+  counter-increment: cd-subsection;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper:is(.level-h2, .level-h3) > :first-child {
+  display: block;
+  padding-inline-end: 0;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper:is(.level-h2, .level-h3) > .sl-anchor-link {
+  flex: none;
+  margin: 0;
+  opacity: 1;
+  font-family: var(--cd-font-mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--cd-ink-3);
+  text-decoration: none;
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-anchor-link:is(:hover, :focus-visible) {
+  color: var(--cd-ink);
+}
+
+html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper:is(.level-h2, .level-h3) .sl-anchor-icon {
+  display: none;
+}
+
+html[data-has-sidebar] .sl-markdown-content .level-h2 > .sl-anchor-link::before {
+  content: counter(cd-section);
+}
+
+html[data-has-sidebar] .sl-markdown-content .level-h3 > .sl-anchor-link::before {
+  content: counter(cd-section) '.' counter(cd-subsection);
+}
+
+/* With room beside the column, the numbers hang in the margin. */
+@media (min-width: 72rem) {
+  html[data-has-sidebar] {
+    --sl-content-pad-x: 4rem;
+  }
+
+  html[data-has-sidebar] .sl-markdown-content .sl-heading-wrapper:is(.level-h2, .level-h3) > .sl-anchor-link {
+    inline-size: 3rem;
+    margin-inline-start: -3.75rem;
+    justify-content: flex-end;
+  }
+}
+
+:is(starlight-toc, mobile-starlight-toc) ul {
+  counter-reset: cd-toc;
+}
+
+:is(starlight-toc, mobile-starlight-toc) li {
+  counter-increment: cd-toc;
+}
+
+:is(starlight-toc, mobile-starlight-toc) a > span::before {
+  content: counters(cd-toc, '.') '\2002';
+  font-family: var(--cd-font-mono);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--cd-ink-3);
+}
+
+/* The first entry points at the page title, which has no number. */
+:is(starlight-toc, mobile-starlight-toc) nav > ul > li:first-child,
+mobile-starlight-toc .dropdown > ul > li:first-child {
+  counter-increment: none;
+}
+
+:is(starlight-toc, mobile-starlight-toc) nav > ul > li:first-child > a > span::before,
+mobile-starlight-toc .dropdown > ul > li:first-child > a > span::before {
+  content: none;
+}
+
+.sl-markdown-content a:not(.sl-anchor-link, :where(.not-content *)) {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.sl-markdown-content a:not(.sl-anchor-link, :where(.not-content *)):hover {
+  text-decoration-thickness: 2px;
+}
+
+.sl-markdown-content code:not(:where(pre *, .not-content *)) {
+  border-radius: var(--cd-radius);
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  letter-spacing: 0;
+}
+
+.sl-markdown-content li::marker {
+  color: var(--cd-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start: 1px solid var(--cd-ink);
+}
+
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  border-block-end: 1px solid var(--cd-ink);
+  font-family: var(--cd-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cd-ink-3);
+}
+
+.sl-markdown-content tr:nth-child(2n):not(:where(.not-content *)) {
+  background: none;
+}
+
+.starlight-aside {
+  --sl-color-asides-text-accent: var(--cd-ink);
+  border: 1px solid var(--cd-rule);
+  border-radius: var(--cd-radius);
+  padding: 1rem 1.25rem;
+  background: var(--cd-paper-lo);
+  color: var(--cd-ink);
+}
+
+.starlight-aside--caution {
+  --sl-color-asides-text-accent: var(--cd-caution);
+}
+
+.starlight-aside--danger {
+  --sl-color-asides-text-accent: var(--cd-danger);
+}
+
+.starlight-aside__title {
+  font-size: 0.9375rem;
+}
+
+.starlight-aside__content a {
+  color: var(--cd-ink);
+}

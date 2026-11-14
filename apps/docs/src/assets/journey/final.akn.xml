@@ -1,0 +1,509 @@
+<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">
+  <act name="act">
+    <meta>
+      <identification source="#cobalt">
+        <FRBRWork>
+          <FRBRthis value="/akn/xa/act/1992/7/!main"/>
+          <FRBRuri value="/akn/xa/act/1992/7"/>
+          <FRBRalias value="Legislation Act, 1992" name="title"/>
+          <FRBRdate date="1992-05-02" name="Generation"/>
+          <FRBRauthor href=""/>
+          <FRBRcountry value="xa"/>
+          <FRBRnumber value="7"/>
+        </FRBRWork>
+        <FRBRExpression>
+          <FRBRthis value="/akn/xa/act/1992/7/eng@1992-05-02/!main"/>
+          <FRBRuri value="/akn/xa/act/1992/7/eng@1992-05-02"/>
+          <FRBRdate date="1992-05-02" name="Original"/>
+          <FRBRauthor href=""/>
+          <FRBRlanguage language="eng"/>
+        </FRBRExpression>
+        <FRBRManifestation>
+          <FRBRthis value="/akn/xa/act/1992/7/eng@1992-05-02/!main"/>
+          <FRBRuri value="/akn/xa/act/1992/7/eng@1992-05-02"/>
+          <FRBRdate date="2026-11-14" name="Generation"/>
+          <FRBRauthor href=""/>
+        </FRBRManifestation>
+      </identification>
+      <references source="#cobalt">
+        <TLCOrganization eId="cobalt" href="https://github.com/laws-africa/cobalt" showAs="cobalt"/>
+      <TLCOrganization eId="codify" href="/ontology/org/codify" showAs="Codify"/><TLCTerm eId="term-amending-instrument" href="/ontology/term/amending-instrument" showAs="amending instrument"/><TLCTerm eId="term-commencement" href="/ontology/term/commencement" showAs="commencement"/><TLCTerm eId="term-the-gazette" href="/ontology/term/the-gazette" showAs="the gazette"/><TLCTerm eId="term-law" href="/ontology/term/law" showAs="law"/><TLCTerm eId="term-official-text" href="/ontology/term/official-text" showAs="official text"/><TLCTerm eId="term-prescribed" href="/ontology/term/prescribed" showAs="prescribed"/><TLCTerm eId="term-the-publishing-authority" href="/ontology/term/the-publishing-authority" showAs="the publishing authority"/><TLCTerm eId="term-the-register" href="/ontology/term/the-register" showAs="the register"/><TLCTerm eId="term-subsidiary-legislation" href="/ontology/term/subsidiary-legislation" showAs="subsidiary legislation"/><TLCTerm eId="term-the-tribunal" href="/ontology/term/the-tribunal" showAs="the tribunal"/><TLCTerm eId="term-provision-of-a-law" href="/ontology/term/provision-of-a-law" showAs="provision of a law"/></references>
+    </meta>
+    <preface>
+      <p eId="preface__p_1">THE ATLANTIS GAZETTE</p>
+      <p eId="preface__p_2">No. 412 Published by Authority 14th May, 1992</p>
+      <p eId="preface__p_3">No. 7 of 1992</p>
+      <p eId="preface__p_4">LEGISLATION ACT, 1992</p>
+      <longTitle eId="preface__longTitle_1">
+        <p eId="preface__longTitle_1__p_1">An Act to consolidate and reform the law relating to the making, publication and citation of the legislation of Atlantis; to establish the Office of the Publishing Authority and to provide for its functions; to secure a right of public access to the official text of the law; to provide for the keeping of a register of legislation and for the evidentiary status of published text; to create offences relating to the integrity of the legislative record; to make provision for appeals; and for connected and incidental purposes.</p>
+      </longTitle>
+      <p eId="preface__p_5">[Assented to 2nd May, 1992]</p>
+      <p eId="preface__p_6">WHEREAS IT IS EXPEDIENT THAT THE LAWS OF ATLANTIS BE PUBLISHED IN A COMPLETE, AUTHENTIC AND CURRENT FORM, AND THAT EVERY PERSON HAVE ACCESS TO THE LAW BY WHICH THAT PERSON IS BOUND: BE IT ENACTED BY THE ASSEMBLY OF ATLANTIS, AND BY THE AUTHORITY OF THE SAME, AS FOLLOWS:</p>
+    </preface>
+    <preamble><formula name="enactingFormula" refersTo="#codify"><p>BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:</p></formula></preamble><body>
+      <part eId="part_I">
+        <num>I</num>
+        <heading>PRELIMINARY</heading>
+        <section eId="part_I__sec_1">
+          <num>1</num>
+          <heading>Short title and commencement</heading>
+          <point eId="part_I__sec_1__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_I__sec_1__point_1__p_1">This Act may be cited as the Legislation Act, 1992.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_1__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_1__point_2__p_1">This Act shall come into operation on such day as the Minister may, by notice published in <term refersTo="#term-the-gazette">the Gazette</term>, appoint, and different days may be appointed for different provisions and for different purposes.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_1__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_I__sec_1__point_3__p_1">Where a provision of this Act has not been brought into operation within two years of the passing of this Act, it shall come into operation on the day after the expiry of that period.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_2">
+          <num>2</num>
+          <heading>Interpretation</heading>
+          <point eId="part_I__sec_2__point_1">
+            <num>(1)</num>
+            <intro>
+              <p eId="part_I__sec_2__point_1__intro__p_1">In this Act, unless the context otherwise requires—</p>
+            </intro>
+            <point eId="part_I__sec_2__point_1__point_a">
+              <num>(a)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_a__p_1"><def refersTo="#term-amending-instrument">"amending instrument"</def> means any Act, order, rule, regulation, by-law or other instrument by which a provision of a law is inserted, substituted, amended, repealed or otherwise affected;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_b">
+              <num>(b)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_b__p_1"><def refersTo="#term-commencement">"commencement"</def>, in relation to a provision, means the day on which the provision comes into operation;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_c">
+              <num>(c)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_c__p_1"><def refersTo="#term-the-gazette">"the Gazette"</def> means the official gazette of Atlantis published under <ref href="#part_I__sec_6" class="derived">section 6</ref>;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_d">
+              <num>(d)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_d__p_1"><def refersTo="#term-law">"law"</def> means any Act of the Assembly and any instrument of subsidiary legislation, whether made before or after the commencement of this section;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_e">
+              <num>(e)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_e__p_1"><def refersTo="#term-official-text">"official text"</def>, in relation to a law, means the text of the law as enacted or made, incorporating every amendment to it that is in force at the material time, as published under Part II;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_f">
+              <num>(f)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_f__p_1"><def refersTo="#term-prescribed">"prescribed"</def> means prescribed by regulations made under this Act;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_g">
+              <num>(g)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_g__p_1"><def refersTo="#term-the-publishing-authority">"the Publishing Authority"</def> means the officer holding the office established by <ref href="#part_III__sec_9" class="derived">section 9</ref>;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_h">
+              <num>(h)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_h__p_1"><def refersTo="#term-the-register">"the Register"</def> means the register of legislation kept under <ref href="#part_I__sec_8" class="derived">section 8</ref>;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_i">
+              <num>(i)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_i__p_1"><def refersTo="#term-subsidiary-legislation">"subsidiary legislation"</def> means any instrument having legislative effect made under a power conferred by an Act;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_2__point_1__point_j">
+              <num>(j)</num>
+              <content>
+                <p eId="part_I__sec_2__point_1__point_j__p_1"><def refersTo="#term-the-tribunal">"the Tribunal"</def> means the Administrative Tribunal established under the Administrative Tribunal Act.</p>
+              </content>
+            </point>
+          </point>
+          <point eId="part_I__sec_2__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_2__point_2__p_1">A reference in this Act to a provision of a law includes a reference to a Part, a section, a subsection, a paragraph, a Schedule and any other division of the law.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_2__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_I__sec_2__point_3__p_1">Where in this Act a period of days is expressed to run from a given day, that day shall not be counted, and where the last day of the period is not a working day the period shall extend to the next working day.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_3">
+          <num>3</num>
+          <heading>Application</heading>
+          <point eId="part_I__sec_3__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_I__sec_3__point_1__p_1">This Act applies to every <term refersTo="#term-law">law</term> in force on the <term refersTo="#term-commencement">commencement</term> of this section and to every <term refersTo="#term-law">law</term> enacted or made after that <term refersTo="#term-commencement">commencement</term>.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_3__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_3__point_2__p_1">This Act binds the State.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_3__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_I__sec_3__point_3__p_1">Where any other Act is inconsistent with this Act in relation to the publication or citation of legislation, this Act prevails to the extent of the inconsistency, unless the other Act expressly provides otherwise.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_4">
+          <num>4</num>
+          <heading>Duty to publish</heading>
+          <point eId="part_I__sec_4__point_1">
+            <num>(1)</num>
+            <intro>
+              <p eId="part_I__sec_4__point_1__intro__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> shall cause every <term refersTo="#term-law">law</term> in force to be published in an electronic form which—</p>
+            </intro>
+            <point eId="part_I__sec_4__point_1__point_a">
+              <num>(a)</num>
+              <content>
+                <p eId="part_I__sec_4__point_1__point_a__p_1">permits the whole of the text of the <term refersTo="#term-law">law</term> to be searched;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_4__point_1__point_b">
+              <num>(b)</num>
+              <content>
+                <p eId="part_I__sec_4__point_1__point_b__p_1">permits any provision of the <term refersTo="#term-law">law</term> to be extracted, cited and reproduced without transcription; and</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_4__point_1__point_c">
+              <num>(c)</num>
+              <content>
+                <p eId="part_I__sec_4__point_1__point_c__p_1">identifies, in respect of each provision, its <term refersTo="#term-commencement">commencement</term> and every amendment affecting it.</p>
+              </content>
+            </point>
+          </point>
+          <point eId="part_I__sec_4__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_4__point_2__p_1">The reproduction of a printed page as an image shall not, of itself, satisfy the requirements of subsection (1).</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_5">
+          <num>5</num>
+          <heading>Currency of the official text</heading>
+          <point eId="part_I__sec_5__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_I__sec_5__point_1__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> shall maintain the <term refersTo="#term-official-text">official text</term> of every <term refersTo="#term-law">law</term> in a state that is current to within thirty days of the coming into force of any <term refersTo="#term-amending-instrument">amending instrument</term> affecting the <term refersTo="#term-law">law</term>.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_5__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_5__point_2__p_1">Where a provision has been amended, <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> shall publish both the text of the provision as it stands and the text as it stood immediately before the amendment took effect, and shall in each case identify the <term refersTo="#term-amending-instrument">amending instrument</term> by its citation.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_5__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_I__sec_5__point_3__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> may correct in the <term refersTo="#term-official-text">official text</term> any clerical or typographical error, or any error of a similar nature, but no such correction shall change the effect of the <term refersTo="#term-law">law</term>, and every correction shall be recorded in <term refersTo="#term-the-register">the Register</term>.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_6">
+          <num>6</num>
+          <heading>The Gazette</heading>
+          <point eId="part_I__sec_6__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_I__sec_6__point_1__p_1">There shall continue to be an official gazette of Atlantis, to be published by <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> at such intervals as are <term refersTo="#term-prescribed">prescribed</term>.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_6__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_6__point_2__p_1">The publication in <term refersTo="#term-the-gazette">the Gazette</term> of any notice, order or instrument shall be sufficient notice of its contents to all persons.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_7">
+          <num>7</num>
+          <heading>Evidentiary status</heading>
+          <point eId="part_I__sec_7__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_I__sec_7__point_1__p_1">A copy of the <term refersTo="#term-official-text">official text</term> of a <term refersTo="#term-law">law</term>, published under this Part and bearing an endorsement by <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> as to its currency, shall be received in all courts as evidence of the <term refersTo="#term-law">law</term> and of its coming into force, without further proof.</p>
+            </content>
+          </point>
+          <point eId="part_I__sec_7__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_7__point_2__p_1">Nothing in this section makes the <term refersTo="#term-official-text">official text</term> conclusive evidence of the <term refersTo="#term-law">law</term> as enacted, and in the event of a discrepancy the text of the <term refersTo="#term-law">law</term> as enacted by the Assembly prevails.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_I__sec_8">
+          <num>8</num>
+          <heading>The Register</heading>
+          <point eId="part_I__sec_8__point_1">
+            <num>(1)</num>
+            <intro>
+              <p eId="part_I__sec_8__point_1__intro__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> shall keep a register of legislation, in which shall be recorded, in respect of each <term refersTo="#term-law">law</term>—</p>
+            </intro>
+            <point eId="part_I__sec_8__point_1__point_a">
+              <num>(a)</num>
+              <content>
+                <p eId="part_I__sec_8__point_1__point_a__p_1">its short title, number and year;</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_8__point_1__point_b">
+              <num>(b)</num>
+              <content>
+                <p eId="part_I__sec_8__point_1__point_b__p_1">the date of its enactment or making and the date of its <term refersTo="#term-commencement">commencement</term>; and</p>
+              </content>
+            </point>
+            <point eId="part_I__sec_8__point_1__point_c">
+              <num>(c)</num>
+              <content>
+                <p eId="part_I__sec_8__point_1__point_c__p_1">every <term refersTo="#term-amending-instrument">amending instrument</term> affecting it and the date on which each amendment took effect.</p>
+              </content>
+            </point>
+          </point>
+          <point eId="part_I__sec_8__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_I__sec_8__point_2__p_1"><term refersTo="#term-the-register">The Register</term> shall be open to inspection by any person, free of charge, at all reasonable times.</p>
+            </content>
+          </point>
+        </section>
+      </part>
+      <part eId="part_III">
+        <num>III</num>
+        <heading>THE PUBLISHING AUTHORITY</heading>
+        <section eId="part_III__sec_9">
+          <num>9</num>
+          <heading>Office of the Publishing Authority</heading>
+          <point eId="part_III__sec_9__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_III__sec_9__point_1__p_1">There is established the Office of <term refersTo="#term-the-publishing-authority">the Publishing Authority</term>.</p>
+            </content>
+          </point>
+          <point eId="part_III__sec_9__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_III__sec_9__point_2__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> shall be appointed by the Minister, by notice published in <term refersTo="#term-the-gazette">the Gazette</term>, and shall hold office on such terms as are specified in the instrument of appointment.</p>
+            </content>
+          </point>
+          <point eId="part_III__sec_9__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_III__sec_9__point_3__p_1">In the exercise of the functions conferred by this Act, <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> shall not be subject to the direction of any person as to the content of the <term refersTo="#term-official-text">official text</term>.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_III__sec_10">
+          <num>10</num>
+          <heading>Functions and powers</heading>
+          <point eId="part_III__sec_10__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_III__sec_10__point_1__p_1">The functions of <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> are to publish the laws in accordance with Part II, to keep <term refersTo="#term-the-register">the Register</term>, and to do all things necessary or convenient to be done for or in connection with the performance of those functions.</p>
+            </content>
+          </point>
+          <point eId="part_III__sec_10__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_III__sec_10__point_2__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> may, in writing, delegate any of its functions, other than this power of delegation, to an officer of the Office, and a delegation under this subsection does not prevent the performance of the function by <term refersTo="#term-the-publishing-authority">the Publishing Authority</term>.</p>
+            </content>
+          </point>
+        </section>
+      </part>
+      <part eId="part_II">
+        <num>II</num>
+        <section eId="part_II__sec_11">
+          <num>11</num>
+          <heading>Deferral of publication</heading>
+          <point eId="part_II__sec_11__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_II__sec_11__point_1__p_1"><term refersTo="#term-the-publishing-authority">The Publishing Authority</term> may, where it considers it expedient to do so, defer the publication of any <term refersTo="#term-law">law</term> or class of laws for such period and on such terms as it thinks fit.</p>
+            </content>
+          </point>
+          <point eId="part_II__sec_11__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_II__sec_11__point_2__p_1">A deferral under subsection (1) shall not be called in question in any proceedings.</p>
+            </content>
+          </point>
+        </section>
+      </part>
+      <part eId="part_IV">
+        <num>IV</num>
+        <heading>ACCESS AND APPEALS</heading>
+        <section eId="part_IV__sec_12">
+          <num>12</num>
+          <heading>Right of access</heading>
+          <point eId="part_IV__sec_12__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_IV__sec_12__point_1__p_1">Every person has the right of access to the <term refersTo="#term-official-text">official text</term> of any <term refersTo="#term-law">law</term> in force, in a form that is complete, current and free of charge.</p>
+            </content>
+          </point>
+          <point eId="part_IV__sec_12__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_IV__sec_12__point_2__p_1">No fee shall be charged for access to the <term refersTo="#term-official-text">official text</term> in electronic form, but <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> may charge a reasonable fee, not exceeding the cost of production, for a certified printed copy.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_IV__sec_13">
+          <num>13</num>
+          <heading>Appeals</heading>
+          <point eId="part_IV__sec_13__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_IV__sec_13__point_1__p_1">A person aggrieved by a decision of <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> under this Act, other than a decision to defer publication under <ref href="#part_II__sec_11" class="derived">section 11</ref>, may appeal to <term refersTo="#term-the-tribunal">the Tribunal</term> within twenty-eight days of being notified of the decision.</p>
+            </content>
+          </point>
+          <point eId="part_IV__sec_13__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_IV__sec_13__point_2__p_1">On an appeal under this section <term refersTo="#term-the-tribunal">the Tribunal</term> may confirm, vary or set aside the decision appealed against, and the decision of <term refersTo="#term-the-tribunal">the Tribunal</term> shall be final.</p>
+            </content>
+          </point>
+        </section>
+      </part>
+      <part eId="part_V">
+        <num>V</num>
+        <heading>OFFENCES AND ENFORCEMENT</heading>
+        <section eId="part_V__sec_14">
+          <num>14</num>
+          <heading>Obstruction</heading>
+          <content>
+            <p eId="part_V__sec_14__p_1">A person who wilfully obstructs <term refersTo="#term-the-publishing-authority">the Publishing Authority</term>, or an officer of the Office, in the discharge of any function under this Act commits an offence and is liable on summary conviction to a fine not exceeding five hundred pounds or to imprisonment for a term not exceeding three months, or to both.</p>
+          </content>
+        </section>
+        <section eId="part_V__sec_15">
+          <num>15</num>
+          <heading>Falsifying the record</heading>
+          <point eId="part_V__sec_15__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_V__sec_15__point_1__p_1">A person who, in <term refersTo="#term-the-register">the Register</term> or in the <term refersTo="#term-official-text">official text</term>, makes or causes to be made an entry which that person knows to be false in a material particular commits an offence.</p>
+            </content>
+          </point>
+          <point eId="part_V__sec_15__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_V__sec_15__point_2__p_1">A person who is guilty of an offence under subsection (1) is liable on conviction on indictment to a fine not exceeding five thousand pounds or to imprisonment for a term not exceeding two years, or to both.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_V__sec_16">
+          <num>16</num>
+          <heading>Offences by bodies corporate</heading>
+          <content>
+            <p eId="part_V__sec_16__p_1">Where an offence under this Act committed by a body corporate is proved to have been committed with the consent or connivance of, or to be attributable to any neglect on the part of, a director, manager, secretary or other similar officer of the body corporate, that person, as well as the body corporate, commits the offence and is liable to be proceeded against and punished accordingly.</p>
+          </content>
+        </section>
+      </part>
+      <part eId="part_VI">
+        <num>VI</num>
+        <heading>REGULATIONS AND GENERAL</heading>
+        <section eId="part_VI__sec_17">
+          <num>17</num>
+          <heading>Regulations</heading>
+          <point eId="part_VI__sec_17__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_VI__sec_17__point_1__p_1">The Minister may make regulations, not inconsistent with this Act, prescribing all matters that are required or permitted to be <term refersTo="#term-prescribed">prescribed</term>, or that are necessary or convenient to be <term refersTo="#term-prescribed">prescribed</term>, for carrying out or giving effect to this Act.</p>
+            </content>
+          </point>
+          <point eId="part_VI__sec_17__point_2">
+            <num>(2)</num>
+            <intro>
+              <p eId="part_VI__sec_17__point_2__intro__p_1">Without limiting the generality of subsection (1), regulations may—</p>
+            </intro>
+            <point eId="part_VI__sec_17__point_2__point_a">
+              <num>(a)</num>
+              <content>
+                <p eId="part_VI__sec_17__point_2__point_a__p_1">prescribe the form and manner of publication of laws and of <term refersTo="#term-the-register">the Register</term>;</p>
+              </content>
+            </point>
+            <point eId="part_VI__sec_17__point_2__point_b">
+              <num>(b)</num>
+              <content>
+                <p eId="part_VI__sec_17__point_2__point_b__p_1">prescribe the intervals at which <term refersTo="#term-the-gazette">the Gazette</term> is to be published;</p>
+              </content>
+            </point>
+            <point eId="part_VI__sec_17__point_2__point_c">
+              <num>(c)</num>
+              <content>
+                <p eId="part_VI__sec_17__point_2__point_c__p_1">prescribe fees for certified printed copies; and</p>
+              </content>
+            </point>
+            <point eId="part_VI__sec_17__point_2__point_d">
+              <num>(d)</num>
+              <content>
+                <p eId="part_VI__sec_17__point_2__point_d__p_1">prescribe the procedure on an appeal to <term refersTo="#term-the-tribunal">the Tribunal</term>.</p>
+              </content>
+            </point>
+          </point>
+          <point eId="part_VI__sec_17__point_3">
+            <num>(3)</num>
+            <content>
+              <p eId="part_VI__sec_17__point_3__p_1">Regulations made under this section shall be laid before the Assembly within twenty-one days of their making, and if the Assembly resolves within forty days that the regulations be annulled, the regulations shall cease to have effect, but without prejudice to anything previously done under them.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_VI__sec_18">
+          <num>18</num>
+          <heading>Transitional</heading>
+          <point eId="part_VI__sec_18__point_1">
+            <num>(1)</num>
+            <content>
+              <p eId="part_VI__sec_18__point_1__p_1">Any <term refersTo="#term-law">law</term> that, immediately before the <term refersTo="#term-commencement">commencement</term> of this section, was published under any enactment repealed by this Act shall be taken to have been published under this Act.</p>
+            </content>
+          </point>
+          <point eId="part_VI__sec_18__point_2">
+            <num>(2)</num>
+            <content>
+              <p eId="part_VI__sec_18__point_2__p_1">The person who, immediately before the <term refersTo="#term-commencement">commencement</term> of <ref href="#part_III__sec_9" class="derived">section 9</ref>, held the office charged with the publication of the laws shall continue in office as <term refersTo="#term-the-publishing-authority">the Publishing Authority</term> as if appointed under that section.</p>
+            </content>
+          </point>
+        </section>
+        <section eId="part_VI__sec_19">
+          <num>19</num>
+          <heading>Savings</heading>
+          <content>
+            <p eId="part_VI__sec_19__p_1">Nothing in this Act affects the validity of any <term refersTo="#term-law">law</term> as enacted or made, or the operation of any <term refersTo="#term-law">law</term> in force immediately before the <term refersTo="#term-commencement">commencement</term> of this section, except as expressly provided.</p>
+          </content>
+        </section>
+        <section eId="part_VI__sec_20">
+          <num>20</num>
+          <heading>Repeals</heading>
+          <content>
+            <p eId="part_VI__sec_20__p_1">The enactments specified in the Schedule are repealed to the extent set out in the third column of the Schedule.</p>
+          </content>
+        </section>
+      </part>
+    </body>
+  </act>
+</akomaNtoso>

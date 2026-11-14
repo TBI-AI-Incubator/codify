@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="360" viewBox="0 0 358 360" role="img" aria-label="The embeddings table provision_embeddings is split by jurisdiction. Jurisdictions that existed when migration 0020 ran each get a partition whose HNSW index is built by hand and attached; every jurisdiction added later shares the DEFAULT partition, indexed from creation, until promote_sql moves it to a partition of its own.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="0" width="358" height="56" rx="3" class="s box"/>
+<text x="12" y="17">Embeddings table, split by jurisdiction</text>
+<text x="12" y="32" class="code">provision_embeddings</text>
+<text x="12" y="48" class="note">Index</text>
+<text x="80" y="48" class="code">provision_embeddings_hnsw_idx</text>
+<rect x="24" y="72" width="334" height="72" rx="3" class="s box"/>
+<text x="36" y="89">Jurisdictions at 0020</text>
+<text x="36" y="104" class="code">provision_embeddings_p_&lt;id&gt;</text>
+<text x="36" y="120" class="note">HNSW: build, then attach</text>
+<text x="36" y="136" class="note">Exact scan until attached</text>
+<rect x="24" y="160" width="334" height="72" rx="3" class="em box"/>
+<text x="36" y="177" class="em">Added after 0020</text>
+<text x="36" y="192" class="code">provision_embeddings_p_default</text>
+<text x="36" y="208" class="note">HNSW from creation</text>
+<text x="36" y="224" class="note">Shared until promoted</text>
+<path d="M48 232 L48 286" class="s" marker-end="url(#arrow)"/>
+<text x="64" y="258">Promote, writers stopped</text>
+<text x="64" y="274" class="code">promote_sql</text>
+<rect x="24" y="288" width="334" height="72" rx="3" class="s box"/>
+<text x="36" y="305">Promoted from DEFAULT</text>
+<text x="36" y="320" class="code">provision_embeddings_p_&lt;id&gt;</text>
+<text x="36" y="336" class="note">HNSW copied from parent</text>
+<text x="36" y="352" class="note">Searched on its own</text>
+<path d="M12 56 L12 305" class="s2"/>
+<path d="M12 89 L24 89" class="s2"/>
+<path d="M12 177 L24 177" class="s2"/>
+<path d="M12 305 L24 305" class="s2"/>
+</svg>

@@ -1,0 +1,119 @@
+---
+import { Image } from 'astro:assets'
+import { Journey, Stage } from '@codify/docs-theme/components'
+import akn from '../assets/journey/final.akn.xml?raw'
+import page from '../assets/journey/page-001.webp'
+import scaffold from '../assets/journey/scaffold.bluebell?raw'
+import source from '../assets/journey/source.txt?raw'
+import validator from '../assets/journey/validator.json?raw'
+import { journey } from '../journey.mjs'
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+const stage = (label: string) => {
+  const found = journey.find((entry) => entry.label === label)!
+  return { n: journey.indexOf(found) + 1, label, href: `${base}/${found.slug}/` }
+}
+
+// Films made by scripts/films/v12-rail.mjs from the same files as the stills.
+const filmUrls = import.meta.glob<string>('../assets/journey/films/*.mp4', { eager: true, query: '?url', import: 'default' })
+const films = (name: string) =>
+  (['light', 'dark'] as const).flatMap((theme) =>
+    (['wide', 'narrow'] as const).map((size) => ({ theme, size, src: filmUrls[`../assets/journey/films/v12-${name}-${theme}-${size}.mp4`]! })),
+  )
+
+const dedent = (text: string) => {
+  const lines = text.split('\n')
+  const indent = Math.min(...lines.filter((line) => line.trim()).map((line) => line.search(/\S/)))
+  return lines.map((line) => line.slice(indent)).join('\n')
+}
+const first = (text: string, count: number) => text.split('\n').slice(0, count).join('\n')
+
+// shortcut: section 1 is read out of the XML by pattern, use a parser if this renders more than one still
+const section = /<section eId="part_I__sec_1">([\s\S]*?)<\/section>/.exec(akn)![1]!
+const law = {
+  title: /<FRBRalias value="([^"]*)"/.exec(akn)![1],
+  uri: /<FRBRuri value="([^"]*)"/.exec(akn)![1]!,
+  heading: /<heading>(.*?)<\/heading>/.exec(section)![1],
+  subsections: [...section.matchAll(/<num>(.*?)<\/num>\s*<content>\s*<p[^>]*>([\s\S]*?)<\/p>/g)].map(([, num, text]) => ({
+    num,
+    text: text!.replace(/<[^>]+>/g, ''),
+  })),
+}
+---
+
+<Journey>
+  <Stage {...stage('Acquire')} does="Start from the source as published: here, a gazette PDF." file="pages/page-001.png">
+    <Image
+      src={page}
+      widths={[320, 640, page.width]}
+      sizes="(min-width: 62rem) 14rem, 16rem"
+      alt="Page 1 of the Atlantis Gazette, which opens the Legislation Act, 1992."
+    />
+  </Stage>
+  <Stage {...stage('OCR')} films={films('ocr')} does="Turn every page into text, including pages that are only an image." file="source.txt">
+    <pre>{first(source, 14)}</pre>
+  </Stage>
+  <Stage {...stage('Structure')} films={films('structure')} does="Find the parts and sections, and lay them out as a scaffold." file="scaffold.bluebell">
+    <pre>{dedent(scaffold.slice(scaffold.indexOf('BODY')))}</pre>
+  </Stage>
+  <Stage {...stage('Validate')} films={films('validate')} does="Check the finished Akoma Ntoso and report each finding against its element." file="validator.json">
+    <pre>{dedent(validator.slice(validator.lastIndexOf('\n', validator.indexOf('"eid"'))).split('\n').filter((line) => line.trim().startsWith('"')).join('\n'))}</pre>
+  </Stage>
+  <Stage {...stage('Publish')} films={films('publish')} does="Serve the law to readers, to search and to other software." file={law.uri}>
+    <div class="law">
+      <p class="law-title">{law.title}</p>
+      <p class="law-heading"><span>1</span>{law.heading}</p>
+      {law.subsections.map(({ num, text }) => (
+        <p class="law-subsection">
+          <span>{num}</span>
+          {text}
+        </p>
+      ))}
+    </div>
+  </Stage>
+</Journey>
+
+<style>
+  .law {
+    block-size: 100%;
+    padding: 1rem 0.875rem;
+    background: var(--cd-paper);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--cd-ink);
+  }
+
+  .law p {
+    margin: 0;
+  }
+
+  .law-title {
+    border-block-end: 1px solid var(--cd-rule);
+    padding-block-end: 0.75rem;
+    font-family: var(--cd-font-display);
+    font-size: 1.375rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .law-heading {
+    display: flex;
+    gap: 0.5rem;
+    margin-block: 0.75rem 0.375rem !important;
+    font-weight: 600;
+    hyphens: auto;
+  }
+
+  .law-subsection {
+    display: flex;
+    gap: 0.5rem;
+    margin-block-start: 0.375rem !important;
+    color: var(--cd-ink-2);
+  }
+
+  .law span {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--cd-ink-3);
+  }
+</style>

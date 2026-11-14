@@ -1,0 +1,23 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Codify",
+  "description": "Codify turns legislation, from scanned gazettes to publisher XML, into citable Akoma Ntoso 3.0 with stable eIds and FRBR identifiers. It reads scans through an OpenAI-compatible model, structures each act by the rules of a jurisdiction config, validates and grades the result, and stores laws and their dated versions in PostgreSQL for search, comparison and serving over HTTP and MCP. Python library and command line, Apache 2.0.",
+  "folders": [
+    "docs/start",
+    "docs/guide",
+    "docs/concepts",
+    "docs/reference",
+    "docs/operate",
+    "docs/open-core",
+    "docs/project",
+    "docs/decisions"
+  ],
+  "excludeFolders": ["docs/notebooks", "docs/design", "docs/corpus-baselines", "docs/runbooks", "docs/jurisdictions", "docs/figures", "docs/images"],
+  "rules": [
+    "Every ingest needs a jurisdiction config; start from a synthetic one such as xa (Atlantis) before writing your own.",
+    "Set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL to any OpenAI-compatible endpoint; ingest-one stops when LLM_BASE_URL is unset.",
+    "Build or upgrade the database schema with `codify migrate` (the migrations extra) against the database at POSTGRES_URL.",
+    "Acquisition and URL ingest need ACQUISITION_USER_AGENT set to a User-Agent that names you and a contact.",
+    "Store and cite a law by its FRBR work URI and a provision by its eId; never by database id or position."
+  ]
+}

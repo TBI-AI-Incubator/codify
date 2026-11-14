@@ -1,0 +1,40 @@
+---
+// A mark, once cleared for use, goes in this row before the name.
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute
+---
+
+<a href={siteTitleHref} class="cd-brand" translate="no">
+  <span class="cd-brand-name">
+    <span class="cd-brand-product">{siteTitle}</span>
+    <span class="cd-brand-family">CentreAI</span>
+  </span>
+</a>
+
+<style>
+  .cd-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-inline-size: 0;
+    color: var(--cd-ink);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .cd-brand-name {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+
+  .cd-brand-product {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .cd-brand-family {
+    font-size: 0.6875rem;
+    color: var(--cd-ink-3);
+  }
+</style>

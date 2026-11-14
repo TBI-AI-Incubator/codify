@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="624" height="525" viewBox="0 0 624 525" role="img" aria-label="The open-core line. Inside, the Codify core (under the Apache License 2.0; the Python package is codify-core on PyPI): available as commands and apps are reading, structuring and validating a PDF (codify ingest-one), validation and the quality grade in every bundle, bulk publisher indexes (codify index-* and crawl-ocs), storage in PostgreSQL (codify load), hybrid search (codify search), directive-to-law comparison (codify compare), the read API (codify serve), the MCP server for agents (codify mcp), the web app (apps/web, run from a source checkout, not in the PyPI package) and the jurisdiction configs flagged synthetic or public_reference; library only are the repair agent (codify.repair), acquisition adapters (codify.acquisition), translation (codify.translate) and the lens interface (codify.lenses). The core calls your own OpenAI-compatible model endpoint to read scans, structure, compare, embed and translate. Your lens, a package with an entry point in codify.lenses, plugs in through an opening in the line beside the lens interface. Not in the core: the commercial lens detectors and their catalogues, customer corpora and real documents, other jurisdiction configs, sign-in, roles, tenancy and an audit trail, durable job orchestration, and hosting, backup, upgrade and support.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="0" width="424" height="370" rx="3" class="em box"/>
+<text x="12" y="20">Codify core</text>
+<text x="12" y="36" class="code">Apache-2.0; codify-core on PyPI</text>
+<rect x="12" y="52" width="84" height="20" rx="3" class="s2 box"/>
+<text x="20" y="66" class="micro">Available</text>
+<text x="12" y="96">Read, structure, validate</text>
+<text x="12" y="111" class="code">codify ingest-one</text>
+<text x="216" y="96">Validation and grade</text>
+<text x="216" y="111" class="note">in every bundle</text>
+<text x="12" y="130">Bulk publisher indexes</text>
+<text x="12" y="145" class="code">codify index-*, crawl-ocs</text>
+<text x="216" y="130">Storage in PostgreSQL</text>
+<text x="216" y="145" class="code">codify load</text>
+<text x="12" y="164">Hybrid search</text>
+<text x="12" y="179" class="code">codify search</text>
+<text x="216" y="164">Directive-to-law comparison</text>
+<text x="216" y="179" class="code">codify compare</text>
+<text x="12" y="198">Read API</text>
+<text x="12" y="213" class="code">codify serve</text>
+<text x="216" y="198">MCP server for agents</text>
+<text x="216" y="213" class="code">codify mcp</text>
+<text x="12" y="232">Web app, source checkout</text>
+<text x="12" y="247" class="code">apps/web</text>
+<text x="216" y="232">Jurisdiction configs</text>
+<text x="216" y="247" class="code">synthetic, public_reference</text>
+<rect x="12" y="262" width="108" height="20" rx="3" class="s2 box"/>
+<text x="20" y="276" class="micro">Library only</text>
+<text x="12" y="306">Repair agent</text>
+<text x="12" y="321" class="code">codify.repair</text>
+<text x="216" y="306">Acquisition adapters</text>
+<text x="216" y="321" class="code">codify.acquisition</text>
+<text x="12" y="340">Translation</text>
+<text x="12" y="355" class="code">codify.translate</text>
+<text x="216" y="340">Lens interface</text>
+<text x="216" y="355" class="code">codify.lenses</text>
+<rect x="421" y="324" width="6" height="28" class="box"/>
+<path d="M418 324 L430 324" class="s"/>
+<path d="M418 352 L430 352" class="s"/>
+<rect x="456" y="0" width="168" height="92" rx="3" class="s box"/>
+<text x="468" y="17">Your model endpoint</text>
+<text x="468" y="32" class="note">OpenAI-compatible,</text>
+<text x="468" y="48" class="note">used to read scans,</text>
+<text x="468" y="64" class="note">structure, compare,</text>
+<text x="468" y="80" class="note">embed and translate</text>
+<path d="M424 20 L454 20" class="s" marker-end="url(#arrow)"/>
+<rect x="456" y="328" width="168" height="72" rx="3" class="s box"/>
+<text x="468" y="345">Your lens</text>
+<text x="468" y="360" class="note">a package with an</text>
+<text x="468" y="376" class="note">entry point in</text>
+<text x="468" y="392" class="code">codify.lenses</text>
+<path d="M456 346 L344 346" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="424" width="624" height="100" rx="3" class="s2 dash box"/>
+<text x="12" y="444" class="micro">Not in the core</text>
+<text x="12" y="468">Commercial lens detectors and catalogues</text>
+<text x="324" y="468">Customer corpora and real documents</text>
+<text x="12" y="488">Other jurisdiction configs</text>
+<text x="324" y="488">Sign-in, roles, tenancy, audit trail</text>
+<text x="12" y="508">Durable job orchestration</text>
+<text x="324" y="508">Hosting, backup, upgrade, support</text>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="488" viewBox="0 0 358 488" role="img" aria-label="One eId, part_I__sec_5__point_1, names subsection 5(1) of the Legislation Act, 1992 as enacted (thirty days) and as amended from 1 January 2012 (seven days); the 2012 text records the change in a textualMod from /akn/xa/act/2011/5.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<text x="0" y="11" class="micro">Over time: an amendment</text>
+<text x="0" y="40" class="code">part_I__sec_5__point_1</text>
+<path d="M8 46 L8 256" class="s2"/>
+<path d="M8 88 L18 88" class="s2" marker-end="url(#arrow2)"/>
+<path d="M8 256 L18 256" class="s2" marker-end="url(#arrow2)"/>
+<rect x="20" y="68" width="338" height="136" rx="3" class="s box"/>
+<text x="32" y="88">As enacted</text>
+<text x="32" y="104" class="code">/akn/xa/act/1992/7/eng@1992-05-02</text>
+<text x="32" y="128" class="note">(1) The Publishing Authority shall maintain</text>
+<text x="32" y="144" class="note">the official text of every law in a state that</text>
+<text x="32" y="160" class="note">is current to within thirty days of the coming</text>
+<text x="32" y="176" class="note">into force of any amending instrument</text>
+<text x="32" y="192" class="note">affecting the law.</text>
+<path d="M189 204 L189 234" class="s" marker-end="url(#arrow)"/>
+<rect x="20" y="236" width="338" height="136" rx="3" class="s box"/>
+<text x="32" y="256">As amended from 1 January 2012</text>
+<text x="32" y="272" class="code">/akn/xa/act/1992/7/eng@2012-01-01</text>
+<text x="32" y="296" class="note">(1) The Publishing Authority shall maintain</text>
+<text x="32" y="312" class="note">the official text of every law in a state that</text>
+<text x="32" y="328" class="note">is current to within <tspan font-weight="600">seven days</tspan> of the coming</text>
+<text x="32" y="344" class="note">into force of any amending instrument</text>
+<text x="32" y="360" class="note">affecting the law.</text>
+<text x="0" y="400" class="note">Recorded in the 2012 text</text>
+<text class="code"><tspan x="0" y="420">&lt;textualMod eId="pmod_1" type="substitution"&gt;</tspan><tspan x="14.4" y="436">&lt;source href="/akn/xa/act/2011/5"/&gt;</tspan><tspan x="14.4" y="452">&lt;destination href="…#part_I__sec_5__point_1"/&gt;</tspan><tspan x="14.4" y="468">&lt;force period="#period_2012"/&gt;</tspan><tspan x="0" y="484">&lt;/textualMod&gt;</tspan></text>
+</svg>

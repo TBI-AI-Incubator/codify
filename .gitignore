@@ -16,3 +16,6 @@ bundle/
 data/datadumps/
 .DS_Store
 .hypothesis/
+
+# Left by scripts/run_docs_page.py on docs/start/quickstart.md
+/quickstart/

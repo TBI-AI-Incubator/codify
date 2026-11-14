@@ -1,0 +1,6 @@
+packages:
+  - .
+  - ../docs-theme
+
+# Seven days, matching the Dependabot cooldown.
+minimumReleaseAge: 10080

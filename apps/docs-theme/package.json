@@ -1,0 +1,25 @@
+{
+  "name": "@codify/docs-theme",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The Codify documentation look for Astro Starlight: tokens, fonts and component overrides.",
+  "exports": {
+    ".": "./index.ts",
+    "./styles.css": "./styles/index.css",
+    "./tokens.css": "./styles/tokens.css",
+    "./components": "./components/index.ts",
+    "./components/*": "./components/*",
+    "./favicon.svg.ts": "./favicon.svg.ts",
+    "./figures": "./figures.mjs"
+  },
+  "dependencies": {
+    "@fontsource/geist-mono": "5.3.0",
+    "@fontsource/geist-sans": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0"
+  },
+  "peerDependencies": {
+    "@astrojs/starlight": "^0.42.0",
+    "astro": "^7.2.10"
+  }
+}

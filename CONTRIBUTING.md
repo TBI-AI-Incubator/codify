@@ -1,22 +1,23 @@
 # Contributing
 
-Participation is governed by the [code of conduct](CODE_OF_CONDUCT.md).
+The [code of conduct](CODE_OF_CONDUCT.md) governs participation. There is no
+contributor licence agreement.
 
 Use Python 3.12 or newer and install with
-`uv sync --group dev --extra migrations`. Run the offline tests described in
-[the test guide](docs/offline-suite.md). CI also checks Ruff, strict source typing
-and a wheel build; its exact commands are in `.github/workflows/ci.yml`.
+`uv sync --frozen --group dev --extra migrations --extra serve --extra mcp`.
+[Testing](docs/project/testing.md) gives every CI check as a local command;
+[Contributing](docs/project/contributing.md) lists the files a change must also
+update (changelog, HTTP contract, product-surface list, baselines, notebooks).
 
-Keep core independent of applications. Add focused regression tests for changed
-behaviour. Use invented documents for new fixtures; do not commit customer data,
-source scans, operational identifiers, credentials or private catalogue content.
-Public source availability alone does not establish redistribution permission.
+Keep the core independent of applications built on it. Add focused regression
+tests for changed behaviour. Write new fixtures from invented documents; do not
+commit customer data, source scans, operational identifiers, credentials or
+private catalogue content. A public source is not thereby free to redistribute.
 
-For configurations, see [adding a jurisdiction](docs/jurisdictions/adding-a-jurisdiction.md).
-Only configurations flagged `synthetic` or `public_reference` are packaged; the
-guide explains both flags.
+Only configs flagged `synthetic` or `public_reference` are packaged; see
+[Write a jurisdiction config](docs/guide/write-a-jurisdiction-config.md).
 
 Use concise comments, British English prose and American English identifiers.
-Sign off contributions with `git commit -s` under the Developer Certificate of
-Origin (https://developercertificate.org/). The project licence is Apache 2.0;
-third-party components retain their own terms.
+Sign off with `git commit -s` under the Developer Certificate of Origin
+(https://developercertificate.org/). The project is under Apache 2.0;
+third-party components keep their own terms.

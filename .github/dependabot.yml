@@ -62,6 +62,34 @@ updates:
         update-types:
           - major
 
+  # The theme's dependencies are locked in the docs app's pnpm workspace.
+  - package-ecosystem: npm
+    directories:
+      - /apps/docs
+      - /apps/docs-theme
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: '08:00'
+      timezone: Europe/London
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - javascript
+    cooldown:
+      default-days: 7
+      semver-patch-days: 7
+      semver-minor-days: 14
+      semver-major-days: 30
+    groups:
+      patch-and-minor:
+        update-types:
+          - patch
+          - minor
+      major-updates:
+        update-types:
+          - major
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

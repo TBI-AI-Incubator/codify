@@ -175,7 +175,18 @@ New, additive:
   entry, so one act's texts can be joined. With `keep_ended` (`--keep-ended`), a state-act
   text whose validity ended before the as-of date is listed under `ended`, with its
   validity end (`valid_to`); `entries` and `repealed` are as before, and without the option
-  the index has no `ended` section.
+  the index has no `ended` section. `--as-of DATE` keeps the texts in force on that
+  date; without it the date is today.
+- `codify index-ocs` and `codify crawl-ocs`, two commands for one publisher's JSON
+  search portal (source kind `json_portal`). `index-ocs` lists every law and
+  subordinate law the search returns into an index, checkpoints beside it, and
+  exits 1 while the index is short of the catalogue's total; `--resume` continues
+  a build. `crawl-ocs` saves the raw document of every timeline a complete index
+  lists, then of every other timeline of the kinds `--kinds` names (`current`
+  unless told otherwise), and the English text of each that has one. It exits 2 if
+  the index is incomplete or a kind is unknown, exits 1 if a fetch failed, and
+  stops with an error after 20 failed fetches in a row.
+  Both send one request at a time, 30 a minute unless `--rate` says otherwise.
 - `is_riigi_teataja` also accepts an `oigusakt` root in an older versioned schema namespace
   (for example `maarus_1_10.02.2010`), so those members reach the Riigi Teataja converter
   and no longer fail in the native AKN parser.
@@ -626,6 +637,16 @@ Repository: security policy, code of conduct, contributor guide, issue and pull
 request templates, and the boundary decision naming structure-preserving
 translation as core.
 
+Recorded on 2026-11-14, miscounted when this entry was cut:
+
+- `codify serve` had fifteen routes at this release, not ten. Reads: `GET
+  /health`, `/jurisdictions`, `/jurisdictions/{code}`,
+  `/jurisdictions/{code}/laws`, `/laws`, `/laws/{law_id}`,
+  `/versions/{version_id}` and `/search`. Runs: `POST /runs/ingest`, `POST
+  /runs/ingest-url`, `GET /runs`, `GET /runs/{run_id}`, `GET
+  /runs/{run_id}/stream`, `POST /runs/{run_id}/cancel` and `POST
+  /runs/{run_id}/retry`. The two reader routes of 0.5.0 make seventeen.
+
 ## 0.3.0 (2026-09-18)
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
@@ -728,6 +749,11 @@ date converts with its month and the new-year reform where a Gregorian grid
 and a reform year are declared; and such a date's month and day carry into the
 work date.
 
+Recorded on 2026-11-14, left out when this entry was cut:
+
+- `codify index-ee-archive` indexes the statutes in force in a Riigi Teataja
+  bulk XML archive (`--principal-only`, `--max-files`, `--out`).
+
 ## 0.1.0 (2026-09-09)
 
 First version of the standalone library, before any published release or benchmark run.
@@ -742,6 +768,14 @@ First version of the standalone library, before any published release or benchma
   requiring enrichment must provide it explicitly.
 - Test fixtures and documentation have been adapted for a standalone checkout.
   Database and provider tests remain separate from the default offline CI.
+
+Recorded on 2026-11-14, left out when this entry was cut:
+
+- The `codify` command had four subcommands: `scan-corpus` (measure the anchor
+  scan over a directory of sources, no model or database), `ingest-one` (run one
+  document through the pipeline into a bundle), `index-datadump` (index a bulk
+  FORMEX archive by CELEX number) and `index-legislation-gov-uk` (list every
+  item the publisher's feeds carry, by type and year).
 
 Benchmark numbers from before the split are not results for this version. The
 synthetic retrieval evaluator can be run separately against a disposable

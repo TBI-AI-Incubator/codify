@@ -1,0 +1,33 @@
+---
+import Default from '@astrojs/starlight/components/Footer.astro'
+
+// A logotype, once cleared for use, goes in this column above the line.
+const institute = 'https://institute.global'
+---
+
+<Default><slot /></Default>
+<div class="cd-endorsement">
+  <p>Codify is built and maintained by the <a href={institute}>Tony Blair Institute for Global Change</a>.</p>
+</div>
+
+<style>
+  .cd-endorsement {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-block-start: 3rem;
+    border-block-start: 1px solid var(--cd-rule);
+    padding-block: 1.5rem 0.5rem;
+    color: var(--cd-ink);
+  }
+
+  .cd-endorsement p a {
+    color: inherit;
+  }
+
+  .cd-endorsement p {
+    margin: 0;
+    font-size: var(--sl-text-xs);
+    color: var(--cd-ink-3);
+  }
+</style>

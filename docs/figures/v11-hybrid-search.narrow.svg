@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="453" viewBox="0 0 358 453" role="img" aria-label="Hybrid search, top to bottom: a query passes the scope (one jurisdiction, the current version of each law, normative provisions only) into two arms. The lexical arm ranks provisions by BM25 on the query’s words; the dense arm, which calls a model to embed the query, ranks them by nearness of embeddings. Each passes on up to 30, ranked. Reciprocal rank fusion scores each provision 1 / (60 + lexical rank) + 1 / (60 + dense rank), with no term from an arm that did not find it, and matches come out best first with eid, score and text.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="7" width="7" height="7" class="ink"/>
+<text x="14" y="14" class="note">calls a model</text>
+<rect x="0" y="32" width="358" height="40" rx="3" class="s box"/>
+<text x="12" y="49">Query</text>
+<text x="12" y="64" class="code">"right of access to the official text"</text>
+<path d="M179 72 L179 86" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="88" width="358" height="56" rx="3" class="s box-lo"/>
+<text x="12" y="105">Scope, applied inside each arm</text>
+<text x="12" y="120" class="note">One jurisdiction, the current version</text>
+<text x="12" y="136" class="note">of each law, normative provisions only</text>
+<path d="M85.5 144 L85.5 166" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="168" width="171" height="104" rx="3" class="s box"/>
+<text x="12" y="185">Lexical arm</text>
+<text x="12" y="200" class="note">BM25 on the query’s</text>
+<text x="12" y="216" class="note">words; rare words</text>
+<text x="12" y="232" class="note">outweigh common ones</text>
+<text x="12" y="256" class="note">Up to 30 best, ranked</text>
+<path d="M85.5 272 L85.5 294" class="s" marker-end="url(#arrow)"/>
+<path d="M272.5 144 L272.5 166" class="s" marker-end="url(#arrow)"/>
+<rect x="187" y="168" width="171" height="104" rx="3" class="s box"/>
+<text x="199" y="185">Dense arm</text>
+<rect x="339" y="177" width="7" height="7" class="ink"/>
+<text x="199" y="200" class="note">Query embedding</text>
+<text x="199" y="216" class="note">against each</text>
+<text x="199" y="232" class="note">provision’s embedding</text>
+<text x="199" y="256" class="note">Up to 30 nearest, ranked</text>
+<path d="M272.5 272 L272.5 294" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="296" width="358" height="100" rx="3" class="em box"/>
+<text x="12" y="313" class="em">Reciprocal rank fusion</text>
+<text x="12" y="328" class="note">Each provision scores</text>
+<text x="12" y="348" class="code">1 / (60 + lexical rank)</text>
+<text x="12" y="364" class="code">+ 1 / (60 + dense rank)</text>
+<text x="12" y="384" class="note">An arm that did not find it adds nothing.</text>
+<path d="M179 396 L179 410" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="412" width="358" height="40" rx="3" class="s box"/>
+<text x="12" y="429">Matches, best first</text>
+<text x="12" y="444" class="code">eid, score, text</text>
+</svg>
