@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 export const figuresDir = fileURLToPath(new URL('../../../../docs/figures/', import.meta.url))
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+export const esc = (s) =>
+  String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 // Used only where the SVG is opened on its own (GitHub, a file viewer); the site strips it.
 export const standaloneStyle = `<style>

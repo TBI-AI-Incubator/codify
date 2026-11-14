@@ -47,7 +47,7 @@ const sectionLines = dedent(`        ${section}`.split('\n'))
 const law = {
   title: /<FRBRalias value="([^"]*)"/.exec(akn)[1],
   heading: /<heading>(.*?)<\/heading>/.exec(section)[1],
-  subsections: [...section.matchAll(/<num>(.*?)<\/num>\s*<content>\s*<p[^>]*>([\s\S]*?)<\/p>/g)].map(([, num, text]) => [num, text.replace(/<[^>]+>/g, '')]),
+  subsections: [...section.matchAll(/<num>(.*?)<\/num>\s*<content>\s*<p[^>]*>([\s\S]*?)<\/p>/g)].map(([, num, text]) => [num, text.split(/<[^>]*>/).join('')]),
 }
 const part = at(source, 'PART I ')
 const sourceFromPart = source.slice(part, part + 12)

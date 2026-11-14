@@ -4,11 +4,22 @@ import { fileURLToPath } from 'node:url'
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+/** Drops each `<style>` element and rejects a figure that still carries a style, a script or an event handler. */
+export function dropStyles(svg, path = 'figure') {
+  let out = svg
+  for (let start; (start = out.indexOf('<style')) >= 0; ) {
+    const end = out.indexOf('</style>', start)
+    if (end < 0) break
+    out = out.slice(0, start) + out.slice(end + '</style>'.length).trimStart()
+  }
+  if (/<(style|script)\b|<[^>]*\son[a-z]+\s*=/i.test(out)) throw new Error(`${path}: a figure may not carry a style, a script or an event handler`)
+  return out
+}
+
 /** A figure SVG ready to inline: no XML prolog or standalone style, ids prefixed so two copies never clash. */
 export function inlineSvg(path, prefix) {
-  return readFileSync(path, 'utf8')
+  return dropStyles(readFileSync(path, 'utf8'), path)
     .replace(/<\?xml[^>]*>\s*/, '')
-    .replace(/<style[\s\S]*?<\/style>\s*/g, '')
     .replace(/\bid="([^"]+)"/g, `id="${prefix}-$1"`)
     .replace(/url\(#([^)]+)\)/g, `url(#${prefix}-$1)`)
     .replace(/href="#([^"]+)"/g, `href="#${prefix}-$1"`)
