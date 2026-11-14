@@ -95,13 +95,13 @@ import asyncio
 import os
 from pathlib import Path
 
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 from codify.translate import PinnedTerm, translate_document
 from codify.translate.quality_grade import translation_quality_grade
 
 
 async def main() -> None:
-    llm = LiteLLMClient(
+    llm = OpenAICompatibleClient(
         base_url=os.environ["LLM_BASE_URL"],
         api_key=os.environ["LLM_API_KEY"],
         model=os.environ["LLM_MODEL"],
