@@ -84,3 +84,40 @@ async def test_no_request_is_sent_without_a_user_agent(monkeypatch: pytest.Monke
             inner=httpx.MockTransport(lambda r: sent.append(r) or httpx.Response(200)),
         )
     assert sent == []
+
+
+@pytest.mark.asyncio
+async def test_other_headers_do_not_drop_the_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "eu-test/1 (+https://example.test)")
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(200, text="<FORMEX/>")
+
+    await fetch_url(
+        "https://public.test/a",
+        headers={"Accept": "application/xml"},
+        resolver=_resolver,
+        inner=httpx.MockTransport(handler),
+    )
+    assert sent[0].headers["user-agent"] == "eu-test/1 (+https://example.test)"
+    assert sent[0].headers["accept"] == "application/xml"
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_user_agent_is_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT", raising=False)
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.headers["user-agent"])
+        return httpx.Response(200, text="<FORMEX/>")
+
+    await fetch_url(
+        "https://public.test/a",
+        headers={"user-agent": "explicit/2"},
+        resolver=_resolver,
+        inner=httpx.MockTransport(handler),
+    )
+    assert sent == ["explicit/2"]
