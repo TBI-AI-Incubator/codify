@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="624" height="777" viewBox="0 0 624 777" role="img" aria-label="A translation run: units walked by eId; a model glossary in which pinned terms replace the model’s entries; model translation in chapter batches with numbers and citations as placeholders; up to 3 model repair passes; a deterministic write and audit; an optional sampled model judge; and a result that a caller grades and turns into per-provision findings.">
+<svg xmlns="http://www.w3.org/2000/svg" width="624" height="809" viewBox="0 0 624 809" role="img" aria-label="A translation run: body and attachment units walked by eId; a model glossary, one call per 350,000 characters, in which pinned terms replace the model’s entries; model translation in chapter batches with numbers and citations as placeholders and examples shared within a lane; up to 3 model repair passes; a deterministic write and audit; an optional sampled model judge; and a result that a caller grades and turns into per-provision findings.">
 <style>
 svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
 .s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
@@ -14,77 +14,79 @@ text.em{font-weight:600}
 <rect x="525" y="7" width="7" height="7" class="ink"/>
 <text x="536" y="14" class="note">calls a model</text>
 <text x="344" y="14" class="micro">Flags raised</text>
-<rect x="0" y="32" width="296" height="40" rx="3" class="s box"/>
+<rect x="0" y="32" width="296" height="56" rx="3" class="s box"/>
 <text x="12" y="49">Units by eId</text>
-<text x="12" y="64" class="note">Each element with an <tspan font-family="'Geist Mono',ui-monospace,monospace">eId</tspan> is one unit</text>
+<text x="12" y="64" class="note">Body and attachment elements with an</text>
+<text x="12" y="80" class="note"><tspan font-family="'Geist Mono',ui-monospace,monospace">eId</tspan>; each unit carries its paragraphs</text>
 <path d="M296 45 L336 45" class="s2 dash"/>
 <text x="344" y="49" class="code">translate_skipped_without_eid</text>
-<path d="M40 72 L40 94" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="96" width="296" height="56" rx="3" class="s box"/>
-<text x="12" y="113">Glossary</text>
-<rect x="277" y="105" width="7" height="7" class="ink"/>
-<text x="12" y="128" class="note">One call over the whole act; a</text>
-<text x="12" y="144" class="note"><tspan font-family="'Geist Mono',ui-monospace,monospace">PinnedTerm</tspan> replaces the model’s entry</text>
-<path d="M296 109 L336 109" class="s2 dash"/>
-<text x="344" y="113" class="code">notes_partial</text>
-<text x="344" y="129" class="code">notes_failed</text>
-<path d="M40 152 L40 174" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="176" width="296" height="72" rx="3" class="s box"/>
-<text x="12" y="193">Translate</text>
-<rect x="277" y="185" width="7" height="7" class="ink"/>
-<text x="12" y="208" class="note">Batches of 8 units by chapter; numbers</text>
-<text x="12" y="224" class="note">and citations go as placeholders; earlier</text>
-<text x="12" y="240" class="note">answers in a chapter go in as examples</text>
-<path d="M296 189 L336 189" class="s2 dash"/>
-<text x="344" y="193" class="code">translate_sentinel_missing</text>
-<path d="M40 248 L40 270" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="272" width="296" height="56" rx="3" class="s box"/>
-<text x="12" y="289">Repair</text>
-<rect x="277" y="281" width="7" height="7" class="ink"/>
-<text x="12" y="304" class="note">A unit with a lost placeholder or an</text>
-<text x="12" y="320" class="note">untranslated line goes again, up to 3 times</text>
-<path d="M296 285 L336 285" class="s2 dash"/>
-<text x="344" y="289" class="code">translate_sentinel_unrepaired</text>
-<path d="M40 328 L40 350" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="352" width="296" height="40" rx="3" class="s box"/>
-<text x="12" y="369">Write</text>
-<text x="12" y="384" class="note">Answers patched onto a copy of the source</text>
-<path d="M40 392 L40 414" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="416" width="296" height="152" rx="3" class="em box"/>
-<text x="12" y="433" class="em">Deterministic audit</text>
-<text x="12" y="448" class="note">Defined terms present in the output</text>
-<text x="12" y="464" class="note">Volume against the source</text>
-<path d="M296 460 L336 460" class="s2 dash"/>
-<text x="344" y="464" class="code">translate_low_coverage</text>
-<text x="12" y="480" class="note">Placeholders restored</text>
-<text x="12" y="496" class="note">Money amounts neither lost nor doubled</text>
-<text x="12" y="512" class="note">Sentences per provision</text>
-<path d="M296 508 L336 508" class="s2 dash"/>
-<text x="344" y="512" class="code">translate_clause_gap</text>
-<text x="12" y="528" class="note">Source script left in the text</text>
-<text x="12" y="544" class="note">One drafting voice for obligations</text>
+<path d="M40 88 L40 110" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="112" width="296" height="56" rx="3" class="s box"/>
+<text x="12" y="129">Glossary</text>
+<rect x="277" y="121" width="7" height="7" class="ink"/>
+<text x="12" y="144" class="note">One call per 350,000 characters of the act;</text>
+<text x="12" y="160" class="note">a <tspan font-family="'Geist Mono',ui-monospace,monospace">PinnedTerm</tspan> replaces the model’s entry</text>
+<path d="M296 125 L336 125" class="s2 dash"/>
+<text x="344" y="129" class="code">notes_partial</text>
+<text x="344" y="145" class="code">notes_failed</text>
+<path d="M40 168 L40 190" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="192" width="296" height="88" rx="3" class="s box"/>
+<text x="12" y="209">Translate</text>
+<rect x="277" y="201" width="7" height="7" class="ink"/>
+<text x="12" y="224" class="note">Batches of 8 units by chapter (default);</text>
+<text x="12" y="240" class="note">numbers and citations go as placeholders;</text>
+<text x="12" y="256" class="note">earlier answers in a lane of up to 8</text>
+<text x="12" y="272" class="note">batches go in as examples</text>
+<path d="M296 205 L336 205" class="s2 dash"/>
+<text x="344" y="209" class="code">translate_sentinel_missing</text>
+<path d="M40 280 L40 302" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="304" width="296" height="56" rx="3" class="s box"/>
+<text x="12" y="321">Repair</text>
+<rect x="277" y="313" width="7" height="7" class="ink"/>
+<text x="12" y="336" class="note">A unit with a lost placeholder or an</text>
+<text x="12" y="352" class="note">untranslated line goes again, up to 3 times</text>
+<path d="M296 317 L336 317" class="s2 dash"/>
+<text x="344" y="321" class="code">translate_sentinel_unrepaired</text>
+<path d="M40 360 L40 382" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="384" width="296" height="40" rx="3" class="s box"/>
+<text x="12" y="401">Write</text>
+<text x="12" y="416" class="note">Answers patched onto a copy of the source</text>
+<path d="M40 424 L40 446" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="448" width="296" height="152" rx="3" class="em box"/>
+<text x="12" y="465" class="em">Deterministic audit</text>
+<text x="12" y="480" class="note">Defined terms present in the output</text>
+<text x="12" y="496" class="note">Volume against the source</text>
+<path d="M296 492 L336 492" class="s2 dash"/>
+<text x="344" y="496" class="code">translate_low_coverage</text>
+<text x="12" y="512" class="note">Placeholders restored</text>
+<text x="12" y="528" class="note">Money amounts neither lost nor doubled</text>
+<text x="12" y="544" class="note">Sentences per provision</text>
 <path d="M296 540 L336 540" class="s2 dash"/>
-<text x="344" y="544" class="code">register_deontic_mixed</text>
-<text x="12" y="560" class="note">Gazette headers, titles, front matter</text>
-<path d="M40 568 L40 590" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="592" width="296" height="56" rx="3" class="s box dash"/>
-<text x="12" y="609">Judge, optional</text>
-<rect x="277" y="601" width="7" height="7" class="ink"/>
-<text x="12" y="624" class="note">Scores up to 20 sampled provisions; its</text>
-<text x="12" y="640" class="note">repairs are counted, not written</text>
-<path d="M296 605 L336 605" class="s2 dash"/>
-<text x="344" y="609" class="code">judge_fidelity</text>
-<text x="344" y="625" class="note">and one code per dimension</text>
-<path d="M40 648 L40 670" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="672" width="624" height="40" rx="3" class="s box"/>
-<text x="12" y="689">TranslationResult</text>
-<text x="12" y="704" class="note"><tspan font-family="'Geist Mono',ui-monospace,monospace">akn_xml</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">notes</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">audit</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">flags</tspan></text>
-<path d="M40 712 L40 734" class="s" marker-end="url(#arrow)"/>
-<rect x="0" y="736" width="296" height="40" rx="3" class="s box"/>
-<text x="12" y="753" class="code">translation_quality_grade</text>
-<text x="12" y="768" class="note">A, B, C or ungraded, from audit and flags</text>
-<path d="M384 712 L384 734" class="s" marker-end="url(#arrow)"/>
-<rect x="344" y="736" width="280" height="40" rx="3" class="s box"/>
-<text x="356" y="753" class="code">delivery_findings</text>
-<text x="356" y="768" class="note">Per eId: review or advisory, from audit</text>
+<text x="344" y="544" class="code">translate_clause_gap</text>
+<text x="12" y="560" class="note">Source script left in the text</text>
+<text x="12" y="576" class="note">One drafting voice for obligations</text>
+<path d="M296 572 L336 572" class="s2 dash"/>
+<text x="344" y="576" class="code">register_deontic_mixed</text>
+<text x="12" y="592" class="note">Gazette headers, titles, front matter</text>
+<path d="M40 600 L40 622" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="624" width="296" height="56" rx="3" class="s box dash"/>
+<text x="12" y="641">Judge, optional</text>
+<rect x="277" y="633" width="7" height="7" class="ink"/>
+<text x="12" y="656" class="note">Scores up to 20 sampled provisions; its</text>
+<text x="12" y="672" class="note">repairs are counted, not written</text>
+<path d="M296 637 L336 637" class="s2 dash"/>
+<text x="344" y="641" class="code">judge_fidelity</text>
+<text x="344" y="657" class="note">and one code per dimension</text>
+<path d="M40 680 L40 702" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="704" width="624" height="40" rx="3" class="s box"/>
+<text x="12" y="721">TranslationResult</text>
+<text x="12" y="736" class="note"><tspan font-family="'Geist Mono',ui-monospace,monospace">akn_xml</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">notes</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">audit</tspan>, <tspan font-family="'Geist Mono',ui-monospace,monospace">flags</tspan></text>
+<path d="M40 744 L40 766" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="768" width="296" height="40" rx="3" class="s box"/>
+<text x="12" y="785" class="code">translation_quality_grade</text>
+<text x="12" y="800" class="note">A, B, C or ungraded, from audit and flags</text>
+<path d="M384 744 L384 766" class="s" marker-end="url(#arrow)"/>
+<rect x="344" y="768" width="280" height="40" rx="3" class="s box"/>
+<text x="356" y="785" class="code">delivery_findings</text>
+<text x="356" y="800" class="note">Per eId: review or advisory, from audit</text>
 </svg>

@@ -15,17 +15,21 @@ function note(x, y, s, cls = 'note') {
 
 // Each line may carry the flag it raises; `flags` sit beside the stage as a whole.
 const stages = [
-  { label: 'Units by eId', lines: ['Each element with an `eId` is one unit'], flags: ['translate_skipped_without_eid'] },
+  {
+    label: 'Units by eId',
+    lines: ['Body and attachment elements with an', '`eId`; each unit carries its paragraphs'],
+    flags: ['translate_skipped_without_eid'],
+  },
   {
     label: 'Glossary',
     model: true,
-    lines: ['One call over the whole act; a', '`PinnedTerm` replaces the model’s entry'],
+    lines: ['One call per 350,000 characters of the act;', 'a `PinnedTerm` replaces the model’s entry'],
     flags: ['notes_partial', 'notes_failed'],
   },
   {
     label: 'Translate',
     model: true,
-    lines: ['Batches of 8 units by chapter; numbers', 'and citations go as placeholders; earlier', 'answers in a chapter go in as examples'],
+    lines: ['Batches of 8 units by chapter (default);', 'numbers and citations go as placeholders;', 'earlier answers in a lane of up to 8', 'batches go in as examples'],
     flags: ['translate_sentinel_missing'],
   },
   {
@@ -128,7 +132,7 @@ function draw(width) {
 }
 
 const title =
-  'A translation run: units walked by eId; a model glossary in which pinned terms replace the model’s entries; model translation in chapter batches with numbers and citations as placeholders; up to 3 model repair passes; a deterministic write and audit; an optional sampled model judge; and a result that a caller grades and turns into per-provision findings.'
+  'A translation run: body and attachment units walked by eId; a model glossary, one call per 350,000 characters, in which pinned terms replace the model’s entries; model translation in chapter batches with numbers and citations as placeholders and examples shared within a lane; up to 3 model repair passes; a deterministic write and audit; an optional sampled model judge; and a result that a caller grades and turns into per-provision findings.'
 
 for (const [suffix, width] of [['', 624], ['.narrow', 358]]) {
   const { out, height } = draw(width)
