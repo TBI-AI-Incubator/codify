@@ -197,6 +197,14 @@ async def _run(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    base_url = os.environ.get("LITELLM_BASE_URL")
+    if not base_url:
+        print(
+            "no chat endpoint: set LITELLM_BASE_URL (and LITELLM_API_KEY) to an "
+            "OpenAI-compatible endpoint, in the environment or the nearest .env",
+            file=sys.stderr,
+        )
+        return 2
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -207,7 +215,7 @@ async def _run(args: argparse.Namespace) -> int:
     raw_bytes = source.read_bytes()
 
     llm = create_llm_client(
-        base_url=os.environ.get("LITELLM_BASE_URL", "http://localhost:4000/v1"),
+        base_url=base_url,
         # Matches the gateway's own default (docker-compose.yaml): `docker
         # compose` reads .env without exporting it to a later `uv run`.
         api_key=(

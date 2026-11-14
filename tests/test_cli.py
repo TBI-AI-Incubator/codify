@@ -18,6 +18,12 @@ from codify.pipeline.enrich.anchors import AnchorCoverage, StructuralAnchor
 from codify.pipeline.enrich.structure import ScanTrace
 
 
+@pytest.fixture(autouse=True)
+def _a_chat_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`ingest-one` refuses to start without one; the closed port answers nothing."""
+    monkeypatch.setenv("LITELLM_BASE_URL", "http://127.0.0.1:1")
+
+
 def _trace(coverage: AnchorCoverage | None) -> ScanTrace:
     return ScanTrace(anchors=(), coverage=coverage, scaffold=None, fallback=None)
 
@@ -257,6 +263,32 @@ async def test_the_client_is_built_off_the_proxy(monkeypatch, tmp_path: Path) ->
     # The mode is only worth pinning because of what it drops from the request.
     direct = LiteLLMClient(base_url="http://x/v1", api_key="k", model="m", telemetry_mode="direct")
     assert direct._body() == {}
+
+
+async def test_ingest_one_refuses_to_start_without_a_chat_endpoint(  # type: ignore[no-untyped-def]
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    """Unset, it used to call a local gateway nobody had started."""
+    from codify import cli
+
+    monkeypatch.delenv("LITELLM_BASE_URL")
+    monkeypatch.setattr(cli, "create_llm_client", lambda **_: pytest.fail("built a client"))
+    source = tmp_path / "act.txt"
+    source.write_text("1. Short title.\n")
+    out = tmp_path / "bundle"
+    args = argparse.Namespace(
+        source=str(source),
+        jurisdiction="xa",
+        out=str(out),
+        model="m",
+        ocr_model="",
+        fallback_model="",
+        quiet=True,
+    )
+
+    assert await cli._run(args) == 2
+    assert "LITELLM_BASE_URL" in capsys.readouterr().err
+    assert not out.exists()
 
 
 def test_help_keeps_the_docstring_examples_on_their_own_lines(capsys) -> None:  # type: ignore[no-untyped-def]

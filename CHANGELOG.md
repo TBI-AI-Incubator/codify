@@ -38,6 +38,13 @@ New, additive:
 - `codify.cli.build_parser()` returns the `codify` argument parser, so a command
   reference can be generated from it. `main` behaves as before.
 
+Fixed:
+
+- `ingest-one` stops before any work, with exit code 2, when `LITELLM_BASE_URL`
+  is unset, and names the variables to set. It used to call
+  `http://localhost:4000/v1`, a gateway this repository does not start, so the
+  first error was a failed connection on every page.
+
 ## 0.7.0 (2026-11-13)
 
 Six breaks, so the minor moves, as `VERSIONING.md` prescribes while the major
