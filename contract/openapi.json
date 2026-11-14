@@ -49,6 +49,7 @@
           },
           "description": {
             "default": "",
+            "description": "Free-text, these configs were hand-written before the structured shape landed and frequently carry narrative provenance.",
             "title": "Description",
             "type": "string"
           },
@@ -128,6 +129,7 @@
           },
           "requires_token": {
             "default": false,
+            "description": "Token-gated source: skip in `effective_tier` when the env var is unset unless `fallback_format` declares a usable downgrade.",
             "title": "Requires Token",
             "type": "boolean"
           },
@@ -177,6 +179,7 @@
                 "type": "null"
               }
             ],
+            "description": "Body shape of an amending instrument. `two_pasal_roman`: the host's own articles are Roman, so an Arabic-numbered one after them is quoted text.",
             "title": "Amending Body Structure"
           },
           "amendment_item_kind": {
@@ -188,6 +191,7 @@
                 "type": "null"
               }
             ],
+            "description": "Hierarchy element that numbers one amendment made by an amending article (a numbered `Angka` item). What follows it belongs to the amended statute, so it must not compete in the host's numbering. Empty leaves the pass inert.",
             "title": "Amendment Item Kind"
           },
           "cross_reference_format": {
@@ -224,6 +228,7 @@
             "title": "Style"
           },
           "trigger_phrases": {
+            "description": "Lead-in phrases marking an embedded amendment article: a number following one of these plus a colon is quoted content, not a new top-level article.",
             "items": {
               "type": "string"
             },
@@ -240,14 +245,17 @@
         "properties": {
           "always_opens": {
             "default": false,
+            "description": "True where no table in the body carries this caption, so a line that opens with it always begins the attachment.",
             "title": "Always Opens",
             "type": "boolean"
           },
           "caption": {
+            "description": "Centred in the source, so the match tolerates a wide indent.",
             "title": "Caption",
             "type": "string"
           },
           "hierarchy": {
+            "description": "Levels the attachment's own content uses: an annex can be a lettered outline rather than the article hierarchy of the body it is attached to. Empty keeps today's behaviour: the body's levels, or none.",
             "items": {
               "$ref": "#/components/schemas/HierarchyEntry"
             },
@@ -256,11 +264,13 @@
           },
           "normative": {
             "default": true,
+            "description": "False for an explanatory memorandum: no norm, and no legal basis.",
             "title": "Normative",
             "type": "boolean"
           },
           "prefix": {
             "default": false,
+            "description": "True where the caption opens a longer title on the same line (\"SCHEDULE of fees\u2026\"), so the caption need only begin the line. The line is the heading.",
             "title": "Prefix",
             "type": "boolean"
           }
@@ -361,6 +371,7 @@
             "type": "array"
           },
           "territories": {
+            "description": "Territorial / temporal scope, typically populated for SC resolutions and other time-bounded regimes; absent on permanent treaty frameworks.",
             "items": {
               "type": "string"
             },
@@ -410,6 +421,7 @@
         "description": "Deterministic conversion rule for non-Gregorian local calendars.\n\nkind selects which optional fields apply:\n\n- epoch_offset  single-epoch calendars. Gregorian = local_year + epoch_year,\n                where epoch_year is an integer offset (Buddhist Era -543).\n- era_table     named era segments with boundaries.\n- hijri_lunar   Lunar calendar, ~354 days. Needs codify.calendar, not an offset.\n- hijri_solar   Solar calendar, Gregorian year length.\n- ethiopian     ~7-8 year offset, 13-month year.\n- buddhist      Buddhist Era calendar, epoch_year -543.\n- bikram_samvat 57-year offset, month-sensitive (Chaitra straddles the\n                mid-April new year).",
         "properties": {
           "date_cues": {
+            "description": "Phrases that introduce the date a document was made. A dated line elsewhere in the text is some other instrument's.",
             "items": {
               "type": "string"
             },
@@ -425,6 +437,7 @@
                 "type": "null"
               }
             ],
+            "description": "Integer added to the local year to give the Gregorian year (Buddhist -543, ROC and Juche 1911, since their year 1 is 1912 CE). None for calendars without a simple offset: hijri, ethiopian, era_table, bikram_samvat.",
             "title": "Epoch Year"
           },
           "eras": {
@@ -440,6 +453,7 @@
                 "type": "null"
               }
             ],
+            "description": "Era table: [{\"name\": \"Reiwa\", \"start\": \"2019-05-01\"}] for Japanese-style.",
             "title": "Eras"
           },
           "kind": {
@@ -457,10 +471,12 @@
           },
           "month_day_is_gregorian": {
             "default": false,
+            "description": "Whether the months and days coincide with the Gregorian ones, so only the year converts. False for any calendar with a grid of its own.",
             "title": "Month Day Is Gregorian",
             "type": "boolean"
           },
           "month_names": {
+            "description": "Month names in the local calendar's own order, index 0 = month 1. Present only where a dated line is read off the source text.",
             "items": {
               "type": "string"
             },
@@ -487,6 +503,7 @@
                 "type": "null"
               }
             ],
+            "description": "Month-sensitive conversions (Bikram Samvat New Year mid-April).",
             "title": "New Year Month"
           },
           "new_year_reform_year": {
@@ -498,6 +515,7 @@
                 "type": "null"
               }
             ],
+            "description": "The local year began in this month before `new_year_reform_year`, so an earlier date carries the previous year's number and the offset is short.",
             "title": "New Year Reform Year"
           },
           "note": {
@@ -514,9 +532,11 @@
                 "type": "null"
               }
             ],
+            "description": "Offset variant for month-sensitive: subtract `offset` from local year before the new-year day, otherwise `offset + 1`.",
             "title": "Offset"
           },
           "year_particles": {
+            "description": "Words marking a year as belonging to this calendar (\"B.E.\", \"A.H.\").",
             "items": {
               "type": "string"
             },
@@ -584,6 +604,7 @@
           },
           "pattern_flags": {
             "default": "",
+            "description": "e.g. \"i\" for case-insensitive",
             "title": "Pattern Flags",
             "type": "string"
           },
@@ -634,6 +655,7 @@
                 "type": "null"
               }
             ],
+            "description": "basket path, relative to repo root",
             "title": "Output"
           },
           "queries": {
@@ -651,6 +673,7 @@
         "additionalProperties": true,
         "properties": {
           "amendment_markers": {
+            "description": "The pair a publisher prints around amended words; brackets are only the commonest. A list because a tuple crosses the schema boundary as unknown.",
             "items": {
               "type": "string"
             },
@@ -716,6 +739,7 @@
                 "type": "null"
               }
             ],
+            "description": "Per-class authoritative language, falling back to the jurisdiction's when None. Vatican needs it: Latin for canon law, Italian for the City State.",
             "title": "Authoritative Language"
           },
           "basic_unit": {
@@ -748,6 +772,7 @@
                 "type": "null"
               }
             ],
+            "description": "Another class of this jurisdiction whose fields this one lays over. One level.",
             "title": "Extends"
           },
           "frbr_subtype": {
@@ -797,11 +822,13 @@
           },
           "number_has_year_prefix": {
             "default": false,
+            "description": "A matching year prefix in the printed serial is separate from the URI number.",
             "title": "Number Has Year Prefix",
             "type": "boolean"
           },
           "number_source": {
             "default": "stated",
+            "description": "\"title_identity\": the URI number is always the title digest, never a stated serial, for classes whose serials repeat across issuers.",
             "enum": [
               "stated",
               "title_identity"
@@ -829,6 +856,7 @@
                 "type": "null"
               }
             ],
+            "description": "Where this class sits in the legal hierarchy, for ranking a name search: higher outranks lower on a close title match. Unset means no weighting, so a jurisdiction whose hierarchy nobody has transcribed keeps pure relevance order. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions.",
             "title": "Search Rank"
           },
           "short_label": {
@@ -840,6 +868,7 @@
                 "type": "null"
               }
             ],
+            "description": "Compact display form (e.g. \"VKM\" for al/vendim). Falls back to the title-cased doctype when unset. Single source of truth for the UI + PDF.",
             "title": "Short Label"
           }
         },
@@ -1395,7 +1424,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Structured conversion rule. Populated for non-Gregorian jurisdictions (NP, TW, KP, JP, IR, ET, TH). FRBR URIs always use Gregorian (ADR 001), this drives the conversion utility."
           },
           "country_code": {
             "title": "Country Code",
@@ -1524,7 +1554,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Declared where instruments carry no number and the title is the identity."
           },
           "uri_patterns": {
             "additionalProperties": {
@@ -1842,6 +1873,7 @@
             "title": "Bluebell Keyword"
           },
           "captions": {
+            "description": "The closed caption vocabulary a `caption` level answers to.",
             "items": {
               "type": "string"
             },
@@ -1850,6 +1882,7 @@
           },
           "eid_abbrev": {
             "default": "",
+            "description": "Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (hcontainer: sch, xhd; two local terms on one element) or the publisher's own AKN differs (UK SIs number sections reg_N).",
             "title": "Eid Abbrev",
             "type": "string"
           },
@@ -1880,6 +1913,7 @@
                 "type": "null"
               }
             ],
+            "description": "Unified multilingual store for local_term_ara / local_script_rus / etc. Keys are ISO 639-3 language codes or \"script:<iso-15924>\".",
             "title": "Local Terms"
           },
           "marker_form": {
@@ -1904,6 +1938,7 @@
                 "type": "null"
               }
             ],
+            "description": "Genres whose levels carry no keyword: a judgment writes \"DUDUK PERKARA\" and \"[1.1]\", never its hierarchy term. Unset keeps keyword matching.",
             "title": "Marker Form"
           },
           "note": {
@@ -2342,6 +2377,7 @@
         "additionalProperties": true,
         "properties": {
           "adoption_markers": {
+            "description": "Phrases declaring the instrument adopts another body's numbered text, which every count over the document must read as an attachment, not its own structure.",
             "items": {
               "type": "string"
             },
@@ -2360,6 +2396,7 @@
             "title": "Akn Profile"
           },
           "akn_sources": {
+            "description": "Legacy / hand-curated list of upstreams. Coexists with `source_adapters` during the schema-migration window; `effective_tier` walks both.",
             "items": {
               "$ref": "#/components/schemas/AknSource"
             },
@@ -2377,6 +2414,7 @@
             ]
           },
           "attachments": {
+            "description": "Captions opening an attachment, whose numbering restarts the body's.",
             "items": {
               "$ref": "#/components/schemas/AttachmentCaption"
             },
@@ -2395,6 +2433,7 @@
             "title": "Authoritative Language"
           },
           "binding_regimes": {
+            "description": "Non-membership binding regimes (treaty frameworks, bilateral regimes, constitutional annexes), which are not memberships.",
             "items": {
               "$ref": "#/components/schemas/BindingRegime"
             },
@@ -2417,6 +2456,7 @@
             "type": "string"
           },
           "closing_phrases": {
+            "description": "`LegalEra.closing_phrases` for a jurisdiction that declares no eras. An era's own list wins where it declares one.",
             "items": {
               "type": "string"
             },
@@ -2488,6 +2528,7 @@
             "title": "Effective Tier"
           },
           "enacting_formula_markers": {
+            "description": "Evidence the source carries its own formula, so no fallback is injected. Never a cut point: a phrase here may open the instrument, not close it.",
             "items": {
               "type": "string"
             },
@@ -2502,6 +2543,7 @@
             "type": "array"
           },
           "footnote_markers": {
+            "description": "`LegalEra.footnote_markers` for a jurisdiction that declares no eras. An era's own list wins where it declares one.",
             "items": {
               "type": "string"
             },
@@ -2519,6 +2561,7 @@
             ]
           },
           "furniture_inline_patterns": {
+            "description": "Furniture that shares a line with real content, so whole-line disposal would take the content with it: a portal credit run, a stamped URL. Narrower than `ocr_header_patterns`, which also matches the real title on page one.",
             "items": {
               "type": "string"
             },
@@ -2526,6 +2569,7 @@
             "type": "array"
           },
           "furniture_line_patterns": {
+            "description": "Furniture whose whole line is disposable: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one. Substring scrubbing is safe for both sets, whole-line disposal only for this one.",
             "items": {
               "type": "string"
             },
@@ -2550,6 +2594,7 @@
             "type": "array"
           },
           "legal_eras": {
+            "description": "Drafting periods, for reporting quality per era rather than per corpus. Empty means one undivided population. Distinct from `CalendarRule.eras`, which is a regnal year table.",
             "items": {
               "$ref": "#/components/schemas/LegalEra"
             },
@@ -2557,6 +2602,7 @@
             "type": "array"
           },
           "lexicon_words": {
+            "description": "Legal vocabulary particular to this jurisdiction, folded into the language's word list when a page is scored. A term naming one jurisdiction is that jurisdiction's data, not the language's.",
             "items": {
               "type": "string"
             },
@@ -2572,6 +2618,7 @@
           },
           "min_anchor_coverage": {
             "default": 0.8,
+            "description": "Minimum ratio of captured anchors over marker literals in the source. Ingest fails below it, so a silently-partial AKN cannot ship. 0.80 tolerates in-prose cross-references without over-firing. 0.0 disables.",
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Min Anchor Coverage",
@@ -2607,11 +2654,13 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "ISO-639-3 language code \u2192 localised jurisdiction name. Used by the PDF exporter to render the cover in the target language without a hardcoded Python map. Mirror of `Law.title_translations`.",
             "title": "Name Translations",
             "type": "object"
           },
           "note": {
             "default": "",
+            "description": "Free-text note at the jurisdiction level for cross-cutting guidance.",
             "title": "Note",
             "type": "string"
           },
@@ -2626,6 +2675,7 @@
             ]
           },
           "ocr_header_patterns": {
+            "description": "Running header and footer text that leaks into article bodies during OCR. Stripped from `<p>` before translation so the LLM never sees it. Literal regex strings, so a profile author adds patterns without touching Python.",
             "items": {
               "type": "string"
             },
@@ -2633,6 +2683,7 @@
             "type": "array"
           },
           "opening_material_terminators": {
+            "description": "Phrases the recitals precede, after which pre-body text is page bleed.",
             "items": {
               "type": "string"
             },
@@ -2640,6 +2691,7 @@
             "type": "array"
           },
           "placeholders": {
+            "description": "Whole-string markers for missing or struck content, beyond the platform default.",
             "items": {
               "$ref": "#/components/schemas/PlaceholderMarker"
             },
@@ -2647,6 +2699,7 @@
             "type": "array"
           },
           "pool_excluded_refers_to": {
+            "description": "`refersTo` values marking a duty on someone other than the instrument's subjects: units at or under a marked element stay readable but leave the pool.",
             "items": {
               "type": "string"
             },
@@ -2655,10 +2708,12 @@
           },
           "public_reference": {
             "default": false,
+            "description": "Ships in the open core. Defaults False, so a jurisdiction joins the open set by a deliberate edit: excluded by default rather than included and simplified, because a simplified config is still a tell about what was studied.",
             "title": "Public Reference",
             "type": "boolean"
           },
           "residual_legal_systems": {
+            "description": "Foreign corpora still residually applicable here: pre-independence or occupying-power law left in force, VA for suppletive Italian law, and so on. Enables amendment/consolidation agents to traverse layered systems.",
             "items": {
               "$ref": "#/components/schemas/ResidualLaw"
             },
@@ -2673,9 +2728,11 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Where one source holds several instruments, how their openings are read."
           },
           "source_adapters": {
+            "description": "Read by codify.acquisition.",
             "items": {
               "$ref": "#/components/schemas/SourceAdapter"
             },
@@ -2684,6 +2741,7 @@
           },
           "source_truncation_floor": {
             "default": 0.0,
+            "description": "Share of a document's contents listing that may lack a body before the source is read as truncated. Off by default: the separating value was measured on the corpora that declare it, and a partial corpus cannot evidence a threshold for a series it has never seen. 0.0 disables.",
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Source Truncation Floor",
@@ -2735,6 +2793,7 @@
           },
           "synthetic": {
             "default": false,
+            "description": "Fictional jurisdictions authored as synthetic test material (the AKN-spine scan factory). Discovered and validated like any other config, but kept out of the derived registry and the world atlas, which are real-only.",
             "title": "Synthetic",
             "type": "boolean"
           },
@@ -2754,6 +2813,7 @@
                 "type": "null"
               }
             ],
+            "description": "Promoted from registry.json, which is derived rather than maintained. Ladder: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base.",
             "title": "Tier"
           },
           "tradition": {
@@ -3046,6 +3106,7 @@
         "description": "A period whose documents share a drafting convention and authority.\n\nStructural quality tracks era more than jurisdiction, so it is reported per era.\n``from_``/``to`` are inclusive ISO dates, either may be open, and the field is\nspelled ``from`` in the config files.",
         "properties": {
           "authority_patterns": {
+            "description": "How this era's offices are named in provision text. Review candidates, not verdicts: a match says the office is named, not that the provision grants it a power, since the same name appears in signature blocks and definitions. Opt-in per era, because an era ending is not its authority being abolished.",
             "items": {
               "type": "string"
             },
@@ -3071,9 +3132,11 @@
                 "type": "null"
               }
             ],
+            "description": "The calendar this era's instruments are dated in, where it differs from the jurisdiction's current one. None means it does not differ. Same closed set as the jurisdiction's own field, so the two cannot drift apart.",
             "title": "Calendar"
           },
           "closing_phrases": {
+            "description": "Phrases opening the attestation that closes a document of this era, so the promulgation and signature stop being read as the last article's text. Era-scoped because the wording follows the enacting authority.",
             "items": {
               "type": "string"
             },
@@ -3091,6 +3154,7 @@
             "type": "string"
           },
           "footnote_markers": {
+            "description": "Regex for how a footnote marker opens in this era. The modern set uses superscripts and the older ones a parenthesised numeral; declaring only one form silently drops the other era.",
             "items": {
               "type": "string"
             },
@@ -3175,6 +3239,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "Per-instrument citation map, absorbs si_citation / decree_citation / loi_citation / law_citation / ordonnance_citation etc. without a separate field per jurisdiction.",
             "title": "Citations",
             "type": "object"
           },
@@ -3224,10 +3289,12 @@
           },
           "numbers_unique_across_years": {
             "default": false,
+            "description": "Whether an instrument number identifies a work on its own. False almost everywhere: most jurisdictions restart numbering each year, so a citation that omits its date names one of many. Declaring it true lets a year-less citation resolve on the number, and is a claim about the whole series rather than about the corpus held, which may hold only one of the collisions and so cannot disprove it.",
             "title": "Numbers Unique Across Years",
             "type": "boolean"
           },
           "series_citation_connectors": {
+            "description": "Regex fragments that may sit between a series name and its number.",
             "items": {
               "type": "string"
             },
@@ -3235,6 +3302,7 @@
             "type": "array"
           },
           "series_citations": {
+            "description": "Instruments cited by a never-reused series number and no year. Order matters: full names before abbreviations, so the full form wraps first.",
             "items": {
               "$ref": "#/components/schemas/SeriesCitation"
             },
@@ -3333,6 +3401,7 @@
             "type": "array"
           },
           "superseded_by": {
+            "description": "Superseding acts (as FRBR URIs or free-text citations).",
             "items": {
               "type": "string"
             },
@@ -3548,6 +3617,7 @@
         "description": "Lines that open an issue or an act, for telling apart the instruments one\nsource holds. Absent means the jurisdiction declares none, and nothing splits.",
         "properties": {
           "act_heading_patterns": {
+            "description": "Regexes matched at a line start; a `number` group, where present, is the label.",
             "items": {
               "type": "string"
             },
@@ -3555,6 +3625,7 @@
             "type": "array"
           },
           "contents_keywords": {
+            "description": "Headings of a contents listing, matched case-insensitively at a line start.",
             "items": {
               "type": "string"
             },
@@ -3562,6 +3633,7 @@
             "type": "array"
           },
           "issue_heading_patterns": {
+            "description": "The level above acts: a gazette issue within a bound volume.",
             "items": {
               "type": "string"
             },
@@ -3577,9 +3649,11 @@
                 "type": "null"
               }
             ],
+            "description": "A printed page number in a page's furniture; its first participating group is the number.",
             "title": "Printed Page Pattern"
           },
           "skip_heading_patterns": {
+            "description": "Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.",
             "items": {
               "type": "string"
             },
@@ -3587,6 +3661,7 @@
             "type": "array"
           },
           "trailing_section_patterns": {
+            "description": "Whole lines opening a trailing section never ingested: no engine reads from there on.",
             "items": {
               "type": "string"
             },
@@ -3606,6 +3681,7 @@
             "type": "string"
           },
           "name": {
+            "description": "Regex for the instrument's name or abbreviation, matched case-insensitively.",
             "title": "Name",
             "type": "string"
           }
@@ -3703,6 +3779,7 @@
                 "type": "null"
               }
             ],
+            "description": "Names a registered structured parser (codify.pipeline.parsers) that converts this adapter's primary body deterministically; None -> the universal structuring lane.",
             "title": "Parser"
           },
           "rate_limit_per_minute": {
@@ -3745,6 +3822,7 @@
         "properties": {
           "body_opens_with_container": {
             "default": false,
+            "description": "True where the drafting standard puts every article inside a container, so an article before the first one is a citation in the opening material. Some laws cite the constitution that way in the legal-basis recital.",
             "title": "Body Opens With Container",
             "type": "boolean"
           },
@@ -3773,6 +3851,7 @@
             "type": "array"
           },
           "citation_successors": {
+            "description": "Words that, following a marker's number on its own line, make the line a citation list rather than a provision (\"Article 5 to Article 9 apply\").",
             "items": {
               "type": "string"
             },
@@ -3780,6 +3859,7 @@
             "type": "array"
           },
           "classification_rules": {
+            "description": "Deterministic classification rules, evaluated by descending priority before the AI prompt. prompt_additions keeps tacit style hints only.",
             "items": {
               "$ref": "#/components/schemas/ClassificationRule"
             },
@@ -3811,6 +3891,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "Words after a marker's number that mark an inserted unit (\"5 bis\"), mapped to the eId form. One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.",
             "title": "Insertion Suffixes",
             "type": "object"
           },
@@ -3824,6 +3905,7 @@
           },
           "marker_boundary": {
             "default": "relaxed",
+            "description": "`line_anchored` where the drafting standard puts the marker on its own line and the sources keep it, so a mid-sentence citation cannot anchor.",
             "enum": [
               "relaxed",
               "line_anchored"
@@ -3833,6 +3915,7 @@
           },
           "marker_order": {
             "default": "keyword_first",
+            "description": "`number_first` where the number precedes the keyword (\"15. \u00a7\", \"I. FEJEZET\").",
             "enum": [
               "keyword_first",
               "number_first"
@@ -3841,6 +3924,7 @@
             "type": "string"
           },
           "marker_tolerances": {
+            "description": "OCR damage the sources carry, tolerated for this jurisdiction only and byte-identical elsewhere. `missing_separator` is \"Pasal24\".",
             "items": {
               "enum": [
                 "missing_separator",
@@ -3857,6 +3941,7 @@
             "additionalProperties": {
               "type": "integer"
             },
+            "description": "Ordinal words used as container numbers (\"Bagian Kesatu\" is part 1). Declared in the source's own casing; matching is case-sensitive.",
             "title": "Ordinal Words",
             "type": "object"
           },
@@ -3883,6 +3968,7 @@
             "title": "Prompt Variant"
           },
           "prose_precursors": {
+            "description": "Words ending the previous line when a citation wraps onto the next, which a boundary rule cannot see. Empty falls back to the script pack's list.",
             "items": {
               "type": "string"
             },
@@ -3891,10 +3977,12 @@
           },
           "recurring_furniture": {
             "default": false,
+            "description": "True where the layout engine files footnotes and page-top captions under header or footer: furniture is then only what repeats, and a block opening on a marker is a note.",
             "title": "Recurring Furniture",
             "type": "boolean"
           },
           "reference_nouns": {
+            "description": "Words that introduce a citation's number (\"Pasal 41 ayat (3)\"). A line ending in one of these makes the bracketed number on the next line part of the citation, not a structural marker opening a new provision.",
             "items": {
               "type": "string"
             },
@@ -3902,6 +3990,7 @@
             "type": "array"
           },
           "sameline_precursors": {
+            "description": "Precursors that mark a citation only when adjacent on the same line.",
             "items": {
               "type": "string"
             },
@@ -3921,6 +4010,7 @@
           },
           "direct_effect": {
             "default": "none",
+            "description": "Effect spectrum, from strongest (override) to weakest (none). Legacy bool values are coerced to `\"direct\"`/`\"none\"` at load time.",
             "enum": [
               "override",
               "direct",
@@ -3959,6 +4049,7 @@
             "type": "array"
           },
           "excluded_subjects": {
+            "description": "Structured opt-outs by subject area.",
             "items": {
               "type": "string"
             },
@@ -3974,6 +4065,7 @@
                 "type": "null"
               }
             ],
+            "description": "Loose string, year-only values like \"1999\" appear in corpus.",
             "title": "Member Since"
           },
           "member_until": {
@@ -3985,6 +4077,7 @@
                 "type": "null"
               }
             ],
+            "description": "Only set when status is \"former\". ISO 8601.",
             "title": "Member Until"
           },
           "note": {
@@ -3993,6 +4086,7 @@
             "type": "string"
           },
           "protocol_references": {
+            "description": "Structured but free, the treaty/protocol that creates the carve-out. Examples: \"Protocol 21 TFEU\", \"Protocol 10 Act of Accession 2003\", \"Edinburgh Agreement 1992\", \"Withdrawal Agreement 2020\".",
             "items": {
               "type": "string"
             },
@@ -4008,6 +4102,7 @@
                 "type": "null"
               }
             ],
+            "description": "Reactivation date, for the Morocco \u2192 AU 2017 pattern (original member_since is 1963, AU left 1984, rejoined_on 2017-01-30).",
             "title": "Rejoined On"
           },
           "status": {
@@ -4030,6 +4125,7 @@
                 "type": "null"
               }
             ],
+            "description": "Absent \u21d2 implicitly \"member\".",
             "title": "Status"
           },
           "superseded_subjects": {
@@ -4040,6 +4136,7 @@
             "type": "array"
           },
           "suspension_periods": {
+            "description": "History of suspension / reinstatement pairs. Use for Fiji-style cycles and for jurisdictions currently suspended (with suspended_until=None).",
             "items": {
               "$ref": "#/components/schemas/SuspensionPeriod"
             },
@@ -4061,6 +4158,7 @@
                 "type": "null"
               }
             ],
+            "description": "Some configs use a bool; others list the specific instrument types that require transposition (e.g., [\"directive\"]).",
             "title": "Transposition Required"
           }
         },
@@ -4081,6 +4179,7 @@
           },
           "scope": {
             "default": "full",
+            "description": "Suspension scopes observed in practice: full rights withdrawal vs. technocratic carve-outs (no decision-making, no voting, expelled from meetings only). Default is the worst case.",
             "enum": [
               "full",
               "decision_making",
@@ -4091,6 +4190,7 @@
             "type": "string"
           },
           "suspended_from": {
+            "description": "ISO 8601 date",
             "title": "Suspended From",
             "type": "string"
           },
@@ -4103,6 +4203,7 @@
                 "type": "null"
               }
             ],
+            "description": "None \u21d2 still suspended",
             "title": "Suspended Until"
           }
         },
@@ -4132,6 +4233,7 @@
             "type": "string"
           },
           "eId": {
+            "description": "NCName-compatible, permitting camelCase and hyphenated forms both seen in the corpus. min_length=1 keeps the empty alias from raising an opaque pattern-mismatch.",
             "minLength": 1,
             "pattern": "^[A-Za-z][A-Za-z0-9-]*$",
             "title": "Eid",
@@ -4165,6 +4267,7 @@
         "description": "How a jurisdiction that numbers nothing derives an identity from a title.\nEvery field is a literal `codify.frbr.identity_from_title` reads.",
         "properties": {
           "consolidation_markers": {
+            "description": "Parenthetical words marking a re-publication; an edition number after one is the edition folded in, not this document's.",
             "items": {
               "type": "string"
             },
@@ -4172,6 +4275,7 @@
             "type": "array"
           },
           "edition_markers": {
+            "description": "Words inside a parenthetical naming this instrument's edition, spelling variants included; the first is canonical and is what a slug carries.",
             "items": {
               "type": "string"
             },
@@ -4179,6 +4283,7 @@
             "type": "array"
           },
           "strip_prefixes": {
+            "description": "Document-kind words opening a short title, longest first.",
             "items": {
               "type": "string"
             },
@@ -4186,6 +4291,7 @@
             "type": "array"
           },
           "year_particles": {
+            "description": "Words marking the year that follows as the instrument's own.",
             "items": {
               "type": "string"
             },
@@ -4239,6 +4345,7 @@
                 "type": "null"
               }
             ],
+            "description": "Some configs use a URL string, others a bool flag (\"does laws.africa cover this?\").",
             "title": "Laws Africa Reference"
           },
           "note": {

@@ -127,50 +127,87 @@ class SuspensionPeriod(BaseModel):
 
     model_config = _STRICT
 
-    suspended_from: str  # ISO 8601 date
-    suspended_until: str | None = None  # None ⇒ still suspended
+    suspended_from: str = Field(
+        description="ISO 8601 date",
+    )
+    suspended_until: str | None = Field(
+        default=None,
+        description="None ⇒ still suspended",
+    )
     reason: str = ""
-    # Suspension scopes observed in practice: full rights withdrawal vs.
-    # technocratic carve-outs (no decision-making, no voting, expelled from
-    # meetings only). Default is the worst case.
-    scope: Literal["full", "decision_making", "meetings", "voting"] = "full"
+    scope: Literal["full", "decision_making", "meetings", "voting"] = Field(
+        default="full",
+        description=(
+            "Suspension scopes observed in practice: full rights withdrawal vs. "
+            "technocratic carve-outs (no decision-making, no voting, expelled from meetings "
+            "only). Default is the worst case."
+        ),
+    )
 
 
 class SupranationalMembership(BaseModel):
     model_config = _LOOSE
 
     body: str
-    # Effect spectrum, from strongest (override) to weakest (none). Legacy
-    # bool values are coerced to `"direct"`/`"none"` at load time.
-    direct_effect: DirectEffectLevel = "none"
+    direct_effect: DirectEffectLevel = Field(
+        default="none",
+        description=(
+            "Effect spectrum, from strongest (override) to weakest (none). Legacy bool "
+            'values are coerced to `"direct"`/`"none"` at load time.'
+        ),
+    )
     superseded_subjects: list[str] = Field(default_factory=list)
     note: str = ""
-    # Loose string, year-only values like "1999" appear in corpus.
-    member_since: str | None = None
+    member_since: str | None = Field(
+        default=None,
+        description='Loose string, year-only values like "1999" appear in corpus.',
+    )
     direct_effect_note: str | None = None
     direct_effect_instruments: list[str] = Field(default_factory=list)
-    # Some configs use a bool; others list the specific instrument types
-    # that require transposition (e.g., ["directive"]).
-    transposition_required: bool | list[str] | None = None
+    transposition_required: bool | list[str] | None = Field(
+        default=None,
+        description=(
+            "Some configs use a bool; others list the specific instrument types that "
+            'require transposition (e.g., ["directive"]).'
+        ),
+    )
 
     # --- lifecycle + carve-outs ---
-    # Absent ⇒ implicitly "member".
-    status: MembershipStatus | None = None
-    # Only set when status is "former". ISO 8601.
-    member_until: str | None = None
-    # Reactivation date, for the Morocco → AU 2017 pattern (original
-    # member_since is 1963, AU left 1984, rejoined_on 2017-01-30).
-    rejoined_on: str | None = None
-    # History of suspension / reinstatement pairs. Use for Fiji-style cycles
-    # and for jurisdictions currently suspended (with suspended_until=None).
-    suspension_periods: list[SuspensionPeriod] = Field(default_factory=list)
-    # Structured opt-outs by subject area.
-    excluded_subjects: list[str] = Field(default_factory=list)
+    status: MembershipStatus | None = Field(
+        default=None,
+        description='Absent ⇒ implicitly "member".',
+    )
+    member_until: str | None = Field(
+        default=None,
+        description='Only set when status is "former". ISO 8601.',
+    )
+    rejoined_on: str | None = Field(
+        default=None,
+        description=(
+            "Reactivation date, for the Morocco → AU 2017 pattern (original member_since is "
+            "1963, AU left 1984, rejoined_on 2017-01-30)."
+        ),
+    )
+    suspension_periods: list[SuspensionPeriod] = Field(
+        default_factory=list,
+        description=(
+            "History of suspension / reinstatement pairs. Use for Fiji-style cycles and for "
+            "jurisdictions currently suspended (with suspended_until=None)."
+        ),
+    )
+    excluded_subjects: list[str] = Field(
+        default_factory=list,
+        description="Structured opt-outs by subject area.",
+    )
     excluded_instruments: list[str] = Field(default_factory=list)
-    # Structured but free, the treaty/protocol that creates the carve-out.
-    # Examples: "Protocol 21 TFEU", "Protocol 10 Act of Accession 2003",
-    # "Edinburgh Agreement 1992", "Withdrawal Agreement 2020".
-    protocol_references: list[str] = Field(default_factory=list)
+    protocol_references: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Structured but free, the treaty/protocol that creates the carve-out. Examples: "
+            '"Protocol 21 TFEU", "Protocol 10 Act of Accession 2003", "Edinburgh Agreement '
+            '1992", "Withdrawal Agreement 2020".'
+        ),
+    )
 
     @field_validator("body", mode="before")
     @classmethod
@@ -203,9 +240,13 @@ class BindingRegime(BaseModel):
     direct_effect: DirectEffectLevel = "none"
     superseded_subjects: list[str] = Field(default_factory=list)
     note: str = ""
-    # Territorial / temporal scope, typically populated for SC resolutions
-    # and other time-bounded regimes; absent on permanent treaty frameworks.
-    territories: list[str] = Field(default_factory=list)
+    territories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Territorial / temporal scope, typically populated for SC resolutions and other "
+            "time-bounded regimes; absent on permanent treaty frameworks."
+        ),
+    )
     in_force_from: str | None = None
     in_force_until: str | None = None
     renewable: bool = False
@@ -244,6 +285,8 @@ class ResidualLaw(BaseModel):
     subjects: list[str] = Field(default_factory=list)
     in_force_from: date | None = None
     in_force_until: date | None = None
-    # Superseding acts (as FRBR URIs or free-text citations).
-    superseded_by: list[str] = Field(default_factory=list)
+    superseded_by: list[str] = Field(
+        default_factory=list,
+        description="Superseding acts (as FRBR URIs or free-text citations).",
+    )
     note: str = ""

@@ -40,6 +40,10 @@ New, additive:
 - `codify migrate` applies the core migrations to the database at `POSTGRES_URL`.
   It reads the chain from the installed package, so it works from a wheel, which
   carries no `alembic.ini`. It needs the `migrations` extra.
+- The jurisdiction config models carry their field explanations as schema
+  descriptions, so `JurisdictionConfig.model_json_schema()` and
+  `contract/openapi.json` describe 107 more fields. Names, defaults and
+  validation are unchanged.
 
 Fixed:
 
