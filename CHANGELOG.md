@@ -50,6 +50,12 @@ Fixed:
 - `POST /runs/ingest-url` refuses with a 422 that names the `eu` jurisdiction
   config when it is not installed, before it reads the URL. The web Ingest screen
   offers a source URL only when that config is installed and selected.
+- A document ingested through `codify serve` is embedded before the run
+  succeeds, when an embeddings endpoint is set (`EMBEDDING_BASE_URL` or
+  `LITELLM_BASE_URL`), so search finds it; an embedding failure fails the run.
+  Without an endpoint it is stored unembedded and the server logs
+  `stored_unsearchable` with the variable to set. Served ingests used to be
+  stored unembedded, so search never found them.
 
 ## 0.7.0 (2026-11-13)
 

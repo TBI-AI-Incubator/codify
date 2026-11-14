@@ -27,6 +27,7 @@ from fastapi import FastAPI  # noqa: E402
 
 from codify.serve import create_app  # noqa: E402, needs the serve extra
 from codify.serve.runs import RunTable  # noqa: E402
+from tests.test_cli_store import _embedded_at, _FixedVectors  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "synthetic-atlantis-1992.akn.xml"
 
@@ -323,6 +324,7 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
 
     monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     title = f"Served {uuid.uuid4().hex[:8]}"
 
     app = create_app()
@@ -344,6 +346,7 @@ async def test_a_succeeded_http_ingest_is_stored_with_its_descriptors(
             "7",
         )
         assert version["akn_xml"].startswith("<akomaNtoso")
+        assert await _embedded_at(uuid.UUID(version["id"])) is not None  # so search finds it
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.id == uuid.UUID(law["id"])))
@@ -385,20 +388,26 @@ async def test_finished_runs_beyond_keep_are_forgotten_oldest_first() -> None:
 @pytest.mark.integration
 async def test_xml_ingests_without_a_model_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     """The native-AKN lane is deterministic; an unset gateway must not stop it."""
+    from structlog.testing import capture_logs
+
     from codify.serve.app import _ingest_runner
     from codify.storage.models import Law
 
     monkeypatch.delenv("LITELLM_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
     app = _app(None)
-    events = [
-        e
-        async for e in _ingest_runner(app.state.sessions, app.state.clients)(
-            {"source": str(FIXTURE), "jurisdiction": "xa"}
-        )
-    ]
+    with capture_logs() as logs:
+        events = [
+            e
+            async for e in _ingest_runner(app.state.sessions, app.state.clients)(
+                {"source": str(FIXTURE), "jurisdiction": "xa"}
+            )
+        ]
 
     try:
         assert events[-1].kind == "complete", events[-1]
+        # Stored, but without embeddings search cannot find it, and the log says so.
+        assert [e["event"] for e in logs if e["log_level"] == "warning"] == ["stored_unsearchable"]
     finally:
         async with app.state.sessions() as s:
             await s.execute(delete(Law).where(Law.frbr_work_uri == "/akn/xa/act/1992/7"))
@@ -847,6 +856,7 @@ async def test_an_untitled_ingest_takes_the_title_the_pipeline_read(
 
     monkeypatch.setattr(codify.pipeline, "ingest_document", fake_ingest)
     monkeypatch.setattr(cli_store, "_llm_client", lambda model: None)
+    monkeypatch.setattr(cli_store, "_embedding_client", _FixedVectors)
     app = create_app()
     async with _client(None, app) as c:
         rid = await _enqueue(c)

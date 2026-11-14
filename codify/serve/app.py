@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -38,6 +39,7 @@ from codify.serve.schemas import (
 from codify.settings import database_url
 from codify.storage.documents import VersionDocument
 
+logger = structlog.get_logger()
 SessionFactory = Callable[[], AsyncSession]
 _LIMIT = Query(50, ge=1, le=500)
 _OFFSET = Query(0, ge=0)
@@ -101,6 +103,19 @@ def _ingest_runner(
                         akn_xml=event.akn_xml,
                     )
                     law_id = (await get_version(session, version_id)).law_id  # type: ignore[union-attr]
+                    try:
+                        embedder = clients.embeddings()
+                    except SystemExit as exc:
+                        embedder = None
+                        logger.warning(
+                            "stored_unsearchable", version_id=str(version_id), fix=str(exc)
+                        )
+                    if embedder is not None:
+                        from codify.storage.embeddings import embed_and_stamp
+
+                        await embed_and_stamp(
+                            session, version_id, client=embedder, path_context=False
+                        )
                     await session.commit()
                 yield Stored(version_id=version_id, law_id=law_id)
             yield event
