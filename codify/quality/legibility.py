@@ -26,8 +26,7 @@ MIN_TOKENS = 200
 # from damaged text, and a legal corpus is full of indexes, fee schedules and
 # one-line decisions that are legitimately low in prose. Content nouns die with
 # the letter forms, so a document naming no instrument is damaged rather than
-# terse. Both floors are calibrated per language; moving either means
-# re-deriving them against labelled samples.
+# terse. Moving either floor means re-deriving it against labelled samples.
 LEXICON_FLOOR = 12.0
 PROSE_FLOOR = 80.0
 

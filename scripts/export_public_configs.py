@@ -48,7 +48,7 @@ def export(dest: Path) -> int:
         src = JURISDICTIONS_DIR / code
         shutil.copytree(src, out / code, dirs_exist_ok=True)
 
-    # The registry travels filtered to the shipped codes, so it matches the configs beside it.
+    # Filter the registry to the shipped codes; the full registry is not for publication.
     registry = json.loads((JURISDICTIONS_DIR / "registry.json").read_text())
     registry["jurisdictions"] = [j for j in registry["jurisdictions"] if j["code"] in set(codes)]
     (out / "registry.json").write_text(json.dumps(registry, indent=2, ensure_ascii=False) + "\n")

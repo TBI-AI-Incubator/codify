@@ -78,7 +78,7 @@ class DataBuildHook(BuildHookInterface):
         build_data.setdefault("force_include", {}).update(include)
 
     def _filtered_registry(self, shipped: list[str]) -> Path:
-        """The registry cut to the codes the wheel carries, so it matches the shipped configs."""
+        """The registry cut to the shipped codes; the full registry is not for publication."""
         data = json.loads(_REGISTRY.read_text(encoding="utf-8"))
         keep = set(shipped)
         data["jurisdictions"] = [j for j in data.get("jurisdictions", []) if j.get("code") in keep]

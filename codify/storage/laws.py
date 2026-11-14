@@ -46,8 +46,7 @@ SORTS = ("relevance", "title", "year_desc", "year_asc", "ingested")
 # reader named is inside it, bounded so the index keeps doing the ordering.
 RERANK_WINDOW = 200
 
-# One rank step in BM25 units: the smallest weight that reorders adjacent doctype
-# ranks, the smaller intervention rather than the better one.
+# One rank step in BM25 units, large enough to reorder adjacent doctype ranks.
 RANK_WEIGHT = 0.35
 
 

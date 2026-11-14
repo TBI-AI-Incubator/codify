@@ -1615,8 +1615,8 @@ class TestATitleIsJoinedNotConcatenated:
 
 def test_a_real_act_with_a_welded_title_is_repaired() -> None:
     """The repo's other EU fixtures cannot detect this class: their headings are
-    identical either way. This one is taken from the corpus because its stored
-    output carries the defect, so the comparison has a case that must differ."""
+    identical either way. This one's stored output carries the defect, so the
+    comparison has a case that must differ."""
     fixture = FIXTURES_DIR / "eu" / "2012-687" / "eng.xml"
     if not fixture.exists():
         pytest.skip("fixture not in this tree")
