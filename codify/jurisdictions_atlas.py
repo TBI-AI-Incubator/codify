@@ -128,19 +128,18 @@ class SuspensionPeriod(BaseModel):
     model_config = _STRICT
 
     suspended_from: str = Field(
-        description="ISO 8601 date",
+        description="Start of the suspension, as an ISO 8601 date.",
     )
     suspended_until: str | None = Field(
         default=None,
-        description="None ⇒ still suspended",
+        description="End of the suspension, as an ISO 8601 date; None while still suspended.",
     )
     reason: str = ""
     scope: Literal["full", "decision_making", "meetings", "voting"] = Field(
         default="full",
         description=(
-            "Suspension scopes observed in practice: full rights withdrawal vs. "
-            "technocratic carve-outs (no decision-making, no voting, expelled from meetings "
-            "only). Default is the worst case."
+            "What the suspension withdraws: all rights, or only decision-making, voting or "
+            "attendance at meetings. Defaults to full withdrawal."
         ),
     )
 
@@ -152,60 +151,61 @@ class SupranationalMembership(BaseModel):
     direct_effect: DirectEffectLevel = Field(
         default="none",
         description=(
-            "Effect spectrum, from strongest (override) to weakest (none). Legacy bool "
-            'values are coerced to `"direct"`/`"none"` at load time.'
+            "How strongly the body's law takes effect, from override (strongest) to none. "
+            'Legacy boolean values are read as "direct" or "none".'
         ),
     )
     superseded_subjects: list[str] = Field(default_factory=list)
     note: str = ""
     member_since: str | None = Field(
         default=None,
-        description='Loose string, year-only values like "1999" appear in corpus.',
+        description=(
+            "Date membership began, as a loose string, since some sources give only a year such"
+            ' as "1999".'
+        ),
     )
     direct_effect_note: str | None = None
     direct_effect_instruments: list[str] = Field(default_factory=list)
     transposition_required: bool | list[str] | None = Field(
         default=None,
         description=(
-            "Some configs use a bool; others list the specific instrument types that "
-            'require transposition (e.g., ["directive"]).'
+            "Whether the body's instruments need transposing into national law: a boolean, or a"
+            ' list of the instrument types that do (for example ["directive"]).'
         ),
     )
 
     # --- lifecycle + carve-outs ---
     status: MembershipStatus | None = Field(
-        default=None,
-        description='Absent ⇒ implicitly "member".',
+        default=None, description='Membership status; absent means "member".'
     )
     member_until: str | None = Field(
         default=None,
-        description='Only set when status is "former". ISO 8601.',
+        description='Date membership ended, as an ISO 8601 date; set only when status is "former".',
     )
     rejoined_on: str | None = Field(
         default=None,
         description=(
-            "Reactivation date, for the Morocco → AU 2017 pattern (original member_since is "
-            "1963, AU left 1984, rejoined_on 2017-01-30)."
+            "Date a former member rejoined after its membership lapsed; `member_since` keeps "
+            "the original date."
         ),
     )
     suspension_periods: list[SuspensionPeriod] = Field(
         default_factory=list,
         description=(
-            "History of suspension / reinstatement pairs. Use for Fiji-style cycles and for "
-            "jurisdictions currently suspended (with suspended_until=None)."
+            "History of suspensions and reinstatements, including repeated cycles and a "
+            "suspension still in force (`suspended_until` unset)."
         ),
     )
     excluded_subjects: list[str] = Field(
         default_factory=list,
-        description="Structured opt-outs by subject area.",
+        description="Subject areas the member has opted out of.",
     )
     excluded_instruments: list[str] = Field(default_factory=list)
     protocol_references: list[str] = Field(
         default_factory=list,
         description=(
-            "Structured but free, the treaty/protocol that creates the carve-out. Examples: "
-            '"Protocol 21 TFEU", "Protocol 10 Act of Accession 2003", "Edinburgh Agreement '
-            '1992", "Withdrawal Agreement 2020".'
+            "The treaties or protocols that create the carve-outs, as free text (for example "
+            '"Protocol 21 TFEU").'
         ),
     )
 
@@ -243,8 +243,8 @@ class BindingRegime(BaseModel):
     territories: list[str] = Field(
         default_factory=list,
         description=(
-            "Territorial / temporal scope, typically populated for SC resolutions and other "
-            "time-bounded regimes; absent on permanent treaty frameworks."
+            "Territorial scope, typically set for UN Security Council resolutions and other "
+            "time-bounded regimes; absent for permanent treaty frameworks."
         ),
     )
     in_force_from: str | None = None

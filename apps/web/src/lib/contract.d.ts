@@ -331,7 +331,7 @@ export interface components {
             coverage_note?: string | null;
             /**
              * Description
-             * @description Free-text, these configs were hand-written before the structured shape landed and frequently carry narrative provenance.
+             * @description Free-text description of the source, often including its provenance.
              * @default
              */
             description: string;
@@ -355,7 +355,7 @@ export interface components {
             protocol: "http" | "rest" | "odata" | "sru" | "oai_pmh" | "soap" | "sparql" | "bulk_dump";
             /**
              * Requires Token
-             * @description Token-gated source: skip in `effective_tier` when the env var is unset unless `fallback_format` declares a usable downgrade.
+             * @description True for a source that needs an access token: `effective_tier` skips it when the token's environment variable is unset, unless `fallback_format` declares a usable downgrade.
              * @default false
              */
             requires_token: boolean;
@@ -370,12 +370,12 @@ export interface components {
         AmendmentConfig: {
             /**
              * Amending Body Structure
-             * @description Body shape of an amending instrument. `two_pasal_roman`: the host's own articles are Roman, so an Arabic-numbered one after them is quoted text.
+             * @description Body shape of an amending instrument. `two_pasal_roman`: the host instrument numbers its own articles in Roman numerals, so an Arabic-numbered article after them is quoted amending text.
              */
             amending_body_structure?: string | null;
             /**
              * Amendment Item Kind
-             * @description Hierarchy element that numbers one amendment made by an amending article (a numbered `Angka` item). What follows it belongs to the amended statute, so it must not compete in the host's numbering. Empty leaves the pass inert.
+             * @description Hierarchy element that numbers each amendment an amending article makes. What follows it belongs to the amended statute, so it does not compete in the host's numbering; empty leaves the pass inert.
              */
             amendment_item_kind?: string | null;
             /** Cross Reference Format */
@@ -406,17 +406,17 @@ export interface components {
             always_opens: boolean;
             /**
              * Caption
-             * @description Centred in the source, so the match tolerates a wide indent.
+             * @description Caption that opens the attachment. Captions are centred in the source, so the match tolerates a wide indent.
              */
             caption: string;
             /**
              * Hierarchy
-             * @description Levels the attachment's own content uses: an annex can be a lettered outline rather than the article hierarchy of the body it is attached to. Empty keeps today's behaviour: the body's levels, or none.
+             * @description Levels the attachment's own content uses, since an annex can be a lettered outline rather than the article hierarchy of its body. Empty uses the body's levels, or none.
              */
             hierarchy?: components["schemas"]["HierarchyEntry"][];
             /**
              * Normative
-             * @description False for an explanatory memorandum: no norm, and no legal basis.
+             * @description False for an attachment with no normative force, such as an explanatory memorandum, which cannot serve as a legal basis.
              * @default true
              */
             normative: boolean;
@@ -469,7 +469,7 @@ export interface components {
             superseded_subjects?: string[];
             /**
              * Territories
-             * @description Territorial / temporal scope, typically populated for SC resolutions and other time-bounded regimes; absent on permanent treaty frameworks.
+             * @description Territorial scope, typically set for UN Security Council resolutions and other time-bounded regimes; absent for permanent treaty frameworks.
              */
             territories?: string[];
         };
@@ -506,12 +506,12 @@ export interface components {
             date_cues?: string[];
             /**
              * Epoch Year
-             * @description Integer added to the local year to give the Gregorian year (Buddhist -543, ROC and Juche 1911, since their year 1 is 1912 CE). None for calendars without a simple offset: hijri, ethiopian, era_table, bikram_samvat.
+             * @description Integer added to the local year to give the Gregorian year (for example -543 for the Buddhist calendar, or 1911 where year 1 is 1912 CE). None for calendars without a fixed offset, such as hijri, ethiopian, era_table and bikram_samvat.
              */
             epoch_year?: number | null;
             /**
              * Eras
-             * @description Era table: [{"name": "Reiwa", "start": "2019-05-01"}] for Japanese-style.
+             * @description Era table for an era-based calendar, for example [{"name": "Reiwa", "start": "2019-05-01"}].
              */
             eras?: {
                 [key: string]: unknown;
@@ -536,12 +536,12 @@ export interface components {
             new_year_day?: number | null;
             /**
              * New Year Month
-             * @description Month-sensitive conversions (Bikram Samvat New Year mid-April).
+             * @description Gregorian month in which the local year begins, for conversions that depend on the month (Bikram Samvat begins in mid-April).
              */
             new_year_month?: number | null;
             /**
              * New Year Reform Year
-             * @description The local year began in this month before `new_year_reform_year`, so an earlier date carries the previous year's number and the offset is short.
+             * @description First local year that began on 1 January. Before it the year began in `new_year_month`, so a date in an earlier month falls in the next Gregorian year.
              */
             new_year_reform_year?: number | null;
             /**
@@ -551,7 +551,7 @@ export interface components {
             note: string;
             /**
              * Offset
-             * @description Offset variant for month-sensitive: subtract `offset` from local year before the new-year day, otherwise `offset + 1`.
+             * @description For month-sensitive conversions: the years to subtract from the local year before the new-year day; on or after it, `offset + 1`.
              */
             offset?: number | null;
             /**
@@ -600,7 +600,7 @@ export interface components {
             pattern: string;
             /**
              * Pattern Flags
-             * @description e.g. "i" for case-insensitive
+             * @description Regex flags for `pattern`, for example "i" for case-insensitive matching.
              * @default
              */
             pattern_flags: string;
@@ -631,7 +631,7 @@ export interface components {
             max_total: number;
             /**
              * Output
-             * @description basket path, relative to repo root
+             * @description Path of the basket file discovery writes, relative to the repository root.
              */
             output?: string | null;
             /** Queries */
@@ -643,7 +643,7 @@ export interface components {
         DisplayConfig: {
             /**
              * Amendment Markers
-             * @description The pair a publisher prints around amended words; brackets are only the commonest. A list because a tuple crosses the schema boundary as unknown.
+             * @description The pair of strings a publisher prints around amended words; square brackets are the commonest.
              */
             amendment_markers?: string[];
             /**
@@ -685,7 +685,7 @@ export interface components {
             akn_subtype?: string | null;
             /**
              * Authoritative Language
-             * @description Per-class authoritative language, falling back to the jurisdiction's when None. Vatican needs it: Latin for canon law, Italian for the City State.
+             * @description Authoritative language for this class, for legal systems whose classes are enacted in different languages. None falls back to the jurisdiction's.
              */
             authoritative_language?: string | null;
             /**
@@ -722,13 +722,13 @@ export interface components {
             note: string;
             /**
              * Number Has Year Prefix
-             * @description A matching year prefix in the printed serial is separate from the URI number.
+             * @description True where a printed serial may open with the instrument's year; a matching year prefix is kept out of the URI number.
              * @default false
              */
             number_has_year_prefix: boolean;
             /**
              * Number Source
-             * @description "title_identity": the URI number is always the title digest, never a stated serial, for classes whose serials repeat across issuers.
+             * @description "title_identity" makes the URI number the title digest, never a stated serial, for classes whose serials repeat across issuers. "stated" uses the printed serial.
              * @default stated
              * @enum {string}
              */
@@ -737,12 +737,12 @@ export interface components {
             prompt_variant?: string | null;
             /**
              * Search Rank
-             * @description Where this class sits in the legal hierarchy, for ranking a name search: higher outranks lower on a close title match. Unset means no weighting, so a jurisdiction whose hierarchy nobody has transcribed keeps pure relevance order. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions.
+             * @description Rank of the class in the legal hierarchy, used to order a title search: higher outranks lower on a close match, and unset means no weighting. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions.
              */
             search_rank?: number | null;
             /**
              * Short Label
-             * @description Compact display form (e.g. "VKM" for al/vendim). Falls back to the title-cased doctype when unset. Single source of truth for the UI + PDF.
+             * @description Compact label for the class in the interface and in PDF exports. Falls back to the title-cased doctype when unset.
              */
             short_label?: string | null;
         } & {
@@ -934,7 +934,7 @@ export interface components {
         };
         /** FrbrConfig */
         FrbrConfig: {
-            /** @description Structured conversion rule. Populated for non-Gregorian jurisdictions (NP, TW, KP, JP, IR, ET, TH). FRBR URIs always use Gregorian (ADR 001), this drives the conversion utility. */
+            /** @description Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion. */
             calendar_conversion?: components["schemas"]["CalendarConversion"] | null;
             /** Country Code */
             country_code: string;
@@ -1046,7 +1046,7 @@ export interface components {
             captions?: string[];
             /**
              * Eid Abbrev
-             * @description Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (hcontainer: sch, xhd; two local terms on one element) or the publisher's own AKN differs (UK SIs number sections reg_N).
+             * @description Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (an hcontainer, or two local terms on one element) or where the publisher's own AKN uses another prefix.
              * @default
              */
             eid_abbrev: string;
@@ -1059,14 +1059,14 @@ export interface components {
             local_term: string;
             /**
              * Local Terms
-             * @description Unified multilingual store for local_term_ara / local_script_rus / etc. Keys are ISO 639-3 language codes or "script:<iso-15924>".
+             * @description The level's local names, keyed by ISO 639-3 language code, or by "script:<ISO 15924 code>" for a script variant.
              */
             local_terms?: {
                 [key: string]: string;
             } | null;
             /**
              * Marker Form
-             * @description Genres whose levels carry no keyword: a judgment writes "DUDUK PERKARA" and "[1.1]", never its hierarchy term. Unset keeps keyword matching.
+             * @description For genres whose levels carry no keyword, such as a judgment that numbers its paragraphs "[1.1]" and never names the level. Unset keeps keyword matching.
              */
             marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "alphanumeric_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic" | "upper_roman_title") | null;
             /**
@@ -1243,7 +1243,7 @@ export interface components {
             akn_profile?: string | null;
             /**
              * Akn Sources
-             * @description Legacy / hand-curated list of upstreams. Coexists with `source_adapters` during the schema-migration window; `effective_tier` walks both.
+             * @description Hand-curated list of upstream sources. Read alongside `source_adapters`; `effective_tier` considers both.
              */
             akn_sources?: components["schemas"]["AknSource"][];
             amendments?: components["schemas"]["AmendmentConfig"] | null;
@@ -1301,7 +1301,7 @@ export interface components {
             readonly effective_tier: (1 | 2 | 3 | 4 | 5) | null;
             /**
              * Enacting Formula Markers
-             * @description Evidence the source carries its own formula, so no fallback is injected. Never a cut point: a phrase here may open the instrument, not close it.
+             * @description Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it.
              */
             enacting_formula_markers?: string[];
             /** Enacting Formulae */
@@ -1314,12 +1314,12 @@ export interface components {
             frbr?: components["schemas"]["FrbrConfig"] | null;
             /**
              * Furniture Inline Patterns
-             * @description Furniture that shares a line with real content, so whole-line disposal would take the content with it: a portal credit run, a stamped URL. Narrower than `ocr_header_patterns`, which also matches the real title on page one.
+             * @description Page furniture that shares a line with real content, such as a portal credit or a stamped URL, so it is removed from the line rather than discarding the line. Narrower than `ocr_header_patterns`, which also matches the real title on page one.
              */
             furniture_inline_patterns?: string[];
             /**
              * Furniture Line Patterns
-             * @description Furniture whose whole line is disposable: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one. Substring scrubbing is safe for both sets, whole-line disposal only for this one.
+             * @description Page furniture whose whole line can be discarded: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one; only this set is safe for whole-line removal.
              */
             furniture_line_patterns?: string[];
             identification?: components["schemas"]["IdentificationConfig"] | null;
@@ -1327,7 +1327,7 @@ export interface components {
             languages: string[];
             /**
              * Legal Eras
-             * @description Drafting periods, for reporting quality per era rather than per corpus. Empty means one undivided population. Distinct from `CalendarRule.eras`, which is a regnal year table.
+             * @description Drafting periods, so quality is reported per era rather than per corpus; empty means one undivided population. Distinct from `CalendarConversion.eras`, which is a regnal year table.
              */
             legal_eras?: components["schemas"]["LegalEra"][];
             /**
@@ -1339,7 +1339,7 @@ export interface components {
             members?: string[];
             /**
              * Min Anchor Coverage
-             * @description Minimum ratio of captured anchors over marker literals in the source. Ingest fails below it, so a silently-partial AKN cannot ship. 0.80 tolerates in-prose cross-references without over-firing. 0.0 disables.
+             * @description Minimum ratio of captured structural anchors to marker literals in the source; ingest fails below it, so a partial AKN cannot ship. The default 0.80 tolerates in-prose cross-references, and 0.0 disables the check.
              * @default 0.8
              */
             min_anchor_coverage: number;
@@ -1351,7 +1351,7 @@ export interface components {
             name_local?: string | null;
             /**
              * Name Translations
-             * @description ISO-639-3 language code → localised jurisdiction name. Used by the PDF exporter to render the cover in the target language without a hardcoded Python map. Mirror of `Law.title_translations`.
+             * @description Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language. Mirrors `Law.title_translations`.
              */
             name_translations?: {
                 [key: string]: string;
@@ -1365,12 +1365,12 @@ export interface components {
             numbering?: components["schemas"]["NumberingConfig"] | null;
             /**
              * Ocr Header Patterns
-             * @description Running header and footer text that leaks into article bodies during OCR. Stripped from `<p>` before translation so the LLM never sees it. Literal regex strings, so a profile author adds patterns without touching Python.
+             * @description Running header and footer text that leaks into article bodies during OCR, stripped from paragraphs before translation so the model never sees it. Regex strings, so a profile author can add patterns without touching Python.
              */
             ocr_header_patterns?: string[];
             /**
              * Opening Material Terminators
-             * @description Phrases the recitals precede, after which pre-body text is page bleed.
+             * @description Phrases the recitals precede, after which any further pre-body text is stray page text.
              */
             opening_material_terminators?: string[];
             /**
@@ -1380,30 +1380,30 @@ export interface components {
             placeholders?: components["schemas"]["PlaceholderMarker"][];
             /**
              * Pool Excluded Refers To
-             * @description `refersTo` values marking a duty on someone other than the instrument's subjects: units at or under a marked element stay readable but leave the pool.
+             * @description `refersTo` values marking a duty on someone other than the instrument's subjects. Units at or under a marked element stay readable but are not embedded or assessed.
              */
             pool_excluded_refers_to?: string[];
             /**
              * Public Reference
-             * @description Ships in the open core. Defaults False, so a jurisdiction joins the open set by a deliberate edit: excluded by default rather than included and simplified, because a simplified config is still a tell about what was studied.
+             * @description True where the config ships in the open core. Defaults to false, so a jurisdiction joins the open set only by a deliberate edit.
              * @default false
              */
             public_reference: boolean;
             /**
              * Residual Legal Systems
-             * @description Foreign corpora still residually applicable here: pre-independence or occupying-power law left in force, VA for suppletive Italian law, and so on. Enables amendment/consolidation agents to traverse layered systems.
+             * @description Foreign legal corpora still residually applicable here, such as pre-independence or occupying-power law left in force, so amendment and consolidation tooling can trace layered systems.
              */
             residual_legal_systems?: components["schemas"]["ResidualLaw"][];
             /** @description Where one source holds several instruments, how their openings are read. */
             segmentation?: components["schemas"]["SegmentationConfig"] | null;
             /**
              * Source Adapters
-             * @description Read by codify.acquisition.
+             * @description Structured acquisition adapters for this jurisdiction, read by `codify.acquisition`.
              */
             source_adapters?: components["schemas"]["SourceAdapter"][];
             /**
              * Source Truncation Floor
-             * @description Share of a document's contents listing that may lack a body before the source is read as truncated. Off by default: the separating value was measured on the corpora that declare it, and a partial corpus cannot evidence a threshold for a series it has never seen. 0.0 disables.
+             * @description Share of a document's contents listing that may lack a body before the source is treated as truncated. Off by default (0.0), since a threshold has to be set for each series from that series' own documents.
              * @default 0
              */
             source_truncation_floor: number;
@@ -1416,13 +1416,13 @@ export interface components {
             supranational_memberships?: components["schemas"]["SupranationalMembership"][];
             /**
              * Synthetic
-             * @description Fictional jurisdictions authored as synthetic test material (the AKN-spine scan factory). Discovered and validated like any other config, but kept out of the derived registry and the world atlas, which are real-only.
+             * @description True for a fictional jurisdiction authored as synthetic test material. It is discovered and validated like any other config but kept out of the derived registry and the world atlas, which list real jurisdictions only.
              * @default false
              */
             synthetic: boolean;
             /**
              * Tier
-             * @description Promoted from registry.json, which is derived rather than maintained. Ladder: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base.
+             * @description Availability tier of the jurisdiction's statute base: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base.
              */
             tier?: (1 | 2 | 3 | 4 | 5) | null;
             /** Tradition */
@@ -1523,7 +1523,7 @@ export interface components {
         LegalEra: {
             /**
              * Authority Patterns
-             * @description How this era's offices are named in provision text. Review candidates, not verdicts: a match says the office is named, not that the provision grants it a power, since the same name appears in signature blocks and definitions. Opt-in per era, because an era ending is not its authority being abolished.
+             * @description How this era's offices are named in provision text, to flag provisions for review. A match means the office is named, not that it is granted a power; opt-in per era, since an era ending does not abolish its authorities.
              */
             authority_patterns?: string[];
             /**
@@ -1575,7 +1575,7 @@ export interface components {
             article_numbering?: string | null;
             /**
              * Citations
-             * @description Per-instrument citation map, absorbs si_citation / decree_citation / loi_citation / law_citation / ordonnance_citation etc. without a separate field per jurisdiction.
+             * @description Citation pattern per instrument type, keyed by type, so a jurisdiction declares its own without a dedicated field for each.
              */
             citations?: {
                 [key: string]: string;
@@ -1590,7 +1590,7 @@ export interface components {
             note?: string | null;
             /**
              * Numbers Unique Across Years
-             * @description Whether an instrument number identifies a work on its own. False almost everywhere: most jurisdictions restart numbering each year, so a citation that omits its date names one of many. Declaring it true lets a year-less citation resolve on the number, and is a claim about the whole series rather than about the corpus held, which may hold only one of the collisions and so cannot disprove it.
+             * @description Whether an instrument number identifies a work without its year. False for most jurisdictions, which restart numbering each year; true lets a year-less citation resolve on the number alone, and is a claim about the whole series, not just the documents held.
              * @default false
              */
             numbers_unique_across_years: boolean;
@@ -1766,7 +1766,7 @@ export interface components {
             issue_heading_patterns?: string[];
             /**
              * Printed Page Pattern
-             * @description A printed page number in a page's furniture; its first participating group is the number.
+             * @description A printed page number in a page's running header or footer; its first participating group is the number.
              */
             printed_page_pattern?: string | null;
             /**
@@ -1776,7 +1776,7 @@ export interface components {
             skip_heading_patterns?: string[];
             /**
              * Trailing Section Patterns
-             * @description Whole lines opening a trailing section never ingested: no engine reads from there on.
+             * @description Whole lines that open a trailing section which is never ingested: nothing is read from there on.
              */
             trailing_section_patterns?: string[];
         };
@@ -1831,7 +1831,7 @@ export interface components {
             notes: string;
             /**
              * Parser
-             * @description Names a registered structured parser (codify.pipeline.parsers) that converts this adapter's primary body deterministically; None -> the universal structuring lane.
+             * @description Registered structured parser (in `codify.pipeline.parsers`) that converts this adapter's main body deterministically. None sends it through the general structuring lane.
              */
             parser?: string | null;
             /** Rate Limit Per Minute */
@@ -1864,7 +1864,7 @@ export interface components {
             citation_lead_ins?: string[];
             /**
              * Citation Subjects
-             * @description How an instrument refers to itself when it declares its short name (`This Act`). Required alongside `citation_lead_ins`: the same phrasing names the schools and offices a law creates, so an unanchored clause takes the school's name for the law's.
+             * @description How an instrument refers to itself when declaring its short name (`This Act`). Required with `citation_lead_ins`, because the same phrasing names bodies a law creates, and without it a law could take a school's or office's name as its own.
              */
             citation_subjects?: string[];
             /**
@@ -1874,17 +1874,17 @@ export interface components {
             citation_successors?: string[];
             /**
              * Classification Rules
-             * @description Deterministic classification rules, evaluated by descending priority before the AI prompt. prompt_additions keeps tacit style hints only.
+             * @description Deterministic classification rules, evaluated in descending priority before the model is asked. `prompt_additions` carries only style hints the rules cannot express.
              */
             classification_rules?: components["schemas"]["ClassificationRule"][];
             /**
              * Designation Rule
-             * @description Derives a short name from the title's own grammar where the tradition declares no short title. EU acts are cited by form and number.
+             * @description Derives a short name from the title's own grammar where the legal tradition declares no short title. `eu_instrument` cites an act by its form and number.
              */
             designation_rule?: "eu_instrument" | null;
             /**
              * Example Markers
-             * @description Lead-ins that introduce specimen legislation in a drafting manual (`Contoh`), whose markers are displayed rather than enacted.
+             * @description Lead-ins that introduce specimen legislation in a drafting manual ("Example"), whose markers are displayed rather than enacted.
              */
             example_markers?: string[];
             /**
@@ -1908,19 +1908,19 @@ export interface components {
             marker_boundary: "relaxed" | "line_anchored";
             /**
              * Marker Order
-             * @description `number_first` where the number precedes the keyword ("15. §", "I. FEJEZET").
+             * @description `number_first` where the number precedes the keyword (as in "15. §").
              * @default keyword_first
              * @enum {string}
              */
             marker_order: "keyword_first" | "number_first";
             /**
              * Marker Tolerances
-             * @description OCR damage the sources carry, tolerated for this jurisdiction only and byte-identical elsewhere. `missing_separator` is "Pasal24".
+             * @description OCR damage the sources carry, tolerated for this jurisdiction only so parsing elsewhere is unchanged. `missing_separator` accepts a keyword run into its number, as in "Article24".
              */
             marker_tolerances?: ("missing_separator" | "keyword_glyph" | "digit_glyph" | "split_number")[];
             /**
              * Ordinal Words
-             * @description Ordinal words used as container numbers ("Bagian Kesatu" is part 1). Declared in the source's own casing; matching is case-sensitive.
+             * @description Ordinal words used as container numbers (as in "Part One"). Declared in the source's own casing; matching is case-sensitive.
              */
             ordinal_words?: {
                 [key: string]: number;
@@ -1936,13 +1936,13 @@ export interface components {
             prose_precursors?: string[];
             /**
              * Recurring Furniture
-             * @description True where the layout engine files footnotes and page-top captions under header or footer: furniture is then only what repeats, and a block opening on a marker is a note.
+             * @description True where the layout engine files footnotes and page-top captions as header or footer, so only text repeated across pages counts as running header or footer, and a block opening on a marker is a note.
              * @default false
              */
             recurring_furniture: boolean;
             /**
              * Reference Nouns
-             * @description Words that introduce a citation's number ("Pasal 41 ayat (3)"). A line ending in one of these makes the bracketed number on the next line part of the citation, not a structural marker opening a new provision.
+             * @description Words that introduce a citation's number ("Article 41 paragraph (3)"). A line ending in one makes the bracketed number on the next line part of the citation, not a marker opening a new provision.
              */
             reference_nouns?: string[];
             /**
@@ -1959,7 +1959,7 @@ export interface components {
             body: string;
             /**
              * Direct Effect
-             * @description Effect spectrum, from strongest (override) to weakest (none). Legacy bool values are coerced to `"direct"`/`"none"` at load time.
+             * @description How strongly the body's law takes effect, from override (strongest) to none. Legacy boolean values are read as "direct" or "none".
              * @default none
              * @enum {string}
              */
@@ -1972,17 +1972,17 @@ export interface components {
             excluded_instruments?: string[];
             /**
              * Excluded Subjects
-             * @description Structured opt-outs by subject area.
+             * @description Subject areas the member has opted out of.
              */
             excluded_subjects?: string[];
             /**
              * Member Since
-             * @description Loose string, year-only values like "1999" appear in corpus.
+             * @description Date membership began, as a loose string, since some sources give only a year such as "1999".
              */
             member_since?: string | null;
             /**
              * Member Until
-             * @description Only set when status is "former". ISO 8601.
+             * @description Date membership ended, as an ISO 8601 date; set only when status is "former".
              */
             member_until?: string | null;
             /**
@@ -1992,29 +1992,29 @@ export interface components {
             note: string;
             /**
              * Protocol References
-             * @description Structured but free, the treaty/protocol that creates the carve-out. Examples: "Protocol 21 TFEU", "Protocol 10 Act of Accession 2003", "Edinburgh Agreement 1992", "Withdrawal Agreement 2020".
+             * @description The treaties or protocols that create the carve-outs, as free text (for example "Protocol 21 TFEU").
              */
             protocol_references?: string[];
             /**
              * Rejoined On
-             * @description Reactivation date, for the Morocco → AU 2017 pattern (original member_since is 1963, AU left 1984, rejoined_on 2017-01-30).
+             * @description Date a former member rejoined after its membership lapsed; `member_since` keeps the original date.
              */
             rejoined_on?: string | null;
             /**
              * Status
-             * @description Absent ⇒ implicitly "member".
+             * @description Membership status; absent means "member".
              */
             status?: ("member" | "suspended" | "former" | "candidate" | "potential_candidate" | "associate" | "observer" | "special_status" | "never_member") | null;
             /** Superseded Subjects */
             superseded_subjects?: string[];
             /**
              * Suspension Periods
-             * @description History of suspension / reinstatement pairs. Use for Fiji-style cycles and for jurisdictions currently suspended (with suspended_until=None).
+             * @description History of suspensions and reinstatements, including repeated cycles and a suspension still in force (`suspended_until` unset).
              */
             suspension_periods?: components["schemas"]["SuspensionPeriod"][];
             /**
              * Transposition Required
-             * @description Some configs use a bool; others list the specific instrument types that require transposition (e.g., ["directive"]).
+             * @description Whether the body's instruments need transposing into national law: a boolean, or a list of the instrument types that do (for example ["directive"]).
              */
             transposition_required?: boolean | string[] | null;
         } & {
@@ -2036,19 +2036,19 @@ export interface components {
             reason: string;
             /**
              * Scope
-             * @description Suspension scopes observed in practice: full rights withdrawal vs. technocratic carve-outs (no decision-making, no voting, expelled from meetings only). Default is the worst case.
+             * @description What the suspension withdraws: all rights, or only decision-making, voting or attendance at meetings. Defaults to full withdrawal.
              * @default full
              * @enum {string}
              */
             scope: "full" | "decision_making" | "meetings" | "voting";
             /**
              * Suspended From
-             * @description ISO 8601 date
+             * @description Start of the suspension, as an ISO 8601 date.
              */
             suspended_from: string;
             /**
              * Suspended Until
-             * @description None ⇒ still suspended
+             * @description End of the suspension, as an ISO 8601 date; None while still suspended.
              */
             suspended_until?: string | null;
         };
@@ -2061,7 +2061,7 @@ export interface components {
             class: "TLCPerson" | "TLCOrganization" | "TLCRole" | "TLCObject" | "TLCConcept" | "TLCEvent" | "TLCLocation" | "TLCProcess" | "TLCTerm" | "TLCReference";
             /**
              * Eid
-             * @description NCName-compatible, permitting camelCase and hyphenated forms both seen in the corpus. min_length=1 keeps the empty alias from raising an opaque pattern-mismatch.
+             * @description An NCName-compatible identifier; camelCase and hyphenated forms are both accepted, and an empty one is refused.
              */
             eId: string;
             /** Href */
@@ -2119,7 +2119,7 @@ export interface components {
             documents_examined_note?: string | null;
             /**
              * Laws Africa Reference
-             * @description Some configs use a URL string, others a bool flag ("does laws.africa cover this?").
+             * @description Whether Laws.Africa covers this jurisdiction: a URL to its collection, or a bare flag.
              */
             laws_africa_reference?: string | boolean | null;
             /**
