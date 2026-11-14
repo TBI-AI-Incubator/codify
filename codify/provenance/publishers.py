@@ -120,7 +120,7 @@ PATTERN_VERIFIED: dict[str, bool] = {
     "zakon-rada.edition": True,
     "zakon-rada.current": True,
     "zakon-rada.fragment": True,
-    "minjust-edrnpa.act": True,
+    "minjust-edrnpa.act": False,
     "qbz.act": True,
     "ocs.act": True,
     "ocs.edition": True,
@@ -297,13 +297,10 @@ def _rada_page(work_id: str, edition_id: str | None) -> str:
     return f"{_RADA}/laws/show/{lang}{quote(work_id, safe='/')}{ed}"
 
 
-# Ministry of Justice of Ukraine: the register's open dataset, one page for every act
-
-UA_REGISTER_PAGE = "https://data.gov.ua/dataset/b22d184c-4826-4e1d-8577-972effc5700c"
+# Ministry of Justice of Ukraine: an open dataset with no page per act
 
 
 def _no_act_page(u: SplitResult) -> ParsedUrl | None:
-    """The dataset page names no single act, so no URL maps back to one."""
     return None
 
 
@@ -439,7 +436,8 @@ def _build() -> tuple[Publisher, ...]:
             "Ministry of Justice of Ukraine, Unified State Register of Normative Legal Acts",
             ("data.gov.ua",),
             _no_act_page,
-            act=lambda w, e: UA_REGISTER_PAGE,
+            # The dataset page shows no single act; the record's licence links it instead.
+            act=lambda w, e: None,
         ),
         Publisher(
             "qbz",

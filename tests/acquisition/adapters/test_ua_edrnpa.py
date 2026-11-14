@@ -223,3 +223,24 @@ def test_the_attribution_names_the_page_licence_snapshot_and_caveat() -> None:
     assert "data.gov.ua/dataset/" in line and "CC BY 4.0" in line
     assert "snapshot of 8 November 2026" in line
     assert line.endswith("Texts are as adopted and may not reflect later amendments.")
+
+
+def test_a_registered_act_tries_its_registration_before_its_number() -> None:
+    card = _card(
+        publisher="Міністерство юстиції України",
+        type="Наказ",
+        number="121/2016",
+        date_acc="01.03.2016",
+        reg_number="364/28494",
+        reg_date="11.03.2016",
+    )
+    assert ref_candidates(card)[0] == "z0364-16"
+
+
+def test_an_empty_list_value_keeps_its_place() -> None:
+    raw = _export(_item("reg_number", "1/1", "2/2") + _item("reg_date", "", "11.03.2016"))
+    [card] = iter_cards(raw)
+    assert card["reg_date"] == ["", "11.03.2016"]
+    assert (
+        card_record(card, "minjust_registered", "rule")["registrations"][1]["date"] == "2016-03-11"
+    )

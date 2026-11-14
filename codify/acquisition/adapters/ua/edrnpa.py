@@ -13,8 +13,8 @@ from typing import IO, Any, Literal
 from lxml import etree
 
 from codify.pipeline.parsers.rada_html import UNIT_BREAK
-from codify.provenance.publishers import UA_REGISTER_PAGE as DATASET_PAGE
 
+DATASET_PAGE = "https://data.gov.ua/dataset/b22d184c-4826-4e1d-8577-972effc5700c"
 ARCHIVE_URL = f"{DATASET_PAGE}/resource/5616dd04-949a-489c-8efc-54004293b238/download/25-edrnpa.zip"
 PUBLISHER = "minjust-edrnpa"
 
@@ -73,7 +73,8 @@ def iter_cards(raw: IO[bytes]) -> Iterator[Card]:
         card: Card = {}
         for item in el.iterfind("item"):
             values = [" ".join((t.text or "").split()) for t in item.iter("text")]
-            card[item.get("name") or ""] = [v for v in values if v]
+            # Positions are kept: a list's nth date belongs to its nth number.
+            card[item.get("name") or ""] = values if any(values) else []
         yield card
 
 
@@ -163,6 +164,11 @@ def ref_candidates(card: Card) -> list[str]:
     y2 = y4[2:]
     publisher, kind = joined(card, "publisher"), joined(card, "type")
     out: list[str] = []
+    registered = card.get("reg_number") or []
+    year = (first(card, "reg_date") or adopted)[-2:]
+    # A registered act's own registration comes first: its number may be another issuer's.
+    if registered and (m := re.match(r"(\d+)", registered[0])):
+        out.append(f"z{int(m[1]):04d}-{year}")
     if number:
         out.append(number)
         if m := re.fullmatch(r"(\d+[а-яіїєґ]?)-([IVX]+)", number):
@@ -173,10 +179,6 @@ def ref_candidates(card: Card) -> list[str]:
             out += [f"{base}-{y4}-{suffix}", f"{base}-{y2}-{suffix}"]
         if "Національного банку" in publisher and number.isdigit():
             out.append(f"v{int(number):04d}500-{y2}")
-    registered = card.get("reg_number") or []
-    year = (first(card, "reg_date") or adopted)[-2:]
-    if registered and (m := re.match(r"(\d+)", registered[0])):
-        out.append(f"z{int(m[1]):04d}-{year}")
     return [c.lower() for c in out]
 
 

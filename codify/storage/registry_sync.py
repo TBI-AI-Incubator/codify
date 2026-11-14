@@ -68,8 +68,13 @@ async def replace_registry_records(
 ) -> int:
     """Replace one register's records on the rows of the refs it names; returns rows written.
 
-    Each record is stored with `source` set, and a row this read no longer names loses its
-    record from that register."""
+    Each record is stored with `source` set; a row this read no longer names loses it, and a
+    row holding another register's record keeps that one."""
+    # Two replacements of one register would otherwise commit a mixture of both reads.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+        {"k": f"registry_records:{jurisdiction_id}:{source}"},
+    )
     await session.execute(
         text(
             "UPDATE registry_works SET record = NULL, updated_at = now() "
@@ -82,6 +87,7 @@ async def replace_registry_records(
         UPDATE registry_works rw SET record = CAST(v.record AS jsonb), updated_at = now()
         FROM unnest(CAST(:refs AS text[]), CAST(:records AS text[])) AS v(ref, record)
         WHERE rw.jurisdiction_id = :j AND rw.ref = v.ref
+          AND (rw.record IS NULL OR rw.record ->> 'source' = :s)
         """
     )
     items = [
@@ -93,7 +99,12 @@ async def replace_registry_records(
         chunk = items[start : start + _BATCH]
         result = await session.execute(
             stmt,
-            {"j": jurisdiction_id, "refs": [r for r, _ in chunk], "records": [p for _, p in chunk]},
+            {
+                "j": jurisdiction_id,
+                "s": source,
+                "refs": [r for r, _ in chunk],
+                "records": [p for _, p in chunk],
+            },
         )
         count += int(result.rowcount or 0)
     return count
