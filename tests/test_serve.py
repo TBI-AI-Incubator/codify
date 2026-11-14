@@ -586,6 +586,26 @@ async def test_ingest_url_is_the_eu_lane_only() -> None:
     assert seen == [{"source": url, "jurisdiction": "eu", "title": None}]
 
 
+async def test_ingest_url_names_a_missing_eu_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from codify import jurisdictions
+
+    root = tmp_path / "jurisdictions"
+    shutil.copytree(jurisdictions.JURISDICTIONS_DIR, root)
+    shutil.rmtree(root / "eu")
+    monkeypatch.setattr(jurisdictions, "JURISDICTIONS_DIR", root)
+
+    async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
+        yield _complete()
+
+    url = "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679"
+    async with _client(runner) as c:
+        r = await c.post("/runs/ingest-url", json={"url": url, "jurisdiction": "EU"})
+        assert r.status_code == 422 and "eu jurisdiction config" in r.json()["detail"]
+        assert (await c.get("/runs")).json() == []
+
+
 async def test_a_failed_upload_copy_leaves_no_file(monkeypatch: pytest.MonkeyPatch) -> None:
     async def runner(_: dict[str, Any]) -> AsyncIterator[IngestionEvent]:
         yield _complete()

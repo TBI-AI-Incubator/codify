@@ -44,6 +44,9 @@ Fixed:
   is unset, and names the variables to set. It used to call
   `http://localhost:4000/v1`, a gateway this repository does not start, so the
   first error was a failed connection on every page.
+- `POST /runs/ingest-url` refuses with a 422 that names the `eu` jurisdiction
+  config when it is not installed, before it reads the URL. The web Ingest screen
+  offers a source URL only when that config is installed and selected.
 
 ## 0.7.0 (2026-11-13)
 

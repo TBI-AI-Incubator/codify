@@ -335,8 +335,15 @@ def create_app(
 
     @app.post("/runs/ingest-url", status_code=202)
     async def ingest_url(body: IngestUrl) -> RunSnapshot:
+        from codify.jurisdictions import resolve_config
         from codify.pipeline.formats import looks_like_eu
 
+        if not resolve_config("eu").found:
+            raise HTTPException(
+                422,
+                "URL ingest needs the eu jurisdiction config, which is not installed "
+                "(GET /jurisdictions lists the installed configs)",
+            )
         # The EU lane is the only one that fetches; every other lane reads a path.
         if not looks_like_eu(str(body.url)) or body.jurisdiction.strip().lower() != "eu":
             raise HTTPException(
