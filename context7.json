@@ -1,5 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/tbi-ai-incubator/codify",
+  "public_key": "pk_uEBVaZRCzc28QvCmtLzQ9",
   "projectTitle": "Codify",
   "description": "Codify turns legislation, from scanned gazettes to publisher XML, into citable Akoma Ntoso 3.0 with stable eIds and FRBR identifiers. It reads scans through an OpenAI-compatible model, structures each act by the rules of a jurisdiction config, validates and grades the result, and stores laws and their dated versions in PostgreSQL for search, comparison and serving over HTTP and MCP. Python library and command line, Apache 2.0.",
   "folders": [
