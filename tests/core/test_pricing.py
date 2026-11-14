@@ -51,3 +51,14 @@ def test_unpriced_returns_none_rather_than_zero(model: str, usage: dict[str, int
 def test_the_content_filter_fallback_is_priced() -> None:
     costs = cost_details("azure/gpt-5.6-sol", {"input": 1_000_000, "output": 1_000_000})
     assert costs == pytest.approx({"input": 4.0, "output": 20.0, "total": 24.0})
+
+
+def test_batch_bills_half_the_synchronous_rate() -> None:
+    costs = cost_details(
+        "gemini/gemini-3.7-flash", {"input": 1_000_000, "output": 1_000_000}, batch=True
+    )
+    assert costs == pytest.approx({"input": 0.375, "output": 1.875, "total": 2.25})
+
+
+def test_batch_leaves_an_unpriced_model_unpriced() -> None:
+    assert cost_details("some-model-we-have-never-priced", {"input": 100}, batch=True) is None

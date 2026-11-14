@@ -32,25 +32,31 @@ _PAGE_PRICES: dict[str, float] = {
     "mistral-ocr-4-0": 0.004,
 }
 
+# Gemini batch mode and Azure Global Batch both bill half the synchronous rate.
+_BATCH_RATE = 0.5
 
-def cost_details(model: str, usage: Mapping[str, int]) -> dict[str, float] | None:
+
+def cost_details(
+    model: str, usage: Mapping[str, int], *, batch: bool = False
+) -> dict[str, float] | None:
     """Cost in USD keyed to match `usage`, or None for a model with no price.
 
     Returning None rather than zero matters: an absent cost reads as unpriced,
-    where a zero reads as free.
+    where a zero reads as free. `batch` prices a provider batch job's result.
     """
     name = model.rpartition("/")[2]
+    rate = _BATCH_RATE if batch else 1.0
 
     per_page = _PAGE_PRICES.get(name)
     if per_page is not None:
         pages = usage.get("pages_processed")
-        return {"total": pages * per_page} if pages else None
+        return {"total": pages * per_page * rate} if pages else None
 
     prices = _TOKEN_PRICES.get(name)
     if prices is None:
         return None
     details = {
-        key: usage[key] * price
+        key: usage[key] * price * rate
         for key, price in (("input", prices[0]), ("output", prices[1]))
         if usage.get(key)
     }

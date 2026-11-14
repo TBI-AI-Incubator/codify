@@ -31,6 +31,9 @@ Breaks:
 
 New, additive:
 
+- `cost_details` and `record_usage` take `batch=True` to price a provider batch
+  job's result at half the synchronous rate, as Gemini batch mode and Azure
+  Global Batch bill it.
 - Reads from a published Riigi Teataja archive go through the polite transport:
   robots.txt, two requests at a time and 30 a minute. A 429, 403 or 5xx raises
   `ArchiveRefused` at the first answer and is never retried, and no later read in
