@@ -1,0 +1,20 @@
+---
+title: From scanned page to citable law
+description: Codify turns a country's legislation into Akoma Ntoso XML. Follow one Act through the pipeline, then run it on your own law.
+tableOfContents: false
+head:
+  - tag: title
+    content: Codify documentation
+---
+
+import JourneyRail from '../apps/docs/src/components/JourneyRail.astro'
+
+Codify is an open-source engine that turns a country's legislation into [Akoma Ntoso](concepts/akoma-ntoso.md) XML: structured, citable and readable by software. The guide follows one Act through five stages.
+
+<JourneyRail />
+
+The stills come from one `codify ingest-one` run on the Legislation Act, 1992, a synthetic Act in the repository; the last renders section 1 from the Akoma Ntoso it produced. Unless your system asks for reduced motion, stages 2 to 5 each play a short film of the stage at work, once through and one at a time, with a button to pause them; the files are real and the timing is schematic.
+
+To try Codify without a model key, start with the [quickstart](start/quickstart.md).
+
+Every page is also served as Markdown: replace the final `/` of its address with `.md` (this page is `index.md`). `llms.txt` at the site root lists them all for software agents.
