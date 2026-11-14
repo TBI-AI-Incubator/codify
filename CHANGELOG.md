@@ -56,6 +56,9 @@ Fixed:
   Without an endpoint it is stored unembedded and the server logs
   `stored_unsearchable` with the variable to set. Served ingests used to be
   stored unembedded, so search never found them.
+- The web app's MCP dialog gives the `codify mcp --http` command and the address
+  it listens on by default, `http://127.0.0.1:8001/mcp`. It used to show the web
+  app's own origin, where nothing serves MCP.
 
 ## 0.7.0 (2026-11-13)
 
