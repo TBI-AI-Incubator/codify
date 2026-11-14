@@ -439,7 +439,30 @@
   ],
   "structuring": {
     "designation_rule": "eu_instrument",
-    "prompt_additions": "EU recitals appear as numbered paragraphs in the preamble before 'HAS/HAVE ADOPTED THIS REGULATION/DIRECTIVE/DECISION:'. Citations ('Having regard to...') precede recitals. Both require post-processing to become <recitals>/<citations> elements. SECTION is a higher division above ARTICLE, not the basic unit."
+    "prompt_additions": "EU recitals appear as numbered paragraphs in the preamble before 'HAS/HAVE ADOPTED THIS REGULATION/DIRECTIVE/DECISION:'. Citations ('Having regard to...') precede recitals. Both require post-processing to become <recitals>/<citations> elements. SECTION is a higher division above ARTICLE, not the basic unit.",
+    "classification_rules": [
+      {
+        "signal": "title_regex",
+        "pattern": "^(?:(?:Council|Commission|Implementing|Delegated|Framework)\\s+)*Regulation\\b",
+        "pattern_flags": "i",
+        "target_document_class": "regulation",
+        "priority": 100
+      },
+      {
+        "signal": "title_regex",
+        "pattern": "^(?:(?:Council|Commission|Implementing|Delegated|Framework)\\s+)*Directive\\b",
+        "pattern_flags": "i",
+        "target_document_class": "directive",
+        "priority": 100
+      },
+      {
+        "signal": "title_regex",
+        "pattern": "^(?:(?:Council|Commission|Implementing|Delegated|Framework)\\s+)*Decision\\b",
+        "pattern_flags": "i",
+        "target_document_class": "decision",
+        "priority": 100
+      }
+    ]
   },
   "supranational_memberships": [],
   "display": {
