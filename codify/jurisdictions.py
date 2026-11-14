@@ -2513,9 +2513,6 @@ class ResolvedConfig(BaseModel):
         return self.path is not None
 
 
-_CONFIG_CODE = re.compile(r"[a-z0-9][a-z0-9-]*")
-
-
 def resolve_config(country_code: str) -> ResolvedConfig:
     """Identify the config for `country_code` without loading it.
 
@@ -2523,13 +2520,16 @@ def resolve_config(country_code: str) -> ResolvedConfig:
     jurisdiction was missing and where they looked, which a traceback buries.
     """
     code = country_code.strip().lower()
-    # A code names one directory: anything else (a separator, `..`, a drive) is absent.
-    if not _CONFIG_CODE.fullmatch(code):
-        return ResolvedConfig(code=code)
     path = JURISDICTIONS_DIR / code / "config.json"
-    if not path.exists():
+    # A code names one directory under the root: one that escapes it is absent.
+    root = os.path.realpath(JURISDICTIONS_DIR)
+    real = os.path.realpath(os.path.join(root, code, "config.json"))
+    if "/" in code or "\\" in code or not real.startswith(root + os.sep):
         return ResolvedConfig(code=code)
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not os.path.exists(real):
+        return ResolvedConfig(code=code)
+    with open(real, "rb") as source:
+        digest = hashlib.sha256(source.read()).hexdigest()
     # Recorded relative to the tree root, not absolutely: a bundle travels, and
     # an absolute path names the machine that produced it rather than the config.
     try:
