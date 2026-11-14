@@ -585,7 +585,7 @@
       "calendar": "gregorian",
       "tier": 2,
       "status": "draft",
-      "effective_tier": 1,
+      "effective_tier": 2,
       "coverage_status": "in_scope",
       "subsumed_by": null,
       "public_reference": true

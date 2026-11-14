@@ -1703,3 +1703,10 @@ def test_no_hierarchy_term_is_a_placeholder(code: str) -> None:
                 if not letters or lone or token:
                     placeholders.append((doctype, entry.local_term, form))
     assert not placeholders, (code, placeholders)
+
+
+def test_the_eu_cellar_source_rates_as_structured_xml() -> None:
+    """Cellar supplies Formex, not AKN, so it cannot lift the EU to tier 1."""
+    cfg = load_config("eu")
+    assert cfg is not None
+    assert cfg.effective_tier == 2
