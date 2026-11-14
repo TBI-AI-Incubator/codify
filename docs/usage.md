@@ -65,7 +65,7 @@ Before using `--embed` or `search`, configure an OpenAI-compatible embeddings en
 ```bash
 uv sync --extra migrations
 docker compose up -d --wait postgres
-uv run --extra migrations alembic -c alembic.ini upgrade head
+uv run --extra migrations codify migrate
 uv run codify load bundle/ --embed
 uv run codify search "right of access" --jurisdiction xa
 ```

@@ -70,6 +70,8 @@ anchors without model calls. See the [offline scan example](docs/usage.md#inspec
 
 For use in another Python project, install `codify-core` with `uv add codify-core`
 or `pip install codify-core`. Optional extras are `serve`, `mcp` and `migrations`.
+`codify migrate`, with the `migrations` extra, creates the core schema in the
+database at `POSTGRES_URL`.
 
 Storage and search use PostgreSQL with pgvector and pg_textsearch. The repository's
 Docker Compose file builds a local instance. Search needs an embeddings endpoint;

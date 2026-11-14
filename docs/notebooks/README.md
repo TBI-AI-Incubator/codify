@@ -31,7 +31,7 @@ For Codify 201, use a dedicated local database. The notebook writes sample recor
 
 ```bash
 docker compose up -d --wait postgres
-uv run alembic -c alembic.ini upgrade head
+uv run codify migrate
 ```
 
 Docker runs PostgreSQL here, not the notebook or API server.
