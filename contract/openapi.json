@@ -7,11 +7,13 @@
         "properties": {
           "auth_env_var": {
             "default": "",
+            "description": "Name of the environment variable holding the credential. The credential itself is never stored in the config.",
             "title": "Auth Env Var",
             "type": "string"
           },
           "auth_scheme": {
             "default": "none",
+            "description": "How requests to the source are authenticated.",
             "enum": [
               "none",
               "token",
@@ -27,6 +29,7 @@
           },
           "coverage": {
             "default": "unknown",
+            "description": "How much of the statute base the source holds.",
             "enum": [
               "complete",
               "partial",
@@ -45,6 +48,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on `coverage`.",
             "title": "Coverage Note"
           },
           "description": {
@@ -76,10 +80,12 @@
                 "type": "null"
               }
             ],
+            "description": "The format still available when the source's credential is unset, so `effective_tier` can count it at that format.",
             "title": "Fallback Format"
           },
           "format": {
             "default": "pdf",
+            "description": "The format the source serves, which sets its tier in `effective_tier`. Defaults to PDF.",
             "enum": [
               "akn_xml",
               "akn_xml_v2",
@@ -106,14 +112,17 @@
                 "type": "null"
               }
             ],
+            "description": "Licence the source publishes under.",
             "title": "License"
           },
           "name": {
+            "description": "Name of the source.",
             "title": "Name",
             "type": "string"
           },
           "protocol": {
             "default": "http",
+            "description": "How documents are fetched from the source. Defaults to HTTP.",
             "enum": [
               "http",
               "rest",
@@ -142,6 +151,7 @@
                 "type": "null"
               }
             ],
+            "description": "Identifier of the schema the source's documents follow.",
             "title": "Schema Id"
           },
           "schema_url": {
@@ -153,9 +163,11 @@
                 "type": "null"
               }
             ],
+            "description": "URL of the schema the source's documents follow.",
             "title": "Schema Url"
           },
           "url_template": {
+            "description": "URL of the source, or a template for one document's URL.",
             "title": "Url Template",
             "type": "string"
           }
@@ -203,6 +215,7 @@
                 "type": "null"
               }
             ],
+            "description": "How amendments cite the provisions they change. Recorded for reference; the pipeline does not read it.",
             "title": "Cross Reference Format"
           },
           "phrasing": {
@@ -214,6 +227,7 @@
                 "type": "null"
               }
             ],
+            "description": "A phrase that marks a paragraph as an amendment instruction, in addition to the built-in English cues, so its references are classed as amendments.",
             "title": "Phrasing"
           },
           "style": {
@@ -225,6 +239,7 @@
                 "type": "null"
               }
             ],
+            "description": "How the jurisdiction drafts amendments. Recorded for reference; the pipeline does not read it.",
             "title": "Style"
           },
           "trigger_phrases": {
@@ -286,11 +301,13 @@
         "description": "Non-membership binding regime, treaty frameworks, bilateral regimes,\nconstitutional annexes. Used for instruments that are legally binding on a\njurisdiction but are not memberships in an international organisation.",
         "properties": {
           "code": {
+            "description": "Code of the regime, canonicalised against the supranational body registry.",
             "title": "Code",
             "type": "string"
           },
           "direct_effect": {
             "default": "none",
+            "description": "How strongly the regime's instruments take effect, from override to none.",
             "enum": [
               "override",
               "direct",
@@ -312,6 +329,7 @@
                 "type": "null"
               }
             ],
+            "description": "Date the regime took effect, as an ISO date.",
             "title": "In Force From"
           },
           "in_force_until": {
@@ -323,9 +341,11 @@
                 "type": "null"
               }
             ],
+            "description": "Date the regime ends or ended, as an ISO date.",
             "title": "In Force Until"
           },
           "kind": {
+            "description": "What kind of regime it is.",
             "enum": [
               "treaty_framework",
               "bilateral_regime",
@@ -337,11 +357,13 @@
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "renewable": {
             "default": false,
+            "description": "Whether the regime can be renewed.",
             "title": "Renewable",
             "type": "boolean"
           },
@@ -361,9 +383,11 @@
                 "type": "null"
               }
             ],
+            "description": "How often the regime requires reports.",
             "title": "Reporting Cadence"
           },
           "superseded_subjects": {
+            "description": "Subject areas where the regime's rules displace domestic law.",
             "items": {
               "type": "string"
             },
@@ -457,6 +481,7 @@
             "title": "Eras"
           },
           "kind": {
+            "description": "Which conversion applies; it selects the optional fields that are read.",
             "enum": [
               "epoch_offset",
               "era_table",
@@ -492,6 +517,7 @@
                 "type": "null"
               }
             ],
+            "description": "Day of `new_year_month` on which the local year begins, for month-sensitive conversions. Unset means the first of the month.",
             "title": "New Year Day"
           },
           "new_year_month": {
@@ -520,6 +546,7 @@
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
@@ -578,6 +605,7 @@
                 "type": "null"
               }
             ],
+            "description": "First document date the rule applies to, inclusive. A rule with a date bound is skipped for a document without a date.",
             "title": "Date From"
           },
           "date_until": {
@@ -590,15 +618,18 @@
                 "type": "null"
               }
             ],
+            "description": "Last document date the rule applies to, inclusive.",
             "title": "Date Until"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "pattern": {
             "default": "",
+            "description": "Regex tested against the signal's text. Unused for `date_range`.",
             "title": "Pattern",
             "type": "string"
           },
@@ -610,10 +641,12 @@
           },
           "priority": {
             "default": 0,
+            "description": "Rules are tried from highest priority to lowest; the first match wins.",
             "title": "Priority",
             "type": "integer"
           },
           "signal": {
+            "description": "Which part of the document `pattern` is tested against.",
             "enum": [
               "date_range",
               "preamble_match",
@@ -625,6 +658,7 @@
             "type": "string"
           },
           "target_document_class": {
+            "description": "The document class assigned when the rule matches. It must be a key of `document_classes`.",
             "title": "Target Document Class",
             "type": "string"
           }
@@ -642,6 +676,7 @@
         "properties": {
           "max_total": {
             "default": 5000,
+            "description": "Most documents one discovery run returns, unless the caller sets a limit.",
             "exclusiveMinimum": 0.0,
             "title": "Max Total",
             "type": "integer"
@@ -662,6 +697,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "Discovery query per doctype, in the portal's own query syntax.",
             "title": "Queries",
             "type": "object"
           }
@@ -684,26 +720,31 @@
           },
           "font_preference": {
             "default": "serif",
+            "description": "Preferred font style for display. Recorded for reference; the pipeline does not read it.",
             "title": "Font Preference",
             "type": "string"
           },
           "heading_case": {
             "default": "title_case",
+            "description": "How headings are cased. Recorded for reference; the pipeline does not read it.",
             "title": "Heading Case",
             "type": "string"
           },
           "heading_type": {
             "default": "marginal_note",
+            "description": "How provision headings are printed. Declaring `marginal_note` explicitly also scans for basic units whose heading is printed as a marginal note.",
             "title": "Heading Type",
             "type": "string"
           },
           "rtl": {
             "default": false,
+            "description": "Whether the script runs right to left. Recorded for reference; the pipeline does not read it.",
             "title": "Rtl",
             "type": "boolean"
           },
           "script": {
             "default": "latin",
+            "description": "The writing system of the jurisdiction's texts, which selects the script pack used for normalisation and marker matching.",
             "title": "Script",
             "type": "string"
           }
@@ -716,6 +757,7 @@
         "properties": {
           "akn_element": {
             "default": "act",
+            "description": "The AKN document element for the class, such as `act`. `doc` or `statement` selects an open structure rather than the legislative hierarchy.",
             "title": "Akn Element",
             "type": "string"
           },
@@ -728,6 +770,7 @@
                 "type": "null"
               }
             ],
+            "description": "AKN subtype for the class. Recorded for reference; the pipeline does not read it.",
             "title": "Akn Subtype"
           },
           "authoritative_language": {
@@ -744,11 +787,13 @@
           },
           "basic_unit": {
             "default": "section",
+            "description": "The element that carries the class's numbered provisions, such as `section` or `article`. It is given to the structurer and used by the anchor coverage check.",
             "title": "Basic Unit",
             "type": "string"
           },
           "bluebell_compatible": {
             "default": true,
+            "description": "Whether the class can be expressed in Bluebell. Recorded for reference; the pipeline does not read it.",
             "title": "Bluebell Compatible",
             "type": "boolean"
           },
@@ -761,6 +806,7 @@
                 "type": "null"
               }
             ],
+            "description": "Whether instruments of this class apply without domestic transposition. Only a supranational jurisdiction may set it to true.",
             "title": "Direct Effect"
           },
           "extends": {
@@ -784,9 +830,11 @@
                 "type": "null"
               }
             ],
+            "description": "The FRBR subtype segment for the class's works, returned with the class by the MCP jurisdiction tools.",
             "title": "Frbr Subtype"
           },
           "hcontainers": {
+            "description": "Containers with no AKN element of their own, structured under a proxy keyword and renamed to `hcontainer` afterwards.",
             "items": {
               "$ref": "#/components/schemas/HContainer"
             },
@@ -794,6 +842,7 @@
             "type": "array"
           },
           "hierarchy": {
+            "description": "The class's structural levels. Higher levels must come before the basic unit and its subdivisions.",
             "items": {
               "$ref": "#/components/schemas/HierarchyEntry"
             },
@@ -801,6 +850,7 @@
             "type": "array"
           },
           "label": {
+            "description": "Display name of the class, such as \"Act\" or \"Regulation\".",
             "title": "Label",
             "type": "string"
           },
@@ -813,10 +863,12 @@
                 "type": "null"
               }
             ],
+            "description": "The class's name in the local language. Recorded for reference; the pipeline does not read it.",
             "title": "Local Label"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
@@ -845,6 +897,7 @@
                 "type": "null"
               }
             ],
+            "description": "Name of a structuring prompt variant for the class. Recorded for reference; the pipeline does not read it.",
             "title": "Prompt Variant"
           },
           "search_rank": {
@@ -1291,6 +1344,7 @@
                 "type": "null"
               }
             ],
+            "description": "What the formula applies to. Recorded for reference; the pipeline does not read it.",
             "title": "Applies To"
           },
           "document_class": {
@@ -1308,6 +1362,7 @@
                 "type": "null"
               }
             ],
+            "description": "The doctype, or list of doctypes, the formula applies to. Unset applies it to every doctype.",
             "title": "Document Class"
           },
           "enacting_body_tlc": {
@@ -1319,10 +1374,12 @@
                 "type": "null"
               }
             ],
+            "description": "eId of the TLC entry naming the enacting body. Recorded for reference; the pipeline does not read it.",
             "title": "Enacting Body Tlc"
           },
           "era": {
             "default": "",
+            "description": "Label of the period the formula belongs to, recorded in the ingest log.",
             "title": "Era",
             "type": "string"
           },
@@ -1336,6 +1393,7 @@
                 "type": "null"
               }
             ],
+            "description": "First date the formula applies to, inclusive. A bounded formula is never applied to a document without a date.",
             "title": "From"
           },
           "instrument_type": {
@@ -1347,6 +1405,7 @@
                 "type": "null"
               }
             ],
+            "description": "The instrument type the formula belongs to. Recorded for reference; the pipeline does not read it.",
             "title": "Instrument Type"
           },
           "language": {
@@ -1358,15 +1417,18 @@
                 "type": "null"
               }
             ],
+            "description": "Language of the formula's text. Recorded for reference; the pipeline does not read it.",
             "title": "Language"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "position": {
             "default": "preamble",
+            "description": "Where the formula sits in the document. Recorded for reference; the pipeline does not read it.",
             "title": "Position",
             "type": "string"
           },
@@ -1379,6 +1441,7 @@
                 "type": "null"
               }
             ],
+            "description": "Wording injected into the preamble as the enacting formula when the source has none. Text with an unfilled template slot is never injected.",
             "title": "Text"
           },
           "to": {
@@ -1391,6 +1454,7 @@
                 "type": "null"
               }
             ],
+            "description": "Last date the formula applies to, inclusive.",
             "title": "To"
           },
           "transliteration": {
@@ -1402,10 +1466,12 @@
                 "type": "null"
               }
             ],
+            "description": "A transliteration of the formula's text. Recorded for reference; the pipeline does not read it.",
             "title": "Transliteration"
           },
           "verified": {
             "default": false,
+            "description": "Whether the wording has been checked against source documents. A verified formula is preferred over an unverified one that also matches.",
             "title": "Verified",
             "type": "boolean"
           }
@@ -1428,11 +1494,13 @@
             "description": "Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion."
           },
           "country_code": {
+            "description": "The country segment of minted FRBR URIs, where it differs from the jurisdiction code (a subdivision homed under its parent, for example).",
             "title": "Country Code",
             "type": "string"
           },
           "date_calendar": {
             "default": "gregorian",
+            "description": "The calendar the jurisdiction's FRBR dates are given in. Recorded for reference; the pipeline does not read it.",
             "enum": [
               "gregorian",
               "lunar_hijri",
@@ -1455,6 +1523,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on `date_calendar`. Recorded for reference; the pipeline does not read it.",
             "title": "Date Calendar Note"
           },
           "note": {
@@ -1466,6 +1535,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note"
           },
           "notes": {
@@ -1483,6 +1553,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Notes"
           },
           "number_extraction": {
@@ -1498,6 +1569,7 @@
                 "type": "null"
               }
             ],
+            "description": "How an instrument number is found in the source. Recorded for reference; the pipeline does not read it.",
             "title": "Number Extraction"
           },
           "number_format": {
@@ -1515,6 +1587,7 @@
                 "type": "null"
               }
             ],
+            "description": "How instrument numbers are written. Recorded for reference; the pipeline does not read it.",
             "title": "Number Format"
           },
           "number_note": {
@@ -1526,6 +1599,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on instrument numbering. Recorded for reference; the pipeline does not read it.",
             "title": "Number Note"
           },
           "sample_uris": {
@@ -1544,6 +1618,7 @@
                 "type": "null"
               }
             ],
+            "description": "Example FRBR URIs for the jurisdiction. Recorded for reference; the pipeline does not read it.",
             "title": "Sample Uris"
           },
           "title_identity": {
@@ -1561,6 +1636,7 @@
             "additionalProperties": {
               "type": "string"
             },
+            "description": "FRBR work URI template per doctype, using `{year}` and `{number}`. A doctype without one gets the canonical default.",
             "title": "Uri Patterns",
             "type": "object"
           }
@@ -1611,6 +1687,7 @@
                 "type": "null"
               }
             ],
+            "description": "The AKN element the container corresponds to, where one exists. Recorded for reference; the pipeline does not read it.",
             "title": "Akn Element"
           },
           "bluebell_keyword": {
@@ -1650,10 +1727,12 @@
                 "type": "null"
               }
             ],
+            "description": "A Bluebell keyword for the container. Recorded for reference; the pipeline does not read it.",
             "title": "Bluebell Keyword"
           },
           "bluebell_proxy": {
             "default": "SUBSECTION",
+            "description": "The Bluebell keyword the structurer uses for this container before it is renamed.",
             "enum": [
               "BOOK",
               "PART",
@@ -1687,6 +1766,7 @@
           },
           "description": {
             "default": "",
+            "description": "Free-text description of the container. Recorded for reference; the pipeline does not read it.",
             "title": "Description",
             "type": "string"
           },
@@ -1699,6 +1779,7 @@
                 "type": "null"
               }
             ],
+            "description": "Display label for the container. Recorded for reference; the pipeline does not read it.",
             "title": "Label"
           },
           "level": {
@@ -1710,18 +1791,22 @@
                 "type": "null"
               }
             ],
+            "description": "Where the container sits in the hierarchy. Recorded for reference; the pipeline does not read it.",
             "title": "Level"
           },
           "local_term": {
+            "description": "Heading text that identifies the container: a proxy element whose heading starts with it, ignoring case, is renamed to an `hcontainer`.",
             "title": "Local Term",
             "type": "string"
           },
           "name": {
+            "description": "The `name` attribute the resulting `hcontainer` carries.",
             "title": "Name",
             "type": "string"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
@@ -1734,6 +1819,7 @@
                 "type": "null"
               }
             ],
+            "description": "How the container is numbered. Recorded for reference; the pipeline does not read it.",
             "title": "Numbering"
           },
           "position": {
@@ -1745,10 +1831,12 @@
                 "type": "null"
               }
             ],
+            "description": "Where the container appears in the document. Recorded for reference; the pipeline does not read it.",
             "title": "Position"
           },
           "requires_postprocessing": {
             "default": true,
+            "description": "Whether the proxy element is renamed to an `hcontainer` after structuring. False leaves it as the proxy element.",
             "title": "Requires Postprocessing",
             "type": "boolean"
           }
@@ -1791,6 +1879,7 @@
         "additionalProperties": true,
         "properties": {
           "akn_element": {
+            "description": "The AKN element this level becomes, such as `article` or `chapter`.",
             "enum": [
               "book",
               "part",
@@ -1831,6 +1920,7 @@
                 "type": "null"
               }
             ],
+            "description": "The element name a publisher's own AKN uses in hyphenated eIds for this level (`section` in `section-55-2`), where it differs from `akn_element`.",
             "title": "Akn Name"
           },
           "bluebell_keyword": {
@@ -1870,6 +1960,7 @@
                 "type": "null"
               }
             ],
+            "description": "The Bluebell keyword for this level. Unset uses the AKN element name in capitals.",
             "title": "Bluebell Keyword"
           },
           "captions": {
@@ -1887,6 +1978,7 @@
             "type": "string"
           },
           "level": {
+            "description": "Where the level sits: `higher` containers, the single `basic` unit and its `subdivision`s are ordered; `grouping` and `presentational` levels may appear anywhere.",
             "enum": [
               "higher",
               "basic",
@@ -1898,6 +1990,7 @@
             "type": "string"
           },
           "local_term": {
+            "description": "The level's name as the source prints it, such as \"Article\" or \"Chapter\". Marker detection and the eId builder match it in the text.",
             "title": "Local Term",
             "type": "string"
           },
@@ -1943,6 +2036,7 @@
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
@@ -1955,6 +2049,7 @@
                 "type": "null"
               }
             ],
+            "description": "How the level is numbered, such as arabic or roman. Recorded for reference; the pipeline does not read it.",
             "title": "Numbering"
           }
         },
@@ -1971,16 +2066,19 @@
         "properties": {
           "eli_base": {
             "default": "",
+            "description": "Base URI of the jurisdiction's European Legislation Identifiers. Recorded for reference; the pipeline does not read it.",
             "title": "Eli Base",
             "type": "string"
           },
           "pattern": {
             "default": "",
+            "description": "Pattern of identifiers in that scheme. Recorded for reference; the pipeline does not read it.",
             "title": "Pattern",
             "type": "string"
           },
           "system": {
             "default": "",
+            "description": "Name of the jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it.",
             "title": "System",
             "type": "string"
           }
@@ -2393,6 +2491,7 @@
                 "type": "null"
               }
             ],
+            "description": "Name of the AKN profile the jurisdiction's publisher uses. Recorded for reference; the pipeline does not read it.",
             "title": "Akn Profile"
           },
           "akn_sources": {
@@ -2411,7 +2510,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How amending instruments are drafted."
           },
           "attachments": {
             "description": "Captions opening an attachment, whose numbering restarts the body's.",
@@ -2430,6 +2530,7 @@
                 "type": "null"
               }
             ],
+            "description": "The language whose text is legally authoritative, used when a document's own language cannot be detected.",
             "title": "Authoritative Language"
           },
           "binding_regimes": {
@@ -2442,6 +2543,7 @@
           },
           "calendar": {
             "default": "gregorian",
+            "description": "The calendar the jurisdiction's instruments are dated in.",
             "enum": [
               "gregorian",
               "lunar_hijri",
@@ -2464,10 +2566,12 @@
             "type": "array"
           },
           "code": {
+            "description": "The jurisdiction code, such as `xa`.",
             "title": "Code",
             "type": "string"
           },
           "core_tlcs": {
+            "description": "Recurring persons, bodies and concepts, written to a document's `references` block when the document refers to them by eId.",
             "items": {
               "$ref": "#/components/schemas/TLCEntry"
             },
@@ -2476,6 +2580,7 @@
           },
           "coverage_status": {
             "default": "in_scope",
+            "description": "Whether the jurisdiction has its own corpus: `in_scope`, `subsumed` into another jurisdiction's, `no_corpus` or `deferred`.",
             "enum": [
               "in_scope",
               "subsumed",
@@ -2487,6 +2592,7 @@
           },
           "default_document_class": {
             "default": "act",
+            "description": "The doctype used when no classification rule matches. It must be a key of `document_classes`.",
             "title": "Default Document Class",
             "type": "string"
           },
@@ -2498,12 +2604,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How the jurisdiction's texts are written and displayed."
           },
           "document_classes": {
             "additionalProperties": {
               "$ref": "#/components/schemas/DocumentClass"
             },
+            "description": "The instrument types the jurisdiction issues, keyed by doctype.",
             "title": "Document Classes",
             "type": "object"
           },
@@ -2536,6 +2644,7 @@
             "type": "array"
           },
           "enacting_formulae": {
+            "description": "Enacting formulae to inject when the source carries none, chosen by doctype and date.",
             "items": {
               "$ref": "#/components/schemas/EnactingFormula"
             },
@@ -2558,7 +2667,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How the jurisdiction's FRBR URIs are minted."
           },
           "furniture_inline_patterns": {
             "description": "Page furniture that shares a line with real content, such as a portal credit or a stamped URL, so it is removed from the line rather than discarding the line. Narrower than `ocr_header_patterns`, which also matches the real title on page one.",
@@ -2584,9 +2694,11 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it."
           },
           "languages": {
+            "description": "Languages of the jurisdiction's texts, as ISO 639-3 codes. Where there is only one, it is used for a document whose language is not detected.",
             "items": {
               "type": "string"
             },
@@ -2610,6 +2722,7 @@
             "type": "array"
           },
           "members": {
+            "description": "For a supranational jurisdiction, the codes of its members. Recorded for reference; the pipeline does not read it.",
             "items": {
               "type": "string"
             },
@@ -2625,6 +2738,7 @@
             "type": "number"
           },
           "name": {
+            "description": "The jurisdiction's name.",
             "title": "Name",
             "type": "string"
           },
@@ -2637,6 +2751,7 @@
                 "type": "null"
               }
             ],
+            "description": "The jurisdiction's name in English.",
             "title": "Name En"
           },
           "name_local": {
@@ -2648,13 +2763,14 @@
                 "type": "null"
               }
             ],
+            "description": "The jurisdiction's name in its own language.",
             "title": "Name Local"
           },
           "name_translations": {
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language. Mirrors `Law.title_translations`.",
+            "description": "Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language, in the same shape as a law's title translations.",
             "title": "Name Translations",
             "type": "object"
           },
@@ -2672,7 +2788,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How instruments are numbered and cited."
           },
           "ocr_header_patterns": {
             "description": "Running header and footer text that leaks into article bodies during OCR, stripped from paragraphs before translation so the model never sees it. Regex strings, so a profile author can add patterns without touching Python.",
@@ -2691,7 +2808,7 @@
             "type": "array"
           },
           "placeholders": {
-            "description": "Whole-string markers for missing or struck content, beyond the platform default.",
+            "description": "Whole-string markers for missing or struck content, checked in addition to the built-in placeholder pattern.",
             "items": {
               "$ref": "#/components/schemas/PlaceholderMarker"
             },
@@ -2761,6 +2878,7 @@
                 "type": "null"
               }
             ],
+            "description": "How far the config has been validated, as listed in the registry.",
             "title": "Status"
           },
           "structuring": {
@@ -2771,7 +2889,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Settings for marker detection, classification and the structurer."
           },
           "subsumed_by": {
             "anyOf": [
@@ -2782,9 +2901,11 @@
                 "type": "null"
               }
             ],
+            "description": "The code of the jurisdiction whose corpus covers this one. Required when `coverage_status` is `subsumed` and refused otherwise.",
             "title": "Subsumed By"
           },
           "supranational_memberships": {
+            "description": "Supranational bodies the jurisdiction belongs to. Recorded for reference; the pipeline does not read it.",
             "items": {
               "$ref": "#/components/schemas/SupranationalMembership"
             },
@@ -2817,6 +2938,7 @@
             "title": "Tier"
           },
           "tradition": {
+            "description": "The legal traditions the jurisdiction draws on. At least one is required.",
             "items": {
               "enum": [
                 "civil_law",
@@ -2836,6 +2958,7 @@
           },
           "type": {
             "default": "national",
+            "description": "Whether the jurisdiction is national, supranational, subnational or a crown dependency.",
             "enum": [
               "national",
               "supranational",
@@ -2853,7 +2976,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How far the config has been checked against real documents. Recorded for reference; the pipeline does not read it."
           }
         },
         "required": [
@@ -3002,7 +3126,7 @@
         "type": "object"
       },
       "LawSummary": {
-        "description": "The listing row, without the hosted platform's lens and translation fields.",
+        "description": "One law in a listing: its identity, FRBR work URI and latest expression date.",
         "properties": {
           "doctype": {
             "title": "Doctype",
@@ -3145,11 +3269,13 @@
           },
           "document_class": {
             "default": "",
+            "description": "The document class typical of the era. Recorded for reference; the pipeline does not read it.",
             "title": "Document Class",
             "type": "string"
           },
           "enacting_authority": {
             "default": "",
+            "description": "The body that enacted instruments in this era. Recorded for reference; the pipeline does not read it.",
             "title": "Enacting Authority",
             "type": "string"
           },
@@ -3170,14 +3296,17 @@
                 "type": "null"
               }
             ],
+            "description": "First date of the era, as an ISO date, inclusive. Unset leaves it open.",
             "title": "From"
           },
           "id": {
+            "description": "Identifier of the era, used to report structural quality per era.",
             "title": "Id",
             "type": "string"
           },
           "label": {
             "default": "",
+            "description": "Display name of the era, given to the metadata extractor with its calendar.",
             "title": "Label",
             "type": "string"
           },
@@ -3190,6 +3319,7 @@
                 "type": "null"
               }
             ],
+            "description": "Last date of the era, as an ISO date, inclusive. Unset leaves it open.",
             "title": "To"
           }
         },
@@ -3211,6 +3341,7 @@
                 "type": "null"
               }
             ],
+            "description": "Citation pattern for acts. Reference resolution reads every `<class>_citation` field, and needs the default class's, to tell which instrument type a citation names.",
             "title": "Act Citation"
           },
           "act_citation_alt": {
@@ -3222,6 +3353,7 @@
                 "type": "null"
               }
             ],
+            "description": "An alternative citation form for acts. Recorded for reference; the pipeline does not read it.",
             "title": "Act Citation Alt"
           },
           "article_numbering": {
@@ -3233,6 +3365,7 @@
                 "type": "null"
               }
             ],
+            "description": "How articles are numbered. Recorded for reference; the pipeline does not read it.",
             "title": "Article Numbering"
           },
           "citations": {
@@ -3252,6 +3385,7 @@
                 "type": "null"
               }
             ],
+            "description": "An example of an inserted unit's number. Recorded for reference; the pipeline does not read it.",
             "title": "Insertion Example"
           },
           "insertion_note": {
@@ -3263,6 +3397,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on how inserted units are numbered. Recorded for reference; the pipeline does not read it.",
             "title": "Insertion Note"
           },
           "insertion_style": {
@@ -3274,6 +3409,7 @@
                 "type": "null"
               }
             ],
+            "description": "How inserted units are numbered. `slash_alpha` lets a marker number carry a slash and capital letter, as in \"5/A\".",
             "title": "Insertion Style"
           },
           "note": {
@@ -3285,6 +3421,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note"
           },
           "numbers_unique_across_years": {
@@ -3318,12 +3455,14 @@
         "description": "A whole-string pattern a publisher writes where content is missing or\nstruck, and the AKN status the unit should carry for it.",
         "properties": {
           "pattern": {
+            "description": "Regex matched against a unit's whole text.",
             "title": "Pattern",
             "type": "string"
           },
           "status": {
             "$ref": "#/components/schemas/PlaceholderStatus",
-            "default": "incomplete"
+            "default": "incomplete",
+            "description": "The AKN `status` a unit matching `pattern` carries."
           }
         },
         "required": [
@@ -3356,6 +3495,7 @@
                 "type": "null"
               }
             ],
+            "description": "Date the residual law began to apply.",
             "title": "In Force From"
           },
           "in_force_until": {
@@ -3368,18 +3508,22 @@
                 "type": "null"
               }
             ],
+            "description": "Date the residual law stopped applying.",
             "title": "In Force Until"
           },
           "label": {
+            "description": "Display name of the residual corpus.",
             "title": "Label",
             "type": "string"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "scope": {
+            "description": "What the residual law applies to: a territory, subjects, personal status or everything.",
             "enum": [
               "territorial",
               "subject_matter",
@@ -3390,10 +3534,12 @@
             "type": "string"
           },
           "source_jurisdiction": {
+            "description": "Code of the jurisdiction whose corpus applies. It must have a config.",
             "title": "Source Jurisdiction",
             "type": "string"
           },
           "subjects": {
+            "description": "Subject areas the residual law applies to, when `scope` is subject_matter.",
             "items": {
               "type": "string"
             },
@@ -3409,6 +3555,7 @@
             "type": "array"
           },
           "territories": {
+            "description": "Territories the residual law applies in, when `scope` is territorial.",
             "items": {
               "type": "string"
             },
@@ -3677,6 +3824,7 @@
         "description": "A citation naming an instrument by series number alone (\"Act No. 386\").",
         "properties": {
           "doctype": {
+            "description": "The doctype whose FRBR work URI a matched citation links to.",
             "title": "Doctype",
             "type": "string"
           },
@@ -3699,11 +3847,13 @@
         "properties": {
           "auth_env_var": {
             "default": "",
+            "description": "Name of the environment variable holding the credential. The credential itself is never stored in the config.",
             "title": "Auth Env Var",
             "type": "string"
           },
           "auth_scheme": {
             "default": "none",
+            "description": "How requests are authenticated. Anything but `none` needs `auth_env_var`.",
             "enum": [
               "none",
               "token",
@@ -3722,6 +3872,7 @@
                 "type": "null"
               }
             ],
+            "description": "Root URL requests are made against. Unset uses the acquirer's default.",
             "title": "Base Url"
           },
           "discovery": {
@@ -3732,9 +3883,11 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How the source lists documents, for acquirers that support discovery."
           },
           "kind": {
+            "description": "Which acquirer handles this source.",
             "enum": [
               "akn_native",
               "eurlex_cellar",
@@ -3759,14 +3912,17 @@
                 "type": "null"
               }
             ],
+            "description": "Licence the source publishes under, recorded on the documents it yields.",
             "title": "Licence"
           },
           "name": {
+            "description": "Name of the source, used in log lines and errors.",
             "title": "Name",
             "type": "string"
           },
           "notes": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Notes",
             "type": "string"
           },
@@ -3791,10 +3947,12 @@
                 "type": "null"
               }
             ],
+            "description": "Most requests per minute sent to the source's host. Unset leaves the acquirer's own default.",
             "title": "Rate Limit Per Minute"
           },
           "robots_respect": {
             "default": true,
+            "description": "Whether requests honour the host's robots.txt.",
             "title": "Robots Respect",
             "type": "boolean"
           },
@@ -3807,6 +3965,7 @@
                 "type": "null"
               }
             ],
+            "description": "Template for one document's URL, for acquirers that build it from the FRBR URI.",
             "title": "Url Template"
           }
         },
@@ -3954,6 +4113,7 @@
                 "type": "null"
               }
             ],
+            "description": "Jurisdiction-specific guidance appended to the structurer's context, for style hints the deterministic rules cannot express.",
             "title": "Prompt Additions"
           },
           "prompt_variant": {
@@ -3965,6 +4125,7 @@
                 "type": "null"
               }
             ],
+            "description": "Name of a structuring prompt variant. Recorded for reference; the pipeline does not read it.",
             "title": "Prompt Variant"
           },
           "prose_precursors": {
@@ -4005,6 +4166,7 @@
         "additionalProperties": true,
         "properties": {
           "body": {
+            "description": "Code of the body, canonicalised against the supranational body registry.",
             "title": "Body",
             "type": "string"
           },
@@ -4024,6 +4186,7 @@
             "type": "string"
           },
           "direct_effect_instruments": {
+            "description": "The body's instrument types that have direct effect.",
             "items": {
               "type": "string"
             },
@@ -4039,9 +4202,11 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on `direct_effect`.",
             "title": "Direct Effect Note"
           },
           "excluded_instruments": {
+            "description": "Instruments of the body the member does not apply.",
             "items": {
               "type": "string"
             },
@@ -4082,6 +4247,7 @@
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
@@ -4129,6 +4295,7 @@
             "title": "Status"
           },
           "superseded_subjects": {
+            "description": "Subject areas where the body's law displaces domestic law.",
             "items": {
               "type": "string"
             },
@@ -4174,6 +4341,7 @@
         "properties": {
           "reason": {
             "default": "",
+            "description": "Why the suspension was imposed, as free text.",
             "title": "Reason",
             "type": "string"
           },
@@ -4217,6 +4385,7 @@
         "additionalProperties": false,
         "properties": {
           "class": {
+            "description": "The AKN TLC element the entry becomes, such as `TLCOrganization`.",
             "enum": [
               "TLCPerson",
               "TLCOrganization",
@@ -4240,15 +4409,18 @@
             "type": "string"
           },
           "href": {
+            "description": "The URI the entry refers to, written to its `href` attribute.",
             "title": "Href",
             "type": "string"
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "showAs": {
+            "description": "The display name written to the entry's `showAs` attribute.",
             "title": "Showas",
             "type": "string"
           }
@@ -4306,6 +4478,7 @@
         "additionalProperties": true,
         "properties": {
           "ambiguities": {
+            "description": "The open questions about the config, as free text.",
             "items": {
               "type": "string"
             },
@@ -4314,11 +4487,13 @@
           },
           "bluebell_tested": {
             "default": false,
+            "description": "Whether the config's structure has been tested through Bluebell.",
             "title": "Bluebell Tested",
             "type": "boolean"
           },
           "documents_examined": {
             "default": 0,
+            "description": "How many source documents the config was checked against.",
             "title": "Documents Examined",
             "type": "integer"
           },
@@ -4331,6 +4506,7 @@
                 "type": "null"
               }
             ],
+            "description": "Free-text note on the documents examined.",
             "title": "Documents Examined Note"
           },
           "laws_africa_reference": {
@@ -4350,11 +4526,13 @@
           },
           "note": {
             "default": "",
+            "description": "Free-text note for config authors. The pipeline does not read it.",
             "title": "Note",
             "type": "string"
           },
           "status": {
             "default": "draft",
+            "description": "How far the config has been validated: `production`, `draft` or `stub`.",
             "enum": [
               "production",
               "draft",
@@ -4365,6 +4543,7 @@
           },
           "unresolved_ambiguities": {
             "default": 0,
+            "description": "How many open questions about the config remain.",
             "title": "Unresolved Ambiguities",
             "type": "integer"
           }
