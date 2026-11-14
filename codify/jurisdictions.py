@@ -1148,8 +1148,7 @@ class JurisdictionConfig(BaseModel):
     structuring: StructuringConfig | None = None
     supranational_memberships: list[SupranationalMembership] = Field(default_factory=list)
     # Non-membership binding regimes (treaty frameworks, bilateral regimes,
-    # constitutional annexes). Populated in migration for BA, PW, MH, VA
-    # etc., where the existing "membership" modelling was semantically wrong.
+    # constitutional annexes), where membership modelling would be semantically wrong.
     binding_regimes: list[BindingRegime] = Field(default_factory=list)
     # Foreign corpora still residually applicable here: pre-independence or
     # occupying-power law left in force, VA for suppletive Italian law, and so on.
@@ -1183,7 +1182,7 @@ class JurisdictionConfig(BaseModel):
     furniture_line_patterns: list[str] = Field(default_factory=list)
 
     # The same two vocabularies for a jurisdiction that declares no eras, which
-    # is 259 of the 261 configs. An era's own lists win where it declares them.
+    # is nearly every config. An era's own lists win where it declares them.
     closing_phrases: list[str] = Field(default_factory=list)
     footnote_markers: list[str] = Field(default_factory=list)
 
@@ -1802,7 +1801,7 @@ def ordinal_word_folds() -> dict[str, str]:
     words are language-distinctive, so one table serves callers deriving an eId
     without knowing the country.
 
-    Read straight from JSON: a sweep of 257 configs would evict `load_config`'s
+    Read straight from JSON: a sweep of every config would evict `load_config`'s
     64-entry cache.
     """
     out: dict[str, str] = {}

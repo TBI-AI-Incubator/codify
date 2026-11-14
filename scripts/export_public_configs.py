@@ -4,7 +4,7 @@ and the package that reads them, so the result is a tree an ingest can run in.
 `JURISDICTIONS_DIR` resolves relative to the package, so the two have to travel
 together or the export resolves back to the full set and proves nothing.
 
-    uv run python packages/codify/scripts/export_public_configs.py /tmp/open-core
+    uv run python scripts/export_public_configs.py <dest>
 """
 
 from __future__ import annotations
@@ -48,9 +48,7 @@ def export(dest: Path) -> int:
         src = JURISDICTIONS_DIR / code
         shutil.copytree(src, out / code, dirs_exist_ok=True)
 
-    # The registry travels filtered rather than whole: shipping all 257 entries
-    # would publish the list of jurisdictions studied, which is the disclosure
-    # the allowlist exists to avoid.
+    # Filter the registry to the shipped codes; the full registry is not for publication.
     registry = json.loads((JURISDICTIONS_DIR / "registry.json").read_text())
     registry["jurisdictions"] = [j for j in registry["jurisdictions"] if j["code"] in set(codes)]
     (out / "registry.json").write_text(json.dumps(registry, indent=2, ensure_ascii=False) + "\n")

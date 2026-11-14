@@ -181,9 +181,8 @@ class TestIntegration:
 
 class TestBodyArtefacts:
     """LLM body-fill occasionally leaks JSON/markdown fence fragments into the
-    rendered body text when its stop token fails on long chunks. Real-world
-    examples: Customs Code art 5 (~50KB) ending with ``]}]}\\u200a````, NABU asset
-    agency art 15 trailing ``]}]}\\u200a````Or more precisely as valid JSON``."""
+    rendered body text when its stop token fails on long chunks: a long article
+    ending ``]}]}\\u200a````, or one trailing ``Or more precisely as valid JSON``."""
 
     def test_clean_body_passes(self):
         xml = _act(
@@ -208,7 +207,7 @@ class TestBodyArtefacts:
         assert len(issues) == 1
 
     def test_explanatory_tail_flagged(self):
-        # The NABU pattern: LLM appends a clarification sentence at the very end
+        # The model appends a clarification sentence at the very end
         xml = _act(
             '<article eId="art_15"><num>15</num><content><p>The agency shall publish reports. Or more precisely, all reports.</p></content></article>'
         )
@@ -225,8 +224,7 @@ class TestBodyArtefacts:
 
 class TestOrphanArticles:
     """Structurer container-assembly failure: articles sitting at <body> root
-    alongside sections/chapters instead of inside them. The UA Customs Code
-    re-ingest produced 99 such orphans next to 9 sections + 9 chapters."""
+    alongside sections/chapters instead of inside them."""
 
     def test_flat_articles_no_containers_pass(self):
         # A small act with no sections / chapters, articles at root is fine.
@@ -314,9 +312,8 @@ class TestOrphanArticles:
 
 
 class TestOcrGarble:
-    """Detect Arabic OCR mojibake the body-fill LLM passes through unchanged.
-    One re-ingested statute carried 106 instances of doubled
-    ta-marbuta (e.g. ``الآتيةة``) straight from the PDF text-extraction layer."""
+    """Detect Arabic OCR mojibake the body-fill LLM passes through unchanged:
+    doubled ta-marbuta (e.g. ``الآتيةة``) straight from the PDF text-extraction layer."""
 
     def test_clean_arabic_passes(self):
         xml = _act(
@@ -664,7 +661,6 @@ class TestIdentityConsistency:
         assert not self._checks("2007-05-12", "/akn/xz/act/2007/11")
 
     def test_future_year_flagged(self):
-        # Found on the stored corpus: laws.year 2037 against a /2007/ URI.
         assert "identity_year_in_future" in self._checks("2037-05-12", "/akn/xz/act/2037/11")
 
     def test_unconverted_hijri_year_flagged(self):
@@ -868,7 +864,7 @@ class TestMarkupAsText:
 
     def test_a_long_repeat_does_not_hang_the_validator(self):
         # Two separators per repetition let a space belong to either, so a failing
-        # long repeat explores every partition. The corpus holds a fifty-repeat case.
+        # long repeat explores every partition.
         # Bounded in a child process because `re` takes no timeout and holds the GIL,
         # so in-process this would hang the run rather than fail it.
         script = (
@@ -1134,7 +1130,7 @@ class TestStructurelessBody:
         assert "single block" in message
 
     def test_a_short_flat_instrument_stays_clean(self):
-        """274 of the corpus's 288 one-provision bodies are this shape."""
+        """Most one-provision bodies are this shape."""
         xml = _act(
             '<article eId="art_1"><num>1</num><content><p>This Decree enters into '
             "force on the date of its publication in the Official Gazette.</p></content></article>"

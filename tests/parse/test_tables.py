@@ -90,9 +90,8 @@ def test_a_double_rowspan_bumps_twice():
 
 
 class TestATableOutsideABodyFillWindow:
-    """Measured on a real corpus: of 22 versions whose OCR held a table that
-    never reached the AKN, 9 had their rows in the document as plain text. The
-    rows were fine; nothing had nested them."""
+    """A table whose rows reached the document as plain text: the rows were
+    fine; nothing had nested them."""
 
     def test_a_header_and_separator_alone_are_a_table(self) -> None:
         """A separator row is the author declaring a table. The body sitting on

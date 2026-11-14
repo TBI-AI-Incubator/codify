@@ -1,4 +1,4 @@
-# Publishes the open repository on a version tag; the split carries it to the root.
+# Publishes on a version tag.
 name: Release
 
 on:

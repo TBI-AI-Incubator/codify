@@ -1,6 +1,6 @@
 # Historical annex migration
 
-The adjacent file is the exact original revision, preserved for operator investigation. It is outside active Alembic discovery and is not a deployable migration bundle: its ledger/delegation prerequisites were unpublished and are not imported here. The manifest records their source commits.
+The adjacent file is the exact original revision, kept for reference. It is outside active Alembic discovery and is not a deployable migration: it depends on revisions this tree does not ship. The manifest records where it came from.
 
 Clean installations use `0018_annex_admission` after genuine `0014_effect_publisher_id`. No alias or stamp maps historical 0015/0016/0017 to that path. Normal Alembic traversal intentionally rejects those unknown stamps.
 

@@ -1,7 +1,7 @@
 """Core corpus schema baseline.
 
-Root of the core migration chain. Builds today's corpus schema (as of the
-apps/api chain at head 0123) in one step, from the checked-in ``0001_core_baseline.sql``.
+Root of the core migration chain. Builds the corpus schema as of the split in one
+step, from the checked-in ``0001_core_baseline.sql``.
 The SQL was extracted from a clean full-chain migration and verified against it
 by a fresh-database schema diff. New corpus schema changes extend this chain, not
 the product chain.

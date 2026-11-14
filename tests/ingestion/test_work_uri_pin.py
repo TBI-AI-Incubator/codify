@@ -128,8 +128,8 @@ class TestSetWorkUriRefusals:
 
     def test_the_expression_comes_from_the_row_not_the_document(self) -> None:
         """The document's own tail is not a safe source. Cobalt rebuilds its
-        `@date` from the generation date, and one UA document says `ukr` where
-        the row is the English expression, so carrying the document's tail
+        `@date` from the generation date, and a document can name one language
+        where the row is another's expression, so carrying the document's tail
         writes a language mislabel onto a corrected work URI."""
         doc = _stored()
         out = set_work_uri(doc, "/akn/xz/act/2009/259", "/akn/xz/act/2009/259/eng@2015-06-01")
@@ -168,7 +168,7 @@ class TestManifestationFormat:
     """The manifestation format is addressing the repair must not eat.
 
     It sits on `FRBRuri` with no `/!` marker, so splitting on the component
-    alone drops it. Measured on demo that is 970 versions, 961 EU acquis."""
+    alone drops it."""
 
     @pytest.mark.parametrize(
         ("value", "tail"),
@@ -188,7 +188,7 @@ class TestManifestationFormat:
 
 def _with_attachment(doc: str) -> str:
     """A second `<identification>` inside a nested `<doc>`, as an attachment
-    carries. 60 versions in one corpus hold one."""
+    carries."""
     ident = re.search(r"<identification.*?</identification>", doc, re.S)
     assert ident is not None
     nested = ident.group(0).replace("/!main", "/!schedule1")
@@ -205,7 +205,7 @@ def _with_attachment(doc: str) -> str:
 
 def test_every_identification_block_moves_together() -> None:
     """Cobalt rewrites each component's blocks from the generation date, so
-    correcting the root alone left 58 of 60 multi-component documents
+    correcting the root alone left multi-component documents
     asserting two expressions of one work, at two dates, and `/!schedule1` no
     longer resolving under the root."""
     doc = _with_attachment(_stored())

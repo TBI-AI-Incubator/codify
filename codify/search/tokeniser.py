@@ -31,7 +31,7 @@ logger = structlog.get_logger()
 # Digits are kept for article numbers and years; marks are kept because they
 # are vowels in Indic scripts, and excluding them split कानून into three.
 # ponytail: no dictionary segmentation, so CJK and Thai are one run per span.
-# 45 Japanese provisions corpus-wide; revisit with ICU if that grows.
+# Revisit with ICU if such text becomes common.
 _WORD = regex.compile(r"[\p{L}\p{N}\p{M}]+")
 
 # Casefolding is not locale-aware: Turkish İ folds to `i` plus a combining dot,
@@ -82,8 +82,8 @@ _SNOWBALL: Final[dict[str, str]] = {
 _LOCAL = threading.local()
 
 
-# `versions.language` should be 639-3 but carries 639-1 strays: 1,214 rows are
-# `en`, one `lt`. Unfolded they tokenise differently from their siblings, so a
+# `versions.language` should be 639-3 but can carry 639-1 strays such as `en`.
+# Unfolded they tokenise differently from their siblings, so a
 # query reaches one and not the other. Bounded: the query side is
 # caller-supplied.
 @lru_cache(maxsize=256)
@@ -118,9 +118,8 @@ def _snowball_for(language: str) -> Stemmer | None:
 _AR_ARTICLES: Final = ("وال", "بال", "كال", "فال", "ال", "لل")
 _AR_SUFFIXES: Final = ("ها", "ان", "ات", "ون", "ين", "يه", "ية", "ه", "ة", "ي")
 
-# Shortest stem an affix strip may leave. Measured over 14,107 attested pairs:
-# two-stage at 3 round-trips 97.4%, Lucene's single-prefix rule 96.4%, a floor
-# of 4 only 95.0%. Raising it protects وزير but loses more pairs than it saves.
+# Shortest stem an affix strip may leave.
+# Raising it protects وزير but loses more pairs than it saves.
 _AR_MIN_STEM: Final = 2
 _AR_MIN_STEM_CONJUNCTION: Final = 3
 

@@ -385,9 +385,8 @@ def _doctype_matches(formula: EnactingFormula, doctype: str) -> bool:
     if dc is None:
         return True
     if isinstance(dc, str):
-        # A scalar document_class names one doctype, not a wildcard: 68 of the
-        # 71 configs that set it are scalar (ar's "ley" vs "dnu", at's "act" vs
-        # "vo"), so a wildcard here would pick the first formula for every doctype.
+        # A scalar document_class names one doctype, not a wildcard (ar's "ley" vs
+        # "dnu"), or the first formula would be picked for every doctype.
         return dc == doctype
     return doctype in dc
 

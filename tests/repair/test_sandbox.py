@@ -202,7 +202,7 @@ def test_risk_class_covers_every_op() -> None:
 
 
 def test_set_body_on_duplicate_number_escalates_to_high() -> None:
-    # #702: SetBody rewrites VALID text on a duplicate_number, so it queues even when grounded.
+    # SetBody rewrites VALID text on a duplicate_number, so it queues even when grounded.
     bb = (
         "BODY\n  SECTION 1\n    ARTICLE 1\n      First article body here.\n"
         "    ARTICLE 1\n      Second article body here.\n"

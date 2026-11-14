@@ -187,8 +187,8 @@ async def _run(args: argparse.Namespace) -> int:
     # Before any work, and before the output directory is touched. Without a
     # config the pipeline does not stop: it falls back to defaults and produces
     # a plausible bundle from a jurisdiction it knows nothing about, which reads
-    # as a result rather than as the absence of one. On the open core, where
-    # five of 257 configs ship, that is the default experience for the rest.
+    # as a result rather than as the absence of one. Any jurisdiction without a
+    # shipped config lands here.
     config = resolve_config(args.jurisdiction)
     if not config.found:
         print(

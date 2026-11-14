@@ -167,9 +167,8 @@ class OcrStatusError(RuntimeError):
 
 class RateLimiter:
     """Caps calls to a requests-per-minute ceiling across concurrent callers,
-    in-process only. The Foundry deployment's limit is per-deployment, so two API
-    replicas each get the full allowance and can overrun it together; a shared
-    limiter would need Redis. Sized from the deployment's stated RPM.
+    in-process only: each replica gets the full allowance, so replicas can overrun
+    a per-deployment limit together, and a shared limiter needs an external store.
     """
 
     def __init__(self, per_minute: int) -> None:
@@ -351,8 +350,7 @@ class LiteLLMClient:
         # Gemini's filter false-fires on benign legal prose and `safety_settings`
         # cannot disable it. Empty disables the retry.
         self.fallback_model = fallback_model
-        # Direct Azure Foundry Mistral OCR URL, bypasses the LiteLLM proxy
-        # (which has a routing gap on this endpoint under v1.83.7-stable).
+        # Direct OCR endpoint URL: this route is called directly, not through the proxy.
         self.azure_foundry_ocr_url = azure_foundry_ocr_url
         self.azure_foundry_ocr_key = azure_foundry_ocr_key
         self._ocr_limiter = RateLimiter(azure_foundry_ocr_rpm)
@@ -694,7 +692,7 @@ class LiteLLMClient:
             # become anchor zero.
             "extract_header": True,
             "extract_footer": True,
-            # Pinned, not inherited: the default was observed true on 84/84 pages.
+            # Pinned, not inherited from the endpoint default.
             "include_blocks": True,
             # Per-word confidence with a character offset into the markdown, so
             # doubt lands on the text rather than only on the page image.

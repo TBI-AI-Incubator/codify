@@ -16,7 +16,7 @@ down_revision: str | Sequence[str] | None = "0005_goods_code_lineage"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# Product 0131 added `reextract_refs` to a vocabulary of 29.
+# Run kinds added after the baseline snapshot.
 _RUN_KINDS = (
     "ingest",
     "translation",

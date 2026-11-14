@@ -53,7 +53,7 @@ class TestSelectFormula:
         assert select_formula("gb", "act", None) is None
 
     def test_missing_jurisdiction_returns_none(self):
-        # jp has no enacting_formulae per the corpus audit
+        # a jurisdiction with no enacting_formulae
         assert select_formula("jp", "act", date(2024, 1, 1)) is None
 
     def test_verified_preferred_on_ties(self):
@@ -68,9 +68,8 @@ class TestSelectFormula:
 
 class TestDoctypeMatches:
     def test_scalar_document_class_matches_only_its_doctype(self):
-        # 68 of 71 configs that set document_class use a scalar (ar's "ley" vs
-        # "dnu"); a scalar must match one doctype, not act as a wildcard, else the
-        # first formula is selected for every doctype.
+        # A scalar document_class (ar's "ley" vs "dnu") must match one doctype,
+        # not act as a wildcard, else the first formula is selected for every doctype.
         from codify.jurisdictions import EnactingFormula
         from codify.pipeline.enrich.enacting import _doctype_matches
 

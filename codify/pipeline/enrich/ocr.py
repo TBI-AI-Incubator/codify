@@ -59,8 +59,7 @@ MAX_VISION_EDGE_PX = 4096
 VISION_JPEG_QUALITY = 90
 # A page whose /MediaBox is missing: poppler defaults to US Letter.
 LETTER_AREA_SQ_IN = 8.5 * 11.0
-# A guard, not a tuning: no diverted page measured so far carries a text layer
-# over 79 characters, so this has never bound.
+# A guard, not a tuning: diverted pages carry short text layers.
 ANCHOR_CHAR_LIMIT = 4000
 # Azure AI Foundry's Mistral OCR endpoint rejects documents >30 pages with
 # `document_parser_too_many_pages` (code 3730). 25 leaves headroom in case the
@@ -71,8 +70,7 @@ MISTRAL_OCR_MAX_PAGES_PER_CALL = 25
 LAYOUT_MODEL = "mistral-ocr-4-0"
 # Content nouns per 1,000 tokens, above which a particle-less page reads as a
 # list rather than a ruin. Higher than the document-level floor, an index page
-# carrying names densely in few tokens. Over 2,537 documents it spares 358 pages
-# with intact vocabulary and keeps the 643 whose vocabulary is gone.
+# carrying names densely in few tokens.
 GATE_LEXICON_FLOOR = 30.0
 
 # The OCR endpoint writes a figure into the markdown as `![img-0.jpeg](img-0.jpeg)`,
@@ -101,8 +99,8 @@ def _looks_garbled(text: str) -> bool:
     than trust the text layer. Non-Arabic is never flagged.
     """
     text = unicodedata.normalize("NFC", text)
-    # Only the base Arabic block; presentation-form PDFs (U+FB50+) aren't seen
-    # in this corpus and would read as non-Arabic, i.e. left to the normal path.
+    # Only the base Arabic block; presentation forms (U+FB50+) read as non-Arabic
+    # and are left to the normal path.
     arabic = sum(1 for c in text if "؀" <= c <= "ۿ")
     # Guard on chars, not words: garble runs together into few tokens. Share is
     # over non-whitespace, or a spaced two-column extract of the same garble
@@ -126,9 +124,8 @@ def _looks_garbled(text: str) -> bool:
     return double_alef > 0.3 or midword_maqsura > 0.02 or no_prose_and_no_vocabulary
 
 
-# Al-Muqtafi PDFs watermark every page, so a scanned law's text layer holds only
-# the library credit. Strip the stamp so the page falls below MIN_TEXT_LENGTH
-# and OCRs.
+# A source may stamp a credit on every page, so a scan's text layer holds only
+# the stamp. Strip it so the page falls below MIN_TEXT_LENGTH and OCRs.
 @lru_cache(maxsize=64)
 def _compiled(patterns: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
     return tuple(re.compile(p, re.IGNORECASE) for p in patterns)
@@ -511,7 +508,7 @@ def _render_windows(pages: list[int]) -> list[list[int]]:
     """Group diverted pages into windows bounded by page span, not by count.
 
     Chunking by count let a sparse set (pages 1, 50, 900) render the whole span
-    between its ends, which on a 16 GB host is an OOM.
+    between its ends, which can exhaust memory.
     """
     windows: list[list[int]] = []
     for page in pages:
@@ -522,9 +519,8 @@ def _render_windows(pages: list[int]) -> list[list[int]]:
     return windows
 
 
-# Each render holds a whole window's bitmaps (~1 GB at the ceiling) and the API
-# container is also the DBOS worker, so this times MAX_WINDOW_PIXELS is the real
-# transient budget: two concurrent windows against a 6g limit.
+# Each render holds a whole window's bitmaps, so this times MAX_WINDOW_PIXELS
+# is the real transient memory budget.
 MAX_CONCURRENT_RENDERS = 2
 _RENDER_GATES: weakref.WeakKeyDictionary[Any, asyncio.Semaphore] = weakref.WeakKeyDictionary()
 # The real bound, and it must be threading rather than asyncio: DBOS runs
@@ -852,9 +848,9 @@ def _promote_rival_when_empty(page: PageResult) -> PageResult:
 
         A RECITATION refusal on famous legal text returns nothing (`finish_reason`
     `content_filter`), so a scanned page
-        reads as blank though the layout pass already transcribed it. A measured engine
-        A/B put vision ahead wherever both engines read, so this fires only on an empty
-        read, never to override a real one.
+        reads as blank though the layout pass already transcribed it. Vision stays authoritative
+        wherever both engines read, so this fires only on an empty read, never to
+        override a real one.
 
         Recorded rather than hidden: the empty vision read moves into `rival_text`, so
         the `page_reads` row still shows the primary engine returned nothing.

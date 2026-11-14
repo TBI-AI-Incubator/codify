@@ -381,7 +381,7 @@ def _alias_terms_for(entry: HierarchyEntry) -> tuple[str, ...]:
 _ARABIC_JOINER_OPT = ARABIC.joiner_opt
 
 
-# Letter-for-letter misreads the vision OCR produces on this corpus, keyed by
+# Letter-for-letter misreads vision OCR can produce, keyed by
 # the true letter: `Pasal` reads `Pasai`, `Angka` reads `Ang)<a` when the
 # ligature breaks. Narrow by evidence; a broad class turns prose into markers.
 _KEYWORD_GLYPHS = {"l": "li1I", "k": "k", "i": "il1"}
@@ -3353,8 +3353,7 @@ def _unclosed_openers(text: str) -> frozenset[int]:
     """Offsets of directional openers with no later character to close them.
 
     Left in, each masks every marker to end of file and is then dropped as quoted
-    text with no gate tripping. A stray „ and a lone « in one long code together
-    masked 81% of the document.
+    text with no gate tripping.
 
     Each opener is matched only against the closer it takes: a low-9 pairs with a
     curly, not a guillemet. One shared stack would let a » pop a „, so in `« … „ … »`

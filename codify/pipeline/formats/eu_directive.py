@@ -1650,7 +1650,7 @@ def _emit_titled_group(
     one it stays transparent, because a container with no heading says nothing and
     would move its contents' eIds for no reader's benefit."""
     # A wrapper under an annex DIVISION is not reached: `_emit_division` walks
-    # structural children only. Two of 2,500 documents, so it is recorded, not built.
+    # structural children only. Rare in practice, so it is recorded, not built.
     heading = _group_heading(wrapper, "TI")
     if not heading:
         _emit_annex_children(wrapper, out, prefix, counts, provenance)

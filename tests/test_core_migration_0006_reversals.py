@@ -40,7 +40,7 @@ _EVENTS_TRG = "DROP TRIGGER IF EXISTS events_no_truncate ON events"
         ("0125", {_TITLE_FN, _TITLE_TRG, _EVENTS_TRG}),
         ("0126", {_EVENTS_TRG}),
         ("0127", set()),
-        ("0131", set()),  # the demo
+        ("0131", set()),
     ],
 )
 def test_only_what_the_product_chain_does_not_own_is_reversed(

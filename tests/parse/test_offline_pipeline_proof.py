@@ -1,4 +1,4 @@
-"""#967 proof: the structuring pipeline reaches a valid AKN with no gateway.
+"""Proof: the structuring pipeline reaches a valid AKN with no gateway.
 
 An outside contributor has no LiteLLM gateway and no model key, and CI on a fork
 has no secrets. Structuring is anchor-driven: a deterministic skeleton from the

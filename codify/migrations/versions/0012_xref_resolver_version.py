@@ -2,9 +2,7 @@
 
 Without this the resolver can never revisit a row: its selector takes only rows
 with all three target ids null, so a stamp made by a rule later found wrong
-stays forever and a re-run measures nothing. A corpus measurement found references
-stamped onto an explanatory entry, and others onto an unrelated ordinance,
-none of them reachable again by re-running the resolver.
+stays forever and a re-run measures nothing.
 
 Nullable and unstamped on every existing row, which is what makes the backfill
 the same selector as the ordinary path: below the current version, or unstamped,

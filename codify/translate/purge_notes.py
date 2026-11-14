@@ -1,7 +1,7 @@
 """Purge the translation-notes glossary block from stored AKN. Older versions carry
 the binding-prompt payload as a `<block name="translation-notes">` under
-`<preface>`, leaking glossary prose into delivered PDF and TXT; the reviewer copy
-lives on `translation_runs.notes`, so removal is lossless. Pure function; the
+`<preface>`, leaking glossary prose into exported PDF and TXT; the notes also live
+on `translation_runs.notes`, so removal is lossless. Pure function; the
 admin-op step wraps it in `update_repaired_akn` for the immutable-versions gate.
 """
 

@@ -1,8 +1,8 @@
 """The rules that changed at RESOLVER_VERSION 2, and the re-stamp they need.
 
-Both came from reading 108 stamped rows: references resolved onto an
-explanatory entry rather than the unit it explains, and most of one corpus's
-law stamps landed on one ordinance no citing text named.
+Both came from reading stamped rows: references resolved onto an explanatory
+entry rather than the unit it explains, and law stamps landed on an
+instrument no citing text named.
 """
 
 from __future__ import annotations

@@ -213,8 +213,8 @@ def test_error_fields_keeps_a_message_that_cannot_carry_a_payload() -> None:
 def test_the_workspace_is_tagged_so_cost_can_be_split_by_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`/admin/cost` groups by trace tags, so a workspace with no tag cannot be
-    billed for what it spent. The id is tagged rather than the name because a
+    """Cost reports group by trace tags, so an untagged organisation cannot be
+    attributed its spend. The id is tagged rather than the name because a
     rename must not fork the history."""
     from codify.core.tracing import TelemetryContext, attach_current_telemetry, bind_telemetry
 

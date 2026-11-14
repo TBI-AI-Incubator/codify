@@ -1,5 +1,4 @@
-# Ruff for the open repository. Not `ruff.toml`: discovery would apply it to the
-# monorepo's copy of these files too. Passed with --config; see the PR.
+# Ruff settings for this repository, passed with --config.
 line-length = 100
 target-version = "py312"
 

@@ -1,6 +1,6 @@
 # EU acquis — 35 negotiation chapters. Canonical store for Python + HTTP + SPA.
 # `classifier_priority` is the EUR-Lex classifier walk order (specific wins over general).
-# `threshold_confidence` gates ProvisionAlignment.needs_review per chapter (tune via #62 eval set).
+# `threshold_confidence` gates ProvisionAlignment.needs_review per chapter.
 
 clusters:
   - id: 1

@@ -2,9 +2,7 @@
 
 Without a config the pipeline does not fail: it falls back to defaults and emits
 a plausible bundle for a jurisdiction it knows nothing about. That is the worst
-shape for an external user, because nothing prompts them to look. It matters more
-after the open-core split, where five of 257 configs ship and every other code a
-user might name lands on this path.
+shape for an external user, because nothing prompts them to look.
 """
 
 from __future__ import annotations

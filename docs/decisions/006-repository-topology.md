@@ -8,5 +8,4 @@ Dependencies point from applications to this library. Core must not import
 the platform's packages or require a neighbouring platform checkout. Tests and
 build scripts use paths within this repository or explicit caller-provided paths.
 
-The current extraction is a library and CLI. A standalone web interface is
-separate work and is not included in this tree.
+The tree is a library, a CLI, optional servers and a local web app.

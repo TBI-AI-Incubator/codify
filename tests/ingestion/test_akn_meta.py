@@ -202,8 +202,8 @@ class TestAnEmptyWorkDate:
         validate_akn(got, strict=True)
 
     def test_without_one_it_is_left_refused_rather_than_invented(self) -> None:
-        """The expression date is the ingest date on this corpus, so filling
-        from it would stamp a 1944 act as generated in 2026. An unresolved date
+        """The expression date can be the ingest date, so filling from it
+        would stamp an old act as generated today. An unresolved date
         the gate refuses stays visible; a plausible wrong one does not."""
         assert _dates(normalise_akn_meta(self._EMPTY))[0] == ""
 

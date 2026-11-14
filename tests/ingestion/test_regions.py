@@ -81,7 +81,7 @@ class TestAttestation:
 
 
 class TestFootnotes:
-    """16 of 16 sit at or below 0.82 of page height and open with a superscript."""
+    """Footnotes sit low on the page and open with a marker."""
 
     PAGE_H = PageDimensions(dpi=87, width=720, height=1023)
 
@@ -102,7 +102,7 @@ class TestFootnotes:
         ]
 
     def test_the_older_parenthesised_marker_is_accepted_too(self) -> None:
-        """46 of 48 older footnotes open `(١)`. One form only drops an era."""
+        """Older footnotes open `(١)`. One form only drops an era."""
         block = _b("references", 900, 921, "(١) مفسوخ بموجب الأمر العسكري")
         [region] = classify_page([block], self.PAGE_H, page_number=3)
         assert region.kind == "footnote"
@@ -155,7 +155,7 @@ class TestTheDocumentedVocabulary:
         assert unmapped == []
 
     def test_a_marginal_label_becomes_an_aside_rather_than_a_definition(self) -> None:
-        """The `تعاريف` label that contaminated the military orders: a narrow
+        """The `تعاريف` label printed beside the text: a narrow
         block in the margin, where band and type agree."""
         block = OcrBlock(
             type="aside_text",
