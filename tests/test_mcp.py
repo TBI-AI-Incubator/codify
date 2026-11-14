@@ -109,6 +109,14 @@ async def test_every_tool_says_what_it_returns() -> None:
         assert tool.description and "Returns" in tool.description, tool.name
 
 
+async def test_every_tool_parameter_is_described() -> None:
+    async with Client(create_server(sessions=_no_session)) as c:
+        tools = (await c.list_tools()).tools
+    for tool in tools:
+        for name, prop in tool.input_schema.get("properties", {}).items():
+            assert prop.get("description"), f"{tool.name}.{name}"
+
+
 async def test_search_without_an_embeddings_endpoint_is_a_tool_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health */
+        /**
+         * Check the server is up
+         * @description Answers without touching the database.
+         */
         get: operations["health_health_get"];
         put?: never;
         post?: never;
@@ -28,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Jurisdictions */
+        /**
+         * List jurisdictions
+         * @description Every jurisdiction with an installed configuration: its code, name and languages.
+         */
         get: operations["jurisdictions_jurisdictions_get"];
         put?: never;
         post?: never;
@@ -45,7 +51,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Jurisdiction */
+        /**
+         * Get a jurisdiction's configuration
+         * @description The full configuration the pipeline reads for this jurisdiction. 404 when none is installed or it does not load.
+         */
         get: operations["jurisdiction_jurisdictions__code__get"];
         put?: never;
         post?: never;
@@ -62,7 +71,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Laws For */
+        /**
+         * List a jurisdiction's laws
+         * @description Stored laws of one jurisdiction, newest year first. 404 for an unknown code.
+         */
         get: operations["laws_for_jurisdictions__code__laws_get"];
         put?: never;
         post?: never;
@@ -79,7 +91,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Laws */
+        /**
+         * List laws
+         * @description Stored laws, newest year first, filtered by jurisdiction, doctype, year or a title query. A title query orders results by how well the title matches.
+         */
         get: operations["laws_laws_get"];
         put?: never;
         post?: never;
@@ -96,7 +111,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Law */
+        /**
+         * Get a law
+         * @description One law with every stored version, without the XML.
+         */
         get: operations["law_laws__law_id__get"];
         put?: never;
         post?: never;
@@ -113,7 +131,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Law Versions */
+        /**
+         * List a law's versions
+         * @description One page of a law's versions, without the XML. Pass `next_cursor` back as `cursor` for the next page.
+         */
         get: operations["law_versions_laws__law_id__versions_get"];
         put?: never;
         post?: never;
@@ -130,7 +151,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Runs */
+        /**
+         * List runs
+         * @description Runs this server process holds, newest first. Runs are kept in memory and lost on restart.
+         */
         get: operations["list_runs_runs_get"];
         put?: never;
         post?: never;
@@ -149,7 +173,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ingest */
+        /**
+         * Ingest an uploaded document
+         * @description Starts a run that converts the uploaded file to Akoma Ntoso and stores it. 429 when the run queue is full.
+         */
         post: operations["ingest_runs_ingest_post"];
         delete?: never;
         options?: never;
@@ -166,7 +193,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ingest Url */
+        /**
+         * Ingest a document by URL
+         * @description Starts a run that fetches and ingests an EUR-Lex or Publications Office URL under the `eu` jurisdiction, the only lane that fetches. 422 for any other URL or jurisdiction.
+         */
         post: operations["ingest_url_runs_ingest_url_post"];
         delete?: never;
         options?: never;
@@ -181,7 +211,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Run State */
+        /**
+         * Get a run
+         * @description One run's status and events so far.
+         */
         get: operations["run_state_runs__run_id__get"];
         put?: never;
         post?: never;
@@ -200,7 +233,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel */
+        /**
+         * Cancel a run
+         * @description Cancels a queued or running run. 409 when the run is unknown or has already finished.
+         */
         post: operations["cancel_runs__run_id__cancel_post"];
         delete?: never;
         options?: never;
@@ -217,7 +253,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry */
+        /**
+         * Retry a run
+         * @description Starts a new run with the finished run's inputs; the old run keeps its outcome. 409 for an unknown or unfinished run, 429 when the queue is full.
+         */
         post: operations["retry_runs__run_id__retry_post"];
         delete?: never;
         options?: never;
@@ -232,7 +271,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Run Stream */
+        /**
+         * Stream a run's events
+         * @description Server-sent events: every event so far, then each new one, then an `end` event when the run finishes.
+         */
         get: operations["run_stream_runs__run_id__stream_get"];
         put?: never;
         post?: never;
@@ -249,7 +291,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search */
+        /**
+         * Search provisions
+         * @description Hybrid (lexical and vector) search over one jurisdiction's provisions, best match first. 503 when no embeddings endpoint is configured.
+         */
         get: operations["search_search_get"];
         put?: never;
         post?: never;
@@ -266,7 +311,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Version */
+        /**
+         * Get a version
+         * @description One version with its Akoma Ntoso XML.
+         */
         get: operations["version_versions__version_id__get"];
         put?: never;
         post?: never;
@@ -284,7 +332,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Version Document
+         * Get a version as a document tree
          * @description The version as the reader's section tree, not as AKN.
          */
         get: operations["version_document_versions__version_id__document_get"];
@@ -325,14 +373,14 @@ export interface components {
             auth_scheme: "none" | "token" | "bearer" | "api_key" | "operator_code" | "basic" | "soap_session" | "email_registration";
             /**
              * Coverage
-             * @description How much of the statute base the source holds.
+             * @description How much of the statute base the source holds. Recorded for reference; the pipeline does not read it.
              * @default unknown
              * @enum {string}
              */
             coverage: "complete" | "partial" | "stub" | "unknown";
             /**
              * Coverage Note
-             * @description Free-text note on `coverage`.
+             * @description Free-text note on `coverage`. Recorded for reference; the pipeline does not read it.
              */
             coverage_note?: string | null;
             /**
@@ -355,7 +403,7 @@ export interface components {
             format: "akn_xml" | "akn_xml_v2" | "bespoke_xml" | "structured_html" | "html" | "pdf" | "pdf_scanned" | "docx" | "rtf" | "json" | "csv" | "rdf";
             /**
              * License
-             * @description Licence the source publishes under.
+             * @description Licence the source publishes under. Recorded for reference; the pipeline does not read it.
              */
             license?: string | null;
             /**
@@ -365,7 +413,7 @@ export interface components {
             name: string;
             /**
              * Protocol
-             * @description How documents are fetched from the source. Defaults to HTTP.
+             * @description How documents are fetched from the source. Defaults to HTTP. Recorded for reference; the pipeline does not read it.
              * @default http
              * @enum {string}
              */
@@ -378,12 +426,12 @@ export interface components {
             requires_token: boolean;
             /**
              * Schema Id
-             * @description Identifier of the schema the source's documents follow.
+             * @description Identifier of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.
              */
             schema_id?: string | null;
             /**
              * Schema Url
-             * @description URL of the schema the source's documents follow.
+             * @description URL of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.
              */
             schema_url?: string | null;
             /**
@@ -529,11 +577,20 @@ export interface components {
         };
         /** Body_ingest_runs_ingest_post */
         Body_ingest_runs_ingest_post: {
-            /** File */
+            /**
+             * File
+             * @description The source document, such as a PDF.
+             */
             file: string;
-            /** Jurisdiction */
+            /**
+             * Jurisdiction
+             * @description Jurisdiction code, such as `xa`.
+             */
             jurisdiction: string;
-            /** Title */
+            /**
+             * Title
+             * @description Title to store the law under. Unset uses the title read from it.
+             */
             title?: string | null;
         };
         /**
@@ -770,7 +827,7 @@ export interface components {
             akn_subtype?: string | null;
             /**
              * Authoritative Language
-             * @description Authoritative language for this class, for legal systems whose classes are enacted in different languages. None falls back to the jurisdiction's.
+             * @description Authoritative language for this class, for legal systems whose classes are enacted in different languages. Recorded for reference; the pipeline reads only the jurisdiction's.
              */
             authoritative_language?: string | null;
             /**
@@ -797,7 +854,7 @@ export interface components {
             extends?: string | null;
             /**
              * Frbr Subtype
-             * @description The FRBR subtype segment for the class's works, returned with the class by the MCP jurisdiction tools.
+             * @description FRBR subtype of the class's works, returned by the MCP `get_jurisdiction` tool. URI minting does not read it: it uses the doctype or `uri_patterns`.
              */
             frbr_subtype?: string | null;
             /**
@@ -1055,7 +1112,7 @@ export interface components {
             text?: string | null;
             /**
              * To
-             * @description Last date the formula applies to, inclusive.
+             * @description First date the formula no longer applies to, exclusive.
              */
             to?: string | null;
             /**
@@ -1078,7 +1135,7 @@ export interface components {
             calendar_conversion?: components["schemas"]["CalendarConversion"] | null;
             /**
              * Country Code
-             * @description The country segment of minted FRBR URIs, where it differs from the jurisdiction code (a subdivision homed under its parent, for example).
+             * @description The country segment of minted FRBR URIs: usually the jurisdiction code, different for a subdivision homed under its parent.
              */
             country_code: string;
             /**
@@ -1489,7 +1546,7 @@ export interface components {
             calendar: "gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual";
             /**
              * Closing Phrases
-             * @description `LegalEra.closing_phrases` for a jurisdiction that declares no eras. An era's own list wins where it declares one.
+             * @description Phrases opening the closing attestation in any era. Attestation detection reads them together with every era's `closing_phrases`; the per-era region vocabulary uses an era's own list instead where it declares one.
              */
             closing_phrases?: string[];
             /**
@@ -1605,7 +1662,7 @@ export interface components {
             name_local?: string | null;
             /**
              * Name Translations
-             * @description Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language, in the same shape as a law's title translations.
+             * @description Localised jurisdiction names keyed by ISO 639-3 language code, in the same shape as a law's title translations. The pipeline does not read it.
              */
             name_translations?: {
                 [key: string]: string;
@@ -1866,7 +1923,7 @@ export interface components {
             article_numbering?: string | null;
             /**
              * Citations
-             * @description Citation pattern per instrument type, keyed by type, so a jurisdiction declares its own without a dedicated field for each.
+             * @description Citation pattern per instrument type, keyed by type. Recorded for reference; the pipeline does not read it.
              */
             citations?: {
                 [key: string]: string;
@@ -2161,7 +2218,7 @@ export interface components {
             kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml" | "json_portal" | "oecd_compendium";
             /**
              * Licence
-             * @description Licence the source publishes under, recorded on the documents it yields.
+             * @description Licence the source publishes under, recorded on fetched documents by the acquirers that carry it.
              */
             licence?: string | null;
             /**
@@ -2699,6 +2756,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Jurisdiction code, such as `xa`. */
                 code: string;
             };
             cookie?: never;
@@ -2728,11 +2786,14 @@ export interface operations {
     laws_for_jurisdictions__code__laws_get: {
         parameters: {
             query?: {
+                /** @description Most laws to return. */
                 limit?: number;
+                /** @description Laws to skip before the page starts. */
                 offset?: number;
             };
             header?: never;
             path: {
+                /** @description Jurisdiction code, such as `xa`. */
                 code: string;
             };
             cookie?: never;
@@ -2762,11 +2823,17 @@ export interface operations {
     laws_laws_get: {
         parameters: {
             query?: {
+                /** @description Jurisdiction code. Unset lists every jurisdiction. */
                 jurisdiction?: string | null;
+                /** @description Document class, such as `act`. */
                 doctype?: string | null;
+                /** @description Year of the law. */
                 year?: number | null;
+                /** @description Title query. When set, results are ordered by title match. */
                 q?: string | null;
+                /** @description Most laws to return. */
                 limit?: number;
+                /** @description Laws to skip before the page starts. */
                 offset?: number;
             };
             header?: never;
@@ -2800,6 +2867,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Law id, as returned by the law listing. */
                 law_id: string;
             };
             cookie?: never;
@@ -2829,11 +2897,14 @@ export interface operations {
     law_versions_laws__law_id__versions_get: {
         parameters: {
             query?: {
+                /** @description Most versions to return. */
                 limit?: number;
+                /** @description The `next_cursor` of the previous page. Unset starts at the first. */
                 cursor?: string | null;
             };
             header?: never;
             path: {
+                /** @description Law id, as returned by the law listing. */
                 law_id: string;
             };
             cookie?: never;
@@ -2951,6 +3022,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -2982,6 +3054,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -3013,6 +3086,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -3044,6 +3118,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -3073,9 +3148,13 @@ export interface operations {
     search_search_get: {
         parameters: {
             query: {
+                /** @description The search text. */
                 q: string;
+                /** @description Jurisdiction code, such as `xa`. */
                 jurisdiction: string;
+                /** @description Most matches to return. */
                 k?: number;
+                /** @description ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it. */
                 language?: string | null;
             };
             header?: never;
@@ -3109,6 +3188,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Version id, as listed under its law. */
                 version_id: string;
             };
             cookie?: never;
@@ -3140,6 +3220,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Version id, as listed under its law. */
                 version_id: string;
             };
             cookie?: never;

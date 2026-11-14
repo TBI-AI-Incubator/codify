@@ -29,7 +29,7 @@
           },
           "coverage": {
             "default": "unknown",
-            "description": "How much of the statute base the source holds.",
+            "description": "How much of the statute base the source holds. Recorded for reference; the pipeline does not read it.",
             "enum": [
               "complete",
               "partial",
@@ -48,7 +48,7 @@
                 "type": "null"
               }
             ],
-            "description": "Free-text note on `coverage`.",
+            "description": "Free-text note on `coverage`. Recorded for reference; the pipeline does not read it.",
             "title": "Coverage Note"
           },
           "description": {
@@ -112,7 +112,7 @@
                 "type": "null"
               }
             ],
-            "description": "Licence the source publishes under.",
+            "description": "Licence the source publishes under. Recorded for reference; the pipeline does not read it.",
             "title": "License"
           },
           "name": {
@@ -122,7 +122,7 @@
           },
           "protocol": {
             "default": "http",
-            "description": "How documents are fetched from the source. Defaults to HTTP.",
+            "description": "How documents are fetched from the source. Defaults to HTTP. Recorded for reference; the pipeline does not read it.",
             "enum": [
               "http",
               "rest",
@@ -151,7 +151,7 @@
                 "type": "null"
               }
             ],
-            "description": "Identifier of the schema the source's documents follow.",
+            "description": "Identifier of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.",
             "title": "Schema Id"
           },
           "schema_url": {
@@ -163,7 +163,7 @@
                 "type": "null"
               }
             ],
-            "description": "URL of the schema the source's documents follow.",
+            "description": "URL of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.",
             "title": "Schema Url"
           },
           "url_template": {
@@ -414,10 +414,12 @@
         "properties": {
           "file": {
             "contentMediaType": "application/octet-stream",
+            "description": "The source document, such as a PDF.",
             "title": "File",
             "type": "string"
           },
           "jurisdiction": {
+            "description": "Jurisdiction code, such as `xa`.",
             "title": "Jurisdiction",
             "type": "string"
           },
@@ -430,6 +432,7 @@
                 "type": "null"
               }
             ],
+            "description": "Title to store the law under. Unset uses the title read from it.",
             "title": "Title"
           }
         },
@@ -782,7 +785,7 @@
                 "type": "null"
               }
             ],
-            "description": "Authoritative language for this class, for legal systems whose classes are enacted in different languages. None falls back to the jurisdiction's.",
+            "description": "Authoritative language for this class, for legal systems whose classes are enacted in different languages. Recorded for reference; the pipeline reads only the jurisdiction's.",
             "title": "Authoritative Language"
           },
           "basic_unit": {
@@ -830,7 +833,7 @@
                 "type": "null"
               }
             ],
-            "description": "The FRBR subtype segment for the class's works, returned with the class by the MCP jurisdiction tools.",
+            "description": "FRBR subtype of the class's works, returned by the MCP `get_jurisdiction` tool. URI minting does not read it: it uses the doctype or `uri_patterns`.",
             "title": "Frbr Subtype"
           },
           "hcontainers": {
@@ -1454,7 +1457,7 @@
                 "type": "null"
               }
             ],
-            "description": "Last date the formula applies to, inclusive.",
+            "description": "First date the formula no longer applies to, exclusive.",
             "title": "To"
           },
           "transliteration": {
@@ -1494,7 +1497,7 @@
             "description": "Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion."
           },
           "country_code": {
-            "description": "The country segment of minted FRBR URIs, where it differs from the jurisdiction code (a subdivision homed under its parent, for example).",
+            "description": "The country segment of minted FRBR URIs: usually the jurisdiction code, different for a subdivision homed under its parent.",
             "title": "Country Code",
             "type": "string"
           },
@@ -2558,7 +2561,7 @@
             "type": "string"
           },
           "closing_phrases": {
-            "description": "`LegalEra.closing_phrases` for a jurisdiction that declares no eras. An era's own list wins where it declares one.",
+            "description": "Phrases opening the closing attestation in any era. Attestation detection reads them together with every era's `closing_phrases`; the per-era region vocabulary uses an era's own list instead where it declares one.",
             "items": {
               "type": "string"
             },
@@ -2770,7 +2773,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Localised jurisdiction names keyed by ISO 639-3 language code, used to render an export cover in the target language, in the same shape as a law's title translations.",
+            "description": "Localised jurisdiction names keyed by ISO 639-3 language code, in the same shape as a law's title translations. The pipeline does not read it.",
             "title": "Name Translations",
             "type": "object"
           },
@@ -3372,7 +3375,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Citation pattern per instrument type, keyed by type, so a jurisdiction declares its own without a dedicated field for each.",
+            "description": "Citation pattern per instrument type, keyed by type. Recorded for reference; the pipeline does not read it.",
             "title": "Citations",
             "type": "object"
           },
@@ -3912,7 +3915,7 @@
                 "type": "null"
               }
             ],
-            "description": "Licence the source publishes under, recorded on the documents it yields.",
+            "description": "Licence the source publishes under, recorded on fetched documents by the acquirers that carry it.",
             "title": "Licence"
           },
           "name": {
@@ -4948,6 +4951,7 @@
   "paths": {
     "/health": {
       "get": {
+        "description": "Answers without touching the database.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -4961,11 +4965,12 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Health"
+        "summary": "Check the server is up"
       }
     },
     "/jurisdictions": {
       "get": {
+        "description": "Every jurisdiction with an installed configuration: its code, name and languages.",
         "operationId": "jurisdictions_jurisdictions_get",
         "responses": {
           "200": {
@@ -4983,18 +4988,21 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Jurisdictions"
+        "summary": "List jurisdictions"
       }
     },
     "/jurisdictions/{code}": {
       "get": {
+        "description": "The full configuration the pipeline reads for this jurisdiction. 404 when none is installed or it does not load.",
         "operationId": "jurisdiction_jurisdictions__code__get",
         "parameters": [
           {
+            "description": "Jurisdiction code, such as `xa`.",
             "in": "path",
             "name": "code",
             "required": true,
             "schema": {
+              "description": "Jurisdiction code, such as `xa`.",
               "title": "Code",
               "type": "string"
             }
@@ -5022,28 +5030,33 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Jurisdiction"
+        "summary": "Get a jurisdiction's configuration"
       }
     },
     "/jurisdictions/{code}/laws": {
       "get": {
+        "description": "Stored laws of one jurisdiction, newest year first. 404 for an unknown code.",
         "operationId": "laws_for_jurisdictions__code__laws_get",
         "parameters": [
           {
+            "description": "Jurisdiction code, such as `xa`.",
             "in": "path",
             "name": "code",
             "required": true,
             "schema": {
+              "description": "Jurisdiction code, such as `xa`.",
               "title": "Code",
               "type": "string"
             }
           },
           {
+            "description": "Most laws to return.",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "Most laws to return.",
               "maximum": 500,
               "minimum": 1,
               "title": "Limit",
@@ -5051,11 +5064,13 @@
             }
           },
           {
+            "description": "Laws to skip before the page starts.",
             "in": "query",
             "name": "offset",
             "required": false,
             "schema": {
               "default": 0,
+              "description": "Laws to skip before the page starts.",
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
@@ -5084,14 +5099,16 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Laws For"
+        "summary": "List a jurisdiction's laws"
       }
     },
     "/laws": {
       "get": {
+        "description": "Stored laws, newest year first, filtered by jurisdiction, doctype, year or a title query. A title query orders results by how well the title matches.",
         "operationId": "laws_laws_get",
         "parameters": [
           {
+            "description": "Jurisdiction code. Unset lists every jurisdiction.",
             "in": "query",
             "name": "jurisdiction",
             "required": false,
@@ -5104,10 +5121,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Jurisdiction code. Unset lists every jurisdiction.",
               "title": "Jurisdiction"
             }
           },
           {
+            "description": "Document class, such as `act`.",
             "in": "query",
             "name": "doctype",
             "required": false,
@@ -5120,10 +5139,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Document class, such as `act`.",
               "title": "Doctype"
             }
           },
           {
+            "description": "Year of the law.",
             "in": "query",
             "name": "year",
             "required": false,
@@ -5136,10 +5157,12 @@
                   "type": "null"
                 }
               ],
+              "description": "Year of the law.",
               "title": "Year"
             }
           },
           {
+            "description": "Title query. When set, results are ordered by title match.",
             "in": "query",
             "name": "q",
             "required": false,
@@ -5152,15 +5175,18 @@
                   "type": "null"
                 }
               ],
+              "description": "Title query. When set, results are ordered by title match.",
               "title": "Q"
             }
           },
           {
+            "description": "Most laws to return.",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
               "default": 50,
+              "description": "Most laws to return.",
               "maximum": 500,
               "minimum": 1,
               "title": "Limit",
@@ -5168,11 +5194,13 @@
             }
           },
           {
+            "description": "Laws to skip before the page starts.",
             "in": "query",
             "name": "offset",
             "required": false,
             "schema": {
               "default": 0,
+              "description": "Laws to skip before the page starts.",
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
@@ -5201,18 +5229,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Laws"
+        "summary": "List laws"
       }
     },
     "/laws/{law_id}": {
       "get": {
+        "description": "One law with every stored version, without the XML.",
         "operationId": "law_laws__law_id__get",
         "parameters": [
           {
+            "description": "Law id, as returned by the law listing.",
             "in": "path",
             "name": "law_id",
             "required": true,
             "schema": {
+              "description": "Law id, as returned by the law listing.",
               "format": "uuid",
               "title": "Law Id",
               "type": "string"
@@ -5241,29 +5272,34 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Law"
+        "summary": "Get a law"
       }
     },
     "/laws/{law_id}/versions": {
       "get": {
+        "description": "One page of a law's versions, without the XML. Pass `next_cursor` back as `cursor` for the next page.",
         "operationId": "law_versions_laws__law_id__versions_get",
         "parameters": [
           {
+            "description": "Law id, as returned by the law listing.",
             "in": "path",
             "name": "law_id",
             "required": true,
             "schema": {
+              "description": "Law id, as returned by the law listing.",
               "format": "uuid",
               "title": "Law Id",
               "type": "string"
             }
           },
           {
+            "description": "Most versions to return.",
             "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
               "default": 100,
+              "description": "Most versions to return.",
               "maximum": 500,
               "minimum": 1,
               "title": "Limit",
@@ -5271,6 +5307,7 @@
             }
           },
           {
+            "description": "The `next_cursor` of the previous page. Unset starts at the first.",
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -5284,6 +5321,7 @@
                   "type": "null"
                 }
               ],
+              "description": "The `next_cursor` of the previous page. Unset starts at the first.",
               "title": "Cursor"
             }
           }
@@ -5310,11 +5348,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Law Versions"
+        "summary": "List a law's versions"
       }
     },
     "/runs": {
       "get": {
+        "description": "Runs this server process holds, newest first. Runs are kept in memory and lost on restart.",
         "operationId": "list_runs_runs_get",
         "responses": {
           "200": {
@@ -5332,11 +5371,12 @@
             "description": "Successful Response"
           }
         },
-        "summary": "List Runs"
+        "summary": "List runs"
       }
     },
     "/runs/ingest": {
       "post": {
+        "description": "Starts a run that converts the uploaded file to Akoma Ntoso and stores it. 429 when the run queue is full.",
         "operationId": "ingest_runs_ingest_post",
         "requestBody": {
           "content": {
@@ -5370,11 +5410,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Ingest"
+        "summary": "Ingest an uploaded document"
       }
     },
     "/runs/ingest-url": {
       "post": {
+        "description": "Starts a run that fetches and ingests an EUR-Lex or Publications Office URL under the `eu` jurisdiction, the only lane that fetches. 422 for any other URL or jurisdiction.",
         "operationId": "ingest_url_runs_ingest_url_post",
         "requestBody": {
           "content": {
@@ -5408,18 +5449,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Ingest Url"
+        "summary": "Ingest a document by URL"
       }
     },
     "/runs/{run_id}": {
       "get": {
+        "description": "One run's status and events so far.",
         "operationId": "run_state_runs__run_id__get",
         "parameters": [
           {
+            "description": "Run id, as returned when the run was started.",
             "in": "path",
             "name": "run_id",
             "required": true,
             "schema": {
+              "description": "Run id, as returned when the run was started.",
               "format": "uuid",
               "title": "Run Id",
               "type": "string"
@@ -5448,18 +5492,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Run State"
+        "summary": "Get a run"
       }
     },
     "/runs/{run_id}/cancel": {
       "post": {
+        "description": "Cancels a queued or running run. 409 when the run is unknown or has already finished.",
         "operationId": "cancel_runs__run_id__cancel_post",
         "parameters": [
           {
+            "description": "Run id, as returned when the run was started.",
             "in": "path",
             "name": "run_id",
             "required": true,
             "schema": {
+              "description": "Run id, as returned when the run was started.",
               "format": "uuid",
               "title": "Run Id",
               "type": "string"
@@ -5488,18 +5535,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Cancel"
+        "summary": "Cancel a run"
       }
     },
     "/runs/{run_id}/retry": {
       "post": {
+        "description": "Starts a new run with the finished run's inputs; the old run keeps its outcome. 409 for an unknown or unfinished run, 429 when the queue is full.",
         "operationId": "retry_runs__run_id__retry_post",
         "parameters": [
           {
+            "description": "Run id, as returned when the run was started.",
             "in": "path",
             "name": "run_id",
             "required": true,
             "schema": {
+              "description": "Run id, as returned when the run was started.",
               "format": "uuid",
               "title": "Run Id",
               "type": "string"
@@ -5528,18 +5578,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Retry"
+        "summary": "Retry a run"
       }
     },
     "/runs/{run_id}/stream": {
       "get": {
+        "description": "Server-sent events: every event so far, then each new one, then an `end` event when the run finishes.",
         "operationId": "run_stream_runs__run_id__stream_get",
         "parameters": [
           {
+            "description": "Run id, as returned when the run was started.",
             "in": "path",
             "name": "run_id",
             "required": true,
             "schema": {
+              "description": "Run id, as returned when the run was started.",
               "format": "uuid",
               "title": "Run Id",
               "type": "string"
@@ -5568,37 +5621,44 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Run Stream"
+        "summary": "Stream a run's events"
       }
     },
     "/search": {
       "get": {
+        "description": "Hybrid (lexical and vector) search over one jurisdiction's provisions, best match first. 503 when no embeddings endpoint is configured.",
         "operationId": "search_search_get",
         "parameters": [
           {
+            "description": "The search text.",
             "in": "query",
             "name": "q",
             "required": true,
             "schema": {
+              "description": "The search text.",
               "title": "Q",
               "type": "string"
             }
           },
           {
+            "description": "Jurisdiction code, such as `xa`.",
             "in": "query",
             "name": "jurisdiction",
             "required": true,
             "schema": {
+              "description": "Jurisdiction code, such as `xa`.",
               "title": "Jurisdiction",
               "type": "string"
             }
           },
           {
+            "description": "Most matches to return.",
             "in": "query",
             "name": "k",
             "required": false,
             "schema": {
               "default": 10,
+              "description": "Most matches to return.",
               "maximum": 100,
               "minimum": 1,
               "title": "K",
@@ -5606,6 +5666,7 @@
             }
           },
           {
+            "description": "ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it.",
             "in": "query",
             "name": "language",
             "required": false,
@@ -5618,6 +5679,7 @@
                   "type": "null"
                 }
               ],
+              "description": "ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it.",
               "title": "Language"
             }
           }
@@ -5644,18 +5706,21 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Search"
+        "summary": "Search provisions"
       }
     },
     "/versions/{version_id}": {
       "get": {
+        "description": "One version with its Akoma Ntoso XML.",
         "operationId": "version_versions__version_id__get",
         "parameters": [
           {
+            "description": "Version id, as listed under its law.",
             "in": "path",
             "name": "version_id",
             "required": true,
             "schema": {
+              "description": "Version id, as listed under its law.",
               "format": "uuid",
               "title": "Version Id",
               "type": "string"
@@ -5684,7 +5749,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Version"
+        "summary": "Get a version"
       }
     },
     "/versions/{version_id}/document": {
@@ -5693,10 +5758,12 @@
         "operationId": "version_document_versions__version_id__document_get",
         "parameters": [
           {
+            "description": "Version id, as listed under its law.",
             "in": "path",
             "name": "version_id",
             "required": true,
             "schema": {
+              "description": "Version id, as listed under its law.",
               "format": "uuid",
               "title": "Version Id",
               "type": "string"
@@ -5725,7 +5792,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Version Document"
+        "summary": "Get a version as a document tree"
       }
     }
   }

@@ -1065,6 +1065,15 @@ def test_every_success_response_names_a_schema() -> None:
                 assert ref.startswith("#/components/schemas/"), f"{method} {path}: {schema}"
 
 
+def test_every_route_and_parameter_is_described() -> None:
+    paths = create_app(database=SCHEMA_ONLY).openapi()["paths"]
+    for path, ops in paths.items():
+        for method, op in ops.items():
+            assert op.get("summary") and op.get("description"), f"{method} {path}"
+            for param in op.get("parameters", []):
+                assert param.get("description"), f"{method} {path} {param['name']}"
+
+
 def test_the_schema_prints_without_a_database(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("POSTGRES_URL", raising=False)
     monkeypatch.setenv("ENVIRONMENT", "production")  # where an unset URL is an error
