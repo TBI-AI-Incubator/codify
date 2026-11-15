@@ -10,6 +10,7 @@ scaffold assembly.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from codify.pipeline.enrich.anchors import (
     StructuralAnchor,
@@ -52,6 +53,34 @@ def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFill
     return BodyFillResponse(bodies=blocks)
 
 
+def _blank_inline_markup(text: str, scan: str) -> str:
+    """``scan`` with each ``{{…}}`` span of ``text`` blanked: inline markup is never a heading."""
+    out = list(scan)
+    depth = start = i = 0
+    while i < len(text):
+        if text.startswith("{{", i):
+            start = i if depth == 0 else start
+            depth += 1
+            i += 2
+        elif depth and text.startswith("}}", i):
+            depth -= 1
+            i += 2
+            if depth == 0:
+                out[start:i] = " " * (i - start)
+        else:
+            # An unclosed opener on its line is literal text, not markup.
+            depth = 0 if text[i] == "\n" else depth
+            i += 1
+    return "".join(out)
+
+
+def _marker_start(scan: str, offset: int) -> int:
+    """Skip the match's leading boundary, which in a blanked scan can cover hidden prose."""
+    while offset < len(scan) and scan[offset].isspace():
+        offset += 1
+    return offset
+
+
 def text_to_bluebell_verbatim(
     text: str,
     *,
@@ -69,13 +98,13 @@ def text_to_bluebell_verbatim(
     """
     if scan_text is not None and len(scan_text) != len(text):
         raise ValueError("scan_text must be offset-aligned with text")
-    regex = cached_regex(country, doctype)
-    anchors = scan_anchors(
-        scan_text if scan_text is not None else text,
-        regex,
-        country=country,
-        doctype=doctype,
-    )
+    scan = _blank_inline_markup(text, scan_text if scan_text is not None else text)
+    anchors = [
+        replace(a, char_offset=_marker_start(scan, a.char_offset))
+        for a in scan_anchors(
+            scan, cached_regex(country, doctype), country=country, doctype=doctype
+        )
+    ]
     if not anchors:
         raise ValueError("no structural anchors found — use the LLM structuring lane")
 
