@@ -16,16 +16,13 @@ const targets = [
   { n: 5, y: 1218 }, // 1. (Short title and commencement)
   { n: 6, y: 1281 }, // (1) This Act may be cited
 ]
-// final.akn.xml lines 3, 7, 32-33, 41, 43-44, 46-48, 50, abridged. The formula has no marker: Codify inserts it from the jurisdiction config.
+// final.akn.xml lines 3, 7, 32-33, 41, 43-44, 46-48, 50, abridged.
 const xml = [
   ['<meta>'],
   ['  … <FRBRuri value="/akn/xa/act/1992/7"/>', 2],
   ['<preface>'],
   ['  <p>THE ATLANTIS GAZETTE</p> …', 1],
   ['  <p>WHEREAS … AS FOLLOWS:</p>', 3],
-  ['<preamble>'],
-  ['  <formula refersTo="#codify">', 0, true],
-  ['    from the config, not the page', 0, false, 'note'],
   ['<body>'],
   ['  <part eId="part_I">', 4],
   ['    <heading>PRELIMINARY</heading>'],

@@ -40,7 +40,7 @@
       <p eId="preface__p_5">[Assented to 2nd May, 1992]</p>
       <p eId="preface__p_6">WHEREAS IT IS EXPEDIENT THAT THE LAWS OF ATLANTIS BE PUBLISHED IN A COMPLETE, AUTHENTIC AND CURRENT FORM, AND THAT EVERY PERSON HAVE ACCESS TO THE LAW BY WHICH THAT PERSON IS BOUND: BE IT ENACTED BY THE ASSEMBLY OF ATLANTIS, AND BY THE AUTHORITY OF THE SAME, AS FOLLOWS:</p>
     </preface>
-    <preamble><formula name="enactingFormula" refersTo="#codify"><p>BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:</p></formula></preamble><body>
+    <body>
       <part eId="part_I">
         <num>I</num>
         <heading>PRELIMINARY</heading>

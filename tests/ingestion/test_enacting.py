@@ -1,219 +1,81 @@
-"""Tests for the enacting formula emitter."""
+"""Opening material and the enacting formula a source carries."""
 
 from __future__ import annotations
-
-from datetime import date
 
 import pytest
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
 from codify.jurisdictions import JurisdictionConfigError
-from codify.pipeline.enrich.enacting import (
-    emit_enacting_formula,
-    inject_enacting_formula,
-    select_formula,
-)
+from codify.pipeline.enrich.bluebell import parse_to_akn
 
 
-def _minimal_act(has_preface: bool = False) -> str:
-    preface = "<preface><longTitle><p>An Act.</p></longTitle></preface>" if has_preface else ""
+def _minimal_act() -> str:
     return f'''<?xml version="1.0"?>
 <akomaNtoso xmlns="{AKN_NS}">
   <act contains="originalVersion">
     <meta><identification source="#codify"/></meta>
-    {preface}
     <body><section eId="sec_1"><num>1.</num><content><p>Short title.</p></content></section></body>
   </act>
 </akomaNtoso>
 '''
 
 
-class TestSelectFormula:
-    def test_the_later_era_is_selected_by_date(self):
-        f = select_formula("gb", "act", date(2024, 1, 1))
-        assert f is not None
-        assert "King" in f.text
-
-    def test_the_earlier_era_is_selected_by_date(self):
-        f = select_formula("gb", "act", date(2020, 1, 1))
-        assert f is not None
-        assert "Queen" in f.text or "Majesty" in f.text
-
-    def test_an_unknown_country_raises_rather_than_selecting_nothing(self):
-        """A jurisdiction with no config and one whose formulae simply do not
-        match both used to return None, so a run that never consulted a config
-        was indistinguishable from one that consulted it and found no rule."""
-        with pytest.raises(JurisdictionConfigError, match="zz"):
-            select_formula("zz", "act", date(2024, 1, 1))
-
-    def test_no_date_selects_nothing_when_all_formulae_are_era_bounded(self):
-        # gb's formulae tile the timeline with from/to bounds; an undated
-        # document cannot prove which era it is in, so nothing is injected.
-        assert select_formula("gb", "act", None) is None
-
-    def test_missing_jurisdiction_returns_none(self):
-        # a jurisdiction with no enacting_formulae
-        assert select_formula("jp", "act", date(2024, 1, 1)) is None
-
-    def test_verified_preferred_on_ties(self):
-        # Spot-check: where multiple entries match the same date, the
-        # verified one wins if present. Not all configs have verified
-        # entries, so we just assert the selection is stable for gb.
-        f1 = select_formula("gb", "act", date(2024, 1, 1))
-        f2 = select_formula("gb", "act", date(2024, 1, 1))
-        assert f1 is not None and f2 is not None
-        assert f1.text == f2.text
+class _NoModel:
+    def __getattr__(self, name: str) -> object:
+        raise RuntimeError("no model in this test")
 
 
-class TestDoctypeMatches:
-    def test_scalar_document_class_matches_only_its_doctype(self):
-        # A scalar document_class (ar's "ley" vs "dnu") must match one doctype,
-        # not act as a wildcard, else the first formula is selected for every doctype.
-        from codify.jurisdictions import EnactingFormula
-        from codify.pipeline.enrich.enacting import _doctype_matches
+async def _enrich(akn: str, country: str, doctype: str, raw_date: str) -> etree._Element:
+    from codify.pipeline import stages
 
-        assert _doctype_matches(EnactingFormula(document_class="ley"), "ley") is True
-        assert _doctype_matches(EnactingFormula(document_class="ley"), "dnu") is False
-        assert _doctype_matches(EnactingFormula(document_class=None), "anything") is True
-        assert _doctype_matches(EnactingFormula(document_class=["act", "si"]), "si") is True
-        assert _doctype_matches(EnactingFormula(document_class=["act", "si"]), "loi") is False
-
-
-class TestInjectEnactingFormula:
-    def test_injects_into_new_preamble(self):
-        from codify.jurisdictions import EnactingFormula
-
-        f = EnactingFormula(text="ENACTED by the Parliament of Nowhere.", position="preamble")
-        out = inject_enacting_formula(_minimal_act(), f)
-        root = etree.fromstring(out.encode("utf-8"))
-        formula = root.find(".//akn:preamble/akn:formula[@name='enactingFormula']", NS)
-        assert formula is not None
-        assert formula.find("akn:p", NS).text == "ENACTED by the Parliament of Nowhere."
-
-    def test_preamble_sits_before_body(self):
-        from codify.jurisdictions import EnactingFormula
-
-        f = EnactingFormula(text="X", position="preamble")
-        out = inject_enacting_formula(_minimal_act(), f)
-        root = etree.fromstring(out.encode("utf-8"))
-        act = root.find("akn:act", NS)
-        children = [child.tag.split("}")[-1] for child in act]
-        assert children.index("preamble") < children.index("body")
-
-    def test_preserves_existing_preface(self):
-        from codify.jurisdictions import EnactingFormula
-
-        f = EnactingFormula(text="X", position="preamble")
-        out = inject_enacting_formula(_minimal_act(has_preface=True), f)
-        root = etree.fromstring(out.encode("utf-8"))
-        act = root.find("akn:act", NS)
-        children = [child.tag.split("}")[-1] for child in act]
-        assert "preface" in children
-        assert "preamble" in children
-        # Order invariant: preface → preamble → body
-        assert children.index("preface") < children.index("preamble") < children.index("body")
-
-    def test_idempotent(self):
-        from codify.jurisdictions import EnactingFormula
-
-        f = EnactingFormula(text="Y", position="preamble")
-        once = inject_enacting_formula(_minimal_act(), f)
-        twice = inject_enacting_formula(once, f)
-        root = etree.fromstring(twice.encode("utf-8"))
-        formulae = root.findall(".//akn:formula[@name='enactingFormula']", NS)
-        assert len(formulae) == 1
+    desc = stages.Descriptors(
+        title="Test",
+        raw_date=raw_date,
+        number="1",
+        year=raw_date[:4],
+        language="eng",
+        doctype=doctype,
+    )
+    out = await stages.run_enrich_passes(
+        akn,
+        llm=_NoModel(),  # type: ignore[arg-type]
+        jurisdiction_code=country,
+        desc=desc,
+        skip_external_refs=True,
+    )
+    return etree.fromstring(out.encode("utf-8"))
 
 
-class TestEmitEnactingFormula:
-    def test_end_to_end_current_era(self):
-        out = emit_enacting_formula(_minimal_act(), "gb", "act", "2024-06-01")
-        assert "King" in out
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is not None
-
-    def test_an_unknown_country_raises_rather_than_emitting_a_formulaless_act(self):
-        """The document this used to return is valid AKN with no enacting formula,
-        which reads as a law that has none rather than a run that could not find
-        the rule. Absence of a config is a fault, so it raises."""
-        with pytest.raises(JurisdictionConfigError, match="zz"):
-            emit_enacting_formula(_minimal_act(), "zz", "act", "2024-06-01")
-
-    def test_noop_when_missing_from_config(self):
-        out = emit_enacting_formula(_minimal_act(), "jp", "act", "2024-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
+async def test_a_source_without_a_formula_gets_none() -> None:
+    root = await _enrich(_minimal_act(), "xa", "act", "2024-06-01")
+    assert root.find(".//akn:formula", NS) is None
+    assert root.find(".//akn:preamble", NS) is None
 
 
-def _arabic_act(preamble_text: str | None = None) -> str:
-    preamble = f"<preamble><p>{preamble_text}</p></preamble>" if preamble_text else ""
-    return f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    {preamble}
-    <body><article eId="art_1"><num>1</num><content><p>نص</p></content></article></body>
-  </act>
-</akomaNtoso>
-'''
+async def test_a_formula_the_source_prints_is_still_tagged() -> None:
+    akn = parse_to_akn(
+        "PREAMBLE\n\n  Having regard to the Act,\n\n  HEREBY RESOLVES:\n\n"
+        "BODY\n\nSECTION 1\n\n  A.\n",
+        "xa",
+        doctype="resolution",
+        date="2024-03-05",
+        number="4",
+    )
+    root = await _enrich(akn, "xa", "resolution", "2024-03-05")
+    formula = root.find(".//akn:preamble/akn:formula[@name='enactingFormula']", NS)
+    assert formula is not None
+    assert "HEREBY RESOLVES" in "".join(formula.itertext())
+    assert formula.get("refersTo") is None
 
 
-class TestSourceCarriesFormula:
-    def test_marker_in_source_skips_injection(self):
-        src = _arabic_act("رئيس جمهورية زرزورة، استناداً للقانون الأساسي، أصدر القرار الآتي بقانون:")
-        out = emit_enacting_formula(src, "xz", "act", "2001-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
+def test_a_config_still_carrying_formulae_loads() -> None:
+    """Deployed configs may keep the retired key until their data is cleaned."""
+    from codify.jurisdictions import JurisdictionConfig, load_config
 
-    def test_third_person_municipal_marker_skips_injection(self):
-        # A municipal amendment names the council early, then enacts with a
-        # third-person verb ("... قد أصدر التعديل التالي"), the council is not
-        # adjacent to the verb, so only the self-enacting marker catches it.
-        src = _arabic_act(
-            "إن مجلس بلدية الواحة واستناداً إلى الصلاحيات المخولة له في المادة الخامسة "
-            "عشر من قانون الهيئات المحلية رقم (2) لسنة 1995 قد أصدر التعديل التالي:-"
-        )
-        out = emit_enacting_formula(src, "xz", "act", "1999-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_assembly_era_without_marker_injects_fallback(self):
-        out = emit_enacting_formula(_minimal_act(), "xz", "act", "2001-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        formula = root.find(".//akn:formula[@name='enactingFormula']", NS)
-        assert formula is not None
-        assert "مجلس الأمة" in formula.find("akn:p", NS).text
-
-    def test_after_the_era_without_marker_injects_nothing(self):
-        # The only config formula is era-bounded; it must never
-        # leak outside its era via the date-filter fallback.
-        out = emit_enacting_formula(_minimal_act(), "xz", "act", "2014-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_injected_formula_carries_codify_provenance(self):
-        # refersTo="#codify" is what exempts the config fallback from the
-        # fabricated_formula validator check; losing it would make every
-        # injection self-report as fabrication. It is not @source because the
-        # schema refuses that attribute on <formula>.
-        out = emit_enacting_formula(_minimal_act(), "xz", "act", "2001-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        formula = root.find(".//akn:formula[@name='enactingFormula']", NS)
-        assert formula.get("refersTo") == "#codify"
-        assert formula.get("source") is None
-
-    def test_marker_matches_despite_orthography_drift(self):
-        # OCR text with bare alef vs config marker with hamza still matches.
-        src = _arabic_act("رئيس جمهورية زرزورة اصدر القرار الاتي بقانون:")
-        out = emit_enacting_formula(src, "xz", "act", "2001-06-01")
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_marker_check_idempotent_with_existing_formula(self):
-        out = emit_enacting_formula(_minimal_act(), "xz", "act", "2001-06-01")
-        again = emit_enacting_formula(out, "xz", "act", "2001-06-01")
-        root = etree.fromstring(again.encode("utf-8"))
-        assert len(root.findall(".//akn:formula[@name='enactingFormula']", NS)) == 1
+    raw = load_config("xa").model_dump(by_alias=True, exclude_unset=True)
+    raw["enacting_formulae"] = [{"text": "Be it enacted."}]
+    assert JurisdictionConfig.model_validate(raw).code == "xa"
 
 
 class TestSplitOpeningMaterial:
@@ -271,8 +133,8 @@ class TestOpeningMaterialTerminator:
         assert "Menetapkan" in both
 
     def test_invocation_is_still_formula_evidence(self):
-        """It stays in `enacting_formula_markers`, which is what suppresses the
-        config fallback; the two fields answer different questions."""
+        """It stays in `enacting_formula_markers`, which marks where the preamble
+        opens; the two fields answer different questions."""
         from codify.jurisdictions import load_config
 
         cfg = load_config("xl")
@@ -356,130 +218,6 @@ class TestFurnitureNeverBecomesOpeningMaterial:
 
         with pytest.raises(JurisdictionConfigError, match="zz"):
             split_opening_material("Some Act 2020\n", "zz")
-
-
-class TestAuthorityGate:
-    """A Council of Ministers instrument must not receive a
-    legislative-council formula just because its date falls in that era."""
-
-    def _com_regulation(self) -> str:
-        return f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preface><p>قرار مجلس الوزراء رقم (41) لسنة 2004 باللائحة التنفيذية</p></preface>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-
-    def test_com_instrument_skips_assembly_formula(self):
-        out = emit_enacting_formula(self._com_regulation(), "xz", "act", date(2004, 8, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_assembly_era_act_without_instrument_phrase_still_injected(self):
-        plain = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preface><p>قانون رقم (3) لسنة 2000 بشأن الآبار</p></preface>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-        out = emit_enacting_formula(plain, "xz", "act", date(2000, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is not None
-
-    def test_recital_citing_com_does_not_block(self):
-        # "بناء على تنسيب مجلس الوزراء" is a citation, not an enacting verb.
-        recital = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preamble><p>بناء على تنسيب مجلس الوزراء بتاريخ 2000/5/1،</p></preamble>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-        out = emit_enacting_formula(recital, "xz", "act", date(2000, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is not None
-
-    def test_recital_citing_com_decision_number_does_not_block(self):
-        # "وعلى قرار مجلس الوزراء رقم (5) لسنة 2003" in a recital cites a
-        # prior instrument; only a preface instrument title blocks.
-        recital = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preface><p>قانون رقم (7) لسنة 2005</p></preface>
-    <preamble><p>وعلى قرار مجلس الوزراء رقم (5) لسنة 2003،</p></preamble>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-        out = emit_enacting_formula(recital, "xz", "act", date(2005, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is not None
-
-    def test_formula_naming_matching_authority_passes_gate(self):
-        from codify.pipeline.enrich.enacting import _authority_conflict
-
-        com_doc = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act><meta/><preface><p>قرار مجلس الوزراء رقم (41) لسنة 2004</p></preface><body/></act>
-</akomaNtoso>
-'''
-        root = etree.fromstring(com_doc.encode("utf-8"))
-        assert not _authority_conflict(root, "قرر مجلس الوزراء ما يلي")
-        assert _authority_conflict(root, "أصدر مجلس الأمة الزرزوري القانون الآتي نصه:")
-
-    def _municipal_bylaw(self, opener: str) -> str:
-        # A city-council نظام ratified by the Minister of Local Governance.
-        return f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preamble><p>{opener} بعد موافقة وزير الحكم المحلي:</p></preamble>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-
-    def test_municipal_bylaw_construct_form_skips_assembly_formula(self):
-        # "أصدر مجلس بلدية الواحة النظام التالي", an assembly-era date must not pull
-        # the legislative-council formula onto a municipal by-law.
-        src = self._municipal_bylaw("أصدر مجلس بلدية الواحة النظام التالي")
-        out = emit_enacting_formula(src, "xz", "act", date(2005, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_municipal_bylaw_adjective_form_skips_assembly_formula(self):
-        # "أصدر المجلس البلدي لمدينة زرزورة النظام التالي".
-        src = self._municipal_bylaw("أصدر المجلس البلدي لمدينة زرزورة النظام التالي")
-        out = emit_enacting_formula(src, "xz", "act", date(1999, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is None
-
-    def test_recital_citing_municipal_decision_does_not_block(self):
-        # A national statute whose recitals cite a prior municipal decision by
-        # its NOUN form ("قرار مجلس بلدية") must still receive its formula, only
-        # the enacting-VERB form ("قرر/أصدر مجلس بلدية") pins municipal authority.
-        recital = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act contains="originalVersion">
-    <meta><identification source="#codify"/></meta>
-    <preface><p>قانون رقم (5) لسنة 2001 بشأن الحكم المحلي</p></preface>
-    <preamble><p>وعلى قرار مجلس بلدية الواحة رقم (12) لسنة 2000،</p></preamble>
-    <body><section eId="sec_1"><num>1.</num><content><p>نص.</p></content></section></body>
-  </act>
-</akomaNtoso>
-'''
-        out = emit_enacting_formula(recital, "xz", "act", date(2001, 6, 1))
-        root = etree.fromstring(out.encode("utf-8"))
-        assert root.find(".//akn:formula[@name='enactingFormula']", NS) is not None
 
     def test_the_bidi_mangled_form_of_the_title_is_not_furniture(self):
         # Arabic OCR can emit the law's own title with its tokens in visual order.

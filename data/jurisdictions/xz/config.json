@@ -124,16 +124,6 @@
     "publication of the agreement",
     "publication of the convention"
   ],
-  "enacting_formulae": [
-    {
-      "text": "أصدر مجلس الأمة الزرزوري القانون الآتي نصه:",
-      "position": "preamble",
-      "era": "assembly",
-      "from": "1961-07-15",
-      "to": "2011-01-01",
-      "document_class": "act"
-    }
-  ],
   "enacting_formula_markers": [
     "أصدر القرار الآتي بقانون",
     "أصدرنا القانون الآتي",

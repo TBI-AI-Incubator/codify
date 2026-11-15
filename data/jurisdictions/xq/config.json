@@ -56,13 +56,6 @@
     "insertion_style": "bis",
     "note": "Inserted articles take bis/ter rather than a decimal."
   },
-  "enacting_formulae": [
-    {
-      "text": "LA ASAMBLEA NACIONAL DE QUIVIRA DECRETA:",
-      "position": "preamble",
-      "document_class": "ley"
-    }
-  ],
   "enacting_formula_markers": ["DECRETA:"],
   "amendments": {
     "style": "textual_civil",

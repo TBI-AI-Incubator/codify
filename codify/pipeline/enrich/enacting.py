@@ -1,22 +1,16 @@
-"""Inject <formula name="enactingFormula"> into AKN from jurisdiction config.
+"""Split a source's opening material and tag the enacting formula it carries.
 
-Selects the right structured enacting formula for a document's date + doctype
-and injects it into the AKN preamble. No LLM involvement, pure data lookup.
-"""
+Codify never adds a formula the source does not print."""
 
 from __future__ import annotations
 
-import re
-from datetime import date, datetime
 from typing import cast
 
 import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS, NS
-from codify.akn._schema import main_body
-from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, EnactingFormula, load_config
-from codify.pipeline.enrich.akn_meta import FORMULA_PROVENANCE
+from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config
 from codify.pipeline.enrich.anchors import cached_regex
 from codify.pipeline.enrich.arabic_normalise import (
     drop_header_only_lines,
@@ -26,152 +20,11 @@ from codify.pipeline.enrich.arabic_normalise import (
 logger = structlog.get_logger()
 
 
-def select_formula(
-    country: str,
-    doctype: str,
-    doc_date: str | date | None,
-) -> EnactingFormula | None:
-    """Pick the enacting formula that applies to a document. Filters the jurisdiction's
-    ``enacting_formulae`` by doctype (wildcard allowed) and date range, then prefers
-    ``verified: true``. None when the jurisdiction has no formulae or nothing matches.
-    """
-    cfg = load_config(country)
-    if not cfg.enacting_formulae:
-        return None
-
-    target = _coerce_date(doc_date)
-    candidates: list[EnactingFormula] = []
-
-    for f in cfg.enacting_formulae:
-        if not _doctype_matches(f, doctype):
-            continue
-        bounded = f.from_date is not None or f.to_date is not None
-        # An era-bounded formula must never apply outside its era, and a
-        # document with no usable date cannot prove it is inside one.
-        if bounded and (target is None or not _date_in_range(f, target)):
-            continue
-        candidates.append(f)
-
-    if not candidates:
-        # Date filter ruled everything out: fall back only to date-unbounded
-        # formulae.
-        candidates = [
-            f
-            for f in cfg.enacting_formulae
-            if _doctype_matches(f, doctype) and f.from_date is None and f.to_date is None
-        ]
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda f: (not f.verified,))
-    return candidates[0]
-
-
-def inject_enacting_formula(akn_xml: str, formula: EnactingFormula) -> str:
-    """Add ``<preamble><formula name="enactingFormula">…</formula></preamble>``
-    between <preface>/<meta> and <body>. Idempotent."""
-    value = formula.text or ""
-    slots = re.findall(r"\[([^\]]*)\]", value)
-    unresolved = any(
-        any(char.isalpha() for char in slot)
-        and not re.fullmatch(r"\d+[A-Za-z]?(?:\.\d+[A-Za-z]?)*(?:\([A-Za-z0-9]+\))*", slot)
-        for slot in slots
-    )
-    if unresolved or re.search(r"\{[^{}]*\}|\.{3}|…", value):
-        logger.info("enacting_formula_skipped", reason="unexpanded_template")
-        return akn_xml
-    root = etree.fromstring(akn_xml.encode("utf-8"))
-
-    act = _find_act_element(root)
-    if act is None:
-        return akn_xml
-
-    preamble = act.find("akn:preamble", NS)
-    if preamble is None:
-        preamble = etree.SubElement(act, f"{{{AKN_NS}}}preamble")
-        _move_before_body(act, preamble)
-
-    existing = preamble.find("akn:formula[@name='enactingFormula']", NS)
-    if existing is not None:
-        # Idempotent: leave existing formula alone. If the config changed
-        # we'd need an explicit re-enrich; this keeps repeat runs stable.
-        return akn_xml
-
-    # refersTo="#codify" marks the formula as tool-injected config fallback, not
-    # document text; the fabricated_formula validator check skips it on that
-    # provenance. The schema refuses @source here.
-    fml = etree.SubElement(
-        preamble,
-        f"{{{AKN_NS}}}formula",
-        attrib={"name": "enactingFormula", "refersTo": FORMULA_PROVENANCE},
-    )
-    p = etree.SubElement(fml, f"{{{AKN_NS}}}p")
-    p.text = formula.text
-
-    return cast(str, etree.tostring(root, pretty_print=True, encoding="unicode"))
-
-
-def emit_enacting_formula(
-    akn_xml: str,
-    country: str,
-    doctype: str,
-    doc_date: str | date | None,
-) -> str:
-    """Select and inject the enacting formula in one call. No-op when nothing matches, when
-    the source preface or preamble already carries its own, or when the source names a
-    different enacting authority than the formula asserts: a Council of Ministers
-    regulation must never receive a legislative-council formula because its date falls in
-    that era.
-    """
-    cfg = load_config(country)
-    akn_xml = _mark_open_preamble(akn_xml, cfg.opening_material_terminators)
-    root = etree.fromstring(akn_xml.encode("utf-8"))
-    if cfg.enacting_formula_markers:
-        if _source_carries_formula(root, cfg.enacting_formula_markers):
-            logger.info(
-                "enacting_formula_skipped",
-                country=country,
-                doctype=doctype,
-                reason="present_in_source",
-            )
-            return akn_xml
-
-    formula = select_formula(country, doctype, doc_date)
-    if formula is None:
-        logger.info(
-            "enacting_formula_skipped",
-            country=country,
-            doctype=doctype,
-            reason="no_match",
-        )
-        return akn_xml
-
-    if _authority_conflict(root, formula.text or ""):
-        logger.info(
-            "enacting_formula_skipped",
-            country=country,
-            doctype=doctype,
-            reason="authority_mismatch",
-        )
-        return akn_xml
-
-    out = inject_enacting_formula(akn_xml, formula)
-    if out == akn_xml:
-        return out
-    logger.info(
-        "enacting_formula_injected",
-        country=country,
-        era=formula.era,
-        verified=getattr(formula, "verified", False),
-    )
-    return out
-
-
-def _mark_open_preamble(akn_xml: str, terminators: list[str]) -> str:
+def mark_source_formula(akn_xml: str, country: str) -> str:
     """In a `doc` or `statement`, the preamble line a terminator closes becomes the
     source's own enacting formula, and each line before it a recital, so preamble,
     formula and operative body stay apart and the recitals' citations are rows."""
+    terminators = load_config(country).opening_material_terminators
     root = etree.fromstring(akn_xml.encode("utf-8"))
     main = next((c for c in root if isinstance(c.tag, str)), None)
     if main is None or etree.QName(main).localname not in OPEN_STRUCTURE_ROOTS:
@@ -306,114 +159,3 @@ def _truncate_after_enacting_formula(
         text=[line.strip()[:60] for line in tail[:6]],
     )
     return lines[: first + 1]
-
-
-# --- helpers -----------------------------------------------------------------
-
-
-# Phrases pinning the enacting authority: when the source carries one the formula's
-# text does not name, the formula belongs to another body and must not be injected.
-# The noun form is an instrument title, so it counts only in the preface, recitals
-# routinely citing prior Council of Ministers decisions. The verb forms pin enactment
-# and count anywhere in the opening matter.
-_INSTRUMENT_TITLE_AUTHORITIES: tuple[tuple[str, str], ...] = (
-    ("قرار مجلس الوزراء", "مجلس الوزراء"),
-)
-_ENACTING_VERB_AUTHORITIES: tuple[tuple[str, str], ...] = (
-    ("قرر مجلس الوزراء", "مجلس الوزراء"),
-    ("أصدر مجلس الوزراء", "مجلس الوزراء"),
-    # Municipal by-laws (نظام) enacted by a city council and ratified by the
-    # Minister of Local Governance. A PLC-era date must not pull the
-    # legislative-council formula onto a municipal instrument.
-    ("أصدر مجلس بلدية", "مجلس بلدية"),
-    ("قرر مجلس بلدية", "مجلس بلدية"),
-    ("أصدر المجلس البلدي", "المجلس البلدي"),
-    ("قرر المجلس البلدي", "المجلس البلدي"),
-)
-
-
-def _authority_conflict(root: etree._Element, formula_text: str) -> bool:
-    def region(tag: str) -> str:
-        return fold_arabic_for_match(
-            " ".join(" ".join(el.itertext()) for el in root.iter(f"{{{AKN_NS}}}{tag}"))
-        )
-
-    preface = region("preface")
-    opening = preface + " " + region("preamble")
-    fml = fold_arabic_for_match(formula_text)
-    for phrases, src in (
-        (_INSTRUMENT_TITLE_AUTHORITIES, preface),
-        (_ENACTING_VERB_AUTHORITIES, opening),
-    ):
-        for instrument, authority in phrases:
-            if (
-                fold_arabic_for_match(instrument) in src
-                and fold_arabic_for_match(authority) not in fml
-            ):
-                return True
-    return False
-
-
-def _source_carries_formula(root: etree._Element, markers: list[str]) -> bool:
-    """True when any marker phrase occurs in the preface/preamble text.
-    Markers are literal substrings, orthography-folded on both sides, so a
-    config typo can never become a regex that kills the pass."""
-    parts: list[str] = []
-    for tag in ("preface", "preamble"):
-        for el in root.iter(f"{{{AKN_NS}}}{tag}"):
-            parts.append(" ".join(el.itertext()))
-    text = fold_arabic_for_match(" ".join(parts))
-    return any(fold_arabic_for_match(m) in text for m in markers)
-
-
-def _coerce_date(value: str | date | None) -> date | None:
-    if value is None or value == "":
-        return None
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    try:
-        return datetime.fromisoformat(str(value)[:10]).date()
-    except ValueError:
-        return None
-
-
-def _doctype_matches(formula: EnactingFormula, doctype: str) -> bool:
-    """Formula applies to this doctype if it's a wildcard or explicitly lists it."""
-    dc = formula.document_class
-    if dc is None:
-        return True
-    if isinstance(dc, str):
-        # A scalar document_class names one doctype, not a wildcard (ar's "ley" vs
-        # "dnu"), or the first formula would be picked for every doctype.
-        return dc == doctype
-    return doctype in dc
-
-
-def _date_in_range(formula: EnactingFormula, target: date) -> bool:
-    start = _coerce_date(formula.from_date)
-    end = _coerce_date(formula.to_date)
-    if start is not None and target < start:
-        return False
-    if end is not None and target >= end:
-        return False
-    return True
-
-
-def _find_act_element(root: etree._Element) -> etree._Element | None:
-    for tag in ("act", "bill", "amendment", "doc", "statement"):
-        el = root.find(f"akn:{tag}", NS)
-        if el is not None:
-            return el
-    return None
-
-
-def _move_before_body(act: etree._Element, preamble: etree._Element) -> None:
-    """Ensure <preamble> sits before <body> per AKN 3.0 element order."""
-    body = main_body(act)
-    if body is None:
-        return
-    act.remove(preamble)
-    body_idx = list(act).index(body)
-    act.insert(body_idx, preamble)

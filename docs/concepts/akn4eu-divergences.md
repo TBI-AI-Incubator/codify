@@ -29,7 +29,6 @@ For documents structured from PDF or text:
 | Manifestation | URI equals the expression URI, no format suffix; date is the day the file was produced | Requires `.xml` or `.akn` |
 | Authors | `FRBRauthor href=""` at all three levels | Requires an author reference |
 | eIds | ASCII only; a clash takes a `_2` suffix ([identifiers](akoma-ntoso.md#identifiers-eid-and-wid)) | Regenerates eIds on import, so stored citations to yours would not match |
-| Enacting formula | `refersTo="#codify"` where Codify inserted one from the config. It is inserted unless the opening text contains one of the config's `enacting_formula_markers`, so a source worded differently gets a second one, as the worked example does | Wants inserted formulae kept or dropped |
 
 <details>
 <summary>Choices that rarely matter on import</summary>

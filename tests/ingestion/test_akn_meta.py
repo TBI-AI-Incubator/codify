@@ -1,5 +1,5 @@
 # ruff: noqa: E501  # AKN XML test fixtures: line wraps would change tested whitespace
-"""The two things the strict schema refuses in AKN we emit ourselves."""
+"""What the strict schema refuses in the `<meta>` we emit ourselves."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from lxml import etree
 from codify.akn import AKN_NS
 from codify.akn._schema import validate_akn
 from codify.pipeline.enrich.akn_meta import normalise_akn_meta, normalise_akn_meta_if_changed
-from codify.pipeline.enrich.validator import validate_akn as advisory_findings
 
 _META = """<meta><identification source="#codify">
  <FRBRWork><FRBRthis value="/akn/xz/act/2007/237/!main"/><FRBRuri value="/akn/xz/act/2007/237"/>
@@ -22,10 +21,9 @@ _META = """<meta><identification source="#codify">
   <FRBRdate date="2026-08-02" name="Generation"/><FRBRauthor href="#codify"/></FRBRManifestation>
  </identification></meta>"""
 _BODY = '<body><article eId="art_1"><num>1</num><content><p>Body.</p></content></article></body>'
-_FORMULA = '<preamble><formula name="enactingFormula" source="#codify"><p>Be it enacted.</p></formula></preamble>'
 
 
-def _doc(preamble: str = _FORMULA) -> str:
+def _doc(preamble: str = "") -> str:
     return (
         f'<akomaNtoso xmlns="{AKN_NS}"><act name="act">{_META}{preamble}{_BODY}</act></akomaNtoso>'
     )
@@ -51,15 +49,9 @@ def _uris(xml: str) -> list[str | None]:
     ]
 
 
-def _formula(xml: str) -> etree._Element:
-    found = etree.fromstring(xml.encode()).find(f".//{{{AKN_NS}}}formula")
-    assert found is not None
-    return found
-
-
 class TestTheDocumentStartsInvalid:
     def test_the_stored_shape_fails_the_schema(self) -> None:
-        """The premise. Both defects are present in what ingest stores today."""
+        """The premise. The defects are present in what ingest stores today."""
         import pytest
         from lxml.etree import DocumentInvalid
 
@@ -223,40 +215,10 @@ class TestReportingAChange:
         assert normalise_akn_meta_if_changed(_doc()) is not None
 
 
-class TestFormulaProvenance:
-    def test_the_marker_moves_to_a_legal_attribute(self) -> None:
-        fml = _formula(normalise_akn_meta(_doc()))
-        assert fml.get("refersTo") == "#codify"
-        assert fml.get("source") is None
-
-    def test_a_formula_we_did_not_inject_is_untouched(self) -> None:
-        other = (
-            '<preamble><formula name="enactingFormula"><p>From the source.</p></formula></preamble>'
-        )
-        fml = _formula(normalise_akn_meta(_doc(other)))
-        assert fml.get("refersTo") is None
-
-    def test_the_fabricated_formula_exemption_still_holds(self) -> None:
-        """The regression the naive fix causes: strip the marker and every
-        config-injected formula self-reports as fabricated enacting language.
-        The formula text is deliberately absent from the source text, which is
-        what the containment branch would otherwise flag."""
-        out = normalise_akn_meta(_doc())
-        findings = advisory_findings(out, source_text="Article 1. Body.")
-        assert not any(f["check"] == "fabricated_formula" for f in findings)
-
-    def test_a_genuinely_fabricated_formula_is_still_flagged(self) -> None:
-        other = '<preamble><formula name="enactingFormula"><p>Invented enacting words.</p></formula></preamble>'
-        out = normalise_akn_meta(_doc(other))
-        findings = advisory_findings(out, source_text="Article 1. Body.")
-        assert any(f["check"] == "fabricated_formula" for f in findings)
-
-
 class TestTheResult:
     def test_the_normalised_document_passes_the_schema(self) -> None:
-        """Where the two fixes meet: one document carrying both defects comes
-        out valid, which is what lets the write path enforce rather than
-        report."""
+        """One document carrying both date defects comes out valid, which is
+        what lets the write path enforce rather than report."""
         validate_akn(normalise_akn_meta(_doc(), work_date="2007-03-17"), strict=True)
 
     def test_running_it_twice_changes_nothing(self) -> None:

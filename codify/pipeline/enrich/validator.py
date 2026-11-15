@@ -26,7 +26,6 @@ from codify.akn.vocabulary import (
 )
 from codify.frbr import UNKNOWN_YEAR, is_citable_work_uri
 from codify.lang import normalise_digits
-from codify.pipeline.enrich.akn_meta import FORMULA_PROVENANCE
 from codify.pipeline.enrich.anchors import arabic_article_headers
 from codify.pipeline.enrich.arabic_cardinals import find_money_word_mismatches
 from codify.pipeline.enrich.arabic_normalise import (
@@ -1581,17 +1580,12 @@ def check_missing_container_titles(root: etree._Element) -> list[dict[str, Any]]
 
 def _check_fabricated_formula(root: etree._Element, source_text: str) -> list[dict[str, Any]]:
     """Flag enacting formulae absent from the raw structuring text, meaning fabricated
-    enacting language. Formulae with refersTo="#codify" are the era-gated config fallback
-    injected only when the source carries none, and are skipped on that provenance. Both
-    sides are digit-normalised and orthography-folded, so faithful transcription that
-    normalised alef or diacritics is not flagged.
-    """
+    enacting language. Both sides are digit-normalised and orthography-folded, so faithful
+    transcription that normalised alef or diacritics is not flagged."""
     folded_source = fold_arabic_for_match(normalise_digits(source_text))
     issues: list[dict[str, Any]] = []
     for fml in root.iter(f"{{{AKN_NS}}}formula"):
         if fml.get("name") != "enactingFormula":
-            continue
-        if fml.get("refersTo") == FORMULA_PROVENANCE:
             continue
         raw = re.sub(r"\s+", " ", "".join(fml.itertext())).strip()
         text = fold_arabic_for_match(normalise_digits(raw))

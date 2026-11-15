@@ -41,7 +41,7 @@ The start of the worked example, `final.akn.xml`, produced from
       <p eId="preface__p_1">THE ATLANTIS GAZETTE</p>
       ...
     </preface>
-    <preamble><formula name="enactingFormula" refersTo="#codify"><p>BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:</p></formula></preamble><body>
+    <body>
       <part eId="part_I">
         <num>I</num>
         <heading>PRELIMINARY</heading>
@@ -57,7 +57,7 @@ The start of the worked example, `final.akn.xml`, produced from
           ...
 ```
 
-![Page 1 of the worked example's scan, pages/page-001.png, cropped from the masthead to subsection (1) of section 1, beside an abridged extract of final.akn.xml. Six numbered markers pair a printed line with its element. 1: the masthead, THE ATLANTIS GAZETTE, is a p in preface. 2: the line No. 7 of 1992 gives the work URI /akn/xa/act/1992/7, in FRBRuri under meta. 3: the recital ending in the enacting words, WHEREAS to AS FOLLOWS, is another p in preface. The formula in preamble, refersTo #codify, has no marker: Codify inserted it from the jurisdiction config. 4: the heading PART I, PRELIMINARY, is part with eId part_I and heading PRELIMINARY. 5: section 1 is section with eId part_I__sec_1 and num 1. 6: subsection (1) is point with eId part_I__sec_1__point_1.](../figures/v2-page-to-akn.svg "Each numbered marker pairs a line printed on page 1 with the element it became, from the worked example's real run.")
+![Page 1 of the worked example's scan, pages/page-001.png, cropped from the masthead to subsection (1) of section 1, beside an abridged extract of final.akn.xml. Six numbered markers pair a printed line with its element. 1: the masthead, THE ATLANTIS GAZETTE, is a p in preface. 2: the line No. 7 of 1992 gives the work URI /akn/xa/act/1992/7, in FRBRuri under meta. 3: the recital ending in the enacting words, WHEREAS to AS FOLLOWS, is another p in preface. 4: the heading PART I, PRELIMINARY, is part with eId part_I and heading PRELIMINARY. 5: section 1 is section with eId part_I__sec_1 and num 1. 6: subsection (1) is point with eId part_I__sec_1__point_1.](../figures/v2-page-to-akn.svg "Each numbered marker pairs a line printed on page 1 with the element it became, from the worked example's real run.")
 
 | Part | Element | What it holds |
 | --- | --- | --- |
@@ -67,13 +67,6 @@ The start of the worked example, `final.akn.xml`, produced from
 | The law | `body` | The hierarchy of provisions. A `doc` or `statement` uses `mainBody` instead. |
 | Closing matter | `conclusions` | Promulgation and signature lines, where Codify finds them after the last provision. |
 | Schedules and annexes | `attachments` | One `attachment` per schedule, each holding a nested document with its own `meta`. |
-
-<details><summary>Why the worked example states its enacting formula twice</summary>
-
-Codify inserts the `formula` in `preamble` (`refersTo="#codify"`) unless the opening text contains
-one of the config's `enacting_formula_markers`, and the `xa` markers do not include "BE IT ENACTED".
-
-</details>
 
 ## Document types
 

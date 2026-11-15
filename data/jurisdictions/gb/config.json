@@ -260,34 +260,6 @@
     "insertion_style": "alphanumeric",
     "note": "Acts cited by short title and year (e.g. 'Companies Act 2006'). Pre-1963 acts may use regnal year and chapter (e.g. '5 & 6 Eliz. 2 c. 11'). SIs cited as 'SI year/number'."
   },
-  "enacting_formulae": [
-    {
-      "text": "BE IT ENACTED by the King's most Excellent Majesty, by and with the advice and consent of the Lords Spiritual and Temporal, and Commons, in this present Parliament assembled, and by the authority of the same, as follows:—",
-      "position": "preamble",
-      "era": "king-charles-iii",
-      "from": "2022-09-08",
-      "note": "Standard form for Acts passed by both Houses (Public Bills). Used from accession of King Charles III.",
-      "document_class": [
-        "act",
-        "ukpga",
-        "ukla",
-        "ukppa"
-      ]
-    },
-    {
-      "text": "BE IT ENACTED by the Queen's most Excellent Majesty, by and with the advice and consent of the Lords Spiritual and Temporal, and Commons, in this present Parliament assembled, and by the authority of the same, as follows:—",
-      "position": "preamble",
-      "era": "queen-elizabeth-ii",
-      "to": "2022-09-08",
-      "note": "Standard form used during the reign of Queen Elizabeth II.",
-      "document_class": [
-        "act",
-        "ukpga",
-        "ukla",
-        "ukppa"
-      ]
-    }
-  ],
   "amendments": {
     "style": "textual_commonwealth",
     "phrasing": "is amended as follows",

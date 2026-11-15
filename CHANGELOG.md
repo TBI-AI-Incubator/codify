@@ -7,6 +7,14 @@ the launch tag.
 
 Breaks:
 
+- Ingest no longer inserts an enacting formula the source does not print.
+  `JurisdictionConfig.enacting_formulae` and `EnactingFormula` are removed, as are
+  `select_formula`, `inject_enacting_formula` and `emit_enacting_formula`;
+  `mark_source_formula(akn_xml, country)` tags the formula a source carries. A
+  config that still sets `enacting_formulae` loads and the key is ignored. A
+  formula marked `refersTo="#codify"` is no longer exempt from the
+  `fabricated_formula` check, and `normalise_akn_meta` no longer moves a
+  formula's `@source`.
 - Acquisition no longer sends a default User-Agent. Set `ACQUISITION_USER_AGENT`
   to an identity naming you and a contact, or pass `user_agent` to
   `make_polite_client`; without one, building an acquirer's client raises

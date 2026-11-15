@@ -80,13 +80,6 @@
     "insertion_style": "alphanumeric",
     "note": "Laws cited by short title (e.g. 'Закон о нормативных правовых актах') or by number and year. Inserted articles carry a hyphen suffix, e.g. статья 18-1 after статья 18."
   },
-  "enacting_formulae": [
-    {
-      "text": "Настоящий Закон принят Собранием Китежа и промульгирован в соответствии с Основным Законом Республики Китеж.",
-      "position": "preamble",
-      "document_class": "act"
-    }
-  ],
   "amendments": {
     "style": "textual_civil_law",
     "phrasing": "изложить в следующей редакции... дополнить статьёй... признать утратившей силу...",

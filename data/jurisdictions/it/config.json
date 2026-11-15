@@ -463,36 +463,6 @@
     "insertion_style": "latin_ordinal",
     "insertion_example": "Art. 2-bis"
   },
-  "enacting_formulae": [
-    {
-      "text": "La Camera dei deputati ed il Senato della Repubblica hanno approvato;\nIL PRESIDENTE DELLA REPUBBLICA\nPromulga\nla seguente legge:",
-      "document_class": "legge",
-      "position": "preamble",
-      "era": "republic",
-      "from": "1948-01-01"
-    },
-    {
-      "text": "IL PRESIDENTE DELLA REPUBBLICA\nVisti gli articoli 76 e 87 della Costituzione;\n[Vista la legge delega reference];\nVista la deliberazione del Consiglio dei ministri, adottata nella riunione del [date];\nSulla proposta del Presidente del Consiglio dei ministri e del Ministro [portfolio];\nEmana\nil seguente decreto legislativo:",
-      "document_class": "decreto_legislativo",
-      "position": "preamble",
-      "era": "republic",
-      "from": "1948-01-01"
-    },
-    {
-      "text": "IL PRESIDENTE DELLA REPUBBLICA\nVisti gli articoli 77 e 87 della Costituzione;\nRitenuta la straordinaria necessità ed urgenza di [subject];\nVista la deliberazione del Consiglio dei ministri, adottata nella riunione del [date];\nSulla proposta del Presidente del Consiglio dei ministri e del Ministro [portfolio];\nEmana\nil seguente decreto-legge:",
-      "document_class": "decreto_legge",
-      "position": "preamble",
-      "era": "republic",
-      "from": "1948-01-01"
-    },
-    {
-      "text": "[VITTORIO EMANUELE III / UMBERTO II]\nper grazia di Dio e per volontà della Nazione RE D'ITALIA\n…\nAbbiamo decretato e decretiamo:",
-      "document_class": "regio_decreto",
-      "position": "preamble",
-      "era": "monarchy",
-      "to": "1946-06-02"
-    }
-  ],
   "amendments": {
     "style": "textual_civil_law",
     "cross_reference_format": "articolo_year_number"

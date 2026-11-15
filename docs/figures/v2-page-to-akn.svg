@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="624" height="825" viewBox="0 0 624 825" role="img" aria-label="Page 1 of the worked example scan beside the Akoma Ntoso it became: the masthead and the recital with its enacting words go to preface, the act number to the work URI /akn/xa/act/1992/7, PART I to part_I, section 1 to part_I__sec_1 and subsection (1) to part_I__sec_1__point_1.">
+<svg xmlns="http://www.w3.org/2000/svg" width="624" height="777" viewBox="0 0 624 777" role="img" aria-label="Page 1 of the worked example scan beside the Akoma Ntoso it became: the masthead and the recital with its enacting words go to preface, the act number to the work URI /akn/xa/act/1992/7, PART I to part_I, section 1 to part_I__sec_1 and subsection (1) to part_I__sec_1__point_1.">
 <style>
 svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
 .s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
@@ -32,22 +32,19 @@ text.em{font-weight:600}
 <text x="26" y="582" class="code">final.akn.xml</text>
 <text x="26" y="605" class="code">&lt;meta&gt;</text>
 <circle cx="8" cy="617" r="8" class="marker"/><text x="8" y="617" class="marker-n" text-anchor="middle">2</text>
-<text x="40.4" y="621" class="code">… &lt;FRBRuri value="/akn/xa/act/1992/7"/&gt;</text>
+<text x="40.4" y="621" class="code">… &lt;FRBRuri value=&quot;/akn/xa/act/1992/7&quot;/&gt;</text>
 <text x="26" y="637" class="code">&lt;preface&gt;</text>
 <circle cx="8" cy="649" r="8" class="marker"/><text x="8" y="649" class="marker-n" text-anchor="middle">1</text>
 <text x="40.4" y="653" class="code">&lt;p&gt;THE ATLANTIS GAZETTE&lt;/p&gt; …</text>
 <circle cx="8" cy="665" r="8" class="marker"/><text x="8" y="665" class="marker-n" text-anchor="middle">3</text>
 <text x="40.4" y="669" class="code">&lt;p&gt;WHEREAS … AS FOLLOWS:&lt;/p&gt;</text>
-<text x="26" y="685" class="code">&lt;preamble&gt;</text>
-<text x="40.4" y="701" class="code em">&lt;formula refersTo="#codify"&gt;</text>
-<text x="54.8" y="717" class="note">from the config, not the page</text>
-<text x="26" y="733" class="code">&lt;body&gt;</text>
-<circle cx="8" cy="745" r="8" class="marker"/><text x="8" y="745" class="marker-n" text-anchor="middle">4</text>
-<text x="40.4" y="749" class="code">&lt;part eId="part_I"&gt;</text>
-<text x="54.8" y="765" class="code">&lt;heading&gt;PRELIMINARY&lt;/heading&gt;</text>
-<circle cx="8" cy="777" r="8" class="marker"/><text x="8" y="777" class="marker-n" text-anchor="middle">5</text>
-<text x="54.8" y="781" class="code">&lt;section eId="part_I__sec_1"&gt;</text>
-<text x="69.2" y="797" class="code">&lt;num&gt;1&lt;/num&gt;</text>
-<circle cx="8" cy="809" r="8" class="marker"/><text x="8" y="809" class="marker-n" text-anchor="middle">6</text>
-<text x="69.2" y="813" class="code">&lt;point eId="part_I__sec_1__point_1"&gt;</text>
+<text x="26" y="685" class="code">&lt;body&gt;</text>
+<circle cx="8" cy="697" r="8" class="marker"/><text x="8" y="697" class="marker-n" text-anchor="middle">4</text>
+<text x="40.4" y="701" class="code">&lt;part eId=&quot;part_I&quot;&gt;</text>
+<text x="54.8" y="717" class="code">&lt;heading&gt;PRELIMINARY&lt;/heading&gt;</text>
+<circle cx="8" cy="729" r="8" class="marker"/><text x="8" y="729" class="marker-n" text-anchor="middle">5</text>
+<text x="54.8" y="733" class="code">&lt;section eId=&quot;part_I__sec_1&quot;&gt;</text>
+<text x="69.2" y="749" class="code">&lt;num&gt;1&lt;/num&gt;</text>
+<circle cx="8" cy="761" r="8" class="marker"/><text x="8" y="761" class="marker-n" text-anchor="middle">6</text>
+<text x="69.2" y="765" class="code">&lt;point eId=&quot;part_I__sec_1__point_1&quot;&gt;</text>
 </svg>

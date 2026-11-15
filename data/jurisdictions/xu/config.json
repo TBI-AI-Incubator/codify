@@ -144,18 +144,6 @@
     "insertion_style": "alphanumeric",
     "note": "Directives and regulations cited by doctype, number and year (e.g. 'Directive 12 of 2004', 'Regulation 5 of 2009')."
   },
-  "enacting_formulae": [
-    {
-      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS DIRECTIVE:",
-      "position": "preamble",
-      "document_class": "directive"
-    },
-    {
-      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS REGULATION:",
-      "position": "preamble",
-      "document_class": "regulation"
-    }
-  ],
   "amendments": {
     "style": "textual_civil",
     "phrasing": "Article X is replaced by the following: / Article Y is deleted / the following Article is inserted:",

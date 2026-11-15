@@ -14,7 +14,7 @@ from hypothesis import strategies as st
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import anchor_coverage, build_anchor_regex, scan_anchors
 from codify.pipeline.enrich.arabic_normalise import _compile_patterns, strip_ocr_headers_text
-from codify.pipeline.enrich.enacting import emit_enacting_formula, split_opening_material
+from codify.pipeline.enrich.enacting import mark_source_formula, split_opening_material
 from codify.pipeline.enrich.ocr import (
     PageResult,
     _strip_furniture_lines,
@@ -349,7 +349,7 @@ def test_a_printed_enacting_formula_is_not_duplicated(ending: str) -> None:
         '<akomaNtoso xmlns="http://docs.oasis-open.org/legaldocml/ns/akn/3.0">'
         f"<act><preamble><p>{preamble}</p></preamble><body/></act></akomaNtoso>"
     )
-    assert emit_enacting_formula(xml, "ug", "act", "2031-01-01") == xml
+    assert mark_source_formula(xml, "ug") == xml
 
 
 def test_translation_preserves_an_act_citation_without_page_context() -> None:
