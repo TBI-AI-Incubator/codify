@@ -39,6 +39,21 @@ export default defineConfig({
       // File paths start `../../docs/`, so the URL resolves to the repository's docs folder.
       editLink: { baseUrl: `${repoUrl}/edit/main/apps/docs/` },
       lastUpdated: true,
+      // Context7 answers only for domains allowed in its dashboard, so local builds leave it out.
+      head: process.env.DOCS_SITE
+        ? [
+            {
+              tag: 'script',
+              attrs: {
+                src: 'https://context7.com/widget.js',
+                'data-library': '/tbi-ai-incubator/codify',
+                'data-color': '#1a1a1a',
+                'data-placeholder': 'Ask about Codify',
+                defer: true,
+              },
+            },
+          ]
+        : [],
       markdown: { processedDirs: ['../../docs'] },
       sidebar,
       plugins: [
