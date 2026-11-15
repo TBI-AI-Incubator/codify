@@ -81,6 +81,19 @@ def _marker_start(scan: str, offset: int) -> int:
     return offset
 
 
+def _restore_heading(text: str, scan: str, anchor: StructuralAnchor) -> StructuralAnchor:
+    """Put back inline markup the blanked scan cut from the end of a captured heading."""
+    at = scan.find(anchor.heading, anchor.char_offset) if anchor.heading else -1
+    if at < 0:
+        return anchor
+    end = text.find("\n", at)
+    end = len(text) if end < 0 else end
+    tail = at + len(anchor.heading or "")
+    if scan[tail:end].strip() or "{{" not in text[tail:end]:
+        return anchor
+    return replace(anchor, heading=text[at:end].rstrip())
+
+
 def text_to_bluebell_verbatim(
     text: str,
     *,
@@ -100,7 +113,7 @@ def text_to_bluebell_verbatim(
         raise ValueError("scan_text must be offset-aligned with text")
     scan = _blank_inline_markup(text, scan_text if scan_text is not None else text)
     anchors = [
-        replace(a, char_offset=_marker_start(scan, a.char_offset))
+        _restore_heading(text, scan, replace(a, char_offset=_marker_start(scan, a.char_offset)))
         for a in scan_anchors(
             scan, cached_regex(country, doctype), country=country, doctype=doctype
         )

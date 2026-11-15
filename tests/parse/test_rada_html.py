@@ -129,3 +129,11 @@ def test_inline_references_stay_whole_and_never_head_a_unit() -> None:
     assert "SECTION" not in bluebell
     assert re.search(r"^\s*ARTICLE 2 - Набрання чинності$", bluebell, re.M)
     assert "затверджується Кабінетом Міністрів України." in bluebell
+
+
+def test_a_heading_keeps_its_inline_reference() -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    text = "ЗАКОН\nРозділ I\nПравила для {{>/go/1-01 реєстрів}}\nСтаття 1. Сфера\nТекст.\n"
+    bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
+    assert "SECTION I - Правила для {{>/go/1-01 реєстрів}}" in bluebell
