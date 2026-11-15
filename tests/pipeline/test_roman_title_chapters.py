@@ -287,3 +287,21 @@ def test_a_sentence_closed_by_a_quote_or_bracket_is_prose(
     )
     chapters = [a.number for a in _anchors(monkeypatch, text) if a.kind == "chapter"]
     assert chapters == ["I", "II"]
+
+
+def test_a_roman_title_keeps_its_inline_reference(monkeypatch: pytest.MonkeyPatch) -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    cfg = _config(opt_in=True)
+    monkeypatch.setattr("codify.pipeline.enrich.anchors.load_config", lambda _c: cfg)
+    monkeypatch.setattr(
+        "codify.pipeline.enrich.verbatim.cached_regex",
+        lambda _c, _d: build_anchor_regex(cfg, "act"),
+    )
+    text = (
+        "I. GENERAL PROVISIONS\n\nArticle 1\nOrchards are shared.\n\n"
+        "II. RULES FOR {{>/go/1-01 REGISTERS}}\n\nArticle 2\nEach district keeps one.\n"
+    )
+    bluebell, _summary, _anchors = text_to_bluebell_verbatim(text, country="xe", doctype="act")
+    assert "RULES FOR {{>/go/1-01 REGISTERS}}" in bluebell
+    assert bluebell.count("REGISTERS") == 1

@@ -145,3 +145,12 @@ def test_a_heading_keeps_its_inline_reference(heading: str) -> None:
     text = f"ЗАКОН\nРозділ I\n{heading}\nСтаття 1. Сфера\nТекст.\n"
     bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
     assert f"SECTION I - {heading}\n" in bluebell
+
+
+def test_a_reference_on_the_next_line_stays_in_the_body() -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    text = "ЗАКОН\nРозділ I\nПравила\n{{>/go/1-01 Довідка}}\nСтаття 1. Сфера\nТекст.\n"
+    bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
+    assert "SECTION I - Правила\n" in bluebell
+    assert bluebell.count("{{>/go/1-01 Довідка}}") == 1

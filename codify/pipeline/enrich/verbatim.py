@@ -13,6 +13,7 @@ import re
 from dataclasses import replace
 
 from codify.pipeline.enrich.anchors import (
+    _ROMAN_TITLE_PASS,
     StructuralAnchor,
     anchor_summary,
     cached_regex,
@@ -88,12 +89,23 @@ def _marker_start(scan: str, offset: int) -> int:
     return offset
 
 
+def _same_line_gap(gap: str) -> bool:
+    return "\n" not in gap and not gap.strip()
+
+
 def _restore_heading(
     text: str, scan: str, spans: list[tuple[int, int]], anchor: StructuralAnchor
 ) -> StructuralAnchor:
     """Read a captured heading back from ``text`` with the markup the scan blanked in it."""
     words = (anchor.heading or "").split()
-    at = scan.find(words[0], anchor.char_offset + len(anchor.matched_text)) if words else -1
+    marker_end = anchor.char_offset + len(anchor.matched_text)
+    # A Roman-title marker carries its title inside the match.
+    floor = (
+        anchor.char_offset + len(anchor.keyword)
+        if anchor.source_pass == _ROMAN_TITLE_PASS
+        else marker_end
+    )
+    at = scan.find(words[0], floor) if words else -1
     if at < 0:
         return anchor
     end = at
@@ -102,16 +114,16 @@ def _restore_heading(
         if found < 0 or "\n" in scan[end:found]:
             return anchor
         end = found + len(word)
-    floor = anchor.char_offset + len(anchor.matched_text)
     for s, e in reversed(spans):
-        if floor <= s and e <= at and not text[e:at].strip():
+        if floor <= s and e <= at and _same_line_gap(text[e:at]):
             at = s
     for s, e in spans:
-        if s >= end and not text[end:s].strip():
+        if s >= end and _same_line_gap(text[end:s]):
             end = e
     if "{{" not in text[at:end]:
         return anchor
-    return replace(anchor, heading=text[at:end])
+    matched = text[anchor.char_offset : end] if at < marker_end else anchor.matched_text
+    return replace(anchor, heading=text[at:end], matched_text=matched)
 
 
 def text_to_bluebell_verbatim(
