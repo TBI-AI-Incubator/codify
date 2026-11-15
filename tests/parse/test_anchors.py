@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Iterator
 
 import pytest
@@ -508,6 +509,17 @@ def test_a_citation_does_not_displace_the_heading_it_names() -> None:
 
     assert numbers(relaxed) == ["14", "12", "15"]
     assert numbers(anchored) == ["12", "14", "15"]
+
+
+@pytest.mark.parametrize("boundary", ["relaxed", "line_anchored", "column_only"])
+def test_long_blank_run_scans_in_linear_time(boundary: str) -> None:
+    """Parsers blank prose with spaces, so the boundary must not rescan a run per offset."""
+    regex = build_anchor_regex(None, "act", boundary=boundary)
+    text = "Section 5\na" + " " * 20_000 + "\t" * 20_000 + "b"
+    started = time.perf_counter()
+    found = [m.group(0).split() for m in regex.finditer(text)]
+    assert time.perf_counter() - started < 1.0
+    assert found == [["Section", "5"]]
 
 
 def test_abbreviated_article_matches() -> None:
