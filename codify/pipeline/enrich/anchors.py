@@ -462,12 +462,13 @@ def keyword_aliases(
 # What may precede a marker for it to count as a header; `relaxed` admits one
 # space for old scans that lost column layout. Both keep the marker's
 # newline inside the match, which `_is_prose_reference` reads back from.
+# Unbounded arms start only where a run begins, else a long blank run scans quadratically.
 _BOUNDARIES = {
-    "relaxed": r"(?:^\s{0,8}|\t\s*|\s+)",
-    "line_anchored": r"(?:^[^\S\n]{0,8}|\t\s*|\n[^\S\n]*|[^\S\n]{3,})",
-    # `relaxed` without the `|\s+` arm: the coverage denominator counts only
+    "relaxed": r"(?:^\s{0,8}|(?<!\s)\s+)",
+    "line_anchored": r"(?:^[^\S\n]{0,8}|(?<!\t)\t\s*|\n[^\S\n]*|(?<![^\S\n])[^\S\n]{3,})",
+    # `relaxed` without the `\s+` arm: the coverage denominator counts only
     # column-anchored markers, so a mid-prose alias+number is not expected.
-    "column_only": r"(?:^\s{0,8}|\t\s*)",
+    "column_only": r"(?:^\s{0,8}|(?<!\t)\t\s*)",
 }
 
 
