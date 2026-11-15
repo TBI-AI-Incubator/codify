@@ -53,9 +53,9 @@ def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFill
     return BodyFillResponse(bodies=blocks)
 
 
-def _blank_inline_markup(text: str, scan: str) -> str:
-    """``scan`` with each ``{{…}}`` span of ``text`` blanked: inline markup is never a heading."""
-    out = list(scan)
+def _markup_spans(text: str) -> list[tuple[int, int]]:
+    """Each outermost ``{{…}}`` span of ``text``; an unclosed opener on its line is literal."""
+    spans: list[tuple[int, int]] = []
     depth = start = i = 0
     while i < len(text):
         if text.startswith("{{", i):
@@ -66,11 +66,18 @@ def _blank_inline_markup(text: str, scan: str) -> str:
             depth -= 1
             i += 2
             if depth == 0:
-                out[start:i] = " " * (i - start)
+                spans.append((start, i))
         else:
-            # An unclosed opener on its line is literal text, not markup.
             depth = 0 if text[i] == "\n" else depth
             i += 1
+    return spans
+
+
+def _blank(scan: str, spans: list[tuple[int, int]]) -> str:
+    """Inline markup is never a heading, so the scan never sees it."""
+    out = list(scan)
+    for start, end in spans:
+        out[start:end] = " " * (end - start)
     return "".join(out)
 
 
@@ -81,17 +88,30 @@ def _marker_start(scan: str, offset: int) -> int:
     return offset
 
 
-def _restore_heading(text: str, scan: str, anchor: StructuralAnchor) -> StructuralAnchor:
-    """Put back inline markup the blanked scan cut from the end of a captured heading."""
-    at = scan.find(anchor.heading, anchor.char_offset) if anchor.heading else -1
+def _restore_heading(
+    text: str, scan: str, spans: list[tuple[int, int]], anchor: StructuralAnchor
+) -> StructuralAnchor:
+    """Read a captured heading back from ``text`` with the markup the scan blanked in it."""
+    words = (anchor.heading or "").split()
+    at = scan.find(words[0], anchor.char_offset + len(anchor.matched_text)) if words else -1
     if at < 0:
         return anchor
-    end = text.find("\n", at)
-    end = len(text) if end < 0 else end
-    tail = at + len(anchor.heading or "")
-    if scan[tail:end].strip() or "{{" not in text[tail:end]:
+    end = at
+    for word in words:
+        found = scan.find(word, end)
+        if found < 0 or "\n" in scan[end:found]:
+            return anchor
+        end = found + len(word)
+    floor = anchor.char_offset + len(anchor.matched_text)
+    for s, e in reversed(spans):
+        if floor <= s and e <= at and not text[e:at].strip():
+            at = s
+    for s, e in spans:
+        if s >= end and not text[end:s].strip():
+            end = e
+    if "{{" not in text[at:end]:
         return anchor
-    return replace(anchor, heading=text[at:end].rstrip())
+    return replace(anchor, heading=text[at:end])
 
 
 def text_to_bluebell_verbatim(
@@ -111,9 +131,12 @@ def text_to_bluebell_verbatim(
     """
     if scan_text is not None and len(scan_text) != len(text):
         raise ValueError("scan_text must be offset-aligned with text")
-    scan = _blank_inline_markup(text, scan_text if scan_text is not None else text)
+    spans = _markup_spans(text)
+    scan = _blank(scan_text if scan_text is not None else text, spans)
     anchors = [
-        _restore_heading(text, scan, replace(a, char_offset=_marker_start(scan, a.char_offset)))
+        _restore_heading(
+            text, scan, spans, replace(a, char_offset=_marker_start(scan, a.char_offset))
+        )
         for a in scan_anchors(
             scan, cached_regex(country, doctype), country=country, doctype=doctype
         )

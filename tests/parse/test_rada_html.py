@@ -131,9 +131,17 @@ def test_inline_references_stay_whole_and_never_head_a_unit() -> None:
     assert "затверджується Кабінетом Міністрів України." in bluebell
 
 
-def test_a_heading_keeps_its_inline_reference() -> None:
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "Правила для {{>/go/1-01 реєстрів}}",
+        "Правила для {{>/go/1-01 реєстрів}} і обліку",
+        "{{>/go/1-01 Правила}} для реєстрів",
+    ],
+)
+def test_a_heading_keeps_its_inline_reference(heading: str) -> None:
     from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
 
-    text = "ЗАКОН\nРозділ I\nПравила для {{>/go/1-01 реєстрів}}\nСтаття 1. Сфера\nТекст.\n"
+    text = f"ЗАКОН\nРозділ I\n{heading}\nСтаття 1. Сфера\nТекст.\n"
     bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
-    assert "SECTION I - Правила для {{>/go/1-01 реєстрів}}" in bluebell
+    assert f"SECTION I - {heading}\n" in bluebell
