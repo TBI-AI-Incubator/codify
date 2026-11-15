@@ -893,102 +893,6 @@ class NumberingConfig(BaseModel):
         return self
 
 
-class EnactingFormula(BaseModel):
-    model_config = _LOOSE
-
-    text: str | None = Field(
-        default=None,
-        description=(
-            "Wording injected into the preamble as the enacting formula when the source has "
-            "none. Text with an unfilled template slot is never injected."
-        ),
-    )
-    position: str = Field(
-        default="preamble",
-        description=(
-            "Where the formula sits in the document. Recorded for reference; the pipeline does "
-            "not read it."
-        ),
-    )
-    era: str = Field(
-        default="",
-        description=("Label of the period the formula belongs to, recorded in the ingest log."),
-    )
-    from_date: date | None = Field(
-        default=None,
-        alias="from",
-        description=(
-            "First date the formula applies to, inclusive. A bounded formula is never applied "
-            "to a document without a date."
-        ),
-    )
-    to_date: date | None = Field(
-        default=None,
-        alias="to",
-        description=("First date the formula no longer applies to, exclusive."),
-    )
-    note: str = Field(
-        default="",
-        description=("Free-text note for config authors. The pipeline does not read it."),
-    )
-    document_class: str | list[str] | None = Field(
-        default=None,
-        description=(
-            "The doctype, or list of doctypes, the formula applies to. Unset applies it to "
-            "every doctype."
-        ),
-    )
-    language: str | None = Field(
-        default=None,
-        description=(
-            "Language of the formula's text. Recorded for reference; the pipeline does not read it."
-        ),
-    )
-    transliteration: str | None = Field(
-        default=None,
-        description=(
-            "A transliteration of the formula's text. Recorded for reference; the pipeline "
-            "does not read it."
-        ),
-    )
-    instrument_type: str | None = Field(
-        default=None,
-        description=(
-            "The instrument type the formula belongs to. Recorded for reference; the pipeline "
-            "does not read it."
-        ),
-    )
-    applies_to: list[Any] | str | None = Field(
-        default=None,
-        description=(
-            "What the formula applies to. Recorded for reference; the pipeline does not read it."
-        ),
-    )
-    verified: bool = Field(
-        default=False,
-        description=(
-            "Whether the wording has been checked against source documents. A verified formula "
-            "is preferred over an unverified one that also matches."
-        ),
-    )
-    enacting_body_tlc: str | None = Field(
-        default=None,
-        description=(
-            "eId of the TLC entry naming the enacting body. Recorded for reference; the "
-            "pipeline does not read it."
-        ),
-    )
-
-    @field_validator("from_date", "to_date", mode="before")
-    @classmethod
-    def _empty_str_to_none(cls, v: Any) -> Any:
-        # Legacy configs store "" instead of null; coerce so date parsing
-        # doesn't fail on empty strings.
-        if v == "":
-            return None
-        return v
-
-
 class AmendmentConfig(BaseModel):
     model_config = _LOOSE
 
@@ -1999,17 +1903,11 @@ class JurisdictionConfig(BaseModel):
     numbering: NumberingConfig | None = Field(
         default=None, description=("How instruments are numbered and cited.")
     )
-    enacting_formulae: list[EnactingFormula] = Field(
-        default_factory=list,
-        description=(
-            "Enacting formulae to inject when the source carries none, chosen by doctype and date."
-        ),
-    )
     enacting_formula_markers: list[str] = Field(
         default_factory=list,
         description=(
-            "Phrases showing the source carries its own enacting formula, so none is injected. "
-            "Never a cut point: a phrase here may open the instrument, not close it."
+            "Phrases showing the source carries its own enacting formula. Never a cut point: "
+            "a phrase here may open the instrument, not close it."
         ),
     )
     adoption_markers: list[str] = Field(

@@ -8,7 +8,6 @@ import pytest
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import build_anchor_regex, scan_anchors
-from codify.pipeline.enrich.enacting import select_formula
 from codify.pipeline.stages import resolve_doctype
 
 _EXAMPLES = sorted((Path(__file__).parents[1] / "fixtures" / "regulatory").glob("*/examples.json"))
@@ -68,11 +67,3 @@ def test_synthetic_regulatory_outline(path: Path) -> None:
     )
     assert [a.number for a in anchors if a.kind == "section"] == held["sections"]
     assert [a.number for a in anchors if a.kind == "chapter"] == held["chapters"]
-
-
-@pytest.mark.parametrize("path", _EXAMPLES, ids=lambda p: p.parent.name)
-def test_regulatory_formula_scope(path: Path) -> None:
-    examples = json.loads(path.read_text())
-    for case in examples["formula_cases"]:
-        formula = select_formula(examples["code"], case["class"], f"{examples['year']}-06-01")
-        assert (formula is not None) == case["expected"], case["class"]

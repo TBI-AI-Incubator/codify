@@ -1331,157 +1331,6 @@
         "title": "DocumentTableRow",
         "type": "object"
       },
-      "EnactingFormula": {
-        "additionalProperties": true,
-        "properties": {
-          "applies_to": {
-            "anyOf": [
-              {
-                "items": {},
-                "type": "array"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "What the formula applies to. Recorded for reference; the pipeline does not read it.",
-            "title": "Applies To"
-          },
-          "document_class": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The doctype, or list of doctypes, the formula applies to. Unset applies it to every doctype.",
-            "title": "Document Class"
-          },
-          "enacting_body_tlc": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "eId of the TLC entry naming the enacting body. Recorded for reference; the pipeline does not read it.",
-            "title": "Enacting Body Tlc"
-          },
-          "era": {
-            "default": "",
-            "description": "Label of the period the formula belongs to, recorded in the ingest log.",
-            "title": "Era",
-            "type": "string"
-          },
-          "from": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "First date the formula applies to, inclusive. A bounded formula is never applied to a document without a date.",
-            "title": "From"
-          },
-          "instrument_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The instrument type the formula belongs to. Recorded for reference; the pipeline does not read it.",
-            "title": "Instrument Type"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Language of the formula's text. Recorded for reference; the pipeline does not read it.",
-            "title": "Language"
-          },
-          "note": {
-            "default": "",
-            "description": "Free-text note for config authors. The pipeline does not read it.",
-            "title": "Note",
-            "type": "string"
-          },
-          "position": {
-            "default": "preamble",
-            "description": "Where the formula sits in the document. Recorded for reference; the pipeline does not read it.",
-            "title": "Position",
-            "type": "string"
-          },
-          "text": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Wording injected into the preamble as the enacting formula when the source has none. Text with an unfilled template slot is never injected.",
-            "title": "Text"
-          },
-          "to": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "First date the formula no longer applies to, exclusive.",
-            "title": "To"
-          },
-          "transliteration": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "A transliteration of the formula's text. Recorded for reference; the pipeline does not read it.",
-            "title": "Transliteration"
-          },
-          "verified": {
-            "default": false,
-            "description": "Whether the wording has been checked against source documents. A verified formula is preferred over an unverified one that also matches.",
-            "title": "Verified",
-            "type": "boolean"
-          }
-        },
-        "title": "EnactingFormula",
-        "type": "object"
-      },
       "FrbrConfig": {
         "additionalProperties": true,
         "properties": {
@@ -2639,19 +2488,11 @@
             "title": "Effective Tier"
           },
           "enacting_formula_markers": {
-            "description": "Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it.",
+            "description": "Phrases showing the source carries its own enacting formula. Never a cut point: a phrase here may open the instrument, not close it.",
             "items": {
               "type": "string"
             },
             "title": "Enacting Formula Markers",
-            "type": "array"
-          },
-          "enacting_formulae": {
-            "description": "Enacting formulae to inject when the source carries none, chosen by doctype and date.",
-            "items": {
-              "$ref": "#/components/schemas/EnactingFormula"
-            },
-            "title": "Enacting Formulae",
             "type": "array"
           },
           "footnote_markers": {

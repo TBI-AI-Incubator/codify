@@ -214,24 +214,6 @@
     "insertion_style": "alphanumeric",
     "insertion_note": "Inserted sections use alphanumeric suffix: 12A, 12B. Inserted subsections: (1A), (1B). NZ does not re-enact consolidations — the Parliamentary Counsel Office publishes online consolidated versions showing current text with amendment history."
   },
-  "enacting_formulae": [
-    {
-      "text": "The Parliament of New Zealand enacts as follows:",
-      "position": "preamble",
-      "era": "post-1986",
-      "from": "1986-01-01",
-      "note": "Standard formula since the Constitution Act 1986 reconstituted parliament as unicameral. No royal assent formula in the preamble — assent given by Governor-General separately.",
-      "document_class": "act"
-    },
-    {
-      "text": "Be it enacted by the General Assembly of New Zealand in Parliament assembled, and by the authority of the same, as follows:",
-      "position": "preamble",
-      "era": "pre-1987",
-      "to": "1986-12-31",
-      "note": "Pre-Constitution Act 1986 formula, referring to the General Assembly. Legislative Council (upper house) was abolished 1951; this formula was used 1951-1986 with bicameral language retained as convention.",
-      "document_class": "act"
-    }
-  ],
   "amendments": {
     "style": "textual_commonwealth",
     "cross_reference_format": "short_title_year"

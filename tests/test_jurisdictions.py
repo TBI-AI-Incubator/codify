@@ -976,29 +976,6 @@ _DEAD_CLASS_KEYS = {
     "enacting_formula_position",
     "label_en",
 }
-# Scope spellings `_doctype_matches` ignores, which make a formula a wildcard.
-_IGNORED_SCOPE_KEYS = {
-    "applies_to",
-    "instrument_type",
-    "document_type",
-    "document_types",
-    "type",
-    "instrument",
-    "instrument_types",
-}
-
-
-def _inside(formula):
-    from datetime import timedelta
-
-    if formula.from_date:
-        return formula.from_date
-    return formula.to_date - timedelta(days=1) if formula.to_date else None
-
-
-def _scope(formula) -> list[str]:
-    dc = formula.document_class
-    return [] if dc is None else [dc] if isinstance(dc, str) else list(dc)
 
 
 @pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
@@ -1010,86 +987,7 @@ def test_shipped_configs_carry_no_unread_keys(code: str) -> None:
         for name, cls in raw["document_classes"].items()
         for k in _DEAD_CLASS_KEYS & set(cls)
     }
-    dead |= {
-        f"formula[{i}].{k}"
-        for i, f in enumerate(raw.get("enacting_formulae", []))
-        for k in _IGNORED_SCOPE_KEYS & set(f)
-    }
     assert not dead, dead
-
-
-@pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
-def test_formula_scope_is_respected_by_selection(code: str) -> None:
-    from codify.pipeline.enrich.enacting import select_formula
-
-    cfg = load_config(code)
-    classes = set(cfg.document_classes)
-    scoped = [f for f in cfg.enacting_formulae if _scope(f)]
-    for f in scoped:
-        assert set(_scope(f)) <= classes, (code, _scope(f))
-        for doctype in _scope(f):
-            chosen = select_formula(code, doctype, _inside(f))
-            assert chosen is not None and doctype in _scope(chosen), (code, doctype)
-        for other in classes - set(_scope(f)):
-            chosen = select_formula(code, other, _inside(f))
-            assert chosen is not f, (code, other)
-
-
-@pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
-def test_formula_bounds_are_gregorian_dates(code: str) -> None:
-    """Bounds are compared as Gregorian dates, so a Hijri or Solar Hijri year
-    written as a date would sit centuries before any instrument."""
-    cfg = load_config(code)
-    for f in cfg.enacting_formulae:
-        for bound in (f.from_date, f.to_date):
-            if bound is not None:
-                assert 1700 <= bound.year <= 2100, (code, bound)
-        if f.from_date and f.to_date:
-            assert f.from_date < f.to_date, (code, f.era)
-
-
-def _probe_dates(cfg) -> list:
-    from datetime import timedelta
-
-    dates: set = {None}
-    for f in cfg.enacting_formulae:
-        for d in (f.from_date, f.to_date):
-            if d:
-                dates |= {d, d - timedelta(days=1), d + timedelta(days=1)}
-    return list(dates)
-
-
-@pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
-def test_every_formula_is_reachable(code: str) -> None:
-    """`select_formula` takes the first match and ignores language, so a later
-    formula with the same scope and dates can never be chosen."""
-    from codify.pipeline.enrich.enacting import select_formula
-
-    cfg = load_config(code)
-    chosen = {
-        id(r)
-        for cl in cfg.document_classes
-        for d in _probe_dates(cfg)
-        if (r := select_formula(code, cl, d)) is not None
-    }
-    dead = [i for i, f in enumerate(cfg.enacting_formulae) if id(f) not in chosen]
-    assert not dead, (code, dead)
-
-
-@pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
-def test_no_unscoped_formula_leaks_across_classes(code: str) -> None:
-    from codify.pipeline.enrich.enacting import select_formula
-
-    cfg = load_config(code)
-    if len(cfg.document_classes) < 2:
-        return
-    leaked = {
-        (cl, str(d))
-        for cl in cfg.document_classes
-        for d in _probe_dates(cfg)
-        if (r := select_formula(code, cl, d)) is not None and not _scope(r)
-    }
-    assert not leaked, (code, sorted(leaked))
 
 
 @pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
@@ -1162,23 +1060,12 @@ def test_shipped_configs_carry_only_modeled_keys(code: str) -> None:
 
 def test_the_key_walk_names_an_unmodeled_key_at_depth() -> None:
     raw = json.loads((JURISDICTIONS_DIR / "gb" / "config.json").read_text())
-    raw["enacting_formulae"][0]["text_fr"] = "x"
+    raw["source_adapters"][0]["text_fr"] = "x"
     raw["display"] = {**(raw.get("display") or {}), "stray": 1}
     assert _unmodeled_keys(JurisdictionConfig, raw) == [
-        "/enacting_formulae[0]/text_fr",
+        "/source_adapters[0]/text_fr",
         "/display/stray",
     ]
-
-
-# The emitter writes one formula, into the preamble, and reads only `text`.
-_EMITTED_POSITIONS = {"preamble"}
-
-
-@pytest.mark.parametrize("code", _SHIPPED, ids=_SHIPPED)
-def test_every_formula_has_text_and_an_emitted_position(code: str) -> None:
-    for i, f in enumerate(load_config(code).enacting_formulae):
-        assert (f.text or "").strip(), (code, i)
-        assert f.position in _EMITTED_POSITIONS, (code, i, f.position)
 
 
 def _emitted_keywords(code: str, doctype: str) -> set[str]:

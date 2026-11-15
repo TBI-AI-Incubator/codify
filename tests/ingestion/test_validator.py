@@ -512,17 +512,11 @@ class TestFabricatedFormula:
         xml = self._act_with_formula("ENACTED by the Parliament of Nowhere.")
         assert not any(i["check"] == "fabricated_formula" for i in validate_akn(xml))
 
-    def test_config_injected_formula_skipped_on_provenance(self):
-        xml = f'''<?xml version="1.0"?>
-<akomaNtoso xmlns="{AKN_NS}">
-  <act>
-    <meta><identification source="#codify"/></meta>
-    <preamble><formula name="enactingFormula" refersTo="#codify"><p>Config fallback text.</p></formula></preamble>
-    <body><article eId="art_1"><num>1</num><content><p>Body.</p></content></article></body>
-  </act>
-</akomaNtoso>
-'''
-        assert not any(
+    def test_a_formula_marked_as_ours_is_still_checked(self):
+        xml = self._act_with_formula("Config fallback text.").replace(
+            'name="enactingFormula"', 'name="enactingFormula" refersTo="#codify"'
+        )
+        assert any(
             i["check"] == "fabricated_formula"
             for i in validate_akn(xml, source_text="Article 1. Body.")
         )

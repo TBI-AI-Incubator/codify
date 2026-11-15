@@ -16,7 +16,7 @@ def _act(body_extra: str = "") -> str:
 <akomaNtoso xmlns="{AKN_NS}">
   <act>
     <meta><identification source="#codify"/></meta>
-    <preamble><formula name="enactingFormula" refersTo="#codify"><p>Be it enacted.</p></formula></preamble>
+    <preamble><formula name="enactingFormula"><p>Be it enacted.</p></formula></preamble>
     <body><section eId="sec_1"><content><p refersTo="#parliament">X{body_extra}</p></content></section></body>
   </act>
 </akomaNtoso>
@@ -25,7 +25,7 @@ def _act(body_extra: str = "") -> str:
 
 class TestEmitReferences:
     def test_injects_only_referenced_tlcs(self):
-        # The fixture references #codify (identification + formula source)
+        # The fixture references #codify (identification source)
         # and #parliament (refersTo); crown and officialGazette are in the
         # gb catalogue but unreferenced, so they must not be emitted.
         out = emit_references(_act(), "gb")

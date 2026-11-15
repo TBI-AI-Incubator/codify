@@ -1055,80 +1055,6 @@ export interface components {
             /** DocumentTableCells */
             cells?: components["schemas"]["DocumentTableCell"][];
         };
-        /** EnactingFormula */
-        EnactingFormula: {
-            /**
-             * Applies To
-             * @description What the formula applies to. Recorded for reference; the pipeline does not read it.
-             */
-            applies_to?: unknown[] | string | null;
-            /**
-             * Document Class
-             * @description The doctype, or list of doctypes, the formula applies to. Unset applies it to every doctype.
-             */
-            document_class?: string | string[] | null;
-            /**
-             * Enacting Body Tlc
-             * @description eId of the TLC entry naming the enacting body. Recorded for reference; the pipeline does not read it.
-             */
-            enacting_body_tlc?: string | null;
-            /**
-             * Era
-             * @description Label of the period the formula belongs to, recorded in the ingest log.
-             * @default
-             */
-            era: string;
-            /**
-             * From
-             * @description First date the formula applies to, inclusive. A bounded formula is never applied to a document without a date.
-             */
-            from?: string | null;
-            /**
-             * Instrument Type
-             * @description The instrument type the formula belongs to. Recorded for reference; the pipeline does not read it.
-             */
-            instrument_type?: string | null;
-            /**
-             * Language
-             * @description Language of the formula's text. Recorded for reference; the pipeline does not read it.
-             */
-            language?: string | null;
-            /**
-             * Note
-             * @description Free-text note for config authors. The pipeline does not read it.
-             * @default
-             */
-            note: string;
-            /**
-             * Position
-             * @description Where the formula sits in the document. Recorded for reference; the pipeline does not read it.
-             * @default preamble
-             */
-            position: string;
-            /**
-             * Text
-             * @description Wording injected into the preamble as the enacting formula when the source has none. Text with an unfilled template slot is never injected.
-             */
-            text?: string | null;
-            /**
-             * To
-             * @description First date the formula no longer applies to, exclusive.
-             */
-            to?: string | null;
-            /**
-             * Transliteration
-             * @description A transliteration of the formula's text. Recorded for reference; the pipeline does not read it.
-             */
-            transliteration?: string | null;
-            /**
-             * Verified
-             * @description Whether the wording has been checked against source documents. A verified formula is preferred over an unverified one that also matches.
-             * @default false
-             */
-            verified: boolean;
-        } & {
-            [key: string]: unknown;
-        };
         /** FrbrConfig */
         FrbrConfig: {
             /** @description Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion. */
@@ -1592,14 +1518,9 @@ export interface components {
             readonly effective_tier: (1 | 2 | 3 | 4 | 5) | null;
             /**
              * Enacting Formula Markers
-             * @description Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it.
+             * @description Phrases showing the source carries its own enacting formula. Never a cut point: a phrase here may open the instrument, not close it.
              */
             enacting_formula_markers?: string[];
-            /**
-             * Enacting Formulae
-             * @description Enacting formulae to inject when the source carries none, chosen by doctype and date.
-             */
-            enacting_formulae?: components["schemas"]["EnactingFormula"][];
             /**
              * Footnote Markers
              * @description `LegalEra.footnote_markers` for a jurisdiction that declares no eras. An era's own list wins where it declares one.

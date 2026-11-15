@@ -71,13 +71,6 @@
     "insertion_style": "hyphen_suffix",
     "note": "Laws cited by number and promulgation date (e.g. 'loi n° 14 du 3 mars 1998'). Inserted articles use hyphen notation: after article 6 comes 6-1, 6-2."
   },
-  "enacting_formulae": [
-    {
-      "text": "L'Assemblée d'Ys a adopté,\nLe Président de la République d'Ys promulgue la loi dont la teneur suit :",
-      "position": "preamble",
-      "document_class": "act"
-    }
-  ],
   "amendments": {
     "style": "textual_civil_law",
     "phrasing": "est remplacé par les dispositions suivantes... est abrogé... il est inséré un article... ainsi rédigé",

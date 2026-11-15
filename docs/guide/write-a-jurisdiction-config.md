@@ -109,7 +109,7 @@ The full config (`data/jurisdictions/xa/config.json`) adds what a real corpus ne
 | --- | --- |
 | `structuring.classification_rules` | Which class each document is given at ingest |
 | `structuring.long_title_lead_ins`, `citation_lead_ins`, `citation_subjects` | How the long title and the short title are found |
-| `enacting_formulae`, `enacting_formula_markers`, `opening_material_terminators` | How the enacting formula and the opening material before the body are read |
+| `enacting_formula_markers`, `opening_material_terminators` | How the enacting formula the source prints and the opening material before the body are read |
 | `numbering.series_citations` | Citations by series number alone |
 | `core_tlcs` | The top-level classes ([TLCs](../concepts/akoma-ntoso.md)): the people, bodies, roles and publications documents refer to, such as the Atlantis Gazette |
 | `legal_eras` | Periods with their own authority and calendar |

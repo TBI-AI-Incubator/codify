@@ -380,26 +380,6 @@
     "act_citation_alt": "",
     "insertion_style": "alphanumeric"
   },
-  "enacting_formulae": [
-    {
-      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, Having regard to the Treaty on the Functioning of the European Union..., HAVE ADOPTED THIS REGULATION:",
-      "position": "preamble",
-      "era": "olp",
-      "document_class": "regulation"
-    },
-    {
-      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, ... HAVE ADOPTED THIS DIRECTIVE:",
-      "position": "preamble",
-      "era": "olp_directive",
-      "document_class": "directive"
-    },
-    {
-      "text": "THE EUROPEAN PARLIAMENT AND THE COUNCIL OF THE EUROPEAN UNION, ... HAVE ADOPTED THIS DECISION:",
-      "position": "preamble",
-      "era": "olp_decision",
-      "document_class": "decision"
-    }
-  ],
   "amendments": {
     "style": "textual_civil",
     "phrasing": "Article X is replaced by the following: / Article X is amended as follows:",

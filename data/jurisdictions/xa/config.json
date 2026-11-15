@@ -331,13 +331,6 @@
     ],
     "series_citation_connectors": ["No\\.?", "Nos\\.?", "Numbered", "Ser\\.?"]
   },
-  "enacting_formulae": [
-    {
-      "text": "BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:",
-      "position": "preamble",
-      "document_class": "act"
-    }
-  ],
   "enacting_formula_markers": ["Having regard to", "HEREBY RESOLVES", "HEREBY DETERMINES"],
   "opening_material_terminators": ["HEREBY RESOLVES", "HEREBY DETERMINES"],
   "amendments": {

@@ -28,8 +28,7 @@ Accepts unknown keys and keeps them.
 | `default_document_class` | string | `"act"` | The doctype used when no classification rule matches. It must be a key of `document_classes`. |
 | `frbr` | [FrbrConfig](#frbrconfig) or null | `null` | How the jurisdiction's FRBR URIs are minted. |
 | `numbering` | [NumberingConfig](#numberingconfig) or null | `null` | How instruments are numbered and cited. |
-| `enacting_formulae` | list of [EnactingFormula](#enactingformula) | `[]` | Enacting formulae to inject when the source carries none, chosen by doctype and date. |
-| `enacting_formula_markers` | list of string | `[]` | Phrases showing the source carries its own enacting formula, so none is injected. Never a cut point: a phrase here may open the instrument, not close it. |
+| `enacting_formula_markers` | list of string | `[]` | Phrases showing the source carries its own enacting formula. Never a cut point: a phrase here may open the instrument, not close it. |
 | `adoption_markers` | list of string | `[]` | Phrases declaring the instrument adopts another body's numbered text, which every count over the document must read as an attachment, not its own structure. |
 | `opening_material_terminators` | list of string | `[]` | Phrases the recitals precede, after which any further pre-body text is stray page text. |
 | `attachments` | list of [AttachmentCaption](#attachmentcaption) | `[]` | Captions opening an attachment, whose numbering restarts the body's. |
@@ -127,26 +126,6 @@ Accepts unknown keys and keeps them.
 | `numbers_unique_across_years` | boolean | `false` | Whether an instrument number identifies a work without its year. False for most jurisdictions, which restart numbering each year; true lets a year-less citation resolve on the number alone, and is a claim about the whole series, not just the documents held. |
 | `series_citations` | list of [SeriesCitation](#seriescitation) | `[]` | Instruments cited by a never-reused series number and no year. Order matters: full names before abbreviations, so the full form wraps first. |
 | `series_citation_connectors` | list of string | `["No\\.?", "Nos\\.?", "Numbered"]` | Regex fragments that may sit between a series name and its number. |
-
-## EnactingFormula
-
-Accepts unknown keys and keeps them.
-
-| Key | Type | Default | Description |
-| --- | --- | --- | --- |
-| `text` | string or null | `null` | Wording injected into the preamble as the enacting formula when the source has none. Text with an unfilled template slot is never injected. |
-| `position` | string | `"preamble"` | Where the formula sits in the document. Recorded for reference; the pipeline does not read it. |
-| `era` | string | `""` | Label of the period the formula belongs to, recorded in the ingest log. |
-| `from` | date or null | `null` | First date the formula applies to, inclusive. A bounded formula is never applied to a document without a date. |
-| `to` | date or null | `null` | First date the formula no longer applies to, exclusive. |
-| `note` | string | `""` | Free-text note for config authors. The pipeline does not read it. |
-| `document_class` | string or list of string or null | `null` | The doctype, or list of doctypes, the formula applies to. Unset applies it to every doctype. |
-| `language` | string or null | `null` | Language of the formula's text. Recorded for reference; the pipeline does not read it. |
-| `transliteration` | string or null | `null` | A transliteration of the formula's text. Recorded for reference; the pipeline does not read it. |
-| `instrument_type` | string or null | `null` | The instrument type the formula belongs to. Recorded for reference; the pipeline does not read it. |
-| `applies_to` | list of any or string or null | `null` | What the formula applies to. Recorded for reference; the pipeline does not read it. |
-| `verified` | boolean | `false` | Whether the wording has been checked against source documents. A verified formula is preferred over an unverified one that also matches. |
-| `enacting_body_tlc` | string or null | `null` | eId of the TLC entry naming the enacting body. Recorded for reference; the pipeline does not read it. |
 
 ## AttachmentCaption
 

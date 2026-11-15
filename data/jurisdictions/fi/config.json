@@ -262,22 +262,6 @@
     "insertion_style": "alphanumeric_spaced",
     "insertion_example": "5 a §"
   },
-  "enacting_formulae": [
-    {
-      "text": "Eduskunnan päätöksen mukaisesti säädetään:",
-      "language": "fin",
-      "position": "preamble",
-      "document_class": "act",
-      "era": "current"
-    },
-    {
-      "text": "Valtioneuvoston päätöksen mukaisesti, joka on tehty oikeusministeriön esittelystä, säädetään:",
-      "language": "fin",
-      "position": "preamble",
-      "document_class": "vna",
-      "era": "current"
-    }
-  ],
   "amendments": {
     "style": "textual_civil_law",
     "cross_reference_format": "number_slash_year"

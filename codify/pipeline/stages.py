@@ -30,7 +30,7 @@ from codify.pipeline.enrich.amendments import lift_amendment_markup
 from codify.pipeline.enrich.asides import emit_marginal_notes
 from codify.pipeline.enrich.cobalt import enrich_akn
 from codify.pipeline.enrich.conclusions import emit_conclusions
-from codify.pipeline.enrich.enacting import emit_enacting_formula
+from codify.pipeline.enrich.enacting import mark_source_formula
 from codify.pipeline.enrich.hcontainers import postprocess_hcontainers
 from codify.pipeline.enrich.inline_markup import emit_inline_markup
 from codify.pipeline.enrich.metadata import number_from_title
@@ -403,12 +403,7 @@ async def run_enrich_passes(
             lambda x: mark_placeholder_status(x, placeholder_statuses_for_code(jurisdiction_code)),
         ),
         ("amendments", lift_amendment_markup),
-        (
-            "enacting",
-            lambda x: emit_enacting_formula(
-                x, jurisdiction_code, desc.doctype, desc.raw_date or None
-            ),
-        ),
+        ("enacting", lambda x: mark_source_formula(x, jurisdiction_code)),
         ("hcontainers", lambda x: postprocess_hcontainers(x, jurisdiction_code, desc.doctype)),
         ("references", lambda x: emit_references(x, jurisdiction_code)),
         # Both read regions and run before external refs, so a lifted note is

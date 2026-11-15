@@ -13,7 +13,7 @@ from codify.akn.bluebell import akn_xml_to_bluebell
 from codify.akn.document import Document
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.pipeline.enrich.conclusions import find_displaced_attestation, lift_attestation
-from codify.pipeline.enrich.enacting import emit_enacting_formula
+from codify.pipeline.enrich.enacting import mark_source_formula
 from codify.pipeline.enrich.inline_markup import emit_inline_markup
 from codify.pipeline.enrich.metadata import ExtractedMetadata
 from codify.pipeline.enrich.scaffold import BodyBlock, BodyFillResponse
@@ -200,11 +200,11 @@ def test_a_formula_opening_the_preamble_leaves_what_follows_it_alone_on_every_ru
         "PREAMBLE\n\n  HEREBY RESOLVES:\n\n  Adopted in open session.\n\n"
         "BODY\n\nSECTION 1\n\n  A.\n"
     )
-    once = emit_enacting_formula(akn, "xa", "resolution", None)
+    once = mark_source_formula(akn, "xa")
     preamble = _main(once).find("akn:preamble", NS)
     assert preamble is not None
     assert [etree.QName(c).localname for c in preamble] == ["formula", "p"]
-    assert emit_enacting_formula(once, "xa", "resolution", None) == once
+    assert mark_source_formula(once, "xa") == once
 
 
 def test_a_decisions_attestation_lifts_out_of_its_operative_body() -> None:
@@ -258,7 +258,7 @@ def test_a_table_in_the_preamble_keeps_its_place_among_the_recitals() -> None:
         "PREAMBLE\n\n  Having regard to the Act,\n\n  TABLE\n    TR\n      TC\n        Fee\n\n"
         "  Whereas fees apply,\n\n  HEREBY RESOLVES:\n\nBODY\n\nSECTION 1\n\n  A.\n"
     )
-    out = emit_enacting_formula(akn, "xa", "resolution", None)
+    out = mark_source_formula(akn, "xa")
     validate_akn(out, strict=True)
     recitals = _main(out).find("akn:preamble/akn:recitals", NS)
     assert recitals is not None
