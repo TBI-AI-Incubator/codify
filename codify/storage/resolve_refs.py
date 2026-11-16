@@ -23,6 +23,7 @@ from sqlmodel import col
 
 from codify.frbr import UNKNOWN_YEAR, parse_source_ref
 from codify.jurisdictions import try_load_config
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.provenance import ParsedUrl, parse_official_url
 from codify.quality.sentinels import LAW_REASONS
 from codify.storage.models import CrossReference, Law, Provision, Section, Version
@@ -206,6 +207,9 @@ async def _a_longer_name_matches(
     session: AsyncSession, cache: _LawCache, law_id: uuid.UUID, source_text: str
 ) -> bool:
     """Compare all jurisdiction candidates using the title matcher's normalisation."""
+    asked = (law_id, source_text)
+    if asked in cache.outmatched:
+        return cache.outmatched[asked]
     if law_id not in cache.names_by_law:
         rows = (
             await session.execute(
@@ -224,12 +228,17 @@ async def _a_longer_name_matches(
         names = [(row.id, row.title, row.short_title) for row in rows]
         # Each law in this jurisdiction shares one candidate list for the run.
         # SQL must not discard names that Python's normalisation equates.
-        normalised_names = _normalised_title_candidates(names)
+        normalised_names = await on_the_cpu_pool(_normalised_title_candidates, names)
         for candidate_id, title, short_title in names:
             cache.names_by_law[candidate_id] = normalised_names
             cache.titles[candidate_id] = (title, short_title)
         cache.names_by_law[law_id] = normalised_names
-    return _normalised_occurrences_outmatched(law_id, source_text, cache.names_by_law[law_id])
+    # CPU-bound: every candidate name is searched for in the text, so off the event loop.
+    outmatched: bool = await on_the_cpu_pool(
+        _normalised_occurrences_outmatched, law_id, source_text, cache.names_by_law[law_id]
+    )
+    cache.outmatched[asked] = outmatched
+    return outmatched
 
 
 def _title_occurrences_outmatched(
@@ -334,6 +343,8 @@ class _LawCache:
     # law_id -> title, for the check that the citing text names the instrument.
     titles: dict[uuid.UUID, tuple[str | None, str | None]] = field(default_factory=dict)
     names_by_law: dict[uuid.UUID, list[tuple[uuid.UUID, str]]] = field(default_factory=dict)
+    # (law_id, citing text) -> whether a rival name outmatched it; one text cites a law many times.
+    outmatched: dict[tuple[uuid.UUID, str], bool] = field(default_factory=dict)
     scoped_evidence: dict[tuple[uuid.UUID, str, str], tuple[str, str]] | None = None
     official_work: dict[tuple[str, tuple[str, ...]], str | None] = field(default_factory=dict)
     fragment_eid: dict[tuple[uuid.UUID, str], str | None] = field(default_factory=dict)

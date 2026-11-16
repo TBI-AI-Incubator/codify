@@ -702,6 +702,35 @@ async def test_candidate_normalisation_is_shared_across_law_lookups() -> None:
     assert cache.names_by_law[first] is cache.names_by_law[second]
 
 
+async def test_the_rival_name_search_runs_off_the_loop_once_per_law_and_text() -> None:
+    import threading
+    import uuid
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock, patch
+
+    from codify.storage import resolve_refs as resolver
+
+    law = uuid.uuid4()
+    session = AsyncMock()
+    session.execute.return_value = Mock(
+        all=Mock(return_value=[SimpleNamespace(id=law, title="Widgets Act", short_title=None)])
+    )
+    cache = resolver._LawCache()
+    ran_on: list[int] = []
+    real = resolver._normalised_occurrences_outmatched
+
+    def spy(*args: object) -> bool:
+        ran_on.append(threading.get_ident())
+        return real(*args)  # type: ignore[arg-type]
+
+    text = "Under the Widgets Act, a duty arises."
+    with patch.object(resolver, "_normalised_occurrences_outmatched", spy):
+        first = await resolver._a_longer_name_matches(session, cache, law, text)
+        again = await resolver._a_longer_name_matches(session, cache, law, text)
+    assert first is False and again is False
+    assert len(ran_on) == 1 and threading.get_ident() not in ran_on
+
+
 def test_registry_provenance_survives_mapper_round_trip() -> None:
     import uuid
 
