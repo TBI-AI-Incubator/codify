@@ -24,6 +24,16 @@ either official language; a jurisdiction listing that value in
 `pool_excluded_refers_to` keeps them out of the pool. An `Annex` line ends the
 operative text: each annex becomes an attachment of its own.
 
+A unit's eId is its printed number under its parent's, minted once the tree is
+final. Where a heading line stands before a number already printed beside it
+(`LIST B` before a second `III.`, `Procedures` before a second `I.`), a second
+text or list starts over: its units sit in an `hcontainer` group under that
+line, the first of them where several wait, and are named apart from the
+first text's, which stay as they are. A table row starts no group, and loose
+paragraphs gather into a section at each heading instead. Where no heading
+marks the restart, or an unnumbered paragraph's ordinal is a number printed
+beside it, one of the two takes a `_dupN` suffix.
+
 The acquirer (`codify.acquisition.adapters.oecd.compendium`) wraps the body
 in a head whose `<meta name="oecd.*">` tags name the instrument; this module
 reads them back for the preface and the FRBR meta.
@@ -206,6 +216,8 @@ class _Node:
     children: list[_Node] = field(default_factory=list)
     non_adherent: bool = False
     name: str | None = None  # an `hcontainer`'s name
+    lettered: bool = False  # an annex's own top-level `A. Heading` section
+    rank: float | None = None  # set on a group opened at a restart; `_RANK` ranks a unit
 
 
 @dataclass
@@ -226,6 +238,13 @@ class _Instrument:
     formula: str | None = None
     body: list[_Node] = field(default_factory=list)
     annexes: list[_Annex] = field(default_factory=list)
+
+
+class _Row(str):
+    """A table row, its cells joined. A table may number its rows as the text
+    numbers its sections, so a row never starts a second text."""
+
+    __slots__ = ()
 
 
 _SNIFF_BYTES = 4096
@@ -266,7 +285,7 @@ def _blocks(text: str) -> tuple[list[str], dict[str, str]]:
             continue
         if el.tag == "tr":
             cells = [" ".join(c.text_content().split()) for c in el if c.tag in ("td", "th")]
-            joined = " | ".join(c for c in cells if c)
+            joined: str = _Row(" | ".join(c for c in cells if c))
         else:
             joined = _QUOTED_UNIT.sub("", " ".join(el.text_content().split()))
         if joined:
@@ -345,6 +364,20 @@ def _starts_body(block: str) -> bool:
     )
 
 
+def _verb_sections(group: _Node) -> bool:
+    """Whether any section straight under the group is headed by an operative verb."""
+    return any(n.kind == "section" and n.heading in OPERATIVE_VERBS for n in group.children)
+
+
+def _rank(node: _Node) -> float:
+    return _RANK[node.kind] if node.rank is None else node.rank
+
+
+def _group_rank(kind: str) -> float:
+    """Where a group of `kind` units nests: just above them."""
+    return _RANK[kind] - 0.5
+
+
 def _to_roman(n: int) -> str:
     out = ""
     for value, sym in ((50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")):
@@ -359,33 +392,72 @@ class _Builder:
     the deepest open one."""
 
     def __init__(self, scope: str = "") -> None:
-        # An annex's nodes carry its eId as their prefix and bind no one by verb.
+        # An annex's eId, empty for the body: only an annex takes a lettered
+        # heading as a top-level section.
         self.scope = scope
         self.roots: list[_Node] = []
         self.stack: list[_Node] = []
         # Heading lines waiting for the unit they head; consecutive ones all wait.
         self.pending_headings: list[str] = []
-        self.seen: dict[tuple[str, str], int] = {}
         self.prose_count = 0
         self.last_roman = 0
-        self.lettered: set[str] = set()
+        self.in_row = False  # the block being fed is a table row
 
-    def _close_to(self, rank: int) -> None:
-        while self.stack and _RANK[self.stack[-1].kind] >= rank:
+    def _close_to(self, rank: float) -> None:
+        while self.stack and _rank(self.stack[-1]) >= rank:
             self.stack.pop()
+
+    def _siblings(self) -> list[_Node]:
+        return self.stack[-1].children if self.stack else self.roots
+
+    def _restarts(self, kind: str, key: str) -> bool:
+        """Whether a heading line stands before a number its would-be siblings
+        already print: a second text or list starting over (`LIST B` before a
+        second `III.`). A table row starts none, nor does a verb on a line of
+        its own, which heads the section it stands before. A loose paragraph is
+        left to `_group_loose_paragraphs`, which opens a section at its heading."""
+        if not self.pending_headings or self.in_row or (kind == "paragraph" and not self.stack):
+            return False
+        if _operative(self.pending_headings[0]) is not None:
+            return False
+        return any((s.kind, s.key) == (kind, key) and s.num for s in self._siblings())
+
+    def _open_group(self, kind: str) -> None:
+        """Open a group under the first heading line waiting, to hold the units
+        of `kind` that start over after it. It ranks just above them, so the
+        next container above closes it, as does the next group of the same kind."""
+        rank = _group_rank(kind)
+        self._close_to(rank)
+        group = _Node(
+            "hcontainer", "", "", heading=self.pending_headings.pop(0), name="group", rank=rank
+        )
+        self._siblings().append(group)
+        self.stack.append(group)
+
+    def _ends_group(self, kind: str, heading: str | None) -> bool:
+        """Whether the open group ends at this unit: a section headed by an
+        operative verb, the instrument's own act, where no section of the group
+        is headed by one. A table row ends none."""
+        group = self.stack[-1] if self.stack else None
+        return (
+            group is not None
+            and not self.in_row
+            and group.rank == _group_rank(kind)
+            and kind == "section"
+            and heading in OPERATIVE_VERBS
+            and not _verb_sections(group)
+        )
 
     def _open(self, kind: str, num: str, key: str, heading: str | None = None) -> _Node:
         self._close_to(_RANK[kind])
+        if self._ends_group(kind, heading):
+            self.stack.pop()
+        if num and self._restarts(kind, key):
+            self._open_group(kind)
         parent = self.stack[-1] if self.stack else None
-        scope = parent.eid if parent else self.scope
-        n = self.seen.get((scope, f"{kind}:{key}"), 0) + 1
-        self.seen[(scope, f"{kind}:{key}")] = n
-        # A repeated number keeps a unique eId, as a repeated article does.
-        node = _Node(kind, num, key if n == 1 else f"{key}_dup{n}", heading=heading)
+        node = _Node(kind, num, key, heading=heading)
         if kind == "section" and re.fullmatch(_ROMAN, key):
             self.last_roman = _roman_value(key.lower())
-        leaf = f"{_EID_PREFIX[kind]}_{node.key}"
-        node.eid = f"{scope}__{leaf}" if scope else leaf
         if parent is not None:
             parent.children.append(node)
         else:
@@ -432,7 +504,7 @@ class _Builder:
         if _operative(rest) is not None:
             return True
         part = next(
-            (n for n in reversed(self.stack) if n.kind == "subsection" or n.eid in self.lettered),
+            (n for n in reversed(self.stack) if n.kind == "subsection" or n.lettered),
             None,
         )
         if part is not None and _follows(part.key.lower(), numeral.lower()):
@@ -451,7 +523,7 @@ class _Builder:
         parent = next((n for n in reversed(self.stack) if n.kind in ("section", "article")), None)
         if (parent is None and not self.scope) or (parent is None and not titled):
             return False
-        if parent is not None and parent.eid in self.lettered:
+        if parent is not None and parent.lettered:
             parent = None
         kind = "subsection" if parent is not None else "section"
         last_roman = self.last_roman
@@ -459,8 +531,7 @@ class _Builder:
         self.last_roman = last_roman
         if not titled:
             node.text.append(rest)
-        if parent is None:
-            self.lettered.add(node.eid)
+        node.lettered = parent is None
         return True
 
     def feed_prose(self, block: str) -> None:
@@ -488,6 +559,7 @@ class _Builder:
         self._open("paragraph", "", str(self.prose_count)).text.append(block)
 
     def feed(self, block: str) -> None:
+        self.in_row = isinstance(block, _Row)
         m = _CONTAINER.match(block)
         if m:
             word, key, rest = m.groups()
@@ -518,7 +590,11 @@ class _Builder:
         op = _operative(block)
         if op and self._verb_may_open_section():
             verb, rest = op
-            numeral = _to_roman(sum(1 for r in self.roots if r.kind == "section") + 1)
+            count = sum(1 for r in self.roots if r.kind == "section")
+            # Inside a group the number follows the group's last, not the body's count.
+            if any(n.rank == _group_rank("section") for n in self.stack):
+                count = self.last_roman
+            numeral = _to_roman(count + 1)
             node = self._open("section", f"{numeral}.", numeral, heading=verb)
             if rest:
                 node.text.append(rest)
@@ -682,6 +758,14 @@ def _lead_subject(text: str) -> str:
     return (lead[: m.start()] if m else lead).strip()
 
 
+def _items(node: _Node) -> list[_Node]:
+    """The node's children, a group's standing in for the group."""
+    out: list[_Node] = []
+    for child in node.children:
+        out.extend(_items(child) if child.kind == "hcontainer" else [child])
+    return out
+
+
 def _decide(node: _Node, lead: str, encouraging: bool = False) -> None:
     """Mark `node` when its lead-in addresses someone other than the Adherents; a
     lead-in naming no one leaves each item to name its own, and the node is
@@ -691,7 +775,8 @@ def _decide(node: _Node, lead: str, encouraging: bool = False) -> None:
         if not _binds_adherents(addressee):
             _mark_subtree(node)
         return
-    for child in node.children:
+    items = _items(node)
+    for child in items:
         item = _addressee(child.text[0]) if child.text else None
         if (
             item is not None
@@ -699,7 +784,7 @@ def _decide(node: _Node, lead: str, encouraging: bool = False) -> None:
             and (not encouraging or _encourages_an_actor(item))
         ):
             _mark_subtree(child)
-    node.non_adherent = bool(node.children) and all(c.non_adherent for c in node.children)
+    node.non_adherent = bool(items) and all(c.non_adherent for c in items)
 
 
 def _mark_non_adherent_duties(
@@ -712,7 +797,7 @@ def _mark_non_adherent_duties(
     Adherents should:`), an item's verb is the Adherents' own act and stays."""
     for node in nodes:
         text = node.text[0] if node.text else ""
-        if node.kind == "subsection":
+        if node.kind in ("subsection", "hcontainer"):
             _mark_non_adherent_duties(node.children, speaking, adherents)
             continue
         if node.kind == "section" and node.heading in NON_ADHERENT_VERBS:
@@ -748,17 +833,38 @@ def _mark_non_adherent_duties(
         _mark_non_adherent_duties(node.children, voiced, addressed)
 
 
-def _rescope(node: _Node, scope: str, group: str) -> None:
-    """Move a node's eId, and its descendants', from under `scope` to under `group`."""
-    tail = node.eid[len(scope) + 2 :] if scope else node.eid
-    node.eid = f"{group}__{tail}"
-    for child in node.children:
-        _rescope(child, scope, group)
+def _mint_eids(nodes: list[_Node], scope: str = "") -> None:
+    """Name each node under `scope`, once the tree has its final shape, so a
+    number counts as repeated only among the siblings it ends up beside. An
+    `hcontainer` is known by its place among those beside it, whichever step
+    made it. A printed number names its own node: an unnumbered sibling whose
+    ordinal is the same number takes the suffix, whichever of the two stands
+    first."""
+    groups = 0
+    count: dict[str, int] = {}
+    printed: dict[str, int] = {}  # where the first node printing the number stands
+    placed: list[tuple[_Node, str, int]] = []
+    for node in nodes:
+        if node.kind == "hcontainer":
+            groups += 1
+            node.key = str(groups)
+        leaf = f"{_EID_PREFIX[node.kind]}_{node.key}"
+        nth = count.get(leaf, 0) + 1
+        count[leaf] = nth
+        if node.num:
+            printed.setdefault(leaf, nth)
+        placed.append((node, leaf, nth))
+    for node, leaf, nth in placed:
+        plain = printed.get(leaf, 1)
+        # A repeated number keeps a unique eId, as a repeated article does. An
+        # unnumbered node that gave the plain one up takes its place in the count.
+        if nth != plain:
+            leaf = f"{leaf}_dup{plain if nth == 1 else nth}"
+        node.eid = f"{scope}__{leaf}" if scope else leaf
+        _mint_eids(node.children, node.eid)
 
 
-def _group_loose_paragraphs(
-    nodes: list[_Node], scope: str = "", untitled: str = "section"
-) -> list[_Node]:
+def _group_loose_paragraphs(nodes: list[_Node], untitled: str = "section") -> list[_Node]:
     """Gather paragraphs lying straight under the body, a declaration's shape,
     into unnumbered sections that open at each heading line, so every paragraph
     sits in a container as the body's hierarchy expects. A group with no heading
@@ -776,14 +882,22 @@ def _group_loose_paragraphs(
         if group is None or node.heading:
             kind = "section" if node.heading else untitled
             key = str(sum(1 for n in out if n.kind == kind and not n.num) + 1)
-            leaf = f"{_EID_PREFIX[kind]}_{key}"
-            eid = f"{scope}__{leaf}" if scope else leaf
-            group = _Node(kind, "", key, eid=eid, heading=node.heading)
+            group = _Node(kind, "", key, heading=node.heading)
             group.name = "group" if kind == "hcontainer" else None
             node.heading = None
             out.append(group)
-        _rescope(node, scope, group.eid)
         group.children.append(node)
+    return out
+
+
+def _section_headings(nodes: list[_Node]) -> list[str]:
+    """The headings of the body's top-level sections, a group's among them."""
+    out: list[str] = []
+    for node in nodes:
+        if node.kind == "hcontainer":
+            out.extend(_section_headings(node.children))
+        elif node.kind == "section" and node.heading:
+            out.append(node.heading)
     return out
 
 
@@ -903,9 +1017,11 @@ def _segment(blocks: list[str], meta: dict[str, str]) -> _Instrument:
         if _has_articles([*inst.body, *(n for a in inst.annexes for n in a.body)])
         else "section"
     )
-    inst.body = _group_loose_paragraphs(inst.body, untitled=untitled)
+    inst.body = _group_loose_paragraphs(inst.body, untitled)
+    _mint_eids(inst.body)
     for annex in inst.annexes:
-        annex.body = _group_loose_paragraphs(annex.body, annex.eid, untitled)
+        annex.body = _group_loose_paragraphs(annex.body, untitled)
+        _mint_eids(annex.body, annex.eid)
     if not inst.body:
         raise OecdHtmlError("no operative text: not an instrument body, or an empty page")
     return inst
@@ -1141,7 +1257,7 @@ def instrument_html_to_akn(
             "annexes": annexes,
             "citations": len(inst.citations),
             "recitals": len(inst.recitals),
-            "verbs": [n.heading for n in inst.body if n.kind == "section" and n.heading],
+            "verbs": _section_headings(inst.body),
         }
     serialised: bytes = etree.tostring(root, xml_declaration=True, encoding="UTF-8")
     return serialised.decode("utf-8")
