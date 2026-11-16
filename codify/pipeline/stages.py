@@ -42,6 +42,7 @@ from codify.pipeline.enrich.regions import (
     RegionVocabulary,
     vocabulary_for_jurisdiction,
 )
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 
 if TYPE_CHECKING:
     from codify.core.llm import LLMClient
@@ -412,20 +413,29 @@ async def run_enrich_passes(
         ("notes", lambda x: emit_authorial_notes(x, vocab=vocab, regions=regions)),
         ("asides", lambda x: emit_marginal_notes(x, regions=regions)),
     ]
-    for name, fn in sync_passes:
-        try:
-            akn_xml = fn(akn_xml)
-        except UncitableFrbrUri:
-            # Every other pass is decoration this document can ship without.
-            # An identity nobody can cite is the document, so it propagates.
-            raise
-        except CONFIG_FAULTS:
-            # So does a config nobody can read: every pass after it runs thinner.
-            raise
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("enrich_pass_failed", pass_name=name, error=str(exc))
-            continue
-        if on_pass is not None:
+
+    def _run_sync(xml: str) -> tuple[str, list[str]]:
+        done: list[str] = []
+        for name, fn in sync_passes:
+            try:
+                xml = fn(xml)
+            except UncitableFrbrUri:
+                # Every other pass is decoration this document can ship without.
+                # An identity nobody can cite is the document, so it propagates.
+                raise
+            except CONFIG_FAULTS:
+                # So does a config nobody can read: every pass after it runs thinner.
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("enrich_pass_failed", pass_name=name, error=str(exc))
+                continue
+            done.append(name)
+        return xml, done
+
+    # CPU-bound: one hop on the pipeline's CPU pool, off the caller's event loop.
+    akn_xml, done = await on_the_cpu_pool(_run_sync, akn_xml)
+    if on_pass is not None:
+        for name in done:
             on_pass(name)
 
     try:
