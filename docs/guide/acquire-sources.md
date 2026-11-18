@@ -196,7 +196,8 @@ List what to fetch in `data/jurisdictions/<code>/corpus.json`, an object with `j
 | --- | --- |
 | Identity | The default names the Codify project. Pass your own, with a contact address; the config has no field for it. |
 | `robots.txt` | Read once per host, kept 24 hours. A disallowed address is not requested. If `robots.txt` cannot be read, the host is refused for up to five minutes. Both return status 451 ([What can go wrong](#what-can-go-wrong)). |
-| Pace | With `rate_limit_per_minute` set, one request per interval per host, across every client in the process. On 429, 436 or 503 the interval doubles, or takes `Retry-After`, up to 300 seconds, then narrows as requests succeed. Five attempts per request. |
+| Pace | With `rate_limit_per_minute` set, one request per interval per host, across every client in the process. On 429, 436 or 503 the interval doubles, or takes `Retry-After`, up to 300 seconds, then narrows as requests succeed. Five attempts per request. A request without a body is also retried on 502 or 504, a timeout or a dropped connection. |
+| Failing host | Five failed requests in a row to a host (502 or 504, a connection that never answered or dropped, or a 403 or 451), or one still refused with 429, 436 or 503 after every attempt, stop requests to that host for 60 seconds; after a 429, 436 or 503, for the longer of that and its `Retry-After`, up to an hour. Then one request goes through: an answer resumes requests, a failure stops them again. |
 | No rate set | No pacing, although `akn_native` reports 60 per minute on `acquirer.politeness`. Always set the rate. |
 | Credentials | None sent: `auth_scheme` and `auth_env_var` are checked at load, never read. Set the header on the client you pass. |
 | Addresses | Each host, on every redirect hop, is resolved once and refused if private, loopback or link-local. |
@@ -284,6 +285,7 @@ For a network source, build `self._client = make_polite_client(adapter, profile=
 | Status 451, header `x-codify-blocked-by: robots.txt`, body `blocked by <host>/robots.txt for user-agent '...'` | The publisher disallows the address | Ask the publisher. `robots_respect: false` in the entry turns the check off; use it only with their agreement. |
 | Status 451, header `x-codify-blocked-by: robots.txt-unavailable`, body `robots.txt for <host> could not be read (...)` | `robots.txt` unreadable | Wait five minutes, or ask the publisher |
 | `SSRF blocked: 127.0.0.1 in 127.0.0.0/8 (http://127.0.0.1/law.pdf)` | The host resolves to a private address | Fetch from the public address, or read the file from disk |
+| `HostCircuitOpen: the circuit for <host> is open after 5 failed request(s); refusing requests for 60s from the last failure` | The host kept failing or refusing, and requests to it are held | Wait the time it names; the request was not sent. `host_circuit_state("<host>")` shows the count. |
 
 </details>
 

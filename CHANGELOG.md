@@ -55,7 +55,10 @@ New, additive:
   Only that request can free its slot; an answer closes the circuit, a failure
   reopens it. A robots refusal counts as neither, and a 403 or 451 does not
   bring the host's pace back toward its floor. `host_circuit_state` reports a
-  host's circuit. The Riigi Teataja archive reader raises `HostCircuitOpen` at
+  host's circuit. `GuardedTransport` takes two keyword-only hooks for it,
+  `before_send`, called just before each send, and `may_try_next`, asked before
+  a 403 moves on to the next address; both are optional and off by default.
+  The Riigi Teataja archive reader raises `HostCircuitOpen` at
   once, as it does a refusal, rather than retry a range against an open circuit.
 - `PoliteTransport` retries a bodyless request on a 502 or 504, and on a
   connect or read timeout, a dropped connection or a protocol error, with
