@@ -10,7 +10,7 @@ from lxml import etree
 from codify.akn._schema import NS
 from codify.akn.io import parse_akn
 from codify.pipeline.enrich.bluebell import parse_to_akn
-from codify.pipeline.enrich.enacting import emit_enacting_formula
+from codify.pipeline.enrich.enacting import mark_source_formula
 from codify.storage.mappers import document_to_rows
 from codify.storage.refresh_refs import _extract_reference_rows
 
@@ -24,7 +24,7 @@ _SOURCE = (
 
 def _decision(recital_eid: str = "recitals__rec_1") -> str:
     akn = parse_to_akn(_SOURCE, "xa", doctype="resolution", date="2024-03-05", number="4")
-    root = etree.fromstring(emit_enacting_formula(akn, "xa", "resolution", None).encode())
+    root = etree.fromstring(mark_source_formula(akn, "xa").encode())
     recital = root.find(".//akn:recital", NS)
     assert recital is not None
     recital.set("eId", recital_eid)

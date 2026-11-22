@@ -39,12 +39,32 @@ import {
 import { useJurisdictionPin } from '@/lib/jurisdiction-pin';
 import { parseJurisdictionPath, resolveCountry } from '@/lib/jurisdiction-path';
 
+// `codify mcp --http` is its own process on its own port; this app does not proxy it.
+const MCP_COMMAND = 'codify mcp --http';
+const MCP_URL = 'http://127.0.0.1:8001/mcp';
+
+function Copyable({ text, label }: { text: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-ink-20 bg-paper-sunken p-2">
+      <code className="min-w-0 flex-1 truncate font-tbi-mono text-xs text-ink">{text}</code>
+      <button
+        type="button"
+        onClick={() => void navigator.clipboard.writeText(text)}
+        title={label}
+        aria-label={label}
+        className="grid size-7 shrink-0 place-items-center rounded-sm text-ink-60 transition-colors hover:bg-paper hover:text-ink"
+      >
+        <Copy className="size-3.5" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
 function AppSidebar() {
   const location = useLocation();
   const { pathname } = location;
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const mcpUrl = `${window.location.origin}/mcp/`;
   const { jurisdictionPin, jurisdictions } = useJurisdictionPin();
   const currentCode =
     parseJurisdictionPath(pathname)?.code ??
@@ -144,22 +164,16 @@ function AppSidebar() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="text-ink">Connect an MCP client</DialogTitle>
-              <DialogDescription>Use this URL in your MCP client configuration.</DialogDescription>
+              <DialogDescription>
+                This app does not serve MCP. Start the MCP server in a terminal (it needs the
+                mcp extra), then give your client the URL it listens on.
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-2 rounded-md border border-ink-20 bg-paper-sunken p-2">
-              <code className="min-w-0 flex-1 truncate font-tbi-mono text-xs text-ink">
-                {mcpUrl}
-              </code>
-              <button
-                type="button"
-                onClick={() => void navigator.clipboard.writeText(mcpUrl)}
-                title="Copy MCP server URL"
-                aria-label="Copy MCP server URL"
-                className="grid size-7 shrink-0 place-items-center rounded-sm text-ink-60 transition-colors hover:bg-paper hover:text-ink"
-              >
-                <Copy className="size-3.5" aria-hidden />
-              </button>
-            </div>
+            <Copyable text={MCP_COMMAND} label="Copy MCP server command" />
+            <Copyable text={MCP_URL} label="Copy MCP server URL" />
+            <p className="text-xs text-ink-60">
+              Without --http the server speaks stdio, for a client that launches it itself.
+            </p>
           </DialogContent>
         </Dialog>
         <label

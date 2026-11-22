@@ -1,6 +1,6 @@
 """Provider-agnostic embedding client over an OpenAI-compatible endpoint.
 
-Any Matryoshka embedding model exposed by the LiteLLM gateway works:
+Any Matryoshka embedding model exposed by the endpoint works:
 swap the model + dimensions in config, no code change. Vectors are
 L2-normalised so reduced-dimension outputs are safe for both cosine
 search and the comparator's dot-product cache.

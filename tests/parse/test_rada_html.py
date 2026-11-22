@@ -101,3 +101,56 @@ def test_non_rada_html_rejected() -> None:
         get_parser("rada_html").parse(
             b"<html><body><p>plain page</p></body></html>", config=config, doctype="act"
         )
+
+
+_AMENDING = """<html><body>
+<p><a name="n1"></a>ЗАКОН УКРАЇНИ</p>
+<p><a name="n2"></a>Про внесення змін до Закону України "Про вигадані відносини"</p>
+<p><a name="n3"></a>Стаття 1. Внесення змін</p>
+<p><a name="n4"></a>1. У <a href="/go/1-01">Розділ III</a> Закону внести такі зміни,
+що стосуються вигаданих відносин між сторонами:</p>
+<p><a name="n5"></a>2. Порядок ведення вигаданого реєстру визначається
+та затверджується Кабінетом Міністрів України.</p>
+<p><a name="n6"></a>Стаття 2. Набрання чинності</p>
+<p><a name="n7"></a>Цей Закон набирає чинності з дня його опублікування.</p>
+</body></html>"""
+
+
+def test_inline_references_stay_whole_and_never_head_a_unit() -> None:
+    config = load_config("ua")
+    assert config is not None
+    bluebell = (
+        get_parser("rada_html")
+        .parse(_AMENDING.encode(), config=config, doctype="law")
+        .bluebell_text
+    )
+    assert all(line.count("{{") == line.count("}}") for line in bluebell.splitlines())
+    assert _article_nums(bluebell) == ["1", "2"]
+    assert "SECTION" not in bluebell
+    assert re.search(r"^\s*ARTICLE 2 - Набрання чинності$", bluebell, re.M)
+    assert "затверджується Кабінетом Міністрів України." in bluebell
+
+
+@pytest.mark.parametrize(
+    "heading",
+    [
+        "Правила для {{>/go/1-01 реєстрів}}",
+        "Правила для {{>/go/1-01 реєстрів}} і обліку",
+        "{{>/go/1-01 Правила}} для реєстрів",
+    ],
+)
+def test_a_heading_keeps_its_inline_reference(heading: str) -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    text = f"ЗАКОН\nРозділ I\n{heading}\nСтаття 1. Сфера\nТекст.\n"
+    bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
+    assert f"SECTION I - {heading}\n" in bluebell
+
+
+def test_a_reference_on_the_next_line_stays_in_the_body() -> None:
+    from codify.pipeline.enrich.verbatim import text_to_bluebell_verbatim
+
+    text = "ЗАКОН\nРозділ I\nПравила\n{{>/go/1-01 Довідка}}\nСтаття 1. Сфера\nТекст.\n"
+    bluebell, _, _ = text_to_bluebell_verbatim(text, country="ua", doctype="law")
+    assert "SECTION I - Правила\n" in bluebell
+    assert bluebell.count("{{>/go/1-01 Довідка}}") == 1

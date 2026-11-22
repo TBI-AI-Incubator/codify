@@ -11,7 +11,7 @@ import httpx
 import openai
 import pytest
 
-from codify.core.llm import LiteLLMClient, _is_transient, _sniff_mime
+from codify.core.llm import OpenAICompatibleClient, _is_transient, _sniff_mime
 
 
 def _resp(content: str) -> MagicMock:
@@ -45,8 +45,8 @@ def _streaming_chunks(deltas: list[str]) -> Any:
 
 
 @pytest.fixture
-def client() -> LiteLLMClient:
-    c = LiteLLMClient(base_url="http://x/v1", api_key="k", model="gemini-3.6-flash")
+def client() -> OpenAICompatibleClient:
+    c = OpenAICompatibleClient(base_url="http://x/v1", api_key="k", model="gemini-3.6-flash")
     c.client = MagicMock()
     c.client.chat = MagicMock()
     c.client.chat.completions = MagicMock()
@@ -54,7 +54,7 @@ def client() -> LiteLLMClient:
     return c
 
 
-async def test_chat_returns_content(client: LiteLLMClient) -> None:
+async def test_chat_returns_content(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("hello")
     out = await client.chat("hi", system="be terse")
     assert out == "hello"
@@ -66,7 +66,7 @@ async def test_chat_returns_content(client: LiteLLMClient) -> None:
     ]
 
 
-async def test_chat_per_call_model_override(client: LiteLLMClient) -> None:
+async def test_chat_per_call_model_override(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("ok")
     await client.chat("hi", model="gemini-3.5-flash-lite")
     assert (
@@ -74,7 +74,7 @@ async def test_chat_per_call_model_override(client: LiteLLMClient) -> None:
     )
 
 
-async def test_chat_stream_invokes_on_chunk(client: LiteLLMClient) -> None:
+async def test_chat_stream_invokes_on_chunk(client: OpenAICompatibleClient) -> None:
     """on_chunk receives the accumulated text after each delta, not the delta itself."""
     client.client.chat.completions.create.return_value = _streaming_chunks(["he", "llo"])
     seen: list[str] = []
@@ -84,7 +84,7 @@ async def test_chat_stream_invokes_on_chunk(client: LiteLLMClient) -> None:
 
 
 async def test_direct_chat_stream_requests_usage(
-    client: LiteLLMClient, monkeypatch: pytest.MonkeyPatch
+    client: OpenAICompatibleClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     observation = MagicMock()
     monkeypatch.setattr(
@@ -99,7 +99,7 @@ async def test_direct_chat_stream_requests_usage(
     assert kwargs["stream_options"] == {"include_usage": True}
 
 
-async def test_chat_stream_awaits_async_on_chunk(client: LiteLLMClient) -> None:
+async def test_chat_stream_awaits_async_on_chunk(client: OpenAICompatibleClient) -> None:
     """Async on_chunk callbacks are awaited; sync ones are called as-is."""
     client.client.chat.completions.create.return_value = _streaming_chunks(["he", "llo"])
     awaited: list[str] = []
@@ -112,7 +112,7 @@ async def test_chat_stream_awaits_async_on_chunk(client: LiteLLMClient) -> None:
     assert awaited == ["he", "hello"]
 
 
-async def test_chat_stream_retries_on_transient(client: LiteLLMClient) -> None:
+async def test_chat_stream_retries_on_transient(client: OpenAICompatibleClient) -> None:
     err = openai.APIConnectionError(request=httpx.Request("POST", "http://x"))
     client.client.chat.completions.create.side_effect = [
         err,
@@ -123,7 +123,7 @@ async def test_chat_stream_retries_on_transient(client: LiteLLMClient) -> None:
     assert client.client.chat.completions.create.await_count == 2
 
 
-async def test_chat_json_parses(client: LiteLLMClient) -> None:
+async def test_chat_json_parses(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp('{"verdict": "aligned"}')
     result = await client.chat_json("classify this", seed=7)
     assert result == {"verdict": "aligned"}
@@ -132,7 +132,7 @@ async def test_chat_json_parses(client: LiteLLMClient) -> None:
     assert args["seed"] == 7
 
 
-async def test_a_seed_reaches_the_model_as_an_instruction(client: LiteLLMClient) -> None:
+async def test_a_seed_reaches_the_model_as_an_instruction(client: OpenAICompatibleClient) -> None:
     """Gemini has no ``seed`` and ignores ``temperature``/``top_p``/``top_k``, so a
     reproducibility requirement carried only by a request parameter is discarded in
     transit. The gateway does not error on that, so nothing else would notice."""
@@ -146,7 +146,7 @@ async def test_a_seed_reaches_the_model_as_an_instruction(client: LiteLLMClient)
     assert "7" in system["content"]
 
 
-async def test_seed_zero_is_a_seed(client: LiteLLMClient) -> None:
+async def test_seed_zero_is_a_seed(client: OpenAICompatibleClient) -> None:
     """Zero is forwarded as a seed like any other integer, so it has to carry the
     instruction too; a truthiness check would silently exempt it."""
     client.client.chat.completions.create.return_value = _resp("{}")
@@ -156,7 +156,7 @@ async def test_seed_zero_is_a_seed(client: LiteLLMClient) -> None:
     assert "deterministically" in args["messages"][0]["content"]
 
 
-async def test_no_seed_leaves_the_instructions_alone(client: LiteLLMClient) -> None:
+async def test_no_seed_leaves_the_instructions_alone(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("{}")
     await client.chat_json("classify this", system="be terse")
     args = client.client.chat.completions.create.call_args.kwargs
@@ -164,13 +164,13 @@ async def test_no_seed_leaves_the_instructions_alone(client: LiteLLMClient) -> N
     assert "seed" not in args
 
 
-async def test_chat_json_invalid_raises(client: LiteLLMClient) -> None:
+async def test_chat_json_invalid_raises(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("not-json")
     with pytest.raises(ValueError, match="invalid JSON"):
         await client.chat_json("classify")
 
 
-async def test_vision_encodes_image_as_data_url(client: LiteLLMClient) -> None:
+async def test_vision_encodes_image_as_data_url(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("describes the image")
     img = b"\x89PNG\r\n\x1a\nFAKE"
     out = await client.vision("what is this", images=[img])
@@ -183,7 +183,7 @@ async def test_vision_encodes_image_as_data_url(client: LiteLLMClient) -> None:
     assert parts[1] == {"type": "image_url", "image_url": {"url": expected_url}}
 
 
-async def test_chat_retries_on_transient(client: LiteLLMClient) -> None:
+async def test_chat_retries_on_transient(client: OpenAICompatibleClient) -> None:
     err = openai.APIConnectionError(request=httpx.Request("POST", "http://x"))
     client.client.chat.completions.create.side_effect = [err, err, _resp("ok")]
     out = await client.chat("hi")
@@ -191,7 +191,7 @@ async def test_chat_retries_on_transient(client: LiteLLMClient) -> None:
     assert client.client.chat.completions.create.await_count == 3
 
 
-async def test_chat_does_not_retry_on_permanent(client: LiteLLMClient) -> None:
+async def test_chat_does_not_retry_on_permanent(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.side_effect = ValueError("400 bad request")
     with pytest.raises(ValueError):
         await client.chat("hi")
@@ -235,7 +235,7 @@ def test_sniff_mime_falls_back_to_png() -> None:
     assert _sniff_mime(b"unknown bytes") == "image/png"
 
 
-async def test_vision_uses_sniffed_mime_for_jpeg(client: LiteLLMClient) -> None:
+async def test_vision_uses_sniffed_mime_for_jpeg(client: OpenAICompatibleClient) -> None:
     client.client.chat.completions.create.return_value = _resp("ok")
     img = b"\xff\xd8\xffFAKE"
     await client.vision("what is this", images=[img])
@@ -257,7 +257,7 @@ async def test_vision_uses_sniffed_mime_for_jpeg(client: LiteLLMClient) -> None:
 async def test_sdk_transport_preserves_timeout_values(
     timeout: httpx.Timeout | None, expected: dict[str, float | None]
 ) -> None:
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://127.0.0.1:1", api_key="test", model="test", timeout=timeout
     )
     try:

@@ -8,7 +8,7 @@ from codify.translate.write import (
     apply_translation_to_akn,
 )
 
-# --- Markdown emphasis stripping (v38-K-01) ------------------------------------
+# --- Markdown emphasis stripping -----------------------------------------------
 
 
 def test_double_asterisk_bold_collapses_to_inner():
@@ -43,7 +43,7 @@ def test_bold_span_across_punctuation():
     )
 
 
-# --- Invisible-character restoration (v38-J-01) --------------------------------
+# --- Invisible-character restoration -------------------------------------------
 
 
 def test_shy_between_letters_becomes_hyphen():

@@ -1,8 +1,8 @@
 """The rules that changed at RESOLVER_VERSION 2, and the re-stamp they need.
 
-Both came from reading 108 stamped rows: references resolved onto an
-explanatory entry rather than the unit it explains, and most of one corpus's
-law stamps landed on one ordinance no citing text named.
+Both came from reading stamped rows: references resolved onto an explanatory
+entry rather than the unit it explains, and law stamps landed on an
+instrument no citing text named.
 """
 
 from __future__ import annotations
@@ -78,6 +78,26 @@ def test_a_zero_padded_number_in_the_text_still_names_the_instrument(text: str, 
 def test_padding_does_not_let_a_longer_number_match() -> None:
     """`105` is not `05` padded."""
     assert not _text_names_law("Act No. 105 of 2020", "/akn/xa/act/2020/5", None)
+
+
+@pytest.mark.parametrize(
+    ("text", "uri", "named"),
+    [
+        ("under Directive 95/46/EC", "/akn/eu/act/dir/1995/46", True),
+        ("Regulation (EEC) No 2913/92", "/akn/eu/act/reg/1992/2913", True),
+        ("CELEX 32016R0679", "/akn/eu/act/reg/2016/679", True),
+        # The CELEX type letter must match: R is a regulation, not a directive.
+        ("CELEX 31995R0046", "/akn/eu/act/dir/1995/46", False),
+        ("Directive 95/460/EC", "/akn/eu/act/dir/1995/46", False),
+        ("on 1 May 95, item 46", "/akn/eu/act/dir/1995/46", False),
+        # Outside EU works a fraction or a date is not a citation.
+        ("Pay 5/16 of the fee", "/akn/xe/act/2016/5", False),
+    ],
+)
+def test_a_two_digit_year_pair_or_celex_number_names_the_instrument(
+    text: str, uri: str, named: bool
+) -> None:
+    assert bool(_text_names_law(text, uri, None)) is named
 
 
 def test_the_version_is_ahead_of_the_first_policy() -> None:
@@ -680,6 +700,35 @@ async def test_candidate_normalisation_is_shared_across_law_lookups() -> None:
         assert prepare.call_count == 1
         assert session.execute.await_count == 1
     assert cache.names_by_law[first] is cache.names_by_law[second]
+
+
+async def test_the_rival_name_search_runs_off_the_loop_once_per_law_and_text() -> None:
+    import threading
+    import uuid
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock, patch
+
+    from codify.storage import resolve_refs as resolver
+
+    law = uuid.uuid4()
+    session = AsyncMock()
+    session.execute.return_value = Mock(
+        all=Mock(return_value=[SimpleNamespace(id=law, title="Widgets Act", short_title=None)])
+    )
+    cache = resolver._LawCache()
+    ran_on: list[int] = []
+    real = resolver._normalised_occurrences_outmatched
+
+    def spy(*args: object) -> bool:
+        ran_on.append(threading.get_ident())
+        return real(*args)  # type: ignore[arg-type]
+
+    text = "Under the Widgets Act, a duty arises."
+    with patch.object(resolver, "_normalised_occurrences_outmatched", spy):
+        first = await resolver._a_longer_name_matches(session, cache, law, text)
+        again = await resolver._a_longer_name_matches(session, cache, law, text)
+    assert first is False and again is False
+    assert len(ran_on) == 1 and threading.get_ident() not in ran_on
 
 
 def test_registry_provenance_survives_mapper_round_trip() -> None:

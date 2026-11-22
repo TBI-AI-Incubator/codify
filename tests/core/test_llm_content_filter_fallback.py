@@ -11,15 +11,15 @@ import openai
 import pytest
 from pydantic import BaseModel
 
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 
 
 class _Parsed(BaseModel):
     value: str
 
 
-def _client(fallback_model: str | None) -> LiteLLMClient:
-    c = LiteLLMClient(
+def _client(fallback_model: str | None) -> OpenAICompatibleClient:
+    c = OpenAICompatibleClient(
         base_url="http://x/v1", api_key="k", model="gemini-3.6-flash", fallback_model=fallback_model
     )
     c.client = MagicMock()

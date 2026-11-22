@@ -22,9 +22,9 @@ def _llm_or_skip():
         from codify.core.llm import create_llm_client
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"LLM client factory unavailable: {exc}")
-    base_url = os.environ.get("LITELLM_BASE_URL", "http://localhost:4000/v1")
-    api_key = os.environ.get("LITELLM_API_KEY", "sk-codify-dev")
-    model = os.environ.get("LITELLM_MODEL", "gemini-3.6-flash")
+    base_url = os.environ.get("LLM_BASE_URL", "http://localhost:4000/v1")
+    api_key = os.environ.get("LLM_API_KEY", "sk-codify-dev")
+    model = os.environ.get("LLM_MODEL", "gemini-3.6-flash")
     try:
         client = create_llm_client(base_url=base_url, api_key=api_key, model=model)
     except Exception as exc:  # noqa: BLE001

@@ -1,0 +1,9 @@
+[
+  {
+    "check": "missing_container_title",
+    "severity": "warning",
+    "eid": "part_II",
+    "container": "part",
+    "message": "part II has no descriptive heading; the reader shows a bare marker"
+  }
+]

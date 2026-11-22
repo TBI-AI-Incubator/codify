@@ -11,7 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health */
+        /**
+         * Check the server is up
+         * @description Answers without touching the database.
+         */
         get: operations["health_health_get"];
         put?: never;
         post?: never;
@@ -28,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Jurisdictions */
+        /**
+         * List jurisdictions
+         * @description Every jurisdiction with an installed configuration: its code, name and languages.
+         */
         get: operations["jurisdictions_jurisdictions_get"];
         put?: never;
         post?: never;
@@ -45,7 +51,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Jurisdiction */
+        /**
+         * Get a jurisdiction's configuration
+         * @description The full configuration the pipeline reads for this jurisdiction. 404 when none is installed or it does not load.
+         */
         get: operations["jurisdiction_jurisdictions__code__get"];
         put?: never;
         post?: never;
@@ -62,7 +71,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Laws For */
+        /**
+         * List a jurisdiction's laws
+         * @description Stored laws of one jurisdiction, newest year first. 404 for an unknown code.
+         */
         get: operations["laws_for_jurisdictions__code__laws_get"];
         put?: never;
         post?: never;
@@ -79,7 +91,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Laws */
+        /**
+         * List laws
+         * @description Stored laws, newest year first, filtered by jurisdiction, doctype, year or a title query. A title query orders results by how well the title matches.
+         */
         get: operations["laws_laws_get"];
         put?: never;
         post?: never;
@@ -96,7 +111,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Law */
+        /**
+         * Get a law
+         * @description One law with every stored version, without the XML.
+         */
         get: operations["law_laws__law_id__get"];
         put?: never;
         post?: never;
@@ -113,7 +131,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Law Versions */
+        /**
+         * List a law's versions
+         * @description One page of a law's versions, without the XML. Pass `next_cursor` back as `cursor` for the next page.
+         */
         get: operations["law_versions_laws__law_id__versions_get"];
         put?: never;
         post?: never;
@@ -130,7 +151,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Runs */
+        /**
+         * List runs
+         * @description Runs this server process holds, newest first. Runs are kept in memory and lost on restart.
+         */
         get: operations["list_runs_runs_get"];
         put?: never;
         post?: never;
@@ -149,7 +173,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ingest */
+        /**
+         * Ingest an uploaded document
+         * @description Starts a run that converts the uploaded file to Akoma Ntoso and stores it. 429 when the run queue is full.
+         */
         post: operations["ingest_runs_ingest_post"];
         delete?: never;
         options?: never;
@@ -166,7 +193,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Ingest Url */
+        /**
+         * Ingest a document by URL
+         * @description Starts a run that fetches and ingests an EUR-Lex or Publications Office URL under the `eu` jurisdiction, the only lane that fetches. 422 for any other URL or jurisdiction.
+         */
         post: operations["ingest_url_runs_ingest_url_post"];
         delete?: never;
         options?: never;
@@ -181,7 +211,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Run State */
+        /**
+         * Get a run
+         * @description One run's status and events so far.
+         */
         get: operations["run_state_runs__run_id__get"];
         put?: never;
         post?: never;
@@ -200,7 +233,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel */
+        /**
+         * Cancel a run
+         * @description Cancels a queued or running run. 409 when the run is unknown or has already finished.
+         */
         post: operations["cancel_runs__run_id__cancel_post"];
         delete?: never;
         options?: never;
@@ -217,7 +253,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry */
+        /**
+         * Retry a run
+         * @description Starts a new run with the finished run's inputs; the old run keeps its outcome. 409 for an unknown or unfinished run, 429 when the queue is full.
+         */
         post: operations["retry_runs__run_id__retry_post"];
         delete?: never;
         options?: never;
@@ -232,7 +271,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Run Stream */
+        /**
+         * Stream a run's events
+         * @description Server-sent events: every event so far, then each new one, then an `end` event when the run finishes.
+         */
         get: operations["run_stream_runs__run_id__stream_get"];
         put?: never;
         post?: never;
@@ -249,7 +291,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search */
+        /**
+         * Search provisions
+         * @description Hybrid (lexical and vector) search over one jurisdiction's provisions, best match first. 503 when no embeddings endpoint is configured.
+         */
         get: operations["search_search_get"];
         put?: never;
         post?: never;
@@ -266,7 +311,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Version */
+        /**
+         * Get a version
+         * @description One version with its Akoma Ntoso XML.
+         */
         get: operations["version_versions__version_id__get"];
         put?: never;
         post?: never;
@@ -284,7 +332,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Version Document
+         * Get a version as a document tree
          * @description The version as the reader's section tree, not as AKN.
          */
         get: operations["version_document_versions__version_id__document_get"];
@@ -312,71 +360,117 @@ export interface components {
         AknSource: {
             /**
              * Auth Env Var
+             * @description Name of the environment variable holding the credential. The credential itself is never stored in the config.
              * @default
              */
             auth_env_var: string;
             /**
              * Auth Scheme
+             * @description How requests to the source are authenticated.
              * @default none
              * @enum {string}
              */
             auth_scheme: "none" | "token" | "bearer" | "api_key" | "operator_code" | "basic" | "soap_session" | "email_registration";
             /**
              * Coverage
+             * @description How much of the statute base the source holds. Recorded for reference; the pipeline does not read it.
              * @default unknown
              * @enum {string}
              */
             coverage: "complete" | "partial" | "stub" | "unknown";
-            /** Coverage Note */
+            /**
+             * Coverage Note
+             * @description Free-text note on `coverage`. Recorded for reference; the pipeline does not read it.
+             */
             coverage_note?: string | null;
             /**
              * Description
+             * @description Free-text description of the source, often including its provenance.
              * @default
              */
             description: string;
-            /** Fallback Format */
+            /**
+             * Fallback Format
+             * @description The format still available when the source's credential is unset, so `effective_tier` can count it at that format.
+             */
             fallback_format?: ("akn_xml" | "akn_xml_v2" | "bespoke_xml" | "structured_html" | "html" | "pdf" | "pdf_scanned" | "docx" | "rtf" | "json" | "csv" | "rdf") | null;
             /**
              * Format
+             * @description The format the source serves, which sets its tier in `effective_tier`. Defaults to PDF.
              * @default pdf
              * @enum {string}
              */
             format: "akn_xml" | "akn_xml_v2" | "bespoke_xml" | "structured_html" | "html" | "pdf" | "pdf_scanned" | "docx" | "rtf" | "json" | "csv" | "rdf";
-            /** License */
+            /**
+             * License
+             * @description Licence the source publishes under. Recorded for reference; the pipeline does not read it.
+             */
             license?: string | null;
-            /** Name */
+            /**
+             * Name
+             * @description Name of the source.
+             */
             name: string;
             /**
              * Protocol
+             * @description How documents are fetched from the source. Defaults to HTTP. Recorded for reference; the pipeline does not read it.
              * @default http
              * @enum {string}
              */
             protocol: "http" | "rest" | "odata" | "sru" | "oai_pmh" | "soap" | "sparql" | "bulk_dump";
             /**
              * Requires Token
+             * @description True for a source that needs an access token: `effective_tier` skips it when the token's environment variable is unset, unless `fallback_format` declares a usable downgrade.
              * @default false
              */
             requires_token: boolean;
-            /** Schema Id */
+            /**
+             * Schema Id
+             * @description Identifier of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.
+             */
             schema_id?: string | null;
-            /** Schema Url */
+            /**
+             * Schema Url
+             * @description URL of the schema the source's documents follow. Recorded for reference; the pipeline does not read it.
+             */
             schema_url?: string | null;
-            /** Url Template */
+            /**
+             * Url Template
+             * @description URL of the source, or a template for one document's URL.
+             */
             url_template: string;
         };
         /** AmendmentConfig */
         AmendmentConfig: {
-            /** Amending Body Structure */
+            /**
+             * Amending Body Structure
+             * @description Body shape of an amending instrument. `two_pasal_roman`: the host instrument numbers its own articles in Roman numerals, so an Arabic-numbered article after them is quoted amending text.
+             */
             amending_body_structure?: string | null;
-            /** Amendment Item Kind */
+            /**
+             * Amendment Item Kind
+             * @description Hierarchy element that numbers each amendment an amending article makes. What follows it belongs to the amended statute, so it does not compete in the host's numbering; empty leaves the pass inert.
+             */
             amendment_item_kind?: string | null;
-            /** Cross Reference Format */
+            /**
+             * Cross Reference Format
+             * @description How amendments cite the provisions they change. Recorded for reference; the pipeline does not read it.
+             */
             cross_reference_format?: string | null;
-            /** Phrasing */
+            /**
+             * Phrasing
+             * @description A phrase that marks a paragraph as an amendment instruction, in addition to the built-in English cues, so its references are classed as amendments.
+             */
             phrasing?: string | null;
-            /** Style */
+            /**
+             * Style
+             * @description How the jurisdiction drafts amendments. Recorded for reference; the pipeline does not read it.
+             */
             style?: string | null;
-            /** Trigger Phrases */
+            /**
+             * Trigger Phrases
+             * @description Lead-in phrases marking an embedded amendment article: a number following one of these plus a colon is quoted content, not a new top-level article.
+             */
             trigger_phrases?: string[];
         } & {
             [key: string]: unknown;
@@ -389,20 +483,29 @@ export interface components {
         AttachmentCaption: {
             /**
              * Always Opens
+             * @description True where no table in the body carries this caption, so a line that opens with it always begins the attachment.
              * @default false
              */
             always_opens: boolean;
-            /** Caption */
+            /**
+             * Caption
+             * @description Caption that opens the attachment. Captions are centred in the source, so the match tolerates a wide indent.
+             */
             caption: string;
-            /** Hierarchy */
+            /**
+             * Hierarchy
+             * @description Levels the attachment's own content uses, since an annex can be a lettered outline rather than the article hierarchy of its body. Empty uses the body's levels, or none.
+             */
             hierarchy?: components["schemas"]["HierarchyEntry"][];
             /**
              * Normative
+             * @description False for an attachment with no normative force, such as an explanatory memorandum, which cannot serve as a legal basis.
              * @default true
              */
             normative: boolean;
             /**
              * Prefix
+             * @description True where the caption opens a longer title on the same line ("SCHEDULE of fees…"), so the caption need only begin the line. The line is the heading.
              * @default false
              */
             prefix: boolean;
@@ -416,47 +519,78 @@ export interface components {
          *     jurisdiction but are not memberships in an international organisation.
          */
         BindingRegime: {
-            /** Code */
+            /**
+             * Code
+             * @description Code of the regime, canonicalised against the supranational body registry.
+             */
             code: string;
             /**
              * Direct Effect
+             * @description How strongly the regime's instruments take effect, from override to none.
              * @default none
              * @enum {string}
              */
             direct_effect: "override" | "direct" | "indirect_transposition" | "procedural" | "operational" | "advisory" | "none";
-            /** In Force From */
+            /**
+             * In Force From
+             * @description Date the regime took effect, as an ISO date.
+             */
             in_force_from?: string | null;
-            /** In Force Until */
+            /**
+             * In Force Until
+             * @description Date the regime ends or ended, as an ISO date.
+             */
             in_force_until?: string | null;
             /**
              * Kind
+             * @description What kind of regime it is.
              * @enum {string}
              */
             kind: "treaty_framework" | "bilateral_regime" | "constitutional_annex" | "security_council_resolution";
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
             /**
              * Renewable
+             * @description Whether the regime can be renewed.
              * @default false
              */
             renewable: boolean;
-            /** Reporting Cadence */
+            /**
+             * Reporting Cadence
+             * @description How often the regime requires reports.
+             */
             reporting_cadence?: ("monthly" | "quarterly" | "six_monthly" | "annual" | "ad_hoc") | null;
-            /** Superseded Subjects */
+            /**
+             * Superseded Subjects
+             * @description Subject areas where the regime's rules displace domestic law.
+             */
             superseded_subjects?: string[];
-            /** Territories */
+            /**
+             * Territories
+             * @description Territorial scope, typically set for UN Security Council resolutions and other time-bounded regimes; absent for permanent treaty frameworks.
+             */
             territories?: string[];
         };
         /** Body_ingest_runs_ingest_post */
         Body_ingest_runs_ingest_post: {
-            /** File */
+            /**
+             * File
+             * @description The source document, such as a PDF.
+             */
             file: string;
-            /** Jurisdiction */
+            /**
+             * Jurisdiction
+             * @description Jurisdiction code, such as `xa`.
+             */
             jurisdiction: string;
-            /** Title */
+            /**
+             * Title
+             * @description Title to store the law under. Unset uses the title read from it.
+             */
             title?: string | null;
         };
         /**
@@ -476,40 +610,70 @@ export interface components {
          *                     mid-April new year).
          */
         CalendarConversion: {
-            /** Date Cues */
+            /**
+             * Date Cues
+             * @description Phrases that introduce the date a document was made. A dated line elsewhere in the text is some other instrument's.
+             */
             date_cues?: string[];
-            /** Epoch Year */
+            /**
+             * Epoch Year
+             * @description Integer added to the local year to give the Gregorian year (for example -543 for the Buddhist calendar, or 1911 where year 1 is 1912 CE). None for calendars without a fixed offset, such as hijri, ethiopian, era_table and bikram_samvat.
+             */
             epoch_year?: number | null;
-            /** Eras */
+            /**
+             * Eras
+             * @description Era table for an era-based calendar, for example [{"name": "Reiwa", "start": "2019-05-01"}].
+             */
             eras?: {
                 [key: string]: unknown;
             }[] | null;
             /**
              * Kind
+             * @description Which conversion applies; it selects the optional fields that are read.
              * @enum {string}
              */
             kind: "epoch_offset" | "era_table" | "hijri_lunar" | "hijri_solar" | "ethiopian" | "buddhist" | "bikram_samvat";
             /**
              * Month Day Is Gregorian
+             * @description Whether the months and days coincide with the Gregorian ones, so only the year converts. False for any calendar with a grid of its own.
              * @default false
              */
             month_day_is_gregorian: boolean;
-            /** Month Names */
+            /**
+             * Month Names
+             * @description Month names in the local calendar's own order, index 0 = month 1. Present only where a dated line is read off the source text.
+             */
             month_names?: string[];
-            /** New Year Day */
+            /**
+             * New Year Day
+             * @description Day the local year begins in its new-year month, for month-sensitive conversions of a date on the Gregorian grid. Unset keeps the calendar's built-in boundary, a band of days around the new year within which the day does not decide the year. A date on the calendar's own grid always uses the built-in boundary.
+             */
             new_year_day?: number | null;
-            /** New Year Month */
+            /**
+             * New Year Month
+             * @description Gregorian month in which the local year begins, for conversions that depend on the month (Bikram Samvat begins in mid-April).
+             */
             new_year_month?: number | null;
-            /** New Year Reform Year */
+            /**
+             * New Year Reform Year
+             * @description First local year that began on 1 January. Before it the year began in `new_year_month`, so a date in an earlier month falls in the next Gregorian year.
+             */
             new_year_reform_year?: number | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
-            /** Offset */
+            /**
+             * Offset
+             * @description For month-sensitive conversions: the years to subtract from the local year before the new-year day; on or after it, `offset + 1`.
+             */
             offset?: number | null;
-            /** Year Particles */
+            /**
+             * Year Particles
+             * @description Words marking a year as belonging to this calendar ("B.E.", "A.H.").
+             */
             year_particles?: string[];
         };
         /** Cancelled */
@@ -536,36 +700,50 @@ export interface components {
          *       title_regex     the document title (a fixed prefix such as "Regulation:")
          */
         ClassificationRule: {
-            /** Date From */
+            /**
+             * Date From
+             * @description First document date the rule applies to, inclusive. A rule with a date bound is skipped for a document without a date.
+             */
             date_from?: string | null;
-            /** Date Until */
+            /**
+             * Date Until
+             * @description Last document date the rule applies to, inclusive.
+             */
             date_until?: string | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
             /**
              * Pattern
+             * @description Regex tested against the signal's text. Unused for `date_range`.
              * @default
              */
             pattern: string;
             /**
              * Pattern Flags
+             * @description Regex flags for `pattern`, for example "i" for case-insensitive matching.
              * @default
              */
             pattern_flags: string;
             /**
              * Priority
+             * @description Rules are tried from highest priority to lowest; the first match wins.
              * @default 0
              */
             priority: number;
             /**
              * Signal
+             * @description Which part of the document `pattern` is tested against.
              * @enum {string}
              */
             signal: "date_range" | "preamble_match" | "issuer_role" | "gazette_series" | "title_regex";
-            /** Target Document Class */
+            /**
+             * Target Document Class
+             * @description The document class assigned when the rule matches. It must be a key of `document_classes`.
+             */
             target_document_class: string;
         };
         /**
@@ -577,42 +755,57 @@ export interface components {
         DiscoveryConfig: {
             /**
              * Max Total
+             * @description Most documents one discovery run returns, unless the caller sets a limit.
              * @default 5000
              */
             max_total: number;
-            /** Output */
+            /**
+             * Output
+             * @description Path of the basket file discovery writes, relative to the repository root.
+             */
             output?: string | null;
-            /** Queries */
+            /**
+             * Queries
+             * @description Discovery query per doctype, in the portal's own query syntax.
+             */
             queries?: {
                 [key: string]: string;
             };
         };
         /** DisplayConfig */
         DisplayConfig: {
-            /** Amendment Markers */
+            /**
+             * Amendment Markers
+             * @description The pair of strings a publisher prints around amended words; square brackets are the commonest.
+             */
             amendment_markers?: string[];
             /**
              * Font Preference
+             * @description Preferred font style for display. Recorded for reference; the pipeline does not read it.
              * @default serif
              */
             font_preference: string;
             /**
              * Heading Case
+             * @description How headings are cased. Recorded for reference; the pipeline does not read it.
              * @default title_case
              */
             heading_case: string;
             /**
              * Heading Type
+             * @description How provision headings are printed. Declaring `marginal_note` explicitly also scans for basic units whose heading is printed as a marginal note.
              * @default marginal_note
              */
             heading_type: string;
             /**
              * Rtl
+             * @description Whether the script runs right to left. Recorded for reference; the pipeline does not read it.
              * @default false
              */
             rtl: boolean;
             /**
              * Script
+             * @description The writing system of the jurisdiction's texts, which selects the script pack used for normalisation and marker matching.
              * @default latin
              */
             script: string;
@@ -623,58 +816,100 @@ export interface components {
         DocumentClass: {
             /**
              * Akn Element
+             * @description The AKN document element for the class, such as `act`. `doc` or `statement` selects an open structure rather than the legislative hierarchy.
              * @default act
              */
             akn_element: string;
-            /** Akn Subtype */
+            /**
+             * Akn Subtype
+             * @description AKN subtype for the class. Recorded for reference; the pipeline does not read it.
+             */
             akn_subtype?: string | null;
-            /** Authoritative Language */
+            /**
+             * Authoritative Language
+             * @description Authoritative language for this class, for legal systems whose classes are enacted in different languages. Recorded for reference; the pipeline reads only the jurisdiction's.
+             */
             authoritative_language?: string | null;
             /**
              * Basic Unit
+             * @description The element that carries the class's numbered provisions, such as `section` or `article`. It is given to the structurer and used by the anchor coverage check.
              * @default section
              */
             basic_unit: string;
             /**
              * Bluebell Compatible
+             * @description Whether the class can be expressed in Bluebell. Recorded for reference; the pipeline does not read it.
              * @default true
              */
             bluebell_compatible: boolean;
-            /** Direct Effect */
+            /**
+             * Direct Effect
+             * @description Whether instruments of this class apply without domestic transposition. Only a supranational jurisdiction may set it to true.
+             */
             direct_effect?: boolean | null;
-            /** Extends */
+            /**
+             * Extends
+             * @description Another class of this jurisdiction whose fields this one lays over. One level.
+             */
             extends?: string | null;
-            /** Frbr Subtype */
+            /**
+             * Frbr Subtype
+             * @description FRBR subtype of the class's works, returned by the MCP `get_jurisdiction` tool. URI minting does not read it: it uses the doctype or `uri_patterns`.
+             */
             frbr_subtype?: string | null;
-            /** Hcontainers */
+            /**
+             * Hcontainers
+             * @description Containers with no AKN element of their own, structured under a proxy keyword and renamed to `hcontainer` afterwards.
+             */
             hcontainers?: components["schemas"]["HContainer"][];
-            /** Hierarchy */
+            /**
+             * Hierarchy
+             * @description The class's structural levels. Higher levels must come before the basic unit and its subdivisions.
+             */
             hierarchy?: components["schemas"]["HierarchyEntry"][];
-            /** Label */
+            /**
+             * Label
+             * @description Display name of the class, such as "Act" or "Regulation".
+             */
             label: string;
-            /** Local Label */
+            /**
+             * Local Label
+             * @description The class's name in the local language. Recorded for reference; the pipeline does not read it.
+             */
             local_label?: string | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
             /**
              * Number Has Year Prefix
+             * @description True where a printed serial may open with the instrument's year; a matching year prefix is kept out of the URI number.
              * @default false
              */
             number_has_year_prefix: boolean;
             /**
              * Number Source
+             * @description "title_identity" makes the URI number the title digest, never a stated serial, for classes whose serials repeat across issuers. "stated" uses the printed serial.
              * @default stated
              * @enum {string}
              */
             number_source: "stated" | "title_identity";
-            /** Prompt Variant */
+            /**
+             * Prompt Variant
+             * @description Name of a structuring prompt variant for the class. Recorded for reference; the pipeline does not read it.
+             */
             prompt_variant?: string | null;
-            /** Search Rank */
+            /**
+             * Search Rank
+             * @description Rank of the class in the legal hierarchy, used to order a title search: higher outranks lower on a close match, and unset means no weighting. Ranks: 4 constitutional, 3 primary legislation, 2 executive decree, 1 subordinate regulation or decision, 0 implementing instructions.
+             */
             search_rank?: number | null;
-            /** Short Label */
+            /**
+             * Short Label
+             * @description Compact label for the class in the interface and in PDF exports. Falls back to the title-cased doctype when unset.
+             */
             short_label?: string | null;
         } & {
             [key: string]: unknown;
@@ -820,82 +1055,69 @@ export interface components {
             /** DocumentTableCells */
             cells?: components["schemas"]["DocumentTableCell"][];
         };
-        /** EnactingFormula */
-        EnactingFormula: {
-            /** Applies To */
-            applies_to?: unknown[] | string | null;
-            /** Document Class */
-            document_class?: string | string[] | null;
-            /** Enacting Body Tlc */
-            enacting_body_tlc?: string | null;
-            /**
-             * Era
-             * @default
-             */
-            era: string;
-            /** From */
-            from?: string | null;
-            /** Instrument Type */
-            instrument_type?: string | null;
-            /** Language */
-            language?: string | null;
-            /**
-             * Note
-             * @default
-             */
-            note: string;
-            /**
-             * Position
-             * @default preamble
-             */
-            position: string;
-            /** Text */
-            text?: string | null;
-            /** To */
-            to?: string | null;
-            /** Transliteration */
-            transliteration?: string | null;
-            /**
-             * Verified
-             * @default false
-             */
-            verified: boolean;
-        } & {
-            [key: string]: unknown;
-        };
         /** FrbrConfig */
         FrbrConfig: {
+            /** @description Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the conversion. */
             calendar_conversion?: components["schemas"]["CalendarConversion"] | null;
-            /** Country Code */
+            /**
+             * Country Code
+             * @description The country segment of minted FRBR URIs: usually the jurisdiction code, different for a subdivision homed under its parent.
+             */
             country_code: string;
             /**
              * Date Calendar
+             * @description The calendar the jurisdiction's FRBR dates are given in. Recorded for reference; the pipeline does not read it.
              * @default gregorian
              * @enum {string}
              */
             date_calendar: "gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual";
-            /** Date Calendar Note */
+            /**
+             * Date Calendar Note
+             * @description Free-text note on `date_calendar`. Recorded for reference; the pipeline does not read it.
+             */
             date_calendar_note?: string | null;
-            /** Note */
+            /**
+             * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
+             */
             note?: string | null;
-            /** Notes */
+            /**
+             * Notes
+             * @description Free-text note for config authors. The pipeline does not read it.
+             */
             notes?: string[] | string | null;
-            /** Number Extraction */
+            /**
+             * Number Extraction
+             * @description How an instrument number is found in the source. Recorded for reference; the pipeline does not read it.
+             */
             number_extraction?: string | {
                 [key: string]: unknown;
             } | null;
-            /** Number Format */
+            /**
+             * Number Format
+             * @description How instrument numbers are written. Recorded for reference; the pipeline does not read it.
+             */
             number_format?: string | {
                 [key: string]: string;
             } | null;
-            /** Number Note */
+            /**
+             * Number Note
+             * @description Free-text note on instrument numbering. Recorded for reference; the pipeline does not read it.
+             */
             number_note?: string | null;
-            /** Sample Uris */
+            /**
+             * Sample Uris
+             * @description Example FRBR URIs for the jurisdiction. Recorded for reference; the pipeline does not read it.
+             */
             sample_uris?: unknown[] | {
                 [key: string]: string;
             } | null;
+            /** @description Declared where instruments carry no number and the title is the identity. */
             title_identity?: components["schemas"]["TitleIdentity"] | null;
-            /** Uri Patterns */
+            /**
+             * Uri Patterns
+             * @description FRBR work URI template per doctype, using `{year}` and `{number}`. A doctype without one gets the canonical default.
+             */
             uri_patterns?: {
                 [key: string]: string;
             };
@@ -904,40 +1126,68 @@ export interface components {
         };
         /** HContainer */
         HContainer: {
-            /** Akn Element */
+            /**
+             * Akn Element
+             * @description The AKN element the container corresponds to, where one exists. Recorded for reference; the pipeline does not read it.
+             */
             akn_element?: ("book" | "part" | "title" | "subtitle" | "tome" | "chapter" | "subchapter" | "section" | "subsection" | "division" | "subdivision" | "subpart" | "article" | "paragraph" | "subparagraph" | "clause" | "subclause" | "point" | "indent" | "alinea" | "rule" | "subrule" | "item" | "attachment" | "hcontainer" | "proviso") | null;
-            /** Bluebell Keyword */
+            /**
+             * Bluebell Keyword
+             * @description A Bluebell keyword for the container. Recorded for reference; the pipeline does not read it.
+             */
             bluebell_keyword?: ("BOOK" | "PART" | "TITLE" | "SUBTITLE" | "TOME" | "CHAPTER" | "SUBCHAPTER" | "SECTION" | "SUBSECTION" | "DIVISION" | "SUBDIVISION" | "SUBPART" | "ARTICLE" | "PARAGRAPH" | "SUBPARAGRAPH" | "CLAUSE" | "SUBCLAUSE" | "POINT" | "INDENT" | "ALINEA" | "RULE" | "SUBRULE" | "PROVISO" | "TRANSITIONAL" | "CROSSHEADING" | "PART_HEADING") | null;
             /**
              * Bluebell Proxy
+             * @description The Bluebell keyword the structurer uses for this container before it is renamed.
              * @default SUBSECTION
              * @enum {string}
              */
             bluebell_proxy: "BOOK" | "PART" | "TITLE" | "SUBTITLE" | "TOME" | "CHAPTER" | "SUBCHAPTER" | "SECTION" | "SUBSECTION" | "DIVISION" | "SUBDIVISION" | "SUBPART" | "ARTICLE" | "PARAGRAPH" | "SUBPARAGRAPH" | "CLAUSE" | "SUBCLAUSE" | "POINT" | "INDENT" | "ALINEA" | "RULE" | "SUBRULE" | "PROVISO" | "TRANSITIONAL" | "CROSSHEADING" | "PART_HEADING";
             /**
              * Description
+             * @description Free-text description of the container. Recorded for reference; the pipeline does not read it.
              * @default
              */
             description: string;
-            /** Label */
+            /**
+             * Label
+             * @description Display label for the container. Recorded for reference; the pipeline does not read it.
+             */
             label?: string | null;
-            /** Level */
+            /**
+             * Level
+             * @description Where the container sits in the hierarchy. Recorded for reference; the pipeline does not read it.
+             */
             level?: string | null;
-            /** Local Term */
+            /**
+             * Local Term
+             * @description Heading text that identifies the container: a proxy element whose heading starts with it, ignoring case, is renamed to an `hcontainer`.
+             */
             local_term: string;
-            /** Name */
+            /**
+             * Name
+             * @description The `name` attribute the resulting `hcontainer` carries.
+             */
             name: string;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
-            /** Numbering */
+            /**
+             * Numbering
+             * @description How the container is numbered. Recorded for reference; the pipeline does not read it.
+             */
             numbering?: string | null;
-            /** Position */
+            /**
+             * Position
+             * @description Where the container appears in the document. Recorded for reference; the pipeline does not read it.
+             */
             position?: string | null;
             /**
              * Requires Postprocessing
+             * @description Whether the proxy element is renamed to an `hcontainer` after structuring. False leaves it as the proxy element.
              * @default true
              */
             requires_postprocessing: boolean;
@@ -961,39 +1211,64 @@ export interface components {
         HierarchyEntry: {
             /**
              * Akn Element
+             * @description The AKN element this level becomes, such as `article` or `chapter`.
              * @enum {string}
              */
             akn_element: "book" | "part" | "title" | "subtitle" | "tome" | "chapter" | "subchapter" | "section" | "subsection" | "division" | "subdivision" | "subpart" | "article" | "paragraph" | "subparagraph" | "clause" | "subclause" | "point" | "indent" | "alinea" | "rule" | "subrule" | "item" | "attachment" | "hcontainer" | "proviso";
-            /** Akn Name */
+            /**
+             * Akn Name
+             * @description The element name a publisher's own AKN uses in hyphenated eIds for this level (`section` in `section-55-2`), where it differs from `akn_element`.
+             */
             akn_name?: string | null;
-            /** Bluebell Keyword */
+            /**
+             * Bluebell Keyword
+             * @description The Bluebell keyword for this level. Unset uses the AKN element name in capitals.
+             */
             bluebell_keyword?: ("BOOK" | "PART" | "TITLE" | "SUBTITLE" | "TOME" | "CHAPTER" | "SUBCHAPTER" | "SECTION" | "SUBSECTION" | "DIVISION" | "SUBDIVISION" | "SUBPART" | "ARTICLE" | "PARAGRAPH" | "SUBPARAGRAPH" | "CLAUSE" | "SUBCLAUSE" | "POINT" | "INDENT" | "ALINEA" | "RULE" | "SUBRULE" | "PROVISO" | "TRANSITIONAL" | "CROSSHEADING" | "PART_HEADING") | null;
-            /** Captions */
+            /**
+             * Captions
+             * @description The closed caption vocabulary a `caption` level answers to.
+             */
             captions?: string[];
             /**
              * Eid Abbrev
+             * @description Overrides the element's canonical eId prefix. Set it only where the element cannot imply one (an hcontainer, or two local terms on one element) or where the publisher's own AKN uses another prefix.
              * @default
              */
             eid_abbrev: string;
             /**
              * Level
+             * @description Where the level sits: `higher` containers, the single `basic` unit and its `subdivision`s are ordered; `grouping` and `presentational` levels may appear anywhere.
              * @enum {string}
              */
             level: "higher" | "basic" | "subdivision" | "grouping" | "presentational";
-            /** Local Term */
+            /**
+             * Local Term
+             * @description The level's name as the source prints it, such as "Article" or "Chapter". Marker detection and the eId builder match it in the text.
+             */
             local_term: string;
-            /** Local Terms */
+            /**
+             * Local Terms
+             * @description The level's local names, keyed by ISO 639-3 language code, or by "script:<ISO 15924 code>" for a script variant.
+             */
             local_terms?: {
                 [key: string]: string;
             } | null;
-            /** Marker Form */
+            /**
+             * Marker Form
+             * @description For genres whose levels carry no keyword, such as a judgment that numbers its paragraphs "[1.1]" and never names the level. Unset keeps keyword matching.
+             */
             marker_form?: ("caption" | "bracketed_decimal" | "upper_letter_period" | "upper_roman_period" | "lower_letter_period" | "arabic_period" | "alphanumeric_period" | "arabic_closing_paren" | "lower_letter_closing_paren" | "parenthesized_arabic" | "upper_roman_title") | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
-            /** Numbering */
+            /**
+             * Numbering
+             * @description How the level is numbered, such as arabic or roman. Recorded for reference; the pipeline does not read it.
+             */
             numbering?: string | null;
         } & {
             [key: string]: unknown;
@@ -1002,16 +1277,19 @@ export interface components {
         IdentificationConfig: {
             /**
              * Eli Base
+             * @description Base URI of the jurisdiction's European Legislation Identifiers. Recorded for reference; the pipeline does not read it.
              * @default
              */
             eli_base: string;
             /**
              * Pattern
+             * @description Pattern of identifiers in that scheme. Recorded for reference; the pipeline does not read it.
              * @default
              */
             pattern: string;
             /**
              * System
+             * @description Name of the jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it.
              * @default
              */
             system: string;
@@ -1153,44 +1431,79 @@ export interface components {
         };
         /** JurisdictionConfig */
         JurisdictionConfig: {
-            /** Adoption Markers */
+            /**
+             * Adoption Markers
+             * @description Phrases declaring the instrument adopts another body's numbered text, which every count over the document must read as an attachment, not its own structure.
+             */
             adoption_markers?: string[];
-            /** Akn Profile */
+            /**
+             * Akn Profile
+             * @description Name of the AKN profile the jurisdiction's publisher uses. Recorded for reference; the pipeline does not read it.
+             */
             akn_profile?: string | null;
-            /** Akn Sources */
+            /**
+             * Akn Sources
+             * @description Hand-curated list of upstream sources. Read alongside `source_adapters`; `effective_tier` considers both.
+             */
             akn_sources?: components["schemas"]["AknSource"][];
+            /** @description How amending instruments are drafted. */
             amendments?: components["schemas"]["AmendmentConfig"] | null;
-            /** Attachments */
+            /**
+             * Attachments
+             * @description Captions opening an attachment, whose numbering restarts the body's.
+             */
             attachments?: components["schemas"]["AttachmentCaption"][];
-            /** Authoritative Language */
+            /**
+             * Authoritative Language
+             * @description The language whose text is legally authoritative, used when a document's own language cannot be detected.
+             */
             authoritative_language?: string | null;
-            /** Binding Regimes */
+            /**
+             * Binding Regimes
+             * @description Non-membership binding regimes (treaty frameworks, bilateral regimes, constitutional annexes), which are not memberships.
+             */
             binding_regimes?: components["schemas"]["BindingRegime"][];
             /**
              * Calendar
+             * @description The calendar the jurisdiction's instruments are dated in.
              * @default gregorian
              * @enum {string}
              */
             calendar: "gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual";
-            /** Closing Phrases */
+            /**
+             * Closing Phrases
+             * @description Phrases opening the closing attestation in any era. Attestation detection reads them together with every era's `closing_phrases`; the per-era region vocabulary uses an era's own list instead where it declares one.
+             */
             closing_phrases?: string[];
-            /** Code */
+            /**
+             * Code
+             * @description The jurisdiction code, such as `xa`.
+             */
             code: string;
-            /** Core Tlcs */
+            /**
+             * Core Tlcs
+             * @description Recurring persons, bodies and concepts, written to a document's `references` block when the document refers to them by eId.
+             */
             core_tlcs?: components["schemas"]["TLCEntry"][];
             /**
              * Coverage Status
+             * @description Whether the jurisdiction has its own corpus: `in_scope`, `subsumed` into another jurisdiction's, `no_corpus` or `deferred`.
              * @default in_scope
              * @enum {string}
              */
             coverage_status: "in_scope" | "subsumed" | "no_corpus" | "deferred";
             /**
              * Default Document Class
+             * @description The doctype used when no classification rule matches. It must be a key of `document_classes`.
              * @default act
              */
             default_document_class: string;
+            /** @description How the jurisdiction's texts are written and displayed. */
             display?: components["schemas"]["DisplayConfig"] | null;
-            /** Document Classes */
+            /**
+             * Document Classes
+             * @description The instrument types the jurisdiction issues, keyed by doctype.
+             */
             document_classes?: {
                 [key: string]: components["schemas"]["DocumentClass"];
             };
@@ -1203,92 +1516,171 @@ export interface components {
              *     source declares a `fallback_format`, whose tier contributes instead.
              */
             readonly effective_tier: (1 | 2 | 3 | 4 | 5) | null;
-            /** Enacting Formula Markers */
+            /**
+             * Enacting Formula Markers
+             * @description Phrases showing the source carries its own enacting formula. Never a cut point: a phrase here may open the instrument, not close it.
+             */
             enacting_formula_markers?: string[];
-            /** Enacting Formulae */
-            enacting_formulae?: components["schemas"]["EnactingFormula"][];
-            /** Footnote Markers */
+            /**
+             * Footnote Markers
+             * @description `LegalEra.footnote_markers` for a jurisdiction that declares no eras. An era's own list wins where it declares one.
+             */
             footnote_markers?: string[];
+            /** @description How the jurisdiction's FRBR URIs are minted. */
             frbr?: components["schemas"]["FrbrConfig"] | null;
-            /** Furniture Inline Patterns */
+            /**
+             * Furniture Inline Patterns
+             * @description Page furniture that shares a line with real content, such as a portal credit or a stamped URL, so it is removed from the line rather than discarding the line. Narrower than `ocr_header_patterns`, which also matches the real title on page one.
+             */
             furniture_inline_patterns?: string[];
-            /** Furniture Line Patterns */
+            /**
+             * Furniture Line Patterns
+             * @description Page furniture whose whole line can be discarded: mastheads, page numbers, stamps. Narrower than `ocr_header_patterns`, which also carries the running title and so matches the real title on page one; only this set is safe for whole-line removal.
+             */
             furniture_line_patterns?: string[];
+            /** @description The jurisdiction's own identifier scheme. Recorded for reference; the pipeline does not read it. */
             identification?: components["schemas"]["IdentificationConfig"] | null;
-            /** Languages */
+            /**
+             * Languages
+             * @description Languages of the jurisdiction's texts, as ISO 639-3 codes. Where there is only one, it is used for a document whose language is not detected.
+             */
             languages: string[];
-            /** Legal Eras */
+            /**
+             * Legal Eras
+             * @description Drafting periods, so quality is reported per era rather than per corpus; empty means one undivided population. Distinct from `CalendarConversion.eras`, which is a regnal year table.
+             */
             legal_eras?: components["schemas"]["LegalEra"][];
-            /** Lexicon Words */
+            /**
+             * Lexicon Words
+             * @description Legal vocabulary particular to this jurisdiction, folded into the language's word list when a page is scored. A term naming one jurisdiction is that jurisdiction's data, not the language's.
+             */
             lexicon_words?: string[];
-            /** Members */
+            /**
+             * Members
+             * @description For a supranational jurisdiction, the codes of its members. Recorded for reference; the pipeline does not read it.
+             */
             members?: string[];
             /**
              * Min Anchor Coverage
+             * @description Minimum ratio of captured structural anchors to marker literals in the source; ingest fails below it, so a partial AKN cannot ship. The default 0.80 tolerates in-prose cross-references, and 0.0 disables the check.
              * @default 0.8
              */
             min_anchor_coverage: number;
-            /** Name */
+            /**
+             * Name
+             * @description The jurisdiction's name.
+             */
             name: string;
-            /** Name En */
+            /**
+             * Name En
+             * @description The jurisdiction's name in English.
+             */
             name_en?: string | null;
-            /** Name Local */
+            /**
+             * Name Local
+             * @description The jurisdiction's name in its own language.
+             */
             name_local?: string | null;
-            /** Name Translations */
+            /**
+             * Name Translations
+             * @description Localised jurisdiction names keyed by ISO 639-3 language code, in the same shape as a law's title translations. The pipeline does not read it.
+             */
             name_translations?: {
                 [key: string]: string;
             };
             /**
              * Note
+             * @description Free-text note at the jurisdiction level for cross-cutting guidance.
              * @default
              */
             note: string;
+            /** @description How instruments are numbered and cited. */
             numbering?: components["schemas"]["NumberingConfig"] | null;
-            /** Ocr Header Patterns */
+            /**
+             * Ocr Header Patterns
+             * @description Running header and footer text that leaks into article bodies during OCR, stripped from paragraphs before translation so the model never sees it. Regex strings, so a profile author can add patterns without touching Python.
+             */
             ocr_header_patterns?: string[];
-            /** Opening Material Terminators */
+            /**
+             * Opening Material Terminators
+             * @description Phrases the recitals precede, after which any further pre-body text is stray page text.
+             */
             opening_material_terminators?: string[];
-            /** Placeholders */
+            /**
+             * Placeholders
+             * @description Whole-string markers for missing or struck content, checked in addition to the built-in placeholder pattern.
+             */
             placeholders?: components["schemas"]["PlaceholderMarker"][];
-            /** Pool Excluded Refers To */
+            /**
+             * Pool Excluded Refers To
+             * @description `refersTo` values marking a duty on someone other than the instrument's subjects. Units at or under a marked element stay readable but are not embedded or assessed.
+             */
             pool_excluded_refers_to?: string[];
             /**
              * Public Reference
+             * @description True where the config ships in the open core. Defaults to false, so a jurisdiction joins the open set only by a deliberate edit.
              * @default false
              */
             public_reference: boolean;
-            /** Residual Legal Systems */
+            /**
+             * Residual Legal Systems
+             * @description Foreign legal corpora still residually applicable here, such as pre-independence or occupying-power law left in force, so amendment and consolidation tooling can trace layered systems.
+             */
             residual_legal_systems?: components["schemas"]["ResidualLaw"][];
+            /** @description Where one source holds several instruments, how their openings are read. */
             segmentation?: components["schemas"]["SegmentationConfig"] | null;
-            /** Source Adapters */
+            /**
+             * Source Adapters
+             * @description Structured acquisition adapters for this jurisdiction, read by `codify.acquisition`.
+             */
             source_adapters?: components["schemas"]["SourceAdapter"][];
             /**
              * Source Truncation Floor
+             * @description Share of a document's contents listing that may lack a body before the source is treated as truncated. Off by default (0.0), since a threshold has to be set for each series from that series' own documents.
              * @default 0
              */
             source_truncation_floor: number;
-            /** Status */
+            /**
+             * Status
+             * @description How far the config has been validated, as listed in the registry.
+             */
             status?: ("production" | "draft" | "stub") | null;
+            /** @description Settings for marker detection, classification and the structurer. */
             structuring?: components["schemas"]["StructuringConfig"] | null;
-            /** Subsumed By */
+            /**
+             * Subsumed By
+             * @description The code of the jurisdiction whose corpus covers this one. Required when `coverage_status` is `subsumed` and refused otherwise.
+             */
             subsumed_by?: string | null;
-            /** Supranational Memberships */
+            /**
+             * Supranational Memberships
+             * @description Supranational bodies the jurisdiction belongs to. Recorded for reference; the pipeline does not read it.
+             */
             supranational_memberships?: components["schemas"]["SupranationalMembership"][];
             /**
              * Synthetic
+             * @description True for a fictional jurisdiction authored as synthetic test material. It is discovered and validated like any other config but kept out of the derived registry and the world atlas, which list real jurisdictions only.
              * @default false
              */
             synthetic: boolean;
-            /** Tier */
+            /**
+             * Tier
+             * @description Availability tier of the jurisdiction's statute base: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base.
+             */
             tier?: (1 | 2 | 3 | 4 | 5) | null;
-            /** Tradition */
+            /**
+             * Tradition
+             * @description The legal traditions the jurisdiction draws on. At least one is required.
+             */
             tradition: ("civil_law" | "common_law" | "islamic" | "customary" | "hindu" | "confucian" | "jewish" | "socialist" | "sui_generis")[];
             /**
              * Type
+             * @description Whether the jurisdiction is national, supranational, subnational or a crown dependency.
              * @default national
              * @enum {string}
              */
             type: "national" | "supranational" | "subnational" | "crown_dependency";
+            /** @description How far the config has been checked against real documents. Recorded for reference; the pipeline does not read it. */
             validation?: components["schemas"]["ValidationConfig"] | null;
         } & {
             [key: string]: unknown;
@@ -1339,7 +1731,7 @@ export interface components {
         };
         /**
          * LawSummary
-         * @description The listing row, without the hosted platform's lens and translation fields.
+         * @description One law in a listing: its identity, FRBR work URI and latest expression date.
          */
         LawSummary: {
             /** Doctype */
@@ -1377,66 +1769,121 @@ export interface components {
          *     spelled ``from`` in the config files.
          */
         LegalEra: {
-            /** Authority Patterns */
+            /**
+             * Authority Patterns
+             * @description How this era's offices are named in provision text, to flag provisions for review. A match means the office is named, not that it is granted a power; opt-in per era, since an era ending does not abolish its authorities.
+             */
             authority_patterns?: string[];
-            /** Calendar */
+            /**
+             * Calendar
+             * @description The calendar this era's instruments are dated in, where it differs from the jurisdiction's current one. None means it does not differ. Same closed set as the jurisdiction's own field, so the two cannot drift apart.
+             */
             calendar?: ("gregorian" | "lunar_hijri" | "solar_hijri" | "ethiopian" | "japanese_era" | "minguo" | "buddhist_era" | "dual") | null;
-            /** Closing Phrases */
+            /**
+             * Closing Phrases
+             * @description Phrases opening the attestation that closes a document of this era, so the promulgation and signature stop being read as the last article's text. Era-scoped because the wording follows the enacting authority.
+             */
             closing_phrases?: string[];
             /**
              * Document Class
+             * @description The document class typical of the era. Recorded for reference; the pipeline does not read it.
              * @default
              */
             document_class: string;
             /**
              * Enacting Authority
+             * @description The body that enacted instruments in this era. Recorded for reference; the pipeline does not read it.
              * @default
              */
             enacting_authority: string;
-            /** Footnote Markers */
+            /**
+             * Footnote Markers
+             * @description Regex for how a footnote marker opens in this era. The modern set uses superscripts and the older ones a parenthesised numeral; declaring only one form silently drops the other era.
+             */
             footnote_markers?: string[];
-            /** From */
+            /**
+             * From
+             * @description First date of the era, as an ISO date, inclusive. Unset leaves it open.
+             */
             from?: string | null;
-            /** Id */
+            /**
+             * Id
+             * @description Identifier of the era, used to report structural quality per era.
+             */
             id: string;
             /**
              * Label
+             * @description Display name of the era, given to the metadata extractor with its calendar.
              * @default
              */
             label: string;
-            /** To */
+            /**
+             * To
+             * @description Last date of the era, as an ISO date, inclusive. Unset leaves it open.
+             */
             to?: string | null;
         } & {
             [key: string]: unknown;
         };
         /** NumberingConfig */
         NumberingConfig: {
-            /** Act Citation */
+            /**
+             * Act Citation
+             * @description Citation pattern for acts. Reference resolution reads every `<class>_citation` field, and needs the default class's, to tell which instrument type a citation names.
+             */
             act_citation?: string | null;
-            /** Act Citation Alt */
+            /**
+             * Act Citation Alt
+             * @description An alternative citation form for acts. Recorded for reference; the pipeline does not read it.
+             */
             act_citation_alt?: string | null;
-            /** Article Numbering */
+            /**
+             * Article Numbering
+             * @description How articles are numbered. Recorded for reference; the pipeline does not read it.
+             */
             article_numbering?: string | null;
-            /** Citations */
+            /**
+             * Citations
+             * @description Citation pattern per instrument type, keyed by type. Recorded for reference; the pipeline does not read it.
+             */
             citations?: {
                 [key: string]: string;
             };
-            /** Insertion Example */
+            /**
+             * Insertion Example
+             * @description An example of an inserted unit's number. Recorded for reference; the pipeline does not read it.
+             */
             insertion_example?: string | null;
-            /** Insertion Note */
+            /**
+             * Insertion Note
+             * @description Free-text note on how inserted units are numbered. Recorded for reference; the pipeline does not read it.
+             */
             insertion_note?: string | null;
-            /** Insertion Style */
+            /**
+             * Insertion Style
+             * @description How inserted units are numbered. `slash_alpha` lets a marker number carry a slash and capital letter, as in "5/A".
+             */
             insertion_style?: string | null;
-            /** Note */
+            /**
+             * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
+             */
             note?: string | null;
             /**
              * Numbers Unique Across Years
+             * @description Whether an instrument number identifies a work without its year. False for most jurisdictions, which restart numbering each year; true lets a year-less citation resolve on the number alone, and is a claim about the whole series, not just the documents held.
              * @default false
              */
             numbers_unique_across_years: boolean;
-            /** Series Citation Connectors */
+            /**
+             * Series Citation Connectors
+             * @description Regex fragments that may sit between a series name and its number.
+             */
             series_citation_connectors?: string[];
-            /** Series Citations */
+            /**
+             * Series Citations
+             * @description Instruments cited by a never-reused series number and no year. Order matters: full names before abbreviations, so the full form wraps first.
+             */
             series_citations?: components["schemas"]["SeriesCitation"][];
         } & {
             [key: string]: unknown;
@@ -1447,9 +1894,15 @@ export interface components {
          *     struck, and the AKN status the unit should carry for it.
          */
         PlaceholderMarker: {
-            /** Pattern */
+            /**
+             * Pattern
+             * @description Regex matched against a unit's whole text.
+             */
             pattern: string;
-            /** @default incomplete */
+            /**
+             * @description The AKN `status` a unit matching `pattern` carries.
+             * @default incomplete
+             */
             status: components["schemas"]["PlaceholderStatus"];
         };
         /**
@@ -1476,29 +1929,52 @@ export interface components {
          *     find the source corpus.
          */
         ResidualLaw: {
-            /** In Force From */
+            /**
+             * In Force From
+             * @description Date the residual law began to apply.
+             */
             in_force_from?: string | null;
-            /** In Force Until */
+            /**
+             * In Force Until
+             * @description Date the residual law stopped applying.
+             */
             in_force_until?: string | null;
-            /** Label */
+            /**
+             * Label
+             * @description Display name of the residual corpus.
+             */
             label: string;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
             /**
              * Scope
+             * @description What the residual law applies to: a territory, subjects, personal status or everything.
              * @enum {string}
              */
             scope: "territorial" | "subject_matter" | "personal_status" | "general";
-            /** Source Jurisdiction */
+            /**
+             * Source Jurisdiction
+             * @description Code of the jurisdiction whose corpus applies. It must have a config.
+             */
             source_jurisdiction: string;
-            /** Subjects */
+            /**
+             * Subjects
+             * @description Subject areas the residual law applies to, when `scope` is subject_matter.
+             */
             subjects?: string[];
-            /** Superseded By */
+            /**
+             * Superseded By
+             * @description Superseding acts (as FRBR URIs or free-text citations).
+             */
             superseded_by?: string[];
-            /** Territories */
+            /**
+             * Territories
+             * @description Territories the residual law applies in, when `scope` is territorial.
+             */
             territories?: string[];
         };
         /** RunSnapshot */
@@ -1580,17 +2056,35 @@ export interface components {
          *     source holds. Absent means the jurisdiction declares none, and nothing splits.
          */
         SegmentationConfig: {
-            /** Act Heading Patterns */
+            /**
+             * Act Heading Patterns
+             * @description Regexes matched at a line start; a `number` group, where present, is the label.
+             */
             act_heading_patterns?: string[];
-            /** Contents Keywords */
+            /**
+             * Contents Keywords
+             * @description Headings of a contents listing, matched case-insensitively at a line start.
+             */
             contents_keywords?: string[];
-            /** Issue Heading Patterns */
+            /**
+             * Issue Heading Patterns
+             * @description The level above acts: a gazette issue within a bound volume.
+             */
             issue_heading_patterns?: string[];
-            /** Printed Page Pattern */
+            /**
+             * Printed Page Pattern
+             * @description A printed page number in a page's running header or footer; its first participating group is the number.
+             */
             printed_page_pattern?: string | null;
-            /** Skip Heading Patterns */
+            /**
+             * Skip Heading Patterns
+             * @description Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.
+             */
             skip_heading_patterns?: string[];
-            /** Trailing Section Patterns */
+            /**
+             * Trailing Section Patterns
+             * @description Whole lines that open a trailing section which is never ingested: nothing is read from there on.
+             */
             trailing_section_patterns?: string[];
         };
         /**
@@ -1598,9 +2092,15 @@ export interface components {
          * @description A citation naming an instrument by series number alone ("Act No. 386").
          */
         SeriesCitation: {
-            /** Doctype */
+            /**
+             * Doctype
+             * @description The doctype whose FRBR work URI a matched citation links to.
+             */
             doctype: string;
-            /** Name */
+            /**
+             * Name
+             * @description Regex for the instrument's name or abbreviation, matched case-insensitively.
+             */
             name: string;
         };
         /**
@@ -1613,48 +2113,73 @@ export interface components {
         SourceAdapter: {
             /**
              * Auth Env Var
+             * @description Name of the environment variable holding the credential. The credential itself is never stored in the config.
              * @default
              */
             auth_env_var: string;
             /**
              * Auth Scheme
+             * @description How requests are authenticated. Anything but `none` needs `auth_env_var`.
              * @default none
              * @enum {string}
              */
             auth_scheme: "none" | "token" | "bearer" | "oauth";
-            /** Base Url */
+            /**
+             * Base Url
+             * @description Root URL requests are made against. Unset uses the acquirer's default.
+             */
             base_url?: string | null;
+            /** @description How the source lists documents, for acquirers that support discovery. */
             discovery?: components["schemas"]["DiscoveryConfig"] | null;
             /**
              * Kind
+             * @description Which acquirer handles this source.
              * @enum {string}
              */
             kind: "akn_native" | "eurlex_cellar" | "html_portal" | "pdf_gazette" | "paragraf_propisi" | "sparql" | "bulk_xml_archive" | "gazette_xml" | "json_portal" | "oecd_compendium";
-            /** Licence */
+            /**
+             * Licence
+             * @description Licence the source publishes under, recorded on fetched documents by the acquirers that carry it.
+             */
             licence?: string | null;
-            /** Name */
+            /**
+             * Name
+             * @description Name of the source, used in log lines and errors.
+             */
             name: string;
             /**
              * Notes
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             notes: string;
-            /** Parser */
+            /**
+             * Parser
+             * @description Registered structured parser (in `codify.pipeline.parsers`) that converts this adapter's main body deterministically. None sends it through the general structuring lane.
+             */
             parser?: string | null;
-            /** Rate Limit Per Minute */
+            /**
+             * Rate Limit Per Minute
+             * @description Most requests per minute sent to the source's host. Unset leaves the acquirer's own default.
+             */
             rate_limit_per_minute?: number | null;
             /**
              * Robots Respect
+             * @description Whether requests honour the host's robots.txt.
              * @default true
              */
             robots_respect: boolean;
-            /** Url Template */
+            /**
+             * Url Template
+             * @description Template for one document's URL, for acquirers that build it from the FRBR URI.
+             */
             url_template?: string | null;
         };
         /** StructuringConfig */
         StructuringConfig: {
             /**
              * Body Opens With Container
+             * @description True where the drafting standard puts every article inside a container, so an article before the first one is a citation in the opening material. Some laws cite the constitution that way in the legal-basis recital.
              * @default false
              */
             body_opens_with_container: boolean;
@@ -1670,24 +2195,33 @@ export interface components {
             citation_lead_ins?: string[];
             /**
              * Citation Subjects
-             * @description How an instrument refers to itself when it declares its short name (`This Act`). Required alongside `citation_lead_ins`: the same phrasing names the schools and offices a law creates, so an unanchored clause takes the school's name for the law's.
+             * @description How an instrument refers to itself when declaring its short name (`This Act`). Required with `citation_lead_ins`, because the same phrasing names bodies a law creates, and without it a law could take a school's or office's name as its own.
              */
             citation_subjects?: string[];
-            /** Citation Successors */
+            /**
+             * Citation Successors
+             * @description Words that, following a marker's number on its own line, make the line a citation list rather than a provision ("Article 5 to Article 9 apply").
+             */
             citation_successors?: string[];
-            /** Classification Rules */
+            /**
+             * Classification Rules
+             * @description Deterministic classification rules, evaluated in descending priority before the model is asked. `prompt_additions` carries only style hints the rules cannot express.
+             */
             classification_rules?: components["schemas"]["ClassificationRule"][];
             /**
              * Designation Rule
-             * @description Derives a short name from the title's own grammar where the tradition declares no short title. EU acts are cited by form and number.
+             * @description Derives a short name from the title's own grammar where the legal tradition declares no short title. `eu_instrument` cites an act by its form and number.
              */
             designation_rule?: "eu_instrument" | null;
             /**
              * Example Markers
-             * @description Lead-ins that introduce specimen legislation in a drafting manual (`Contoh`), whose markers are displayed rather than enacted.
+             * @description Lead-ins that introduce specimen legislation in a drafting manual ("Example"), whose markers are displayed rather than enacted.
              */
             example_markers?: string[];
-            /** Insertion Suffixes */
+            /**
+             * Insertion Suffixes
+             * @description Words after a marker's number that mark an inserted unit ("5 bis"), mapped to the eId form. One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.
+             */
             insertion_suffixes?: {
                 [key: string]: string;
             };
@@ -1698,78 +2232,143 @@ export interface components {
             long_title_lead_ins?: string[];
             /**
              * Marker Boundary
+             * @description `line_anchored` where the drafting standard puts the marker on its own line and the sources keep it, so a mid-sentence citation cannot anchor.
              * @default relaxed
              * @enum {string}
              */
             marker_boundary: "relaxed" | "line_anchored";
             /**
              * Marker Order
+             * @description `number_first` where the number precedes the keyword (as in "15. §").
              * @default keyword_first
              * @enum {string}
              */
             marker_order: "keyword_first" | "number_first";
-            /** Marker Tolerances */
+            /**
+             * Marker Tolerances
+             * @description OCR damage the sources carry, tolerated for this jurisdiction only so parsing elsewhere is unchanged. `missing_separator` accepts a keyword run into its number, as in "Article24".
+             */
             marker_tolerances?: ("missing_separator" | "keyword_glyph" | "digit_glyph" | "split_number")[];
-            /** Ordinal Words */
+            /**
+             * Ordinal Words
+             * @description Ordinal words used as container numbers (as in "Part One"). Declared in the source's own casing; matching is case-sensitive.
+             */
             ordinal_words?: {
                 [key: string]: number;
             };
-            /** Prompt Additions */
+            /**
+             * Prompt Additions
+             * @description Jurisdiction-specific guidance appended to the structurer's context, for style hints the deterministic rules cannot express.
+             */
             prompt_additions?: string | null;
-            /** Prompt Variant */
+            /**
+             * Prompt Variant
+             * @description Name of a structuring prompt variant. Recorded for reference; the pipeline does not read it.
+             */
             prompt_variant?: string | null;
-            /** Prose Precursors */
+            /**
+             * Prose Precursors
+             * @description Words ending the previous line when a citation wraps onto the next, which a boundary rule cannot see. Empty falls back to the script pack's list.
+             */
             prose_precursors?: string[];
             /**
              * Recurring Furniture
+             * @description True where the layout engine files footnotes and page-top captions as header or footer, so only text repeated across pages counts as running header or footer, and a block opening on a marker is a note.
              * @default false
              */
             recurring_furniture: boolean;
-            /** Reference Nouns */
+            /**
+             * Reference Nouns
+             * @description Words that introduce a citation's number ("Article 41 paragraph (3)"). A line ending in one makes the bracketed number on the next line part of the citation, not a marker opening a new provision.
+             */
             reference_nouns?: string[];
-            /** Sameline Precursors */
+            /**
+             * Sameline Precursors
+             * @description Precursors that mark a citation only when adjacent on the same line.
+             */
             sameline_precursors?: string[];
         } & {
             [key: string]: unknown;
         };
         /** SupranationalMembership */
         SupranationalMembership: {
-            /** Body */
+            /**
+             * Body
+             * @description Code of the body, canonicalised against the supranational body registry.
+             */
             body: string;
             /**
              * Direct Effect
+             * @description How strongly the body's law takes effect, from override (strongest) to none. Legacy boolean values are read as "direct" or "none".
              * @default none
              * @enum {string}
              */
             direct_effect: "override" | "direct" | "indirect_transposition" | "procedural" | "operational" | "advisory" | "none";
-            /** Direct Effect Instruments */
+            /**
+             * Direct Effect Instruments
+             * @description The body's instrument types that have direct effect.
+             */
             direct_effect_instruments?: string[];
-            /** Direct Effect Note */
+            /**
+             * Direct Effect Note
+             * @description Free-text note on `direct_effect`.
+             */
             direct_effect_note?: string | null;
-            /** Excluded Instruments */
+            /**
+             * Excluded Instruments
+             * @description Instruments of the body the member does not apply.
+             */
             excluded_instruments?: string[];
-            /** Excluded Subjects */
+            /**
+             * Excluded Subjects
+             * @description Subject areas the member has opted out of.
+             */
             excluded_subjects?: string[];
-            /** Member Since */
+            /**
+             * Member Since
+             * @description Date membership began, as a loose string, since some sources give only a year such as "1999".
+             */
             member_since?: string | null;
-            /** Member Until */
+            /**
+             * Member Until
+             * @description Date membership ended, as an ISO 8601 date; set only when status is "former".
+             */
             member_until?: string | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
-            /** Protocol References */
+            /**
+             * Protocol References
+             * @description The treaties or protocols that create the carve-outs, as free text (for example "Protocol 21 TFEU").
+             */
             protocol_references?: string[];
-            /** Rejoined On */
+            /**
+             * Rejoined On
+             * @description Date a former member rejoined after its membership lapsed; `member_since` keeps the original date.
+             */
             rejoined_on?: string | null;
-            /** Status */
+            /**
+             * Status
+             * @description Membership status; absent means "member".
+             */
             status?: ("member" | "suspended" | "former" | "candidate" | "potential_candidate" | "associate" | "observer" | "special_status" | "never_member") | null;
-            /** Superseded Subjects */
+            /**
+             * Superseded Subjects
+             * @description Subject areas where the body's law displaces domestic law.
+             */
             superseded_subjects?: string[];
-            /** Suspension Periods */
+            /**
+             * Suspension Periods
+             * @description History of suspensions and reinstatements, including repeated cycles and a suspension still in force (`suspended_until` unset).
+             */
             suspension_periods?: components["schemas"]["SuspensionPeriod"][];
-            /** Transposition Required */
+            /**
+             * Transposition Required
+             * @description Whether the body's instruments need transposing into national law: a boolean, or a list of the instrument types that do (for example ["directive"]).
+             */
             transposition_required?: boolean | string[] | null;
         } & {
             [key: string]: unknown;
@@ -1785,37 +2384,56 @@ export interface components {
         SuspensionPeriod: {
             /**
              * Reason
+             * @description Why the suspension was imposed, as free text.
              * @default
              */
             reason: string;
             /**
              * Scope
+             * @description What the suspension withdraws: all rights, or only decision-making, voting or attendance at meetings. Defaults to full withdrawal.
              * @default full
              * @enum {string}
              */
             scope: "full" | "decision_making" | "meetings" | "voting";
-            /** Suspended From */
+            /**
+             * Suspended From
+             * @description Start of the suspension, as an ISO 8601 date.
+             */
             suspended_from: string;
-            /** Suspended Until */
+            /**
+             * Suspended Until
+             * @description End of the suspension, as an ISO 8601 date; None while still suspended.
+             */
             suspended_until?: string | null;
         };
         /** TLCEntry */
         TLCEntry: {
             /**
              * Class
+             * @description The AKN TLC element the entry becomes, such as `TLCOrganization`.
              * @enum {string}
              */
             class: "TLCPerson" | "TLCOrganization" | "TLCRole" | "TLCObject" | "TLCConcept" | "TLCEvent" | "TLCLocation" | "TLCProcess" | "TLCTerm" | "TLCReference";
-            /** Eid */
+            /**
+             * Eid
+             * @description An NCName-compatible identifier; camelCase and hyphenated forms are both accepted, and an empty one is refused.
+             */
             eId: string;
-            /** Href */
+            /**
+             * Href
+             * @description The URI the entry refers to, written to its `href` attribute.
+             */
             href: string;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
-            /** Showas */
+            /**
+             * Showas
+             * @description The display name written to the entry's `showAs` attribute.
+             */
             showAs: string;
         };
         /**
@@ -1824,46 +2442,72 @@ export interface components {
          *     Every field is a literal `codify.frbr.identity_from_title` reads.
          */
         TitleIdentity: {
-            /** Consolidation Markers */
+            /**
+             * Consolidation Markers
+             * @description Parenthetical words marking a re-publication; an edition number after one is the edition folded in, not this document's.
+             */
             consolidation_markers?: string[];
-            /** Edition Markers */
+            /**
+             * Edition Markers
+             * @description Words inside a parenthetical naming this instrument's edition, spelling variants included; the first is canonical and is what a slug carries.
+             */
             edition_markers?: string[];
-            /** Strip Prefixes */
+            /**
+             * Strip Prefixes
+             * @description Document-kind words opening a short title, longest first.
+             */
             strip_prefixes?: string[];
-            /** Year Particles */
+            /**
+             * Year Particles
+             * @description Words marking the year that follows as the instrument's own.
+             */
             year_particles?: string[];
         };
         /** ValidationConfig */
         ValidationConfig: {
-            /** Ambiguities */
+            /**
+             * Ambiguities
+             * @description The open questions about the config, as free text.
+             */
             ambiguities?: string[];
             /**
              * Bluebell Tested
+             * @description Whether the config's structure has been tested through Bluebell.
              * @default false
              */
             bluebell_tested: boolean;
             /**
              * Documents Examined
+             * @description How many source documents the config was checked against.
              * @default 0
              */
             documents_examined: number;
-            /** Documents Examined Note */
+            /**
+             * Documents Examined Note
+             * @description Free-text note on the documents examined.
+             */
             documents_examined_note?: string | null;
-            /** Laws Africa Reference */
+            /**
+             * Laws Africa Reference
+             * @description Whether Laws.Africa covers this jurisdiction: a URL to its collection, or a bare flag.
+             */
             laws_africa_reference?: string | boolean | null;
             /**
              * Note
+             * @description Free-text note for config authors. The pipeline does not read it.
              * @default
              */
             note: string;
             /**
              * Status
+             * @description How far the config has been validated: `production`, `draft` or `stub`.
              * @default draft
              * @enum {string}
              */
             status: "production" | "draft" | "stub";
             /**
              * Unresolved Ambiguities
+             * @description How many open questions about the config remain.
              * @default 0
              */
             unresolved_ambiguities: number;
@@ -2033,6 +2677,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Jurisdiction code, such as `xa`. */
                 code: string;
             };
             cookie?: never;
@@ -2062,11 +2707,14 @@ export interface operations {
     laws_for_jurisdictions__code__laws_get: {
         parameters: {
             query?: {
+                /** @description Most laws to return. */
                 limit?: number;
+                /** @description Laws to skip before the page starts. */
                 offset?: number;
             };
             header?: never;
             path: {
+                /** @description Jurisdiction code, such as `xa`. */
                 code: string;
             };
             cookie?: never;
@@ -2096,11 +2744,17 @@ export interface operations {
     laws_laws_get: {
         parameters: {
             query?: {
+                /** @description Jurisdiction code. Unset lists every jurisdiction. */
                 jurisdiction?: string | null;
+                /** @description Document class, such as `act`. */
                 doctype?: string | null;
+                /** @description Year of the law. */
                 year?: number | null;
+                /** @description Title query. When set, results are ordered by title match. */
                 q?: string | null;
+                /** @description Most laws to return. */
                 limit?: number;
+                /** @description Laws to skip before the page starts. */
                 offset?: number;
             };
             header?: never;
@@ -2134,6 +2788,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Law id, as returned by the law listing. */
                 law_id: string;
             };
             cookie?: never;
@@ -2163,11 +2818,14 @@ export interface operations {
     law_versions_laws__law_id__versions_get: {
         parameters: {
             query?: {
+                /** @description Most versions to return. */
                 limit?: number;
+                /** @description The `next_cursor` of the previous page. Unset starts at the first. */
                 cursor?: string | null;
             };
             header?: never;
             path: {
+                /** @description Law id, as returned by the law listing. */
                 law_id: string;
             };
             cookie?: never;
@@ -2285,6 +2943,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -2316,6 +2975,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -2347,6 +3007,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -2378,6 +3039,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Run id, as returned when the run was started. */
                 run_id: string;
             };
             cookie?: never;
@@ -2407,9 +3069,13 @@ export interface operations {
     search_search_get: {
         parameters: {
             query: {
+                /** @description The search text. */
                 q: string;
+                /** @description Jurisdiction code, such as `xa`. */
                 jurisdiction: string;
+                /** @description Most matches to return. */
                 k?: number;
+                /** @description ISO 639-3 code of the expression to search. Unset searches each law's original language; a law without that expression falls back to it. */
                 language?: string | null;
             };
             header?: never;
@@ -2443,6 +3109,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Version id, as listed under its law. */
                 version_id: string;
             };
             cookie?: never;
@@ -2474,6 +3141,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Version id, as listed under its law. */
                 version_id: string;
             };
             cookie?: never;

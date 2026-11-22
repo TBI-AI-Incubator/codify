@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="410" viewBox="0 0 358 410" role="img" aria-label="From structure gate to grade: a gate that fires lands the document with a structure_halted error, and only AnchorCoverageError or BodyFillError fails the run; the validator writes findings; the grade folds them, warning for the worked example.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="1" width="358" height="136" rx="3" class="s box"/>
+<text x="12" y="18">Structure gates</text>
+<text x="12" y="33" class="note">A gate that fires lands the document;</text>
+<text x="12" y="49" class="note">adds <tspan font-family="'Geist Mono',ui-monospace,monospace">structure_halted</tspan> (error)</text>
+<path d="M12 61 L346 61" class="s2"/>
+<text x="12" y="77" class="micro">If cannot land: run fails</text>
+<text x="12" y="93" class="note">No <tspan font-family="'Geist Mono',ui-monospace,monospace">final.akn.xml</tspan>; grade ungraded</text>
+<text x="12" y="109" class="code">AnchorCoverageError</text>
+<text x="12" y="125" class="code">BodyFillError</text>
+<path d="M40 137 L40 159" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="161" width="358" height="120" rx="3" class="s box"/>
+<text x="12" y="178">Validate</text>
+<text x="12" y="193" class="note">Each finding: check, severity,</text>
+<text x="12" y="209" class="note">usually an <tspan font-family="'Geist Mono',ui-monospace,monospace">eId</tspan></text>
+<path d="M12 221 L346 221" class="s2"/>
+<text x="12" y="237" class="micro">Worked example</text>
+<text x="12" y="253" class="code">missing_container_title</text>
+<text x="12" y="269" class="code">warning, part_II</text>
+<path d="M40 281 L40 303" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="305" width="358" height="104" rx="3" class="s box"/>
+<text x="12" y="322">Grade</text>
+<text x="12" y="337" class="note">Any error: blocking. Any warning: warning.</text>
+<text x="12" y="353" class="note">Otherwise clean; info never counts.</text>
+<path d="M12 365 L346 365" class="s2"/>
+<text x="12" y="381" class="micro">Worked example</text>
+<text x="12" y="397" class="code">grade: warning</text>
+</svg>

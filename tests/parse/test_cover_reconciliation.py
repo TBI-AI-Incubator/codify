@@ -36,7 +36,7 @@ def test_dense_toc_without_keyword_returns_numbers() -> None:
 
 
 def test_body_with_five_articles_at_top_is_not_a_toc() -> None:
-    """Copilot #3 regression: five line-anchored article headings in a
+    """Regression: five line-anchored article headings in a
     normal body page (Articles 1-5 with prose between them) must NOT be
     accepted as a TOC. Without the density gate this false-fired on
     every ordinary body extract."""
@@ -60,7 +60,7 @@ def test_arabic_toc_page_returns_numbers() -> None:
 
 
 def test_gapped_toc_preserves_the_gap() -> None:
-    """Copilot #4 regression: `max(numbers)` inflates the count when the
+    """Regression: `max(numbers)` inflates the count when the
     TOC has gaps. Returning the number list lets the reconciliation
     compare set size against body count, which is what we actually want.
     Articles 1, 2, 5 = 3 declared, not 5."""
@@ -148,8 +148,8 @@ def test_env_7_1999_shape_returns_error() -> None:
     assert issue["delta"] == -11
 
 
-def test_off_by_one_swallows_reviewer_arb_3_2000_case() -> None:
-    """Documenting the tolerance trade-off: reviewer's Arb 3/2000 case
+def test_off_by_one_sits_inside_the_tolerance() -> None:
+    """Documenting the tolerance trade-off: an off-by-one
     (cover 59, body 58) sits inside ±1 and does not fire. Trading
     slightly more silent-drop coverage against false-positive rate on
     documents whose annexes sit outside the TOC."""
@@ -163,7 +163,7 @@ def test_two_article_delta_is_warning() -> None:
 
 
 def test_body_over_cover_flagged() -> None:
-    """Civil Code 4/2014 shape: cover 1230, body 1302."""
+    """Body count over cover count."""
     issue = reconcile_cover_vs_body(list(range(1, 1231)), 1302)
     assert issue is not None
     assert issue["delta"] == 72
@@ -171,7 +171,7 @@ def test_body_over_cover_flagged() -> None:
 
 
 def test_gapped_cover_reports_set_size_not_max() -> None:
-    """Copilot #4: TOC has articles 1, 2, 5 = 3 declared; body has 3
+    """TOC has articles 1, 2, 5 = 3 declared; body has 3
     articles. No mismatch. If we naively used max(numbers)=5, we would
     fire a spurious delta of -2."""
     assert reconcile_cover_vs_body([1, 2, 5], 3) is None

@@ -4,6 +4,20 @@
 
 Accepted
 
+## Status note, 14 November 2026
+
+The decision stands and its first consequence is complete. The `hu`
+configuration maps the § level to `article` with keyword `ARTICLE` in its `act`
+and `rendelet` classes, as the other eight configurations named below do.
+
+Two details differ from the text:
+
+- No configuration sets `eid_abbrev` on a § level. The `art` prefix follows from
+  the `article` element (`EID_ABBREV` in `codify/akn/eid.py`). `eid_abbrev` is
+  for a level whose element cannot imply a prefix.
+- No test enforces the rule for a new § jurisdiction. Check the mapping when you
+  review a new configuration.
+
 ## Context
 
 The § symbol is used as the basic citable provision in Germanic and Central European civil law traditions: Germany (Paragraph), Austria (Paragraph), Czech Republic (paragraf), Slovakia (paragraf), Denmark (paragraf), Estonia (paragrahv), Sweden (paragraf), Finland (pykälä), and Hungary (szakasz).

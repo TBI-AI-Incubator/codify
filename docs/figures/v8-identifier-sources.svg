@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="416" viewBox="0 0 358 416" role="img" aria-label="Where each part of two identifiers comes from. Work URI /akn/xa/act/1992/7: /akn/xa/act/ is the fixed text of the config pattern frbr.uri_patterns.act, /akn/xa/act/{year}/{number}, the pattern of the default class act; 1992/7 fills its year and number slots, which a model read from the text. eId part_I__sec_1__point_1: part from the hierarchy level with akn_element part, I as printed; sec from akn_element section, 1 as printed, both found by rules; point_1 from the filled text, where each (1) line becomes a point, not the Subsection level.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="0" y="7" width="7" height="7" class="ink"/>
+<text x="14" y="14" class="note">calls a model</text>
+<text x="0" y="40">Work URI</text>
+<text x="358" y="40" class="note" text-anchor="end">from final.akn.xml</text>
+<rect x="0" y="48" width="358" height="32" rx="3" class="s2 box-lo"/>
+<text x="12" y="68" class="code" textLength="129.6" lengthAdjust="spacing">/akn/xa/act/1992/7</text>
+<path d="M100.4 81 L100.4 84 L139.6 84 L139.6 81" class="s2"/>
+<path d="M120 84 L120 104 L128 104" class="s2"/>
+<rect x="132" y="100" width="7" height="7" class="ink"/>
+<text x="144" y="108">Read from the text</text>
+<text x="144" y="124" class="note">metadata: year 1992, number 7</text>
+<path d="M14 81 L14 84 L96.4 84 L96.4 81" class="s2"/>
+<path d="M55 84 L55 152 L63 152" class="s2"/>
+<text x="67" y="156" class="code">frbr.uri_patterns.act</text>
+<text x="67" y="172" class="code">/akn/xa/act/{year}/{number}</text>
+<text x="0" y="216" class="code">eId</text>
+<text x="358" y="216" class="note" text-anchor="end">levels joined by __</text>
+<rect x="0" y="224" width="358" height="32" rx="3" class="s2 box-lo"/>
+<text x="12" y="244" class="code" textLength="158.4" lengthAdjust="spacing">part_I__sec_1__point_1</text>
+<path d="M122 257 L122 260 L168.4 260 L168.4 257" class="s2"/>
+<path d="M145 260 L145 280 L153 280" class="s2"/>
+<rect x="157" y="276" width="7" height="7" class="ink"/>
+<text x="169" y="284">Read from the filled text</text>
+<text x="169" y="300" class="note">each “(1)” line becomes a point,</text>
+<text x="169" y="316" class="note">not the Subsection level</text>
+<path d="M71.6 257 L71.6 260 L103.60000000000001 260 L103.60000000000001 257" class="s2"/>
+<path d="M88 260 L88 344 L96 344" class="s2"/>
+<text x="100" y="348" class="code">akn_element: "section"</text>
+<text x="100" y="364" class="note">prefix sec; 1 as printed, found by rules</text>
+<path d="M14 257 L14 260 L53.2 260 L53.2 257" class="s2"/>
+<path d="M34 260 L34 392 L42 392" class="s2"/>
+<text x="46" y="396" class="code">akn_element: "part"</text>
+<text x="46" y="412" class="note">I as printed in PART I, found by rules</text>
+</svg>

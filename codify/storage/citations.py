@@ -2,7 +2,7 @@
 
 Civil servants cite instruments as numbers, and the conventions vary by
 jurisdiction and by the language the reader is typing in: `5/2010`,
-`Law No. 5 of 2010`, `قرار بقانون رقم 9 لسنة 2025`. Title search cannot reach
+`Law No. 5 of 2010`, `قانون رقم 5 لسنة 2010`. Title search cannot reach
 those reliably, because it matches the words of a stored title and the reader is
 not reproducing a title.
 

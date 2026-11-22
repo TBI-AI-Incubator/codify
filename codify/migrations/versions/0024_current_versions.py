@@ -2,8 +2,8 @@
 
 Search scoped to a jurisdiction passed every current version id as one array,
 and the planner estimates `= ANY(array)` element by element against each
-partition's statistics: 1.8 s of planning for 97 ms of execution across the
-corpus. Joining on a flag plans in milliseconds.
+partition's statistics, so planning dominated execution. Joining on a flag
+plans in milliseconds.
 
 Current means what `latest_versions_global` chose: the original (no parent) with
 the latest expression date, then the latest ingest, then the lowest id. Those

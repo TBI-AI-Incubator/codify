@@ -2,9 +2,7 @@
 
 Without a config the pipeline does not fail: it falls back to defaults and emits
 a plausible bundle for a jurisdiction it knows nothing about. That is the worst
-shape for an external user, because nothing prompts them to look. It matters more
-after the open-core split, where five of 257 configs ship and every other code a
-user might name lands on this path.
+shape for an external user, because nothing prompts them to look.
 """
 
 from __future__ import annotations
@@ -68,6 +66,11 @@ def test_the_resolver_reports_where_it_looked() -> None:
     missing = resolve_config("zz")
     assert not missing.found
     assert missing.path is None and missing.sha256 is None
+
+
+def test_a_code_that_is_not_one_directory_name_is_absent() -> None:
+    for code in ("../gb", "gb/..", "..\\gb", "c:gb", "", "-gb", "gb\x00", "\x00"):
+        assert not resolve_config(code).found, code
 
 
 def test_the_digest_tracks_the_file_rather_than_the_code(

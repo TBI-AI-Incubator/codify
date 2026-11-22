@@ -29,7 +29,7 @@ from codify.acquisition.adapters.th.ocs import (
     section_text,
 )
 from codify.acquisition.adapters.th.ocs_akn import UnmappedUnit, to_akn, to_bluebell
-from codify.acquisition.base import DiscoveryQuery
+from codify.acquisition.base import DiscoveryQuery, MissingUserAgent
 from codify.acquisition.politeness import PoliteTransport
 from codify.frbr import TITLE_DIGEST_PREFIX, identity_from_code
 from codify.jurisdictions import SourceAdapter, TitleIdentity
@@ -257,14 +257,18 @@ def test_registers_json_portal() -> None:
     assert "json_portal" in registered_kinds()
 
 
-def test_default_client_is_polite() -> None:
+def test_default_client_is_polite(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "th-test/1 (+https://example.test)")
     acquirer = OcsAcquirer(_adapter(), title_rule=RULE)
     assert isinstance(acquirer._client._transport, PoliteTransport)
     assert acquirer.politeness.rate_limit_per_minute == 12
-    sent = acquirer._client._transport.profile.user_agent
-    assert sent.startswith("Codify/") and sent.endswith(
-        "(+https://github.com/TBI-AI-Incubator/codify)"
-    )
+    assert acquirer._client._transport.profile.user_agent == "th-test/1 (+https://example.test)"
+
+
+def test_the_client_needs_the_callers_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT")
+    with pytest.raises(MissingUserAgent):
+        OcsAcquirer(_adapter(), title_rule=RULE)
 
 
 def test_section_text_joins_split_spans_and_keeps_paragraphs() -> None:
@@ -1127,6 +1131,14 @@ async def test_an_amending_text_asked_for_by_code_takes_its_own_timelines_code()
     amending, _ = await _fetch(AMENDING, identity=LAW_CODE_IDENTITY)
     assert base.frbr_work_uri == f"/akn/th/act/2001/{identity_from_code('ก0001-1B-0001')}"
     assert amending.frbr_work_uri == (f"/akn/th/act/2010/{identity_from_code('ก0001-1B-0001-xx')}")
+
+
+async def test_an_amending_text_has_its_own_official_work_id() -> None:
+    base, _ = await _fetch(BASE)
+    amending, _ = await _fetch(AMENDING)
+    assert base.official is not None and amending.official is not None
+    assert base.official.work_id == "ก0001-1B-0001"
+    assert amending.official.work_id == "ก0001-1B-0001-xx"
 
 
 async def test_an_identity_the_acquirer_does_not_know_is_refused() -> None:

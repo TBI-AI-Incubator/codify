@@ -331,13 +331,6 @@
     ],
     "series_citation_connectors": ["No\\.?", "Nos\\.?", "Numbered", "Ser\\.?"]
   },
-  "enacting_formulae": [
-    {
-      "text": "BE IT ENACTED by the Assembly of Atlantis, and by the authority of the same, as follows:",
-      "position": "preamble",
-      "document_class": "act"
-    }
-  ],
   "enacting_formula_markers": ["Having regard to", "HEREBY RESOLVES", "HEREBY DETERMINES"],
   "opening_material_terminators": ["HEREBY RESOLVES", "HEREBY DETERMINES"],
   "amendments": {
@@ -439,7 +432,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN."
   },
   "tier": 4,
   "status": "stub",

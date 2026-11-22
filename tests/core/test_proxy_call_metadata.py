@@ -31,8 +31,8 @@ def _context(**over: object) -> TelemetryContext:
 
 def test_an_unbound_call_carries_only_a_refusal_to_make_a_person() -> None:
     """Without a `user_id`, LiteLLM falls back to the trace id for `distinct_id`
-    and PostHog mints a person per call: 759 events became 470 "people". The
-    flag keeps the event and its cost and drops only the phantom."""
+    and the analytics sink mints a person per call. The flag keeps the event
+    and its cost and drops only the phantom."""
     assert proxy_call_metadata() == {"$process_person_profile": False}
 
 

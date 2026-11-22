@@ -25,7 +25,6 @@ import uuid
 from collections import Counter
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -46,21 +45,13 @@ from codify.calendar import local_date_from_text
 from codify.frbr import build_frbr_work_uri, identity_from_code, identity_from_title
 from codify.jurisdictions import SourceAdapter, TitleIdentity, load_config, try_load_config
 from codify.lang import normalise_digits
+from codify.provenance import OfficialRef
 
 SEARCH_URL = "https://www.ocs.go.th/searchlaw/indexs/list_table_search"
 DOC_PATH = "/ocs-api/public/doc/getLawDoc"
 GAZETTE_NAME = "ราชกิจจานุเบกษา"
 
 logger = structlog.get_logger(__name__)
-
-
-def user_agent() -> str:
-    """The crawler identity this source is sent: the Core release and its home."""
-    try:
-        release = version("codify-core")
-    except PackageNotFoundError:
-        release = "0"
-    return f"Codify/{release} (+https://github.com/TBI-AI-Incubator/codify)"
 
 
 TIMELINE_KINDS = {"1": "original", "2": "amending", "3": "consolidated", "4": "current"}
@@ -145,7 +136,7 @@ def own_gazette_note(footnotes: list[dict[str, Any]]) -> str:
 def publication_date(info: dict[str, Any], footnotes: list[dict[str, Any]]) -> str:
     """The earlier of the record's date and its own Gazette note's: a consolidation's
     record can carry a later act's date (an Act of 1979 dated 1991)."""
-    # ponytail: a note misdated earlier than the law wins; one in ~3,000 today.
+    # ponytail: a note misdated earlier than the law wins.
     stated = str(info.get("publishDateAd") or "")
     cfg = try_load_config("th")
     rule = cfg.frbr.calendar_conversion if cfg is not None and cfg.frbr is not None else None
@@ -225,9 +216,7 @@ class OcsAcquirer(BaseAcquirer):
         dump_dir: Path | None = None,
     ) -> None:
         super().__init__(adapter, client=client)
-        self._client = client or make_polite_client(
-            adapter, user_agent=user_agent(), profile=self.politeness
-        )
+        self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._licence = adapter.licence
         self._title_rule = title_rule
         self._session = str(uuid.uuid4())
@@ -418,6 +407,8 @@ class OcsAcquirer(BaseAcquirer):
                     ),
                     "",
                 )
+        # An amending text is another act: its own timeline code, not the law's.
+        official_code = str(info.get("timelineLawCode" if kind == "amending" else "lawCode") or "")
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=work,
@@ -430,6 +421,11 @@ class OcsAcquirer(BaseAcquirer):
             citation_alt=title or None,
             gazette_ref=gazette_ref(payload.get("footnoteList") or [], published),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="ocs", work_id=official_code, edition_id=timeline_id, edition_date=as_of
+            )
+            if official_code
+            else None,
         )
 
     async def search(

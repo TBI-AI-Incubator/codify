@@ -86,7 +86,7 @@ def _text_at(xml: str, eid: str) -> list[str]:
 def test_a_minted_eid_never_takes_one_the_document_publishes() -> None:
     """Ids x, x, x_dup2: before repair `#x_dup2` names the third element and
     nothing else. Renaming the second `x` to `x_dup2` would keep every id
-    unique while moving that reference onto the second element (#95)."""
+    unique while moving that reference onto the second element."""
     out, renamed = ensure_unique_eids(_terms(["x", "x", "x_dup2"], "x_dup2"))
     assert renamed == 1
     assert _term_ids(out) == ["x", "x_dup3", "x_dup2"]

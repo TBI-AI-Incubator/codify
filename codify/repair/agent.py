@@ -141,6 +141,8 @@ PROMPT_VERSION = hashlib.sha256(_INSTRUCTIONS.encode("utf-8")).hexdigest()[:8]
 
 
 def build_agent(model: Model, store: EvidenceStore) -> Agent[RepairDeps, EditPlan]:
+    """Build the AKN repair agent: it reads evidence through the registered tools and
+    finishes by submitting an edit plan, which is validated before it is accepted."""
     agent = Agent(
         model,
         deps_type=RepairDeps,

@@ -246,9 +246,9 @@ def test_page_access_is_bounded_to_evidence_pages() -> None:
 
 @pytest.mark.asyncio
 async def test_preview_tool_takes_a_json_string_and_reports_the_verdict() -> None:
-    """The op union cannot ride a tool schema through the gateway (the demo
-    failure mode: every structured-arg call failed validation and burned the
-    tool retries), so the tool takes the plan as a JSON string."""
+    """The op union cannot ride a tool schema through the gateway (every
+    structured-arg call fails validation and burns the tool retries), so the
+    tool takes the plan as a JSON string."""
     deps, eid = _workspace_deps()
     calls: list[int] = []
 
@@ -366,8 +366,7 @@ async def test_text_only_response_is_nudged_into_a_tool_call() -> None:
 
 @pytest.mark.asyncio
 async def test_repeated_accepted_preview_short_circuits() -> None:
-    """Re-previewing an accepted plan (the observed loop: 72 identical calls)
-    skips the sandbox and points at submit_plan instead."""
+    """Re-previewing an accepted plan skips the sandbox and points at submit_plan instead."""
     deps, eid = _workspace_deps()
     plan = _plan_json(eid, "The restored body of the second article.")
     calls: list[int] = []

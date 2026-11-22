@@ -1,0 +1,102 @@
+# The Python calls the guide tells a reader to make directly, grouped by guide page.
+# Each entry is `module:attribute`; the generator fails if one no longer imports.
+- title: Model your legal system
+  guide: ../guide/model-your-legal-system.md
+  symbols:
+    - codify.jurisdictions:load_config
+    - codify.frbr:build_frbr_work_uri
+    - codify.frbr:build_frbr_expression_uri
+    - codify.frbr:is_citable_work_uri
+    - codify.calendar:year_from_calendar
+    - codify.pipeline.dating:resolve_dating
+    - codify.pipeline.enrich.metadata:calendar_hint
+    - codify.pipeline.enrich.anchors:build_anchor_regex
+    - codify.pipeline.enrich.anchors:scan_anchors
+- title: Acquire sources
+  guide: ../guide/acquire-sources.md
+  symbols:
+    - codify.acquisition:get_acquirer
+    - codify.acquisition:make_polite_client
+    - codify.acquisition:DocumentRef
+    - codify.acquisition:AcquiredDocument
+    - codify.acquisition.base:BaseAcquirer
+    - codify.acquisition.adapters.akn_native:AknNativeAcquirer
+    - codify.acquisition.pdf_metadata:extract_pdf_metadata
+    - codify.acquisition.manifest:load_manifest
+    - codify.storage.acquisitions:record_acquisition
+- title: OCR
+  guide: ../guide/ocr.md
+  symbols:
+    - codify.pipeline.enrich.ocr:extract_text_from_pdf
+    - codify.pipeline.enrich.ocr:page_verdict
+    - codify.pipeline.enrich.scripts:pack_for_config
+    - codify.quality.page_read:score_page
+    - codify.quality.page_read:ink_ratio
+- title: Structure
+  guide: ../guide/structure.md
+  symbols:
+    - codify.pipeline:ingest_document
+    - codify.pipeline.formats.pdf:ingest
+    - codify.pipeline.segment:segment
+    - codify.pipeline.enrich.verbatim:text_to_bluebell_verbatim
+    - codify.pipeline.enrich.bluebell:parse_to_akn
+    - codify.akn.bluebell:bluebell_to_akn
+- title: Validate and repair
+  guide: ../guide/validate-and-repair.md
+  symbols:
+    - codify.pipeline.enrich.validator:validate_akn
+    - codify.akn:validate_akn
+    - codify.quality.structural_quality_grade:structural_quality_grade
+    - codify.storage.structural_findings:record_findings
+    - codify.repair.ops:EditPlan
+    - codify.repair.edit_ops:apply_plan
+    - codify.repair.sandbox:preview_plan
+    - codify.repair.loop:repair_document
+    - codify.repair.agent:build_agent
+- title: Amendments and versions
+  guide: ../guide/amendments-and-versions.md
+  symbols:
+    - codify.pipeline.enrich.amendments:lift_amendment_markup
+    - codify.storage:effects_for_version
+    - codify.storage:amendment_history
+    - codify.storage:law_amendment_history
+    - codify.timeline:state_at
+- title: Translate
+  guide: ../guide/translate.md
+  symbols:
+    - codify.translate:translate_document
+    - codify.translate:walk_source
+    - codify.translate.write:apply_translation_to_akn
+    - codify.translate:PinnedTerm
+    - codify.translate:select_pinned_terms
+    - codify.translate:apply_pinned_terms
+    - codify.translate.quality_grade:translation_quality_grade
+    - codify.translate.delivery:delivery_findings
+    - codify.storage.repository:save_document
+    - codify.storage.versions:stale_translation_ids
+- title: Search
+  guide: ../guide/search.md
+  symbols:
+    - codify.storage.embeddings:embed_and_stamp
+    - codify.retrieve.hybrid:retrieve
+    - codify.storage.versions:current_scope
+    - codify.storage.retrieval:hybrid_search
+- title: Serve and publish
+  guide: ../guide/serve-and-publish.md
+  symbols:
+    - codify.serve:create_app
+    - codify.mcp:create_server
+- title: Interoperate
+  guide: ../guide/interoperate.md
+  symbols:
+    - codify.akn:parse_xml
+    - codify.pipeline.enrich.cobalt:set_work_uri
+    - codify.deliverable:build_deliverable
+- title: Database
+  guide: ../operate/database.md
+  symbols:
+    - codify.storage.partitions:promote_sql
+- title: Models and costs
+  guide: ../operate/models-and-costs.md
+  symbols:
+    - codify.core.pricing:cost_details

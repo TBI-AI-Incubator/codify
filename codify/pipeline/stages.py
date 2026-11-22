@@ -30,7 +30,7 @@ from codify.pipeline.enrich.amendments import lift_amendment_markup
 from codify.pipeline.enrich.asides import emit_marginal_notes
 from codify.pipeline.enrich.cobalt import enrich_akn
 from codify.pipeline.enrich.conclusions import emit_conclusions
-from codify.pipeline.enrich.enacting import emit_enacting_formula
+from codify.pipeline.enrich.enacting import mark_source_formula
 from codify.pipeline.enrich.hcontainers import postprocess_hcontainers
 from codify.pipeline.enrich.inline_markup import emit_inline_markup
 from codify.pipeline.enrich.metadata import number_from_title
@@ -42,6 +42,7 @@ from codify.pipeline.enrich.regions import (
     RegionVocabulary,
     vocabulary_for_jurisdiction,
 )
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 
 if TYPE_CHECKING:
     from codify.core.llm import LLMClient
@@ -403,12 +404,7 @@ async def run_enrich_passes(
             lambda x: mark_placeholder_status(x, placeholder_statuses_for_code(jurisdiction_code)),
         ),
         ("amendments", lift_amendment_markup),
-        (
-            "enacting",
-            lambda x: emit_enacting_formula(
-                x, jurisdiction_code, desc.doctype, desc.raw_date or None
-            ),
-        ),
+        ("enacting", lambda x: mark_source_formula(x, jurisdiction_code)),
         ("hcontainers", lambda x: postprocess_hcontainers(x, jurisdiction_code, desc.doctype)),
         ("references", lambda x: emit_references(x, jurisdiction_code)),
         # Both read regions and run before external refs, so a lifted note is
@@ -417,20 +413,29 @@ async def run_enrich_passes(
         ("notes", lambda x: emit_authorial_notes(x, vocab=vocab, regions=regions)),
         ("asides", lambda x: emit_marginal_notes(x, regions=regions)),
     ]
-    for name, fn in sync_passes:
-        try:
-            akn_xml = fn(akn_xml)
-        except UncitableFrbrUri:
-            # Every other pass is decoration this document can ship without.
-            # An identity nobody can cite is the document, so it propagates.
-            raise
-        except CONFIG_FAULTS:
-            # So does a config nobody can read: every pass after it runs thinner.
-            raise
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("enrich_pass_failed", pass_name=name, error=str(exc))
-            continue
-        if on_pass is not None:
+
+    def _run_sync(xml: str) -> tuple[str, list[str]]:
+        done: list[str] = []
+        for name, fn in sync_passes:
+            try:
+                xml = fn(xml)
+            except UncitableFrbrUri:
+                # Every other pass is decoration this document can ship without.
+                # An identity nobody can cite is the document, so it propagates.
+                raise
+            except CONFIG_FAULTS:
+                # So does a config nobody can read: every pass after it runs thinner.
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("enrich_pass_failed", pass_name=name, error=str(exc))
+                continue
+            done.append(name)
+        return xml, done
+
+    # CPU-bound: one hop on the pipeline's CPU pool, off the caller's event loop.
+    akn_xml, done = await on_the_cpu_pool(_run_sync, akn_xml)
+    if on_pass is not None:
+        for name in done:
             on_pass(name)
 
     try:

@@ -130,8 +130,7 @@ def test_stopwords_are_kept() -> None:
 
 
 # Arabic clitic round-trip: a query for the bare form must reach the prefixed
-# form. Postgres's Snowball config fails these three; measured over the corpus,
-# this tokeniser round-trips 97.4% of 14,107 attested pairs against its 0%.
+# form. Postgres's Snowball config fails these three; this tokeniser round-trips them.
 @pytest.mark.parametrize(
     ("bare", "prefixed"),
     [
@@ -194,8 +193,8 @@ def test_empty_and_punctuation_only_yield_no_tokens(text: str) -> None:
     [("en", "eng"), ("lt", "lit"), ("en-US", "eng"), ("EN", "eng")],
 )
 def test_language_labels_fold_to_iso639_3(stray: str, canonical: str) -> None:
-    """`versions.language` carries 639-1 strays: 1,214 versions are labelled
-    `en`. Unfolded they would tokenise differently from their `eng` siblings,
+    """`versions.language` can carry 639-1 strays such as `en`.
+    Unfolded they would tokenise differently from their `eng` siblings,
     so a query would reach one and not the other."""
     text = "the rights of the accused"
     assert tokenise(text, stray) == tokenise(text, canonical)

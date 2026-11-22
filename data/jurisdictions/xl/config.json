@@ -602,18 +602,6 @@
     "insertion_style": "alphanumeric",
     "note": "Acts cited by short title (e.g. 'Undang-Undang tentang Keterbukaan Informasi Publik') or by number and year. Inserted units take an uppercase-letter suffix (Pasal 13A); deleted units keep their number and read 'Dihapus'."
   },
-  "enacting_formulae": [
-    {
-      "text": "Dengan Persetujuan Bersama DEWAN LANGKASUKA dan PRESIDEN REPUBLIK LANGKASUKA MEMUTUSKAN: Menetapkan: UNDANG-UNDANG TENTANG [SUBJECT].",
-      "position": "preamble",
-      "document_class": "act"
-    },
-    {
-      "text": "DENGAN RAHMAT TUHAN YANG MAHA KUASA PRESIDEN REPUBLIK LANGKASUKA, MEMUTUSKAN: Menetapkan: PERATURAN PEMERINTAH TENTANG [SUBJECT].",
-      "position": "preamble",
-      "document_class": ["pp", "perppu", "perpres"]
-    }
-  ],
   "enacting_formula_markers": ["DENGAN RAHMAT TUHAN YANG MAHA KUASA", "Dengan Persetujuan Bersama", "MEMUTUSKAN:"],
   "opening_material_terminators": ["Menetapkan"],
   "ocr_header_patterns": ["^\\s*[-\\u2013\\u2014]\\s*\\d+\\s*[-\\u2013\\u2014]\\s*$", "^\\s*SALINAN\\s*$"],
@@ -834,7 +822,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored acts round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN."
   },
   "tier": 5,
   "status": "stub",

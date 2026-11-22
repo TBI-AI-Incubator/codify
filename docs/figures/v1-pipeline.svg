@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="624" height="809" viewBox="0 0 624 809" role="img" aria-label="The Codify pipeline, top to bottom: a source PDF is read, its metadata read, anchors found by the jurisdiction config's rules, a scaffold built and filled, parsed to Akoma Ntoso, enriched and validated, then stored and read through the command line, HTTP API, MCP server and web app. Each stage is shown with the bundle files it leaves; manifest.json and events.jsonl cover the whole run.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<rect x="136" y="0" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="17">Jurisdiction config</text>
+<text x="148" y="32" class="code">xa/config.json</text>
+<rect x="0" y="7" width="7" height="7" class="ink"/>
+<text x="14" y="14" class="note">calls a model</text>
+<text x="352" y="32" class="micro">In the bundle</text>
+<rect x="136" y="60" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="77">Source PDF</text>
+<text x="148" y="92" class="note">5 scanned pages</text>
+<path d="M236 100 L236 114" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="116" width="200" height="72" rx="3" class="s box"/>
+<text x="148" y="133">Read pages</text>
+<text x="148" y="148" class="note">5 pages, one read each</text>
+<rect x="317" y="125" width="7" height="7" class="ink"/>
+<path d="M336 129 L346 129" class="s2"/>
+<text x="352" y="133" class="code">pages/page-001.png …</text>
+<text x="352" y="149" class="code">source.txt</text>
+<text x="352" y="165" class="code">page_spans.json</text>
+<text x="352" y="181" class="code">segmentation.json</text>
+<path d="M236 188 L236 202" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="204" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="221">Read metadata</text>
+<text x="148" y="236" class="note">1 call: title, date, number</text>
+<rect x="317" y="213" width="7" height="7" class="ink"/>
+<path d="M236 244 L236 258" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="260" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="277">Find anchors</text>
+<text x="148" y="292" class="note">26 found by the rules</text>
+<path d="M336 273 L346 273" class="s2"/>
+<text x="352" y="277" class="code">anchors.jsonl</text>
+<text x="352" y="293" class="code">ambiguity.jsonl</text>
+<path d="M236 300 L236 314" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="316" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="333">Build scaffold</text>
+<text x="148" y="348" class="note">26 headings, bodies empty</text>
+<path d="M336 329 L346 329" class="s2"/>
+<text x="352" y="333" class="code">scaffold.bluebell</text>
+<path d="M236 356 L236 370" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="372" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="389">Fill text</text>
+<text x="148" y="404" class="note">3 windows, one call each</text>
+<rect x="317" y="381" width="7" height="7" class="ink"/>
+<path d="M336 385 L346 385" class="s2"/>
+<text x="352" y="389" class="code">coverage.json</text>
+<path d="M236 412 L236 426" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="428" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="445">Parse</text>
+<text x="148" y="460" class="note">Bluebell to Akoma Ntoso</text>
+<path d="M236 468 L236 482" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="484" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="501">Enrich</text>
+<text x="148" y="516" class="note">11 passes, one with a model</text>
+<rect x="317" y="493" width="7" height="7" class="ink"/>
+<path d="M236 524 L236 538" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="540" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="557">Validate</text>
+<text x="148" y="572" class="note">1 finding, grade warning</text>
+<path d="M336 553 L346 553" class="s2"/>
+<text x="352" y="557" class="code">validator.json</text>
+<path d="M236 580 L236 594" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="596" width="200" height="72" rx="3" class="em box"/>
+<text x="148" y="613" class="em">Akoma Ntoso XML</text>
+<text x="148" y="628" class="code">/akn/xa/act/1992/7</text>
+<path d="M336 609 L346 609" class="s2"/>
+<text x="352" y="613" class="code">final.akn.xml</text>
+<text x="352" y="629" class="note">for the whole run:</text>
+<text x="352" y="645" class="code">manifest.json</text>
+<text x="352" y="661" class="code">events.jsonl</text>
+<path d="M236 668 L236 682" class="s" marker-end="url(#arrow)"/>
+<rect x="136" y="684" width="200" height="40" rx="3" class="s box"/>
+<text x="148" y="701">Store</text>
+<text x="148" y="716" class="note">PostgreSQL, by codify load</text>
+<path d="M136 20 L120 20 L120 504" class="s2"/>
+<path d="M120 136 L134 136" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 224 L134 224" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 280 L134 280" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 336 L134 336" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 392 L134 392" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 448 L134 448" class="s2" marker-end="url(#arrow2)"/>
+<path d="M120 504 L134 504" class="s2" marker-end="url(#arrow2)"/>
+<rect x="0" y="60" width="108" height="40" rx="3" class="s box"/>
+<text x="10" y="77">Publisher XML</text>
+<text x="10" y="92" class="note">no model</text>
+<path d="M54 100 L54 560 L134 560" class="s" marker-end="url(#arrow)"/>
+<path d="M236 724 L236 738" class="s" marker-end="url(#arrow)"/>
+<rect x="0" y="740" width="624" height="68" rx="3" class="s box"/>
+<text x="12" y="760" class="micro">Read through</text>
+<text x="12" y="782">Command line</text>
+<text x="12" y="798" class="code">codify</text>
+<text x="168" y="782">HTTP API</text>
+<text x="168" y="798" class="code">codify serve</text>
+<text x="324" y="782">MCP server</text>
+<text x="324" y="798" class="code">codify mcp</text>
+<text x="480" y="782">Web app</text>
+<text x="480" y="798" class="code">apps/web</text>
+</svg>

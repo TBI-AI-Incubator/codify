@@ -23,6 +23,7 @@ from codify.frbr import default_token, law_number_token, token_country, token_fa
 from codify.jurisdictions import OPEN_STRUCTURE_ROOTS, load_config, load_short_titles
 from codify.lang import normalise_digits
 from codify.pipeline.enrich.eid import build_term_map, resolve_informal_reference
+from codify.pipeline.enrich.eu_citations import CITATION, EU_CITATION_CLASS, work_uri
 
 if TYPE_CHECKING:
     from codify.core.llm import LLMClient
@@ -50,6 +51,7 @@ _TAIL_EXTERNAL = re.compile(
     r"^(?:that|those|the\s+said)\b"
     r"|(?:Act|Regulations|Order)\s+(?:19|20)\d{2}\b"
     r"|\bthe\s+(?:19|20)\d{2}\s+(?:Act|Regulations)\b"
+    r"|(?:Regulation|Directive|Decision)\s+(?:\([^)]{2,30}\)\s+)?(?:No\s+)?\d{1,4}/\d"
 )
 _TAIL_SELF = re.compile(r"\b(?:this|these)\b")
 
@@ -161,6 +163,11 @@ async def emit_inline_markup(
     # binds following op-paragraphs to that act.
     scope_count = _mark_scoped_amendments(body)
     logger.debug("inline_pass_6_scoped_amendments", country=country, count=scope_count)
+
+    # Pass 7, after pass 5, which reads "amending Directive X" in a footnote as this act amending X.
+    if not skip_external_refs:
+        eu_count = _mark_eu_citations(root, body, eu_text=country == "eu")
+        logger.debug("inline_pass_7_eu_citations", country=country, count=eu_count)
 
     # Inject TLCTerm entries into <references>
     if terms:
@@ -829,6 +836,58 @@ def _mark_title_refs(body: etree._Element, country: str) -> int:
     return count
 
 
+# --- Pass 7: EU act citations -----------------------------------------------
+
+
+def _mark_eu_citations(root: etree._Element, body: etree._Element, *, eu_text: bool) -> int:
+    """Wrap EU act citations in the preamble, body and annexes; an act citing itself is skipped."""
+    work = root.find(".//akn:FRBRWork/akn:FRBRuri", NS)
+    own = work.get("value") if work is not None else None
+    scopes = [
+        root.find(".//akn:preamble", NS),
+        body,
+        root.find(".//akn:attachments", NS),
+    ]
+    paragraphs = {p: None for s in scopes if s is not None for p in s.iter(f"{{{AKN_NS}}}p")}
+    return sum(_mark_eu_citations_in(p, own, eu_text) for p in paragraphs)
+
+
+# Inline formatting a citation may sit in or straddle ("Directive <i>95/46/EC</i>").
+_EU_CITATION_INLINE = frozenset({"i", "b", "u", "span", "inline", "sup", "sub", "term", "def"})
+
+
+def _mark_eu_citations_in(
+    el: etree._Element, own: str | None, eu_text: bool, prefix: list[str] | None = None
+) -> int:
+    """One paragraph, slot by slot, so a list split by a footnote marker keeps its head."""
+    seen = prefix if prefix is not None else [""]
+
+    def make(m: re.Match[str]) -> etree._Element | None:
+        uri = work_uri(m, seen[0] + m.string[: m.start()], eu_text=eu_text)
+        if uri is None or uri == own:
+            return None
+        ref = _derived_ref(uri)
+        ref.set("class", f"{DERIVED_REF_CLASS} {EU_CITATION_CLASS}")
+        return ref
+
+    # Taken first: the refs this inserts are text already counted.
+    children = list(el)
+    text = el.text or ""
+    count = _wrap_in_text_attr(el, "text", CITATION, make)
+    seen[0] += text
+    for child in children:
+        if isinstance(child.tag, str):
+            name = etree.QName(child).localname
+            if name in _EU_CITATION_INLINE:
+                count += _mark_eu_citations_in(child, own, eu_text, seen)
+            elif name != "authorialNote":
+                seen[0] += "".join(child.itertext())
+        text = child.tail or ""
+        count += _wrap_in_tail(el, child, CITATION, make)
+        seen[0] += text
+    return count
+
+
 # --- Pass 5: amendment classification ----------------------------------------
 
 # Op cues by priority, shared by passes 5 and 6 so they cannot classify one
@@ -870,6 +929,8 @@ def _classify_amendment_refs(body: etree._Element, country: str) -> int:
                 continue  # internal refs aren't the amended work
             if "amendment" in (ref.get("class") or ""):
                 continue
+            if EU_CITATION_CLASS in (ref.get("class") or "").split():
+                continue  # names an act, never this paragraph's amended work
             # Appended, not replaced: this ref may already carry the marker
             # saying this pass minted it, and overwriting it filed a minted
             # amendment reference as publisher-authored.
@@ -914,7 +975,10 @@ def _mark_scoped_amendments(body: etree._Element) -> int:
         text = "".join(p.itertext())
         if _SCOPE_OPENER.search(text):
             refs = [
-                r for r in p.iter(f"{{{AKN_NS}}}ref") if not (r.get("href") or "").startswith("#")
+                r
+                for r in p.iter(f"{{{AKN_NS}}}ref")
+                if not (r.get("href") or "").startswith("#")
+                and EU_CITATION_CLASS not in (r.get("class") or "").split()
             ]
             if refs:
                 scope_href = refs[0].get("href")

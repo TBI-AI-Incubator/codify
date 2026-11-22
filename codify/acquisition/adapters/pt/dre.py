@@ -10,7 +10,6 @@ import os
 import re
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
@@ -36,13 +35,7 @@ from codify.acquisition.index import index_path, write_index
 from codify.acquisition.politeness import make_polite_client
 from codify.frbr import build_frbr_expression_uri, build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
-
-try:
-    _RELEASE = version("codify-core")
-except PackageNotFoundError:
-    _RELEASE = "0"
-
-USER_AGENT = f"Codify/{_RELEASE} (+https://github.com/TBI-AI-Incubator/codify)"
+from codify.provenance import OfficialRef, official_ref_from_url
 
 ELI_BASE = "https://data.dre.pt/eli"
 GAZETTE_NAME = "Diário da República"
@@ -134,12 +127,8 @@ class DiarioAcquirer(BaseAcquirer):
         super().__init__(adapter, client=client)
         # Never faster than one request each 1.5 s, whatever the config asks.
         rate = min(self.politeness.rate_limit_per_minute or self.DEFAULT_RATE, self.DEFAULT_RATE)
-        self.politeness = self.politeness.model_copy(
-            update={"rate_limit_per_minute": rate, "user_agent": USER_AGENT}
-        )
-        self._client = client or make_polite_client(
-            adapter, user_agent=USER_AGENT, profile=self.politeness
-        )
+        self.politeness = self.politeness.model_copy(update={"rate_limit_per_minute": rate})
+        self._client = client or make_polite_client(adapter, profile=self.politeness)
         self._licence = adapter.licence
         self._cache = cache_dir
         self._module_version: str | None = None
@@ -441,6 +430,7 @@ class DiarioAcquirer(BaseAcquirer):
         }
         card = {"detail": detail, "consolidation": cons["raw"] if cons else None}
         pages = str(detail.get("Pagina") or "").split("-")[0].strip()
+        alias_ref = official_ref_from_url(alias)
         return AcquiredDocument(
             ref=ref,
             frbr_work_uri=work,
@@ -467,6 +457,12 @@ class DiarioAcquirer(BaseAcquirer):
                 date=published,
             ),
             upstream_metadata=upstream,
+            official=OfficialRef(
+                publisher="dre",
+                work_id=alias_ref.work_id if alias_ref else f"{eli_type}/{eli_num}/{eli_year}",
+                edition_id=as_of.replace("-", "") if cons else None,
+                edition_date=as_of,
+            ),
         )
 
 
@@ -477,7 +473,6 @@ __all__ = [
     "ELI_BASE",
     "GAZETTE_NAME",
     "SiteChanged",
-    "USER_AGENT",
     "api_version",
     "number_and_year",
     "work_eli",

@@ -26,7 +26,6 @@ from codify.akn.vocabulary import (
 )
 from codify.frbr import UNKNOWN_YEAR, is_citable_work_uri
 from codify.lang import normalise_digits
-from codify.pipeline.enrich.akn_meta import FORMULA_PROVENANCE
 from codify.pipeline.enrich.anchors import arabic_article_headers
 from codify.pipeline.enrich.arabic_cardinals import find_money_word_mismatches
 from codify.pipeline.enrich.arabic_normalise import (
@@ -1047,7 +1046,7 @@ def _check_body_artefacts(root: etree._Element) -> list[dict[str, Any]]:
 # A contiguous leading run of root articles is the faithful "general provisions
 # before Chapter One" shape, and the rank-stack structurer can only orphan a leading
 # prefix. Below this fraction grades warning; interspersed articles or a larger
-# fraction (Customs Code: 99 beside 9+9) stay error. Reparenting would mis-place
+# fraction stay error. Reparenting would mis-place
 # genuine general provisions and, for a dropped heading, fabricate a container.
 _ORPHAN_LEADING_RATIO = 0.20
 
@@ -1058,8 +1057,7 @@ def _check_orphan_articles(root: etree._Element) -> list[dict[str, Any]]:
 
     A small contiguous leading run of root articles (general provisions before the first
     container) is faithful and grades ``warning``. Interspersed root articles, or a large
-    fraction of all articles at root (the Customs Code failure: 99 articles beside 9
-    sections and 9 chapters), stay ``error``. Fires only when containers and root
+    fraction of all articles at root, stay ``error``. Fires only when containers and root
     articles coexist, since a document with none legitimately has articles at root.
     """
     body = main_body(root)
@@ -1120,8 +1118,8 @@ def _check_orphan_articles(root: etree._Element) -> list[dict[str, Any]]:
     ]
 
 
-# Measured over 16,629 versions: 274 one-provision bodies sit under 5,000 chars
-# and are legitimately flat; 10 sit above 10,000 and all should have structure.
+# One-provision bodies above this size should have structure; shorter ones are
+# legitimately flat.
 _STRUCTURELESS_BODY_CHARS = 10_000
 # A stub body carries a heading or a stray line, never a provision's worth of text.
 _EMPTY_BODY_CHARS = 200
@@ -1257,8 +1255,8 @@ _OCR_GARBLE_PATTERNS = ARABIC.garble_patterns
 
 def _check_ocr_garble(root: etree._Element) -> list[dict[str, Any]]:
     """Detect OCR mojibake the body-fill LLM passed through unchanged, such as the
-    duplicated ta-marbuta the modern-Arabic re-ingests leak from the PDF extraction
-    layer. Surfaced as candidates for human review; the fix belongs in extraction or
+    duplicated ta-marbuta that PDF text extraction can leak. Surfaced as candidates
+    for human review; the fix belongs in extraction or
     body-fill normalisation.
     """
     issues: list[dict[str, Any]] = []
@@ -1582,17 +1580,12 @@ def check_missing_container_titles(root: etree._Element) -> list[dict[str, Any]]
 
 def _check_fabricated_formula(root: etree._Element, source_text: str) -> list[dict[str, Any]]:
     """Flag enacting formulae absent from the raw structuring text, meaning fabricated
-    enacting language. Formulae with refersTo="#codify" are the era-gated config fallback
-    injected only when the source carries none, and are skipped on that provenance. Both
-    sides are digit-normalised and orthography-folded, so faithful transcription that
-    normalised alef or diacritics is not flagged.
-    """
+    enacting language. Both sides are digit-normalised and orthography-folded, so faithful
+    transcription that normalised alef or diacritics is not flagged."""
     folded_source = fold_arabic_for_match(normalise_digits(source_text))
     issues: list[dict[str, Any]] = []
     for fml in root.iter(f"{{{AKN_NS}}}formula"):
         if fml.get("name") != "enactingFormula":
-            continue
-        if fml.get("refersTo") == FORMULA_PROVENANCE:
             continue
         raw = re.sub(r"\s+", " ", "".join(fml.itertext())).strip()
         text = fold_arabic_for_match(normalise_digits(raw))
@@ -1654,13 +1647,11 @@ def _check_header_coverage(root: etree._Element, source_text: str) -> list[dict[
 
 # A real page yields ~30-50k chars_per_ink; below this floor it had ink and produced
 # no text, meaning a failed OCR read. accept_ratio is not used: a diverted page still
-# yields text (43% of the corpus sits below 0.9 accept), whereas a zero-yield page is
-# rare (~2.4%) and real.
+# yields text, whereas a zero-yield page is rare and real.
 _PAGE_YIELD_FLOOR = 500.0
 # Fraction of the rival's content tokens that must appear in the AKN body for an
-# empty-read page to count as recoverable. Calibrated on two held pages
-# that measured 0.66 and 0.72, so 0.5 clears them with margin while excluding a page
-# whose overlap is only shared boilerplate.
+# empty-read page to count as recoverable. Set to exclude a page whose overlap
+# is only shared boilerplate.
 _PAGE_YIELD_CONTAINMENT_MIN = 0.5
 _AR_DIACRITICS = re.compile(r"[ً-ْـ]")
 

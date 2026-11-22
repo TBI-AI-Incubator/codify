@@ -4,8 +4,8 @@ Supranational memberships, non-membership binding regimes, and residual legal
 systems: data that describes a jurisdiction's international standing for the
 atlas UI, not config the ingest pipeline consumes. Split out of
 `jurisdictions.py` to keep the structuring config focused. `JurisdictionConfig`
-imports these back for its field annotations; the only runtime consumer is
-`apps/api/api/jurisdictions/router.py`.
+imports these back for its field annotations; the runtime consumer is the host
+application's jurisdictions route.
 """
 
 from __future__ import annotations
@@ -127,50 +127,101 @@ class SuspensionPeriod(BaseModel):
 
     model_config = _STRICT
 
-    suspended_from: str  # ISO 8601 date
-    suspended_until: str | None = None  # None ⇒ still suspended
-    reason: str = ""
-    # Suspension scopes observed in practice: full rights withdrawal vs.
-    # technocratic carve-outs (no decision-making, no voting, expelled from
-    # meetings only). Default is the worst case.
-    scope: Literal["full", "decision_making", "meetings", "voting"] = "full"
+    suspended_from: str = Field(
+        description="Start of the suspension, as an ISO 8601 date.",
+    )
+    suspended_until: str | None = Field(
+        default=None,
+        description="End of the suspension, as an ISO 8601 date; None while still suspended.",
+    )
+    reason: str = Field(default="", description=("Why the suspension was imposed, as free text."))
+    scope: Literal["full", "decision_making", "meetings", "voting"] = Field(
+        default="full",
+        description=(
+            "What the suspension withdraws: all rights, or only decision-making, voting or "
+            "attendance at meetings. Defaults to full withdrawal."
+        ),
+    )
 
 
 class SupranationalMembership(BaseModel):
     model_config = _LOOSE
 
-    body: str
-    # Effect spectrum, from strongest (override) to weakest (none). Legacy
-    # bool values are coerced to `"direct"`/`"none"` at load time.
-    direct_effect: DirectEffectLevel = "none"
-    superseded_subjects: list[str] = Field(default_factory=list)
-    note: str = ""
-    # Loose string, year-only values like "1999" appear in corpus.
-    member_since: str | None = None
-    direct_effect_note: str | None = None
-    direct_effect_instruments: list[str] = Field(default_factory=list)
-    # Some configs use a bool; others list the specific instrument types
-    # that require transposition (e.g., ["directive"]).
-    transposition_required: bool | list[str] | None = None
+    body: str = Field(
+        description=("Code of the body, canonicalised against the supranational body registry.")
+    )
+    direct_effect: DirectEffectLevel = Field(
+        default="none",
+        description=(
+            "How strongly the body's law takes effect, from override (strongest) to none. "
+            'Legacy boolean values are read as "direct" or "none".'
+        ),
+    )
+    superseded_subjects: list[str] = Field(
+        default_factory=list,
+        description=("Subject areas where the body's law displaces domestic law."),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    member_since: str | None = Field(
+        default=None,
+        description=(
+            "Date membership began, as a loose string, since some sources give only a year such"
+            ' as "1999".'
+        ),
+    )
+    direct_effect_note: str | None = Field(
+        default=None, description=("Free-text note on `direct_effect`.")
+    )
+    direct_effect_instruments: list[str] = Field(
+        default_factory=list, description=("The body's instrument types that have direct effect.")
+    )
+    transposition_required: bool | list[str] | None = Field(
+        default=None,
+        description=(
+            "Whether the body's instruments need transposing into national law: a boolean, or a"
+            ' list of the instrument types that do (for example ["directive"]).'
+        ),
+    )
 
     # --- lifecycle + carve-outs ---
-    # Absent ⇒ implicitly "member".
-    status: MembershipStatus | None = None
-    # Only set when status is "former". ISO 8601.
-    member_until: str | None = None
-    # Reactivation date, for the Morocco → AU 2017 pattern (original
-    # member_since is 1963, AU left 1984, rejoined_on 2017-01-30).
-    rejoined_on: str | None = None
-    # History of suspension / reinstatement pairs. Use for Fiji-style cycles
-    # and for jurisdictions currently suspended (with suspended_until=None).
-    suspension_periods: list[SuspensionPeriod] = Field(default_factory=list)
-    # Structured opt-outs by subject area.
-    excluded_subjects: list[str] = Field(default_factory=list)
-    excluded_instruments: list[str] = Field(default_factory=list)
-    # Structured but free, the treaty/protocol that creates the carve-out.
-    # Examples: "Protocol 21 TFEU", "Protocol 10 Act of Accession 2003",
-    # "Edinburgh Agreement 1992", "Withdrawal Agreement 2020".
-    protocol_references: list[str] = Field(default_factory=list)
+    status: MembershipStatus | None = Field(
+        default=None, description='Membership status; absent means "member".'
+    )
+    member_until: str | None = Field(
+        default=None,
+        description='Date membership ended, as an ISO 8601 date; set only when status is "former".',
+    )
+    rejoined_on: str | None = Field(
+        default=None,
+        description=(
+            "Date a former member rejoined after its membership lapsed; `member_since` keeps "
+            "the original date."
+        ),
+    )
+    suspension_periods: list[SuspensionPeriod] = Field(
+        default_factory=list,
+        description=(
+            "History of suspensions and reinstatements, including repeated cycles and a "
+            "suspension still in force (`suspended_until` unset)."
+        ),
+    )
+    excluded_subjects: list[str] = Field(
+        default_factory=list,
+        description="Subject areas the member has opted out of.",
+    )
+    excluded_instruments: list[str] = Field(
+        default_factory=list, description=("Instruments of the body the member does not apply.")
+    )
+    protocol_references: list[str] = Field(
+        default_factory=list,
+        description=(
+            "The treaties or protocols that create the carve-outs, as free text (for example "
+            '"Protocol 21 TFEU").'
+        ),
+    )
 
     @field_validator("body", mode="before")
     @classmethod
@@ -198,18 +249,39 @@ class BindingRegime(BaseModel):
 
     model_config = _STRICT
 
-    code: str
-    kind: BindingRegimeKind
-    direct_effect: DirectEffectLevel = "none"
-    superseded_subjects: list[str] = Field(default_factory=list)
-    note: str = ""
-    # Territorial / temporal scope, typically populated for SC resolutions
-    # and other time-bounded regimes; absent on permanent treaty frameworks.
-    territories: list[str] = Field(default_factory=list)
-    in_force_from: str | None = None
-    in_force_until: str | None = None
-    renewable: bool = False
-    reporting_cadence: ReportingCadence | None = None
+    code: str = Field(
+        description=("Code of the regime, canonicalised against the supranational body registry.")
+    )
+    kind: BindingRegimeKind = Field(description=("What kind of regime it is."))
+    direct_effect: DirectEffectLevel = Field(
+        default="none",
+        description=("How strongly the regime's instruments take effect, from override to none."),
+    )
+    superseded_subjects: list[str] = Field(
+        default_factory=list,
+        description=("Subject areas where the regime's rules displace domestic law."),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    territories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Territorial scope, typically set for UN Security Council resolutions and other "
+            "time-bounded regimes; absent for permanent treaty frameworks."
+        ),
+    )
+    in_force_from: str | None = Field(
+        default=None, description=("Date the regime took effect, as an ISO date.")
+    )
+    in_force_until: str | None = Field(
+        default=None, description=("Date the regime ends or ended, as an ISO date.")
+    )
+    renewable: bool = Field(default=False, description=("Whether the regime can be renewed."))
+    reporting_cadence: ReportingCadence | None = Field(
+        default=None, description=("How often the regime requires reports.")
+    )
 
     @field_validator("code", mode="before")
     @classmethod
@@ -237,13 +309,35 @@ class ResidualLaw(BaseModel):
 
     model_config = _STRICT
 
-    source_jurisdiction: str
-    label: str
-    scope: Literal["territorial", "subject_matter", "personal_status", "general"]
-    territories: list[str] = Field(default_factory=list)
-    subjects: list[str] = Field(default_factory=list)
-    in_force_from: date | None = None
-    in_force_until: date | None = None
-    # Superseding acts (as FRBR URIs or free-text citations).
-    superseded_by: list[str] = Field(default_factory=list)
-    note: str = ""
+    source_jurisdiction: str = Field(
+        description=("Code of the jurisdiction whose corpus applies. It must have a config.")
+    )
+    label: str = Field(description=("Display name of the residual corpus."))
+    scope: Literal["territorial", "subject_matter", "personal_status", "general"] = Field(
+        description=(
+            "What the residual law applies to: a territory, subjects, personal status or "
+            "everything."
+        )
+    )
+    territories: list[str] = Field(
+        default_factory=list,
+        description=("Territories the residual law applies in, when `scope` is territorial."),
+    )
+    subjects: list[str] = Field(
+        default_factory=list,
+        description=("Subject areas the residual law applies to, when `scope` is subject_matter."),
+    )
+    in_force_from: date | None = Field(
+        default=None, description=("Date the residual law began to apply.")
+    )
+    in_force_until: date | None = Field(
+        default=None, description=("Date the residual law stopped applying.")
+    )
+    superseded_by: list[str] = Field(
+        default_factory=list,
+        description="Superseding acts (as FRBR URIs or free-text citations).",
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )

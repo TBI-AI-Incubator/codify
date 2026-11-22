@@ -101,7 +101,7 @@ class TestDeclaredShortTitle:
         assert declared_short_title(text, "xa") == "Coral Day Act of 2012"
 
     def test_a_full_stop_inside_the_quotes_is_dropped(self) -> None:
-        """A seventh of the clauses in one corpus close the sentence inside the quote."""
+        """A clause can close the sentence inside the quote."""
         text = 'This Act shall be known as the "Ward Care Act of 2012."'
         assert declared_short_title(text, "xa") == "Ward Care Act of 2012"
 
@@ -146,8 +146,7 @@ class TestDeclaredShortTitle:
         )
 
     def test_a_school_the_act_creates_is_not_the_act(self) -> None:
-        """The same phrasing names what a law creates; a sixth of one corpus's
-        stored short names were a school, campus or office before it was anchored."""
+        """The same phrasing names what a law creates, so the match is anchored."""
         text = "The school shall be known as the Poseidonis Memorial National High School."
         assert declared_short_title(text, "xa") is None
 

@@ -1,8 +1,8 @@
 """Hybrid dense + BM25 retrieval over `provisions`, RRF combined server-side.
 
 The lexical arm ranks with BM25 over `provisions.search_tokens` rather than
-`ts_rank`, which has no inverse document frequency: measured on the corpus, a
-term in 2,326 provisions and one in 21 scored identically. Query and text go
+`ts_rank`, which has no inverse document frequency, so a rare term and a
+common one score alike. Query and text go
 through the same tokeniser; applied on one side only it returns nothing,
 silently.
 """
@@ -28,13 +28,10 @@ from codify.storage.versions import (
     scoped_text,
 )
 
-# Measured, not conventional. Sweeping lexical:dense weights 0.25-4.0 against
-# rrf_k 10-100 at every pool production fuses found equal weight best everywhere:
-# each off-1.0 weight buys one language at another's expense. k=40 did beat 60,
-# until BM25's length normalisation was fixed in migration 0130, after which the
-# gain fell to +0.0004 ndcg@10. It was recovering what a badly-normalised lexical
-# arm had lost, so 60 stands. Equal weight is the SQL's `SUM(1.0 / ...)` with no
-# per-arm term: a weight that must be 1.0 is not a parameter.
+# Chosen by sweep, not convention: any unequal weight buys one language at
+# another's expense, and no other k beats 60 by a margin worth taking. Equal
+# weight is the SQL's `SUM(1.0 / ...)` with no per-arm term: a weight that must
+# be 1.0 is not a parameter.
 RRF_K = 60
 
 # `<@>` returns the NEGATIVE BM25 score: Postgres scans an ordering operator
@@ -60,14 +57,14 @@ RRF_K = 60
 # partitioned by jurisdiction with one HNSW each: the jurisdiction predicate
 # prunes to the scope's partitions and the version predicate is applied inside
 # the ordered index scan. A window over the join instead sorts every embedding
-# in scope exactly, which measured 60 s cold on 67k provisions. The window
+# in scope exactly, which is slow on a large scope. The window
 # orders by `distance + 0`: the relaxed scan is approximately ordered and the
 # planner would otherwise take its order for the window's.
 #
 # The walk below suits a scope its terms are dense in. Where they are common in
-# the corpus but rare in the scope (English words in a Thai scope), it reads the
-# BM25 index past most of the corpus to find `pool` rows in scope, and passed
-# 15 s on 12.6M provisions. A small scope is read first and ranked instead.
+# the corpus but rare in the scope (one language's words in another's scope), it
+# reads the BM25 index past most of the corpus to find `pool` rows in scope. A
+# small scope is read first and ranked instead.
 _HYBRID_TEMPLATE = """
     WITH {in_scope}fts AS (
       SELECT id, ROW_NUMBER() OVER (ORDER BY score) AS rn
@@ -151,11 +148,9 @@ def _hybrid_sql(
     return sql, params | dense_params
 
 
-# Measured on the demo corpus: reading a scope costs about 6 us a row warm
-# (45,553 rows in 279 ms), so this keeps the read near a second.
+# Cap on rows read scope-first, sized to keep the read near a second.
 SCOPE_FIRST_MAX_ROWS = 150_000
-# Counting 150,000 of a large scope's rows took 2 s cold, so past this many laws
-# a scope is walked uncounted. No demo jurisdiction above it holds fewer rows.
+# Counting a large scope is itself slow: past this many laws it is walked uncounted.
 SCOPE_FIRST_MAX_VERSIONS = 10_000
 
 # The LIMIT inside LATERAL keeps the count driven by the scope's versions: a
@@ -322,8 +317,8 @@ async def hybrid_search(
         return []
     # Continue the approximate index scan past rows the version and model
     # filters discard, rather than stopping at pgvector's default 40 candidates.
-    # Relaxed: strict order re-reads the graph per candidate (37 s against
-    # 0.96 s measured) and the window above re-sorts the pool anyway.
+    # Relaxed: strict order re-reads the graph per candidate, and the window
+    # above re-sorts the pool anyway.
     # Transaction-local: never change the next borrower's search settings.
     await session.execute(text("SET LOCAL hnsw.iterative_scan = 'relaxed_order'"))
     jurisdiction_ids = await _partitions(session, scope)

@@ -8,6 +8,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
+from lxml import etree
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from codify.akn._schema import AKN_NS
 from codify.akn.io import parse_akn
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.pipeline.enrich.validator import validate_akn
@@ -102,6 +104,35 @@ async def test_rederive_rebuilds_provisions_after_repair(session: AsyncSession) 
     assert embedded_at is None  # cleared so a failed re-embed is a visible gap
 
     # cleanup
+    await session.execute(
+        text("DELETE FROM laws WHERE id=(SELECT law_id FROM versions WHERE id=:v)"), {"v": vid}
+    )
+    await session.commit()
+
+
+async def test_rederive_identifies_units_the_stored_xml_left_unnamed(session: AsyncSession) -> None:
+    bb = "BODY\n  ARTICLE 1\n    One.\n  ARTICLE 2\n    Two.\n  ARTICLE 3\n    Three.\n"
+    suffix = uuid.uuid4().hex[:8]
+    akn = parse_to_akn(bb, country="xz", doctype="act", number=suffix, date="2020-01-01")
+    vid = await save_document(
+        session, parse_akn(akn), jurisdiction_code="xz", law_title=f"Unnamed {suffix}", akn_xml=akn
+    )
+    await session.commit()
+
+    root = etree.fromstring(akn.encode())
+    first, second, third = root.iter(f"{{{AKN_NS}}}article")
+    del second.attrib["eId"]
+    third.set("eId", first.get("eId"))
+    await rederive_version_rows(session, vid, etree.tostring(root, encoding="unicode"))
+    await session.commit()
+
+    eid = first.get("eId")
+    assert set(await _provision_texts(session, vid)) == {
+        f"{eid}__content",
+        "codify-synth-1__content",
+        f"{eid}_dup2__content",
+    }
+
     await session.execute(
         text("DELETE FROM laws WHERE id=(SELECT law_id FROM versions WHERE id=:v)"), {"v": vid}
     )

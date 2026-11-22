@@ -124,15 +124,6 @@
     },
     "insertion_style": "alphanumeric"
   },
-  "enacting_formulae": [
-    {
-      "text": "BE IT ENACTED by Parliament as follows:",
-      "position": "preamble",
-      "document_class": [
-        "act"
-      ]
-    }
-  ],
   "amendments": {
     "style": "textual_commonwealth",
     "phrasing": "is amended",

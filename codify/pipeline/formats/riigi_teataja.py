@@ -37,14 +37,14 @@ from codify.pipeline.formats.riigi_teataja_annexes import (
     annex_elements,
     annex_url,
 )
+from codify.pipeline.formats.riigi_teataja_notes import AKT_URL, FOLDED, annotate
+from codify.pipeline.formats.riigi_teataja_notes import MARK as _MARK
+from codify.pipeline.formats.riigi_teataja_notes import local as _local
+from codify.pipeline.formats.riigi_teataja_notes import q as _q
 
 logger = structlog.get_logger()
 
 NSMAP = {None: AKN_NS}
-
-
-def _q(tag: str) -> str:
-    return f"{{{AKN_NS}}}{tag}"
 
 
 _SUPERSCRIPT_MAP = {
@@ -105,8 +105,11 @@ def _display_number(raw: str) -> str:
     return " ".join(re.sub(r"<[^>]+>", "", _sup_to_unicode(unescape(raw))).split())
 
 
-def _local(el: etree._Element) -> str:
-    return etree.QName(el).localname if isinstance(el.tag, str) else ""
+def _mark(el: etree._Element, src: etree._Element) -> etree._Element:
+    """Carry the source unit's own id on the AKN element until the final pass reads it."""
+    if src_id := src.get("id"):
+        el.set(_MARK, src_id)
+    return el
 
 
 def _clean_text(el: etree._Element | None) -> str:
@@ -131,18 +134,25 @@ def _clean_text(el: etree._Element | None) -> str:
     return " ".join("".join(parts).split())
 
 
-def _rewrite_viide_uri(raw_uri: str) -> str:
-    """Rewrite Riigi Teataja internal links to canonical public URLs."""
-    m = re.search(r"id=(\d+)(?:!pr(\d+)(?:lg(\d+))?)?", raw_uri)
-    if m:
-        akt_id = m.group(1)
-        pr = m.group(2)
-        lg = m.group(3)
-        frag = f"#pr{pr}" if pr else ""
-        if pr and lg:
-            frag = f"#pr{pr}lg{lg}"
-        return f"https://www.riigiteataja.ee/akt/{akt_id}{frag}"
-    return raw_uri
+_VIIDE_ID = re.compile(r"id=([^&]+)")
+_VIIDE_TARGET = re.compile(r"(\d+)(?:!([a-z]+\d\w*))?")
+
+
+def _viide_targets(raw_uri: str) -> list[str]:
+    """Public URLs for each target of a Riigi Teataja link, subpoint fragments kept;
+    none for an interstitial placeholder."""
+    if "vaheleht" in raw_uri:
+        return []
+    m = _VIIDE_ID.search(raw_uri)
+    if not m:
+        bare = re.fullmatch(r"\./(\d+)", raw_uri)
+        return [f"{AKT_URL}{bare.group(1)}" if bare else raw_uri]
+    urls: list[str] = []
+    for part in m.group(1).split(";"):
+        t = _VIIDE_TARGET.fullmatch(part)
+        if t:
+            urls.append(f"{AKT_URL}{t.group(1)}" + (f"#{t.group(2)}" if t.group(2) else ""))
+    return urls or [raw_uri]
 
 
 _SCHEMA_NAMESPACE = re.compile(r"Juurakt|[a-z]+_\d+_\d{2}\.\d{2}\.\d{4}")
@@ -352,11 +362,15 @@ def _write_native(node: etree._Element, w: _Blocks) -> None:
         tag = _local(child)
         if tag == "viide":
             v_text = child.findtext("{*}kuvatavTekst") or "".join(child.itertext())
-            v_uri = child.findtext(".//{*}viideURI")
-            if v_uri:
-                w.leaf("ref", v_text, href=_rewrite_viide_uri(v_uri))
+            targets = [
+                t for u in child.findall(".//{*}viideURI") for t in _viide_targets(u.text or "")
+            ]
+            if targets:
+                w.leaf("ref", v_text, href=targets[0])
+                for extra in targets[1:]:
+                    w.leaf("ref", "", href=extra)
             else:
-                w.leaf("ref", v_text)
+                w.text(v_text)
         elif tag in _INLINE:
             w.push(_INLINE[tag])
             _write_native(child, w)
@@ -536,7 +550,7 @@ def _fill_unit(
     for ap_idx, ap in enumerate(subs, start=1):
         ap_nr = _extract_number(ap.find("{*}alampunktNr"), default=str(ap_idx))
         ap_eid = f"{eid}__point_{ap_nr}"
-        pt = etree.SubElement(unit, _q("point"), eId=ap_eid, wId=ap_eid)
+        pt = _mark(etree.SubElement(unit, _q("point"), eId=ap_eid, wId=ap_eid), ap)
         ap_knr = ap.findtext("{*}kuvatavNr")
         if ap_knr and ap_knr.strip():
             pt_num = etree.SubElement(pt, _q("num"))
@@ -554,7 +568,7 @@ def _convert_paragrahv(
 ) -> None:
     p_nr = _extract_number(p_src.find("{*}paragrahvNr"))
     p_eid = f"{parent_eid}__art_{p_nr}" if parent_eid else f"art_{p_nr}"
-    art = etree.SubElement(parent_akn, _q("article"), eId=p_eid, wId=p_eid)
+    art = _mark(etree.SubElement(parent_akn, _q("article"), eId=p_eid, wId=p_eid), p_src)
 
     knr = p_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
@@ -589,6 +603,7 @@ def _convert_paragrahv(
     single_has_points = single_unnumbered and bool(loiked[0].findall("{*}alampunkt"))
 
     if single_unnumbered and not single_has_points:
+        loiked[0].set(FOLDED, "1")
         own = _split_text(loiked[0], None)[0]
         c = etree.SubElement(art, _q("content"))
         _fill(
@@ -617,7 +632,7 @@ def _convert_paragrahv(
         raw_l_nr = loige_el.find("{*}loigeNr")
         l_nr = _extract_number(raw_l_nr, default=str(l_idx)) if not single_unnumbered else "1"
         l_eid = f"{p_eid}__para_{l_nr}"
-        para = etree.SubElement(art, _q("paragraph"), eId=l_eid, wId=l_eid)
+        para = _mark(etree.SubElement(art, _q("paragraph"), eId=l_eid, wId=l_eid), loige_el)
 
         l_knr = loige_el.findtext("{*}kuvatavNr")
         if l_knr and l_knr.strip():
@@ -646,7 +661,7 @@ def _convert_jaotis(
         raw_nr = jt_src.find("{*}alljaotisNr")
     jt_nr = _extract_number(raw_nr)
     jt_eid = f"{parent_eid}__subsec_{jt_nr}" if parent_eid else f"subsec_{jt_nr}"
-    subsec = etree.SubElement(parent_akn, _q("subsection"), eId=jt_eid, wId=jt_eid)
+    subsec = _mark(etree.SubElement(parent_akn, _q("subsection"), eId=jt_eid, wId=jt_eid), jt_src)
 
     knr = jt_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
@@ -674,7 +689,7 @@ def _convert_jagu(
     raw_nr = j_src.find("{*}jaguNr")
     j_nr = _extract_number(raw_nr)
     j_eid = f"{parent_eid}__sec_{j_nr}" if parent_eid else f"sec_{j_nr}"
-    sec = etree.SubElement(parent_akn, _q("section"), eId=j_eid, wId=j_eid)
+    sec = _mark(etree.SubElement(parent_akn, _q("section"), eId=j_eid, wId=j_eid), j_src)
 
     knr = j_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
@@ -701,7 +716,7 @@ def _convert_peatykk(
     raw_nr = p_src.find(f"{{*}}{prefix}Nr")
     c_nr = _extract_number(raw_nr)
     c_eid = f"{parent_eid}__chp_{c_nr}" if parent_eid else f"chp_{c_nr}"
-    chp = etree.SubElement(parent_akn, _q("chapter"), eId=c_eid, wId=c_eid)
+    chp = _mark(etree.SubElement(parent_akn, _q("chapter"), eId=c_eid, wId=c_eid), p_src)
 
     knr = p_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
@@ -731,7 +746,7 @@ def _convert_osa(
     raw_nr = o_src.find("{*}osaNr")
     o_nr = _extract_number(raw_nr)
     o_eid = f"part_{o_nr}"
-    part = etree.SubElement(parent_akn, _q("part"), eId=o_eid, wId=o_eid)
+    part = _mark(etree.SubElement(parent_akn, _q("part"), eId=o_eid, wId=o_eid), o_src)
 
     knr = o_src.findtext("{*}kuvatavNr")
     if knr and knr.strip():
@@ -988,7 +1003,9 @@ def riigi_teataja_to_akn(
                 raw_nr = child.find("{*}punktNr")
                 p_nr = _extract_number(raw_nr)
                 p_eid = f"{target_eid}__point_{p_nr}" if target_eid else f"point_{p_nr}"
-                pt = etree.SubElement(target_parent, _q("point"), eId=p_eid, wId=p_eid)
+                pt = _mark(
+                    etree.SubElement(target_parent, _q("point"), eId=p_eid, wId=p_eid), child
+                )
                 knr = child.findtext("{*}kuvatavNr")
                 if knr and knr.strip():
                     pt_num = etree.SubElement(pt, _q("num"))
@@ -1088,6 +1105,7 @@ def riigi_teataja_to_akn(
         ),
     )
     unique_xml, _ = ensure_unique_eids(raw_xml_out, huge_tree=True)
+    unique_xml, anchors = annotate(unique_xml, root, work_uri)
 
     metadata: dict[str, Any] = {
         "title": title,
@@ -1105,6 +1123,7 @@ def riigi_teataja_to_akn(
             "year": int(publication_date.split("-")[0]) if publication_date else int(year),
         },
     }
+    metadata["source_anchors"] = anchors
     if left_out:
         # A wrong layout call drops body text, so each document says what it left out.
         logger.info("riigi_teataja_tables_left_out", expression=exp_uri, **left_out)

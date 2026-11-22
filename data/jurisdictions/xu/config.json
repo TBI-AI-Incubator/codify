@@ -144,18 +144,6 @@
     "insertion_style": "alphanumeric",
     "note": "Directives and regulations cited by doctype, number and year (e.g. 'Directive 12 of 2004', 'Regulation 5 of 2009')."
   },
-  "enacting_formulae": [
-    {
-      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS DIRECTIVE:",
-      "position": "preamble",
-      "document_class": "directive"
-    },
-    {
-      "text": "THE ASSEMBLY OF THE HESPERIAN UNION AND THE HESPERIAN COUNCIL, Having regard to the Treaty establishing the Hesperian Union, HAS ADOPTED THIS REGULATION:",
-      "position": "preamble",
-      "document_class": "regulation"
-    }
-  ],
   "amendments": {
     "style": "textual_civil",
     "phrasing": "Article X is replaced by the following: / Article Y is deleted / the following Article is inserted:",
@@ -211,7 +199,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored instruments (a framework directive, a directly-applicable regulation and an amending directive) round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN structured as numbered articles and paragraphs (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored instruments (a framework directive, a directly-applicable regulation and an amending directive) round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN structured as numbered articles and paragraphs."
   },
   "tier": 5,
   "status": "stub",

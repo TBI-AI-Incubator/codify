@@ -6,9 +6,8 @@ finding. The gate that matters is not what the model can be told, it is what
 the applier accepts, and until now nothing compared a plan's targets to the
 finding that licensed it.
 
-The accept cases are not invented: each is a shape taken from the 391 repair
-proposals on the demo corpus, which the rule was measured against before it
-was written.
+The accept cases are shapes taken from real repair proposals, which the rule
+was checked against before it was written.
 """
 
 from __future__ import annotations
@@ -116,9 +115,8 @@ class TestRefusal:
         assert out_of_scope([Unknown()], DUPLICATE)  # type: ignore[list-item]
 
     def test_a_sibling_the_finding_does_not_name_is_refused(self) -> None:
-        """Measured on the corpus: an agent renumbering the neighbouring article
-        as well as the flagged one. Real, applied, and more than the finding
-        licensed, so the narrowing is deliberate."""
+        """An agent renumbering the neighbouring article as well as the flagged one
+        is more than the finding licensed, so the narrowing is deliberate."""
         assert out_of_scope(
             _plan(RenumberSequence(parent_eid="art_2", kind="point", nums=["1", "2"])), DUPLICATE
         )

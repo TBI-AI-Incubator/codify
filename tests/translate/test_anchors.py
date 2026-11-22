@@ -65,7 +65,7 @@ def test_build_translation_scaffold_preserves_keyword_number_indent() -> None:
 
 
 def test_scaffold_roundtrip_through_parse_to_akn_preserves_eids() -> None:
-    """CDFY-T1 invariant: parsing the scaffold (with empty bodies) yields the same eId set."""
+    """Invariant: parsing the scaffold (with empty bodies) yields the same eId set."""
     src_doc = _doc()
     units = list(walk_source_units(src_doc))
     scaffold, _ = build_translation_scaffold(units, preface_text="An Act")

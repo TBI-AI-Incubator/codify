@@ -1,8 +1,7 @@
 # The one service the offline suite needs. At the root of the open repository,
 # where `docker compose up -d --wait postgres` is the whole setup step.
 
-# Named rather than inherited: this directory and the monorepo root are both
-# `codify`, so the default project would be the root stack's.
+# Named explicitly so the project name does not depend on the checkout directory.
 name: codify-core
 
 services:

@@ -1,5 +1,5 @@
--- Core corpus schema baseline. Generated from the apps/api chain at head 0123
--- and verified byte-identical (modulo pg_dump nonces) via a fresh-DB schema diff.
+-- Core corpus schema baseline, generated from the application's chain at the
+-- split point and verified byte-identical (modulo pg_dump nonces) via a fresh-DB schema diff.
 -- Frozen once adopted: existing databases are already stamped at this revision,
 -- so corpus schema changes are NEW revisions in this chain, never edits here.
 CREATE EXTENSION IF NOT EXISTS vector;

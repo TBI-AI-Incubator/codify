@@ -194,8 +194,7 @@ def assert_base_at_head() -> None:
             )
 
 
-# Clones average 23 MB and the disk died at ~890 of them, so 5 GB leaves room to
-# act and 12 GB is where the next full run plausibly finishes the job.
+# Warn early enough to act; go loud before a full run would fill the disk.
 _CLONE_WARN_BYTES = 5 * 1024**3
 _CLONE_LOUD_BYTES = 12 * 1024**3
 _clone_warning_emitted = False
@@ -431,8 +430,7 @@ def _reindex_bm25(url: URL) -> None:
     clone inherits the template's OID and they collide in one cluster-wide
     cache entry. Symptom is `DataCorruptedError: pg_textsearch memtable record
     ... extends past free_offset` from whichever worker reads a cursor another
-    advanced. Recreating the index here gives each clone a fresh OID; measured,
-    it takes the failure from 6 per run to 0 across three runs.
+    advanced. Recreating the index here gives each clone a fresh OID.
 
     Enumerated by access method, never by name: the first version of this named
     `provisions_bm25_idx` alone, and the title index added later inherited the

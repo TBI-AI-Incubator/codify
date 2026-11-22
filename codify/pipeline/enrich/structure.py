@@ -140,14 +140,13 @@ _BIDI_CONTROLS = str.maketrans("", "", "‎‏‪‫‬‭‮⁦⁧⁨⁩")
 _EMPTY_PARENS_DIGIT_RE = re.compile(r"\(\s*\)\s*(\d+)")
 # Rewrite `Nمادة` → `مادة N`; digits may be Latin, Arabic-Indic or Persian/Urdu.
 # `[ \t]*` not `\s*`: `\s*` swallows a newline and welds the previous line's page
-# number to the article number (`30\nمادة139` → `مادة 30139`), which cost one
-# civil code ~65 articles.
+# number to the article number (`12\nمادة7` → `مادة 127`), which hides the
+# real article.
 _DIGIT_PREFIX_MADDA_RE = re.compile(r"([0-9٠-٩۰-۹]+)[ \t]*مادة")
 
 # RTL reorder prefixes headers with a stray `)` on its own line (`)مادة 3`),
 # defeating the regex's column boundary. Stripped before a line-start numbered
-# article keyword; on three measured instruments it cost 21, nine and seven
-# articles.
+# article keyword, which it otherwise hides.
 _STRAY_PAREN_MADDA_RE = re.compile(
     r"(?m)^([^\S\n]{0,8})\)[^\S\n]{0,4}(?=(?:ال)?مادة(?:[^\S\n]|\()*[0-9٠-٩۰-۹])"
 )
@@ -528,7 +527,7 @@ def basic_unit_kind(config: JurisdictionConfig | None, doctype: str) -> str | No
     if doc_class is None or not doc_class.hierarchy:
         return None
     # A class whose provisions are marked without a keyword names its own citable
-    # unit: an MK judgment is cited by paragraph, and `section` would gate against
+    # unit: a judgment class is cited by paragraph, and `section` would gate against
     # its four captions. Narrowed to marker-form classes.
     declared = doc_class.basic_unit
     if declared and any(h.akn_element == declared and h.marker_form for h in doc_class.hierarchy):

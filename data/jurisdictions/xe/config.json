@@ -80,13 +80,6 @@
     "insertion_style": "alphanumeric",
     "note": "Laws cited by short title (e.g. 'Закон о нормативных правовых актах') or by number and year. Inserted articles carry a hyphen suffix, e.g. статья 18-1 after статья 18."
   },
-  "enacting_formulae": [
-    {
-      "text": "Настоящий Закон принят Собранием Китежа и промульгирован в соответствии с Основным Законом Республики Китеж.",
-      "position": "preamble",
-      "document_class": "act"
-    }
-  ],
   "amendments": {
     "style": "textual_civil_law",
     "phrasing": "изложить в следующей редакции... дополнить статьёй... признать утратившей силу...",
@@ -129,7 +122,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN."
   },
   "tier": 5,
   "status": "stub",

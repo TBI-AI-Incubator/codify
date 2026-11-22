@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import zipfile
 from collections.abc import Iterator
@@ -81,6 +82,36 @@ async def test_ee_datadump_fetch_succeeds(tmp_path: Path) -> None:
     assert doc.bodies[0].content == _SYNTHETIC_EE_XML
     assert doc.source_url == "https://www.riigiteataja.ee/akt/123122022025.xml"
     assert doc.frbr_work_uri == "/akn/ee/act/2022/synthetic-act"
+
+
+@pytest.mark.asyncio
+async def test_ee_datadump_fetch_names_the_redaction_group_and_dates_the_archive(
+    tmp_path: Path,
+) -> None:
+    xml = _SYNTHETIC_EE_XML.replace(
+        b"<globaalID>123122022025</globaalID>",
+        b"<globaalID>123122022025</globaalID>"
+        b"<terviktekstiGrupiID>5555</terviktekstiGrupiID>"
+        b"<kehtivuseAlgus>2023-01-01+02:00</kehtivuseAlgus>",
+    )
+    archive = tmp_path / "xml.2026.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr(_MEMBER, xml)
+    os.utime(archive, (1_700_000_000, 1_700_000_000))
+    index = tmp_path / "index.json"
+    index.write_text(
+        json.dumps({"archive": str(archive), "entries": {"123122022025": {"member": _MEMBER}}})
+    )
+    doc = await EeDatadumpAcquirer(_adapter(), index_path=index).fetch(_ref())
+
+    assert doc.official is not None
+    assert doc.official.model_dump() == {
+        "publisher": "riigi-teataja",
+        "work_id": "5555",
+        "edition_id": "123122022025",
+        "edition_date": "2023-01-01",
+    }
+    assert doc.fetched_at.timestamp() == 1_700_000_000
 
 
 @pytest.mark.asyncio

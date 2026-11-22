@@ -38,7 +38,7 @@ def set_work_uri(
         Both halves come from the row, the expression being `versions.expression_uri`, never
     the document: Cobalt rebuilds `@date` from
         `FRBRExpression/FRBRdate`, which on a scanned corpus is the pipeline's generation
-        date, and one UA row's language disagrees with its own expression. `expression_date`
+        date, and a stored row's language can disagree with its own expression. `expression_date`
         is written to that element and its manifestation twin, or Cobalt regenerates the old
         value and reverts the repair on the next write.
 
@@ -174,8 +174,7 @@ def _language_of(expression_uri: str, work_uri: str) -> str:
 def _component_tail(value: str | None) -> str:
     """What an FRBR URI addressed beyond the expression: a `/!component`, a manifestation
     format, or both. The format sits on the manifestation's `FRBRuri` with no `/!` marker
-    (`…/eng@2016-05-04.xml`), so splitting on `/!` alone drops it. Measured on demo that
-    is 970 versions, 961 of them the EU acquis.
+    (`…/eng@2016-05-04.xml`), so splitting on `/!` alone drops it.
     """
     raw = value or ""
     head, sep, component = raw.partition("/!")

@@ -1,10 +1,9 @@
-"""Bring the emitted `<meta>` and enacting formula within the AKN 3.0 schema, and stop
-the day we ran being recorded as a date the law has.
+"""Bring the emitted `<meta>` within the AKN 3.0 schema, and stop the day we ran being
+recorded as a date the law has.
 
-Three defects, all ours: `FRBRWork/FRBRdate` carries a bare year, `<formula>` carries
-a schema-invalid `@source`, and `FRBRExpression/FRBRdate` carries `date.today()`,
-which the expression URI is then rebuilt from. Pure and idempotent, so the ingest pass
-and the corpus backfill share it.
+Two defects, both ours: `FRBRWork/FRBRdate` carries a bare year, and
+`FRBRExpression/FRBRdate` carries `date.today()`, which the expression URI is then
+rebuilt from. Pure and idempotent, so the ingest pass and the corpus backfill share it.
 """
 
 from __future__ import annotations
@@ -27,17 +26,11 @@ _BARE_YEAR = re.compile(r"^\d{4}$")
 # cannot hold year zero.
 _UNRESOLVED_YEAR = 1
 
-# The provenance marker on a config-injected enacting formula. `@source` is
-# refused by the schema; `@refersTo` carries the same value legally, and
-# `validator._check_fabricated_formula` reads it back.
-FORMULA_PROVENANCE = "#codify"
-
 
 def normalise_akn_meta(
     akn_xml: str, *, work_date: date | str | None = None, expression_undated: bool = False
 ) -> str:
-    """Give every FRBR date a value the schema accepts and the law supports, and move the
-    formula marker off `@source`.
+    """Give every FRBR date a value the schema accepts and the law supports.
 
     A bare work year expands to 1 January where `work_date` agrees, that being the most a
     year supports; an empty one only `work_date` can fill. `expression_undated` means the
@@ -90,12 +83,6 @@ def _normalise(
         # document's rather than keeping the run date on a nested annex.
         for ident in root.iter(f"{{{AKN_NS}}}identification"):
             _date_expression_from_work(ident)
-
-    for fml in root.iter(f"{{{AKN_NS}}}formula"):
-        if fml.get("source") != FORMULA_PROVENANCE:
-            continue
-        del fml.attrib["source"]
-        fml.set("refersTo", FORMULA_PROVENANCE)
 
 
 def _date_expression_from_work(ident: etree._Element) -> None:

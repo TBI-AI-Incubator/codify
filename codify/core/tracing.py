@@ -292,8 +292,7 @@ def context_tags(context: TelemetryContext) -> list[str]:
     tags = [f"workflow:{context.workflow_kind}"]
     if context.jurisdiction:
         tags.append(f"jurisdiction:{context.jurisdiction}")
-    # The id, not the name: this is what stays stable when a workspace is
-    # renamed. /admin/cost trades it for the name at read time.
+    # The id, not the name: it stays stable when an organisation is renamed.
     if context.org_id:
         tags.append(f"organisation:{context.org_id}")
     return tags
@@ -371,7 +370,9 @@ def agent_model_settings() -> ModelSettings:
 _UNPRICED: set[str] = set()
 
 
-def record_usage(observation: Any, model: str, usage: Mapping[str, Any]) -> None:
+def record_usage(
+    observation: Any, model: str, usage: Mapping[str, Any], *, batch: bool = False
+) -> None:
     """Set usage on a direct observation, and cost where the model has a price, so a
     new direct route cannot forget the cost half. Non-integer values are dropped,
     bools included: providers mix strings and flags into the usage blob, and
@@ -381,7 +382,7 @@ def record_usage(observation: Any, model: str, usage: Mapping[str, Any]) -> None
     if not details:
         return
     observation.update(usage_details=details)
-    costs = cost_details(model, details)
+    costs = cost_details(model, details, batch=batch)
     if costs is not None:
         observation.update(cost_details=costs)
     elif model not in _UNPRICED:

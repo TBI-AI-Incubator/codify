@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from codify.provenance import OfficialRef
 
 MediaType = Literal[
     "application/pdf", "application/xml", "application/json", "text/html", "text/plain"
@@ -57,6 +61,9 @@ class Body(BaseModel):
 
 
 class AcquiredDocument(BaseModel):
+    """One document an acquirer fetched: its FRBR identity, one or more bodies (the main
+    text has role `primary`) and the source, licence and publication details that came with it."""
+
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     ref: DocumentRef
@@ -72,12 +79,23 @@ class AcquiredDocument(BaseModel):
     gazette_ref: GazetteRef | None = None
     ocr_required: bool = False
     upstream_metadata: dict[str, Any] = Field(default_factory=dict)
+    official: OfficialRef | None = None
+    # One per further language body that has its own page at the publisher.
+    official_translations: list[OfficialRef] = Field(default_factory=list)
 
     def primary(self) -> Body:
         for b in self.bodies:
             if b.role == "primary":
                 return b
         return self.bodies[0]
+
+
+def archive_date(path: Path | None) -> datetime:
+    """A bulk archive's modified time: its copy or download date unless preserved; else now."""
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, UTC) if path else datetime.now(UTC)
+    except OSError:
+        return datetime.now(UTC)
 
 
 class DiscoveryQuery(BaseModel):
@@ -100,16 +118,34 @@ class CorpusManifest(BaseModel):
     notes: str = ""
 
 
-_DEFAULT_USER_AGENT = "codify-acquire/0.1 (+https://github.com/TBI-AI-Incubator)"
+USER_AGENT_ENV = "ACQUISITION_USER_AGENT"
+
+
+class MissingUserAgent(RuntimeError):
+    """No User-Agent was given and ACQUISITION_USER_AGENT is unset."""
+
+
+def require_user_agent(user_agent: str = "") -> str:
+    """`user_agent`, else the caller's identity from ACQUISITION_USER_AGENT."""
+    resolved = user_agent or os.environ.get(USER_AGENT_ENV, "").strip()
+    if not resolved:
+        raise MissingUserAgent(
+            f"set {USER_AGENT_ENV} to the User-Agent your acquisition requests carry, "
+            "naming you and a contact (for example 'my-crawler/1.0 (+https://example.org)')"
+        )
+    return resolved
 
 
 class PolitenessProfile(BaseModel):
-    """Runtime rate, robots and concurrency settings derived from an adapter."""
+    """Runtime rate, robots and concurrency settings derived from an adapter.
+
+    An empty `user_agent` is resolved from ACQUISITION_USER_AGENT when a client is built.
+    """
 
     model_config = ConfigDict(extra="forbid")
     rate_limit_per_minute: int | None = None
     concurrency: int = 4
-    user_agent: str = _DEFAULT_USER_AGENT
+    user_agent: str = ""
     robots_respect: bool = True
 
     @classmethod
@@ -118,7 +154,7 @@ class PolitenessProfile(BaseModel):
         adapter: object,
         *,
         concurrency: int = 4,
-        user_agent: str = _DEFAULT_USER_AGENT,
+        user_agent: str = "",
     ) -> "PolitenessProfile":
         """Build a profile from a SourceAdapter, single source of truth for
         rate_limit_per_minute and robots_respect.
@@ -209,6 +245,7 @@ class BaseAcquirer:
 __all__ = [
     "Acquirer",
     "AcquiredDocument",
+    "archive_date",
     "BaseAcquirer",
     "Body",
     "BodyRole",
@@ -217,6 +254,9 @@ __all__ = [
     "DocumentRef",
     "GazetteRef",
     "MediaType",
+    "MissingUserAgent",
     "PolitenessProfile",
+    "require_user_agent",
+    "USER_AGENT_ENV",
     "UnknownAdapterError",
 ]

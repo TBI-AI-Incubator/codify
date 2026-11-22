@@ -5,6 +5,104 @@ the launch tag.
 
 ## Unreleased
 
+Breaks:
+
+- Ingest no longer inserts an enacting formula the source does not print.
+  `JurisdictionConfig.enacting_formulae` and `EnactingFormula` are removed, as are
+  `select_formula`, `inject_enacting_formula` and `emit_enacting_formula`;
+  `mark_source_formula(akn_xml, country)` tags the formula a source carries. A
+  config that still sets `enacting_formulae` loads and the key is ignored. A
+  formula marked `refersTo="#codify"` is no longer exempt from the
+  `fabricated_formula` check, and `normalise_akn_meta` no longer moves a
+  formula's `@source`.
+- Acquisition no longer sends a default User-Agent. Set `ACQUISITION_USER_AGENT`
+  to an identity naming you and a contact, or pass `user_agent` to
+  `make_polite_client`; without one, building an acquirer's client raises
+  `MissingUserAgent` before any request is sent. Adapters whose source requires a
+  fixed agent keep sending it.
+- The Diário da República and Thai OCS adapters and the EUR-Lex URL fetch no
+  longer send a built-in `Codify/<release>` agent; they resolve the caller's the
+  same way. `codify.acquisition.adapters.pt.dre.USER_AGENT` is removed.
+- The `eu` configuration ships, so EU works mint the AKN subtypes
+  `/akn/eu/act/reg|dir|dec/{year}/{number}` rather than
+  `/akn/eu/act/regulation|directive|decision/...`, and `POST /runs/ingest-url`
+  accepts an EUR-Lex or Publications Office URL under `eu` without a data root.
+- The Mistral OCR page price is the provider's global list rate, $4.00 per 1,000
+  pages.
+- `LITELLM_BASE_URL` is now `LLM_BASE_URL`, `LITELLM_API_KEY` is `LLM_API_KEY`,
+  `LITELLM_MODEL` is `LLM_MODEL`, `LITELLM_OCR_MODEL` is `LLM_OCR_MODEL` and
+  `LITELLM_CONTENT_FILTER_FALLBACK_MODEL` is `LLM_CONTENT_FILTER_FALLBACK_MODEL`.
+  `LITELLM_MASTER_KEY` is no longer read as the API key; set `LLM_API_KEY`.
+  The old names are not read as a fallback.
+- `codify.core.llm.LiteLLMClient` is now `OpenAICompatibleClient`. The old name
+  is not kept as an alias.
+
+New, additive:
+
+- `cost_details` and `record_usage` take `batch=True` to price a provider batch
+  job's result at half the synchronous rate, as Gemini batch mode and Azure
+  Global Batch bill it.
+- Reads from a published Riigi Teataja archive go through the polite transport:
+  robots.txt, two requests at a time and 30 a minute. A 429, 403 or 5xx raises
+  `ArchiveRefused` at the first answer and is never retried, and no later read in
+  the process is sent for fifteen minutes (or until `reset_archive_refusal()`).
+  Pass a client to `index_remote_ee_archive` to read with your own.
+- `codify.acquisition.effects.uk_text.effect_text` reads the text a UK amendment
+  effect put in place: the words or structure quoted in the amending provision
+  the feed names, cut to the unit the effect names. It attaches only where the
+  instruction, its lead-in, an opener before it or a heading over it names the
+  affected act by title or by a short form the amending act defines, and
+  returns `Refused(reason)` otherwise. Nothing calls it yet.
+- `codify.cli.build_parser()` returns the `codify` argument parser, so a command
+  reference can be generated from it. `main` behaves as before.
+- `codify migrate` applies the core migrations to the database at `POSTGRES_URL`.
+  It reads the chain from the installed package, so it works from a wheel, which
+  carries no `alembic.ini`. It needs the `migrations` extra.
+- The jurisdiction config models carry their field explanations as schema
+  descriptions, so `JurisdictionConfig.model_json_schema()` and
+  `contract/openapi.json` describe 107 more fields. Names, defaults and
+  validation are unchanged.
+- The deterministic inline-markup passes read EU act citations in English text
+  ("Regulation (EU) 2016/679", "Directives 79/117/EEC and 91/414/EEC",
+  "32016R0679") in the preamble, body and annexes into derived references to
+  `/akn/eu/act/reg|dir|dec/{year}/{number}`. A number with no EU marker
+  ("Decision No 1/2019 of the Joint Committee") is left alone, except a year-first
+  one in an EU document, and an act's citation of itself is skipped. For an EU
+  work the resolver also accepts a two-digit-year pair ("95/46") or a CELEX
+  number as naming the act. `refresh_references_for_version` stores them for
+  documents already held.
+
+Fixed:
+
+- "Article 5 of Regulation (EU) No 1303/2013" no longer links to Article 5 of the
+  citing document.
+
+- `ingest-one` stops before any work, with exit code 2, when `LLM_BASE_URL`
+  is unset, and names the variables to set. It used to call
+  `http://localhost:4000/v1`, a gateway this repository does not start, so the
+  first error was a failed connection on every page.
+- `POST /runs/ingest-url` refuses with a 422 that names the `eu` jurisdiction
+  config when it is not installed, before it reads the URL. The web Ingest screen
+  offers a source URL only when that config is installed and selected.
+- A document ingested through `codify serve` is embedded before the run
+  succeeds, when an embeddings endpoint is set (`EMBEDDING_BASE_URL` or
+  `LLM_BASE_URL`), so search finds it; an embedding failure fails the run.
+  Without an endpoint it is stored unembedded and the server logs
+  `stored_unsearchable` with the variable to set. Served ingests used to be
+  stored unembedded, so search never found them.
+- The web app's MCP dialog gives the `codify mcp --http` command and the address
+  it listens on by default, `http://127.0.0.1:8001/mcp`. It used to show the web
+  app's own origin, where nothing serves MCP.
+- The OpenAPI schema's `info.version` is the package version. It was FastAPI's
+  default, `0.1.0`. The drift test ignores it, so a release needs no
+  regeneration of `contract/openapi.json`.
+
+## 0.7.0 (2026-11-13)
+
+Six breaks, so the minor moves, as `VERSIONING.md` prescribes while the major
+is zero; the rest is additive. The OECD compendium conversion is in a release
+for the first time.
+
 Breaks, in that the structurer's output changes for documents it already read:
 
 1. The UK keyword-less scan (`gb`, `gb-eng`, `gb-wls`, `gb-sct`, `gb-nir`) reads
@@ -52,6 +150,7 @@ Breaks, in that the structurer's output changes for documents it already read:
    in-process lane passes. The structural scan's `anchor_coverage` finding reports
    that document as `captured_unmeasured` and a refused skeleton as a failing
    `containers_only`, where both read `no_markers_in_source` before.
+6. OECD section identifiers are provisional and will change in the next release.
 
 New, additive:
 
@@ -101,7 +200,18 @@ New, additive:
   entry, so one act's texts can be joined. With `keep_ended` (`--keep-ended`), a state-act
   text whose validity ended before the as-of date is listed under `ended`, with its
   validity end (`valid_to`); `entries` and `repealed` are as before, and without the option
-  the index has no `ended` section.
+  the index has no `ended` section. `--as-of DATE` keeps the texts in force on that
+  date; without it the date is today.
+- `codify index-ocs` and `codify crawl-ocs`, two commands for one publisher's JSON
+  search portal (source kind `json_portal`). `index-ocs` lists every law and
+  subordinate law the search returns into an index, checkpoints beside it, and
+  exits 1 while the index is short of the catalogue's total; `--resume` continues
+  a build. `crawl-ocs` saves the raw document of every timeline a complete index
+  lists, then of every other timeline of the kinds `--kinds` names (`current`
+  unless told otherwise), and the English text of each that has one. It exits 2 if
+  the index is incomplete or a kind is unknown, exits 1 if a fetch failed, and
+  stops with an error after 20 failed fetches in a row.
+  Both send one request at a time, 30 a minute unless `--rate` says otherwise.
 - `is_riigi_teataja` also accepts an `oigusakt` root in an older versioned schema namespace
   (for example `maarus_1_10.02.2010`), so those members reach the Riigi Teataja converter
   and no longer fail in the native AKN parser.
@@ -277,9 +387,20 @@ New, additive:
   rather than its end. The field is last and defaults to False, so an adapter
   that builds `FeedEffect` today is unchanged. `narrows` answers the same for
   one effect type; `state_at` is unchanged.
+- Publisher links: the URL patterns in `PATTERN_VERIFIED` that were checked against
+  a live sample now return links to the publisher's own page and provisions. An
+  unchecked pattern still returns None. A legislation.gov.uk fragment is keyed by
+  its exact depth, so one deeper than any sampled depth gets no link.
 
 Fixed:
 
+- `LiteLLMClient.chat` and `chat_json` drop the `<think>…</think>` block that a
+  reasoning model served without a reasoning parser prints before its answer.
+  A translated title no longer carries the model's reasoning, and a JSON answer
+  after it parses. Only a closed block at the start of the reply is dropped; an
+  unclosed one is left whole, and a reply of reasoning alone is still invalid
+  JSON. An invalid JSON error shows the answer after the block, or the whole
+  reply when there is none.
 - `DiarioAcquirer` rereads a screen action's `apiVersion` and the module version
   from the site's module manifest and screen script when a call answers that the
   API version changed, then retries once. It raises `SiteChanged` only when the
@@ -565,6 +686,16 @@ Repository: security policy, code of conduct, contributor guide, issue and pull
 request templates, and the boundary decision naming structure-preserving
 translation as core.
 
+Recorded on 2026-11-14, miscounted when this entry was cut:
+
+- `codify serve` had fifteen routes at this release, not ten. Reads: `GET
+  /health`, `/jurisdictions`, `/jurisdictions/{code}`,
+  `/jurisdictions/{code}/laws`, `/laws`, `/laws/{law_id}`,
+  `/versions/{version_id}` and `/search`. Runs: `POST /runs/ingest`, `POST
+  /runs/ingest-url`, `GET /runs`, `GET /runs/{run_id}`, `GET
+  /runs/{run_id}/stream`, `POST /runs/{run_id}/cancel` and `POST
+  /runs/{run_id}/retry`. The two reader routes of 0.5.0 make seventeen.
+
 ## 0.3.0 (2026-09-18)
 
 Body grammar the jurisdiction config declares, and three behaviour changes that
@@ -667,6 +798,11 @@ date converts with its month and the new-year reform where a Gregorian grid
 and a reform year are declared; and such a date's month and day carry into the
 work date.
 
+Recorded on 2026-11-14, left out when this entry was cut:
+
+- `codify index-ee-archive` indexes the statutes in force in a Riigi Teataja
+  bulk XML archive (`--principal-only`, `--max-files`, `--out`).
+
 ## 0.1.0 (2026-09-09)
 
 First version of the standalone library, before any published release or benchmark run.
@@ -681,6 +817,14 @@ First version of the standalone library, before any published release or benchma
   requiring enrichment must provide it explicitly.
 - Test fixtures and documentation have been adapted for a standalone checkout.
   Database and provider tests remain separate from the default offline CI.
+
+Recorded on 2026-11-14, left out when this entry was cut:
+
+- The `codify` command had four subcommands: `scan-corpus` (measure the anchor
+  scan over a directory of sources, no model or database), `ingest-one` (run one
+  document through the pipeline into a bundle), `index-datadump` (index a bulk
+  FORMEX archive by CELEX number) and `index-legislation-gov-uk` (list every
+  item the publisher's feeds carry, by type and year).
 
 Benchmark numbers from before the split are not results for this version. The
 synthetic retrieval evaluator can be run separately against a disposable

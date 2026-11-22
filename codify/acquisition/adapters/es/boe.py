@@ -29,6 +29,7 @@ from codify.acquisition.politeness import make_polite_client
 from codify.akn._schema import parse_xml
 from codify.frbr import build_frbr_work_uri
 from codify.jurisdictions import SourceAdapter
+from codify.provenance import official_ref_from_url
 
 GAZETTE_NAME = "Boletín Oficial del Estado"
 
@@ -204,6 +205,7 @@ class BoeAcquirer(BaseAcquirer):
             if pub and meta.get("diario_numero")
             else None,
             upstream_metadata=upstream,
+            official=official_ref_from_url(meta.get("url_eli", ""), edition_date=item_date(meta)),
         )
 
 

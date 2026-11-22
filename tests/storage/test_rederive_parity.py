@@ -8,6 +8,7 @@ import os
 import threading
 import uuid
 from collections.abc import AsyncIterator, Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ from codify.pipeline.enrich.goods_codes import extract_goods_codes
 from codify.search import tokenise_to_text
 from codify.storage.annex_rows import index_version_annex_rows
 from codify.storage.goods_codes import index_version_goods_codes
+from codify.storage.models import AmendmentEffect
 from codify.storage.repository import rederive_version_rows, save_document
 from codify.tables.resolve import resolve_tables
 
@@ -182,6 +184,54 @@ async def test_rederive_writes_the_ingest_rows_from_the_cpu_pool(
         )
         assert set(seen) == {"document_to_rows", "resolve_tables", "extract_goods_codes"}, seen
         assert all(name.startswith("codify-cpu") for name in seen.values()), seen
+    finally:
+        await session.rollback()
+        await session.execute(
+            text("DELETE FROM laws WHERE id = (SELECT law_id FROM versions WHERE id = :v)"),
+            {"v": version_id},
+        )
+        await session.commit()
+
+
+async def test_rederive_keeps_dated_and_publisher_effects_and_drops_plain_ones(
+    session: AsyncSession,
+) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    akn = parse_to_akn(_SCHEDULE, country="xu", doctype="act", number=suffix, date="2006-07-01")
+    version_id = await save_document(
+        session, parse_akn(akn), jurisdiction_code="xu", law_title=f"Effects {suffix}", akn_xml=akn
+    )
+    try:
+        extra: dict[str, dict[str, Any]] = {
+            "dated": {"in_force_date": date(2007, 1, 1)},
+            "publisher": {"publisher_effect_id": "p1"},
+            "plain": {},
+        }
+        for wid, fields in extra.items():
+            session.add(
+                AmendmentEffect(
+                    version_id=version_id,
+                    source_akn_wid=wid,
+                    target_frbr_uri="/akn/xu/act/2006/1/main#art_1",
+                    akn_category="textual",
+                    akn_action="substitution",
+                    **fields,
+                )
+            )
+        await session.commit()
+        await rederive_version_rows(session, version_id, akn)
+        await session.commit()
+        kept = (
+            (
+                await session.execute(
+                    text("SELECT source_akn_wid FROM amendment_effects WHERE version_id = :v"),
+                    {"v": version_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert sorted(kept) == ["dated", "publisher"]
     finally:
         await session.rollback()
         await session.execute(

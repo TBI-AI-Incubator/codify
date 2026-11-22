@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358" height="400" viewBox="0 0 358 400" role="img" aria-label="One eId, part_I__sec_1, names section 1 of the Legislation Act, 1992 in English and in a French text marked as not authoritative; the French was written by hand for the example.">
+<style>
+svg{color:#1d1d1d;font-family:'Geist Sans',ui-sans-serif,system-ui,sans-serif;fill:none;stroke:none}
+.s{stroke:currentColor;stroke-width:1.5}.s2{stroke:#6b6b6b;stroke-width:1}.dash{stroke-dasharray:3 3}:not(text).em{stroke:currentColor;stroke-width:2.5}
+.box{fill:#fff}.box-lo{fill:#f5f5f5}.ink{fill:currentColor}
+text{fill:currentColor;font-size:13px;font-weight:500;letter-spacing:-0.01em}
+text.note{fill:#3e3e3e;font-size:12px;font-weight:400;letter-spacing:0}
+text.code{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;letter-spacing:0}
+text.micro{fill:#3e3e3e;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.06em;text-transform:uppercase}
+text.em{font-weight:600}
+@media (prefers-color-scheme:dark){svg{color:#f3f4ef}.s2{stroke:#a5afa8}.box{fill:#131615}.box-lo{fill:#1c211f}text.note,text.code,text.micro{fill:#c7cdc9}}
+</style>
+<defs><marker id="arrow" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s" stroke-linejoin="round" stroke-linecap="round"/></marker><marker id="arrow2" viewBox="0 0 9 9" refX="8" refY="4.5" markerWidth="6" markerHeight="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 8 4.5 1 8" class="s2" stroke-linejoin="round" stroke-linecap="round"/></marker></defs>
+<text x="0" y="11" class="micro">Across languages: a translation</text>
+<text x="0" y="40" class="code">part_I__sec_1</text>
+<path d="M8 46 L8 228" class="s2"/>
+<path d="M8 88 L18 88" class="s2" marker-end="url(#arrow2)"/>
+<path d="M8 228 L18 228" class="s2" marker-end="url(#arrow2)"/>
+<rect x="20" y="68" width="338" height="108" rx="3" class="s box"/>
+<text x="32" y="88">English source</text>
+<text x="32" y="104" class="code">/akn/xa/act/1992/7/eng@2012-01-01</text>
+<text x="32" y="128">1 Short title and commencement</text>
+<text x="32" y="148" class="note">(1) This Act may be cited as the Legislation</text>
+<text x="32" y="164" class="note">Act, 1992.</text>
+<path d="M189 176 L189 206" class="s" marker-end="url(#arrow)"/>
+<rect x="20" y="208" width="338" height="108" rx="3" class="s box"/>
+<text x="32" y="228">French, not authoritative</text>
+<text x="32" y="244" class="code">/akn/xa/act/1992/7/fra@2012-01-01</text>
+<text x="32" y="268">1 Titre abrégé et entrée en vigueur</text>
+<text x="32" y="288" class="note">(1) La présente loi peut être citée sous le</text>
+<text x="32" y="304" class="note">titre : Legislation Act, 1992.</text>
+<text x="0" y="344" class="note">Recorded in the French text</text>
+<text class="code"><tspan x="0" y="364">&lt;FRBRtranslation fromLanguage="eng"</tspan><tspan x="14.4" y="380">href="/akn/xa/act/1992/7/eng@2012-01-01"</tspan><tspan x="14.4" y="396">by="#codify" authoritative="false"/&gt;</tspan></text>
+</svg>

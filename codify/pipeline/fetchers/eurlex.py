@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import httpx
 
+from codify.acquisition.base import require_user_agent
 from codify.acquisition.politeness import GuardedTransport, client_tls_context
 from codify.core.security import Resolver
 
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
-_USER_AGENT = "codify-fetch/0.1"
 
 
 async def fetch_url(
@@ -27,6 +27,9 @@ async def fetch_url(
     async with httpx.AsyncClient(
         timeout=timeout, follow_redirects=True, transport=transport
     ) as client:
-        response = await client.get(url, headers=headers or {"User-Agent": _USER_AGENT})
+        sent = httpx.Headers(headers or {})
+        if "user-agent" not in sent:
+            sent["User-Agent"] = require_user_agent()
+        response = await client.get(url, headers=sent)
         response.raise_for_status()
         return response.text

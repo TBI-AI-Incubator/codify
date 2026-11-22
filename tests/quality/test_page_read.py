@@ -293,8 +293,7 @@ class TestLetterSpacedRuns:
 
     def test_a_column_aligned_table_is_a_known_false_positive(self) -> None:
         """Cleaning collapses column padding, so single-letter columns read as a
-        run. Recorded rather than guarded: measured at zero pages across several
-        thousand judgment pages."""
+        run. Recorded rather than guarded."""
         from codify.pipeline.enrich.ocr import clean_page_text
 
         assert letter_spaced_runs(clean_page_text("No.   Pasal   A     B     C     D")) == 1

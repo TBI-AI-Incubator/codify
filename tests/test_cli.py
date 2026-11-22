@@ -13,9 +13,15 @@ from pathlib import Path
 import pytest
 
 from codify.cli import _by_pass, _clear_bundle, _coverage_json, _foundry_ocr_url
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 from codify.pipeline.enrich.anchors import AnchorCoverage, StructuralAnchor
 from codify.pipeline.enrich.structure import ScanTrace
+
+
+@pytest.fixture(autouse=True)
+def _a_chat_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`ingest-one` refuses to start without one; the closed port answers nothing."""
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:1")
 
 
 def _trace(coverage: AnchorCoverage | None) -> ScanTrace:
@@ -255,8 +261,36 @@ async def test_the_client_is_built_off_the_proxy(monkeypatch, tmp_path: Path) ->
         await cli._run(args)
     assert seen["telemetry_mode"] == "direct"
     # The mode is only worth pinning because of what it drops from the request.
-    direct = LiteLLMClient(base_url="http://x/v1", api_key="k", model="m", telemetry_mode="direct")
+    direct = OpenAICompatibleClient(
+        base_url="http://x/v1", api_key="k", model="m", telemetry_mode="direct"
+    )
     assert direct._body() == {}
+
+
+async def test_ingest_one_refuses_to_start_without_a_chat_endpoint(  # type: ignore[no-untyped-def]
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    """Unset, it used to call a local gateway nobody had started."""
+    from codify import cli
+
+    monkeypatch.delenv("LLM_BASE_URL")
+    monkeypatch.setattr(cli, "create_llm_client", lambda **_: pytest.fail("built a client"))
+    source = tmp_path / "act.txt"
+    source.write_text("1. Short title.\n")
+    out = tmp_path / "bundle"
+    args = argparse.Namespace(
+        source=str(source),
+        jurisdiction="xa",
+        out=str(out),
+        model="m",
+        ocr_model="",
+        fallback_model="",
+        quiet=True,
+    )
+
+    assert await cli._run(args) == 2
+    assert "LLM_BASE_URL" in capsys.readouterr().err
+    assert not out.exists()
 
 
 def test_help_keeps_the_docstring_examples_on_their_own_lines(capsys) -> None:  # type: ignore[no-untyped-def]
@@ -267,6 +301,23 @@ def test_help_keeps_the_docstring_examples_on_their_own_lines(capsys) -> None:  
     out = capsys.readouterr().out
     assert "\n    codify ingest-one gazette.pdf --jurisdiction xa --out bundle/\n" in out
     assert "\n    codify scan-corpus ~/corpus --jurisdiction xa\n" in out
+
+
+def test_the_parser_is_built_without_running_a_command() -> None:
+    """A reference generator reads the parser, so every subcommand must be on it."""
+    from codify.cli import build_parser
+
+    sub = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    assert {
+        "scan-corpus",
+        "ingest-one",
+        "segment",
+        "load",
+        "search",
+        "serve",
+        "mcp",
+        "migrate",
+    } <= set(sub.choices)
 
 
 async def test_the_fallback_model_reaches_the_client(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
@@ -305,7 +356,7 @@ def test_the_fallback_flag_defaults_to_the_environment(monkeypatch) -> None:  # 
     from codify import cli
 
     captured: list[argparse.Namespace] = []
-    monkeypatch.setenv("LITELLM_CONTENT_FILTER_FALLBACK_MODEL", "env-fallback")
+    monkeypatch.setenv("LLM_CONTENT_FILTER_FALLBACK_MODEL", "env-fallback")
     monkeypatch.setattr(cli, "_load_env", lambda: None)
     monkeypatch.setattr(cli.asyncio, "run", lambda coro: coro.close() or 0)
     monkeypatch.setattr(cli, "_run", lambda a: captured.append(a) or _noop())

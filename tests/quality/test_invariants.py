@@ -87,7 +87,7 @@ class TestAmbiguitySpan:
         assert AmbiguitySpan(kind="toc_without_body", start=0, end=1).blocking is False
 
     def test_a_resolved_duplicate_does_not_block(self) -> None:
-        """Blocking a dropped TOC twin refused 3 of 36 correct documents."""
+        """Blocking a dropped TOC twin refuses correct documents."""
         span = AmbiguitySpan(kind="duplicate_number", start=0, end=1, resolved=True)
         assert span.blocking is False
 

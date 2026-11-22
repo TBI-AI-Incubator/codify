@@ -23,6 +23,7 @@ from codify.open_wheel import ships_in_open_wheel
 from codify.testing import apply_db_gate, configure_worker_db
 
 configure_worker_db()
+os.environ.setdefault("ACQUISITION_USER_AGENT", "codify-tests/0 (+https://example.test)")
 
 _DB_SKIP_ATTR = "_codify_db_skipped_count"
 

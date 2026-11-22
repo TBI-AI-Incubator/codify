@@ -181,6 +181,14 @@ async def test_fetch_wraps_both_language_bodies_and_carries_the_record() -> None
     doc = await _acquirer().fetch(ref)
     assert doc.frbr_work_uri == "/akn/oecd/act/recommendation/2020/9002"
     assert doc.source_url == f"{BASE}/en/instruments/OECD-LEGAL-9002"
+    assert doc.official is not None
+    assert (doc.official.publisher, doc.official.work_id, doc.official.edition_id) == (
+        "oecd-compendium",
+        "OECD/LEGAL/9002",
+        "en",
+    )
+    assert [r.edition_id for r in doc.official_translations] == ["fr"]
+    json.dumps(doc.official.model_dump())
     assert [(b.role, b.language, b.media_type) for b in doc.bodies] == [
         ("primary", "eng", "text/html"),
         ("translation", "fra", "text/html"),

@@ -12,7 +12,13 @@ from codify.translate.anchors import (
     walk_source_units,
 )
 from codify.translate.audit import audit_translation
-from codify.translate.notes import build_translation_notes, notes_to_prompt
+from codify.translate.notes import (
+    PinnedTerm,
+    apply_pinned_terms,
+    build_translation_notes,
+    notes_to_prompt,
+    select_pinned_terms,
+)
 from codify.translate.translate import (
     TranslationResult,
     translate_document,
@@ -26,16 +32,19 @@ from codify.translate.translate_bodies import (
 )
 
 __all__ = [
+    "PinnedTerm",
     "BodyFillOutcome",
     "SourceUnit",
     "TranslatedBatchResponse",
     "TranslatedBlock",
     "TranslationResult",
     "WalkSummary",
+    "apply_pinned_terms",
     "audit_translation",
     "build_translation_notes",
     "build_translation_scaffold",
     "notes_to_prompt",
+    "select_pinned_terms",
     "translate_bodies",
     "translate_document",
     "translate_title",

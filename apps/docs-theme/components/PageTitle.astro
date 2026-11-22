@@ -1,0 +1,83 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro'
+import options from 'virtual:codify-docs-theme/options'
+
+const stages = options.journey ?? []
+const { id } = Astro.locals.starlightRoute
+const at = stages.findIndex((stage) => stage.pages.includes(id))
+const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+
+{
+  at >= 0 && (
+    <nav class="cd-progress" aria-label="Pipeline stage" style={`--cd-count:${stages.length};--cd-at:${at}`}>
+      <ol>
+        {stages.map((stage, i) => (
+          <li>
+            <a href={`${base}/${stage.slug}/`} aria-current={i === at ? 'step' : undefined}>
+              <span class="cd-progress-n">{i + 1}</span>
+              <span class="cd-progress-label">{stage.label}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+      <span class="cd-progress-marker" data-at={at} aria-hidden="true" />
+      <script is:inline>
+        // Start the marker at the stage the reader came from, then let it slide to this one.
+        {
+          const marker = document.currentScript.previousElementSibling
+          try {
+            const from = sessionStorage.getItem('cd-progress')
+            sessionStorage.setItem('cd-progress', marker.dataset.at)
+            if (from !== null && from !== marker.dataset.at) {
+              marker.style.setProperty('--cd-at', from)
+              requestAnimationFrame(() => requestAnimationFrame(() => marker.style.removeProperty('--cd-at')))
+            }
+          } catch {}
+        }
+      </script>
+    </nav>
+  )
+}
+<Default><slot /></Default>
+<button type="button" class="cd-copy-md">Copy page as Markdown</button>
+<script>
+  // Every page has a Markdown twin at its address with `.md` in place of the final `/`.
+  for (const button of document.querySelectorAll<HTMLButtonElement>('.cd-copy-md')) {
+    const label = button.textContent
+    button.addEventListener('click', async () => {
+      const page = location.pathname.replace(/\/$/, '')
+      const root = import.meta.env.BASE_URL.replace(/\/$/, '')
+      // The fetch is handed over as a promise, so Safari still counts the write as part of the click.
+      const markdown = fetch(page === root ? `${page}/index.md` : `${page}.md`).then((response) => {
+        if (!response.ok) throw new Error(String(response.status))
+        return response.blob().then((body) => new Blob([body], { type: 'text/plain' }))
+      })
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'text/plain': markdown })])
+        button.textContent = 'Copied'
+      } catch {
+        button.textContent = 'Copy failed'
+      }
+      setTimeout(() => (button.textContent = label), 2000)
+    })
+  }
+</script>
+
+<style>
+  .cd-copy-md {
+    margin-block-start: 0.5rem;
+    border: 1px solid var(--cd-rule);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    background: none;
+    color: var(--cd-ink-3);
+    font: inherit;
+    font-size: var(--sl-text-xs);
+    cursor: pointer;
+  }
+
+  .cd-copy-md:hover {
+    color: var(--cd-ink);
+  }
+</style>

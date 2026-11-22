@@ -1,4 +1,4 @@
-# The open repository's CI; the split carries it to the root.
+# CI for this repository.
 name: CI
 
 on:
@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: 'uv.lock'
-      # --config: in pyproject.toml these would govern the monorepo's copy too.
+      # --config: lint settings live in open-repo-ruff.toml.
       - run: uv run --frozen --with 'ruff==0.15.12' ruff check --config open-repo-ruff.toml .
       - run: uv run --frozen --with 'ruff==0.15.12' ruff format --check --config open-repo-ruff.toml .
 
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
           enable-cache: true
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
           enable-cache: true
@@ -63,7 +63,7 @@ jobs:
           "
       # Closed port: a call escaping the fakes fails rather than reaching a provider.
       - env:
-          LITELLM_BASE_URL: http://127.0.0.1:1
+          LLM_BASE_URL: http://127.0.0.1:1
           EMBEDDING_BASE_URL: http://127.0.0.1:1
         run: uv run --frozen pytest tests -m "not integration and not live_llm" -q
 
@@ -74,11 +74,11 @@ jobs:
       POSTGRES_URL: postgresql://codify:codify@localhost:5432/codify
       # An unreachable database fails the run instead of skipping it.
       REQUIRE_DB: '1'
-      LITELLM_BASE_URL: http://127.0.0.1:1
+      LLM_BASE_URL: http://127.0.0.1:1
       EMBEDDING_BASE_URL: http://127.0.0.1:1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
           enable-cache: true
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           python-version: '3.12'
           enable-cache: true

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import date
 from typing import Any
 
@@ -55,6 +56,57 @@ async def upsert_registry_works(
     if batch:
         await session.execute(stmt, batch)
         count += len(batch)
+    return count
+
+
+async def replace_registry_records(
+    session: AsyncSession,
+    jurisdiction_id: uuid.UUID,
+    records: Mapping[str, dict[str, Any]],
+    *,
+    source: str,
+) -> int:
+    """Replace one register's records on the rows of the refs it names; returns rows written.
+
+    Each record is stored with `source` set; a row this read no longer names loses it, and a
+    row holding another register's record keeps that one."""
+    # One replacement per jurisdiction at a time: no mixed reads, no crossed row locks.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+        {"k": f"registry_records:{jurisdiction_id}"},
+    )
+    await session.execute(
+        text(
+            "UPDATE registry_works SET record = NULL, updated_at = now() "
+            "WHERE jurisdiction_id = :j AND record ->> 'source' = :s"
+        ),
+        {"j": jurisdiction_id, "s": source},
+    )
+    stmt = text(
+        """
+        UPDATE registry_works rw SET record = CAST(v.record AS jsonb), updated_at = now()
+        FROM unnest(CAST(:refs AS text[]), CAST(:records AS text[])) AS v(ref, record)
+        WHERE rw.jurisdiction_id = :j AND rw.ref = v.ref
+          AND (rw.record IS NULL OR rw.record ->> 'source' = :s)
+        """
+    )
+    items = [
+        (ref, json.dumps({**record, "source": source}, ensure_ascii=False))
+        for ref, record in records.items()
+    ]
+    count = 0
+    for start in range(0, len(items), _BATCH):
+        chunk = items[start : start + _BATCH]
+        result = await session.execute(
+            stmt,
+            {
+                "j": jurisdiction_id,
+                "s": source,
+                "refs": [r for r, _ in chunk],
+                "records": [p for _, p in chunk],
+            },
+        )
+        count += int(result.rowcount or 0)
     return count
 
 

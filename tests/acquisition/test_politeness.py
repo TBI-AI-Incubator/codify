@@ -7,7 +7,7 @@ import time
 import httpx
 import pytest
 
-from codify.acquisition.base import PolitenessProfile
+from codify.acquisition.base import MissingUserAgent, PolitenessProfile
 from codify.acquisition.politeness import (
     _MAX_RETRIES,
     _ROBOTS_FAIL_TTL_S,
@@ -152,8 +152,11 @@ async def test_user_agent_default_applied() -> None:
 
 
 @pytest.mark.asyncio
-async def test_default_user_agent_carries_a_contact_on_every_request() -> None:
-    """A publisher reading its logs can reach us; the robots probe says so too."""
+async def test_the_callers_user_agent_is_sent_on_every_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With no explicit agent, the robots probe and the request carry the configured one."""
+    monkeypatch.setenv("ACQUISITION_USER_AGENT", "caller/1.0 (+https://caller.test)")
     agents: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -168,8 +171,15 @@ async def test_default_user_agent_carries_a_contact_on_every_request() -> None:
     async with httpx.AsyncClient(transport=transport) as c:
         await c.get("https://example.test/x")
     assert set(agents) == {"/robots.txt", "/x"}
-    for agent in agents.values():
-        assert agent.startswith("codify-acquire/") and "(+https://" in agent
+    assert set(agents.values()) == {"caller/1.0 (+https://caller.test)"}
+
+
+def test_a_client_without_a_user_agent_fails_before_any_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ACQUISITION_USER_AGENT", raising=False)
+    with pytest.raises(MissingUserAgent, match="ACQUISITION_USER_AGENT"):
+        PoliteTransport(profile=PolitenessProfile())
 
 
 # ---- REV-1 fixes -------------------------------------------------------------

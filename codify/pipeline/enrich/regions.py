@@ -21,7 +21,7 @@ RegionKind = Literal["body", "furniture", "toc", "footnote", "conclusions", "asi
 _BODY_TYPES = frozenset({"text", "list", "table", "equation", "code", "caption", "title"})
 _DROPPED_TYPES = frozenset({"image"})
 
-# Measured: 16 of 16 footnote blocks start at or below 0.82, no body block does.
+# Footnote blocks start low on the page; body blocks do not start this low.
 FOOTNOTE_BAND = 0.80
 
 # A marginal label is a narrow column, not the full text measure, so band and type must

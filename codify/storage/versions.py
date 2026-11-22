@@ -254,7 +254,7 @@ class CurrentScope:
 
     Search joins the `is_current` flag rather than binding the versions as an
     array: the planner estimates `= ANY(array)` element by element against each
-    partition's statistics, which cost 1.8 s per query over the corpus.
+    partition's statistics, which made planning dominate the query.
     `jurisdiction_ids=None` is every jurisdiction; `undated` admits a law
     with no year into a year range.
     """
@@ -734,6 +734,10 @@ async def update_repaired_akn(
     if reviewed_by:
         stmt = stmt.bindparams(bindparam("rev_by", value=reviewed_by))
     await session.execute(stmt)
+    # Anchors name elements of the text just replaced; a re-read of the source writes them again.
+    await session.execute(
+        text("DELETE FROM official_anchors WHERE version_id = :vid"), {"vid": version_id}
+    )
 
 
 async def stale_translation_ids(session: AsyncSession, law_id: uuid.UUID) -> set[uuid.UUID]:

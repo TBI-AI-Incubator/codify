@@ -46,9 +46,7 @@ SORTS = ("relevance", "title", "year_desc", "year_asc", "ingested")
 # reader named is inside it, bounded so the index keeps doing the ordering.
 RERANK_WINDOW = 200
 
-# One rank step in BM25 units. Measured floor: 0.35 lifts a `qanun` above a
-# `qarar`, 0.2 does not, and recall and MRR are unchanged up to 1.5. No ceiling
-# was found, so this is the smaller intervention rather than the better one.
+# One rank step in BM25 units, large enough to reorder adjacent doctype ranks.
 RANK_WEIGHT = 0.35
 
 
@@ -224,8 +222,8 @@ async def list_laws(
                 )
             )
 
-    # A rank-weighted order cannot use the BM25 index: 218ms against 38ms on
-    # 50k laws. The re-rank runs over a bounded window, and a page past it
+    # A rank-weighted order cannot use the BM25 index, so the re-rank runs
+    # over a bounded window, and a page past it
     # falls back whole to relevance order, so nothing is shown twice.
     relevance = matched and sort in (None, "relevance")
     rerank = bool(doctype_ranks) and relevance and offset + limit <= RERANK_WINDOW

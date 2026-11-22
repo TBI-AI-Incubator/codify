@@ -154,24 +154,6 @@
     "insertion_style": "alphanumeric",
     "insertion_note": "Inserted sections use alphanumeric suffixes: 12A, 12B, 12C. Full renumbering does not occur on amendment — the Law Reform Commission produces Revised Acts (via revisedacts.lawreform.ie) preserving original numbering with F-note annotations."
   },
-  "enacting_formulae": [
-    {
-      "text": "Be it enacted by the Oireachtas as follows:—",
-      "position": "preamble",
-      "era": "current",
-      "from": "1937-01-01",
-      "document_class": "act",
-      "note": "Standard formula for Acts without a preamble. The em-dash after the colon is part of the formula."
-    },
-    {
-      "text": "The Minister for [Portfolio], in exercise of the powers conferred on [him/her/them] by [section N] of the [Parent Act], [year], hereby makes the following [Regulations/Orders]:",
-      "position": "preamble",
-      "era": "current",
-      "from": "1948-01-01",
-      "document_class": "si",
-      "note": "Enabling recital used in Statutory Instruments. Gender-neutral 'them' increasingly used."
-    }
-  ],
   "amendments": {
     "style": "textual_commonwealth",
     "phrasing": "is amended by substituting... / is amended by inserting... / is amended by deleting...",

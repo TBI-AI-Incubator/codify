@@ -1,0 +1,154 @@
+/* Figures: inline SVG drawn on a 4px grid at display size, themed by these tokens. Spec: the figure kit. */
+:root {
+  --cd-fig-stroke: 1.5px;
+  --cd-fig-stroke-2: 1px;
+  --cd-fig-label: 13px;
+  --cd-fig-note: 12px;
+  --cd-fig-code: 12px;
+  --cd-fig-title: 22px;
+  --cd-fig-stroke-em: 2.5px;
+}
+
+.sl-markdown-content .cd-figure {
+  margin-block: 2rem;
+  container-type: inline-size;
+  color: var(--cd-ink);
+}
+
+.cd-figure__art svg {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+  overflow: visible;
+}
+
+.cd-figure__art--narrow {
+  display: none;
+}
+
+/* A figure with one cut is drawn 358px wide; centre it in a wider column. */
+.cd-figure__art:not(.cd-figure__art--wide, .cd-figure__art--narrow) svg {
+  margin-inline: auto;
+}
+
+/* Wide art is drawn 624px wide; in a narrower column the narrow cut (drawn 358px wide) takes over. */
+@container (max-width: 623.98px) {
+  .cd-figure__art--wide {
+    display: none;
+  }
+  .cd-figure__art--narrow {
+    display: block;
+  }
+}
+
+.cd-figure figcaption {
+  margin-block-start: 0.75rem;
+  padding-block-start: 0.5rem;
+  border-block-start: 1px solid var(--cd-rule);
+  font-size: var(--sl-text-sm);
+  line-height: 1.5;
+  color: var(--cd-ink-2);
+}
+
+.cd-figure__alt {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Drawing classes. Geometry stays in the SVG; colour, weight and type come from here. */
+.cd-figure svg {
+  font-family: var(--cd-font-text);
+  fill: none;
+  stroke: none;
+}
+.cd-figure svg :is(path, line, rect, circle, polyline, polygon) {
+  vector-effect: non-scaling-stroke;
+}
+.cd-figure svg .s {
+  stroke: currentColor;
+  stroke-width: var(--cd-fig-stroke);
+}
+.cd-figure svg .s2 {
+  stroke: var(--cd-ink-3);
+  stroke-width: var(--cd-fig-stroke-2);
+}
+.cd-figure svg .dash {
+  stroke-dasharray: 3 3;
+}
+.cd-figure svg .box {
+  fill: var(--cd-paper);
+}
+.cd-figure svg .box-lo {
+  fill: var(--cd-paper-lo);
+}
+.cd-figure svg .ink {
+  fill: currentColor;
+}
+.cd-figure svg :not(text).em {
+  stroke: currentColor;
+  stroke-width: var(--cd-fig-stroke-em);
+}
+.cd-figure svg text {
+  fill: currentColor;
+  font-size: var(--cd-fig-label);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.cd-figure svg text.note {
+  fill: var(--cd-ink-2);
+  font-size: var(--cd-fig-note);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.cd-figure svg text.code {
+  fill: var(--cd-ink-2);
+  font-family: var(--cd-font-mono);
+  font-size: var(--cd-fig-code);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.cd-figure svg text.micro {
+  fill: var(--cd-ink-2);
+  font-family: var(--cd-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cd-figure svg text.title {
+  font-family: var(--cd-font-display);
+  font-size: var(--cd-fig-title);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.cd-figure svg text.em {
+  font-weight: 600;
+}
+.cd-figure svg .marker {
+  fill: var(--cd-paper);
+  stroke: currentColor;
+  stroke-width: var(--cd-fig-stroke-2);
+}
+.cd-figure svg text.marker-n {
+  font-family: var(--cd-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* Right to left: the drawing mirrors so it flows with the page; each label flips back in place. */
+:root[dir='rtl'] .cd-figure__art svg {
+  transform: scaleX(-1);
+  /* Drawn left to right: an inherited rtl direction would reverse every text-anchor before the mirror. */
+  direction: ltr;
+}
+:root[dir='rtl'] .cd-figure__art svg :is(text, .no-mirror) {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleX(-1);
+}

@@ -1,9 +1,8 @@
 """The bulk-deliverable manifest: the operator's declaration of what to ingest.
 
-One entry per source PDF. FRBR work URIs are human-decided, never guessed: at
-batch scale the classifier's ~85% accuracy fails ~15% of laws every run, so the
-operator pins identity here. Validation is strict because a malformed manifest
-should fail loudly at upload, not halfway through a 1000-PDF batch.
+One entry per source PDF. FRBR work URIs are operator-pinned, never guessed, so
+identity cannot drift at batch scale. Validation is strict because a malformed
+manifest should fail loudly at upload, not halfway through a batch.
 """
 
 from __future__ import annotations

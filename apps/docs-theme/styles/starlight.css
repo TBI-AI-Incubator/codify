@@ -1,0 +1,163 @@
+:root,
+::backdrop {
+  --sl-font: var(--cd-font-text);
+  --sl-font-mono: var(--cd-font-mono);
+
+  --sl-color-white: var(--cd-ink);
+  --sl-color-gray-1: var(--cd-ink);
+  --sl-color-gray-2: var(--cd-ink-2);
+  --sl-color-gray-3: var(--cd-ink-3);
+  --sl-color-gray-4: var(--cd-ink-3);
+  --sl-color-gray-5: var(--cd-rule);
+  --sl-color-gray-6: var(--cd-paper-lo);
+  --sl-color-gray-7: var(--cd-paper-lo);
+  --sl-color-black: var(--cd-paper);
+  --sl-color-accent-low: var(--cd-paper-lo);
+  --sl-color-accent: var(--cd-ink);
+  --sl-color-accent-high: var(--cd-ink);
+  --sl-color-text: var(--cd-ink);
+  --sl-color-text-accent: var(--cd-ink);
+  --sl-color-text-invert: var(--cd-paper);
+  --sl-color-bg: var(--cd-paper);
+  --sl-color-bg-nav: var(--cd-paper);
+  --sl-color-bg-sidebar: var(--cd-paper);
+  --sl-color-bg-inline-code: var(--cd-paper-lo);
+  --sl-color-bg-accent: var(--cd-ink);
+  --sl-color-hairline-light: var(--cd-rule);
+  --sl-color-hairline: var(--cd-rule);
+  --sl-color-hairline-shade: var(--cd-rule);
+
+  /* Standing surfaces are flat; only overlays lift. */
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.16);
+
+  --sl-text-body: 1rem;
+  --sl-text-h1: clamp(2.25rem, 1.6rem + 3vw, 3.25rem);
+  --sl-text-h2: 1.5rem;
+  --sl-text-h3: 1.1875rem;
+  --sl-text-h4: 1.0625rem;
+  --sl-text-h5: 1rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.2;
+  --sl-content-width: 42rem;
+}
+
+@media (min-width: 50rem) {
+  :root {
+    --sl-text-body: 1.0625rem;
+  }
+}
+
+html {
+  scrollbar-color: var(--cd-rule) transparent;
+}
+
+body {
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--cd-selection);
+  color: var(--cd-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cd-ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+h1#_top {
+  font-family: var(--cd-font-display);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.sidebar-content .large {
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  color: var(--cd-ink);
+}
+
+.sidebar-content a {
+  border-radius: var(--cd-radius);
+  font-size: var(--sl-text-sm);
+}
+
+.right-sidebar-panel h2 {
+  font-size: var(--sl-text-xs);
+  font-weight: 600;
+}
+
+starlight-toc a[aria-current='true'] {
+  font-weight: 500;
+}
+
+/* Previous and next read like the tables: a hairline above, a small mono label, the title at body size. No box. */
+.pagination-links {
+  gap: 0 2rem;
+  border-top: 1px solid var(--cd-rule);
+}
+.pagination-links > a {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  padding: 1rem 0 0;
+  align-items: flex-end;
+  gap: 0.5rem;
+  font: 400 0.6875rem/1.4 var(--cd-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cd-ink-3);
+}
+.pagination-links .link-title {
+  display: block;
+  margin-top: 0.3rem;
+  font: 500 1.0625rem/1.35 var(--cd-font-text);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--cd-ink);
+}
+.pagination-links > a:hover .link-title {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.pagination-links > a > svg {
+  font-size: 1rem !important;
+  margin-bottom: 0.2rem;
+  color: var(--cd-ink-3);
+}
+
+site-search > button[data-open-modal] {
+  border-radius: var(--cd-radius);
+}
+
+/* The menu button: an icon, not a filled disc. */
+button:has(> .open-menu) {
+  background-color: transparent !important;
+  color: var(--cd-ink) !important;
+}
+
+button:has(> .open-menu):has(~ :popover-open) {
+  background-color: var(--cd-paper-lo) !important;
+}
+
+/* A page's one call to action: a pill in the text colour, so it reads as the next step and not as another link. */
+.sl-markdown-content a.cta:not(.sl-anchor-link) { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-radius: 999px; background: var(--sl-color-text); color: var(--sl-color-black); font-weight: 500; text-decoration: none; }
+.sl-markdown-content a.cta:not(.sl-anchor-link):hover { opacity: 0.88; }
+.sl-markdown-content a.cta:focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 3px; }

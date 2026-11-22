@@ -6,6 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { Dropzone, type SelectedPdf } from '@/components/upload/dropzone';
 import { countryName } from '@/lib/countries';
 import { useJurisdiction } from '@/lib/jurisdiction-context';
+import { useAllowedJurisdictions } from '@/lib/use-allowed-jurisdictions';
 import { startIngestRun, startIngestUrlRun } from '@/lib/api-runs';
 
 export default function IngestRoute() {
@@ -14,6 +15,9 @@ export default function IngestRoute() {
   const [params] = useSearchParams();
   const { country: pinnedCountry } = useJurisdiction();
   const country = params.get('jurisdiction') ?? pinnedCountry;
+  const { items: jurisdictions } = useAllowedJurisdictions();
+  // The server fetches a URL only under `eu`, and only where that config is installed.
+  const urlIngest = country === 'eu' && jurisdictions.some((j) => j.code === 'eu');
   const [selected, setSelected] = useState<SelectedPdf[]>([]);
   const [extraFilesIgnored, setExtraFilesIgnored] = useState(false);
   const [url, setUrl] = useState('');
@@ -114,29 +118,33 @@ export default function IngestRoute() {
         ) : null}
       </section>
 
-      <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-wide text-ink-40">
-        <span className="h-px flex-1 bg-ink-20" />
-        {t('or use a source URL')}
-        <span className="h-px flex-1 bg-ink-20" />
-      </div>
+      {urlIngest ? (
+        <>
+          <div className="my-8 flex items-center gap-3 text-xs uppercase tracking-wide text-ink-40">
+            <span className="h-px flex-1 bg-ink-20" />
+            {t('or use a source URL')}
+            <span className="h-px flex-1 bg-ink-20" />
+          </div>
 
-      <form onSubmit={submitUrl} className="flex gap-2">
-        <input
-          type="url"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          placeholder={t('https://eur-lex.europa.eu/…/document.xml')}
-          aria-label={t('Source URL')}
-          className="h-10 min-w-0 flex-1 rounded-lg border border-ink-20 bg-paper px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        <button
-          type="submit"
-          disabled={submitting || !url.trim()}
-          className="rounded-lg bg-emphasis-strong px-4 text-sm font-medium text-paper disabled:opacity-50"
-        >
-          {submitting ? t('Starting…') : t('Ingest URL')}
-        </button>
-      </form>
+          <form onSubmit={submitUrl} className="flex gap-2">
+            <input
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder={t('https://eur-lex.europa.eu/…/document.xml')}
+              aria-label={t('Source URL')}
+              className="h-10 min-w-0 flex-1 rounded-lg border border-ink-20 bg-paper px-3 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <button
+              type="submit"
+              disabled={submitting || !url.trim()}
+              className="rounded-lg bg-emphasis-strong px-4 text-sm font-medium text-paper disabled:opacity-50"
+            >
+              {submitting ? t('Starting…') : t('Ingest URL')}
+            </button>
+          </form>
+        </>
+      ) : null}
 
       {error ? (
         <p role="alert" className="mt-4 text-sm text-destructive">

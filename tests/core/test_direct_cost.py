@@ -12,7 +12,7 @@ from structlog.testing import capture_logs
 
 from codify.core import llm as llm_module
 from codify.core import tracing
-from codify.core.llm import LiteLLMClient
+from codify.core.llm import OpenAICompatibleClient
 from codify.core.tracing import record_usage
 
 
@@ -53,7 +53,7 @@ def _observed(monkeypatch: pytest.MonkeyPatch, usage_info: dict[str, Any]) -> di
 
     monkeypatch.setattr(llm_module, "direct_observation", _stub)
     monkeypatch.setattr(httpx, "AsyncClient", lambda **_: _Client())
-    client = LiteLLMClient(
+    client = OpenAICompatibleClient(
         base_url="http://x/v1",
         api_key="k",
         model="m",
@@ -67,12 +67,12 @@ def _observed(monkeypatch: pytest.MonkeyPatch, usage_info: dict[str, Any]) -> di
 def test_ocr_records_pages_and_the_cost_of_them(monkeypatch: pytest.MonkeyPatch) -> None:
     fields = _observed(monkeypatch, {"pages_processed": 4, "doc_size_bytes": 34281})
     assert fields["usage_details"] == {"pages_processed": 4}
-    assert fields["cost_details"] == pytest.approx({"total": 0.0176})
+    assert fields["cost_details"] == pytest.approx({"total": 0.016})
 
 
 def test_ocr_keeps_doc_size_out_of_usage(monkeypatch: pytest.MonkeyPatch) -> None:
     # Left in the usage blob it is summed into the token total beside the page
-    # count, which is how a week of OCR read as 73.7M tokens.
+    # count, inflating it.
     fields = _observed(monkeypatch, {"pages_processed": 4, "doc_size_bytes": 34281})
     assert "doc_size_bytes" not in fields["usage_details"]
     assert fields["metadata"] == {"doc_size_bytes": 34281}
@@ -90,7 +90,7 @@ def test_a_new_provider_usage_key_is_not_counted(monkeypatch: pytest.MonkeyPatch
         {"pages_processed": 4, "doc_size_bytes": 34281, "images_processed": 900, "cached": True},
     )
     assert fields["usage_details"] == {"pages_processed": 4}
-    assert fields["cost_details"] == pytest.approx({"total": 0.0176})
+    assert fields["cost_details"] == pytest.approx({"total": 0.016})
 
 
 def test_a_boolean_never_lands_in_the_usage_total() -> None:
@@ -98,6 +98,12 @@ def test_a_boolean_never_lands_in_the_usage_total() -> None:
     observation = _Observation()
     record_usage(observation, "mistral-ocr-4-0", {"pages_processed": 2, "cached": True})
     assert observation.fields["usage_details"] == {"pages_processed": 2}
+
+
+def test_a_batch_result_records_the_batch_rate() -> None:
+    observation = _Observation()
+    record_usage(observation, "gemini-3.7-flash", {"input": 1_000_000}, batch=True)
+    assert observation.fields["cost_details"] == pytest.approx({"input": 0.375, "total": 0.375})
 
 
 def test_an_unpriced_model_says_so_once() -> None:

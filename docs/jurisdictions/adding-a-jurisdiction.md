@@ -285,12 +285,11 @@ and an edit there is live.
 
 ## What a thin config leaves empty
 
-The minimum in Step 1 loads. Six fields are set by every one of the thirteen
+The minimum in Step 1 loads. Five fields are set by every one of the thirteen
 configs that ship and by none of the example above:
-`calendar`, `enacting_formulae`, `amendments`, `core_tlcs`,
-`supranational_memberships` and `display`. None is required, and a config without
-them parses; `enacting_formulae` and `core_tlcs` come back as empty lists and
-`amendments` as unset. Read a shipped config before deciding you do not need them.
+`calendar`, `amendments`, `core_tlcs`, `supranational_memberships` and `display`.
+None is required, and a config without them parses; `core_tlcs` comes back as an
+empty list and `amendments` as unset. Read a shipped config before deciding you do not need them.
 
 ## Traps
 

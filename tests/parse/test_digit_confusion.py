@@ -153,7 +153,7 @@ class TestConfidenceMargin:
         assert corrections == []
 
     def test_gap_of_six_in_valid_sequence_untouched(self) -> None:
-        """Copilot flagged the false-positive case: `10, 16, 18` is a
+        """The false-positive case: `10, 16, 18` is a
         legitimate increasing sequence (reserved articles 11-15), but a
         naive score check would trigger repair to `10, 11, 18` via the
         1↔6 pair since candidate `11` scores 15 vs `16`'s score of 3.
@@ -189,7 +189,7 @@ class TestConfidenceMargin:
 
 
 def test_repair_preserves_arabic_indic_script() -> None:
-    """A repaired Arabic-Indic number stays Arabic-Indic: ArbReg 39/2004's
+    """A repaired Arabic-Indic number stays Arabic-Indic: here the
     OCR emitted مادة (١) between ٥ and ٧, and the repair must write ٦, not
     a lone ASCII 6 inside an Arabic sequence."""
     nums = ["٥", "١", "٧"]
@@ -202,7 +202,7 @@ class TestShiftedRunRepair:
     """A consistently-misread run (٦١..٦٩ → ١١..١٩) defeats the
     per-anchor pass; the run-level hypothesis pass repairs it whole."""
 
-    def test_arb_reg_shifted_run_repaired(self) -> None:
+    def test_a_shifted_run_is_repaired(self) -> None:
         nums = [str(n) for n in (58, 59, 60)] + [str(n) for n in range(11, 20)] + ["70"]
         repaired, corrections = repair_number_sequence(nums)
         assert repaired == [str(n) for n in range(58, 71)]
@@ -261,12 +261,10 @@ class TestAnomalyIsNotEvidence:
     Fitting what follows to the number it breaks reads the one damaged heading
     as the truth and the run correcting it as the damage. That failure is
     silent: articles keep their text and change their numbers, so a citation
-    resolves to the wrong provision. Measured on the corpus at 140 articles
-    across 8 versions before this guard.
+    resolves to the wrong provision.
     """
 
     def test_a_declined_anomaly_does_not_renumber_the_run_after_it(self) -> None:
-        # One corpus statute renumbered 133 of its 621 articles this way.
         repaired, _ = repair_number_sequence(["358", "359", "260", "361", "362", "363"])
 
         # The damaged 260 is corrected to 360; the correct run is left alone.
@@ -284,8 +282,7 @@ class TestAnomalyIsNotEvidence:
 
         Scoring credits any candidate below the next number, so in a document
         numbered 10 to 16 a gazette number could be rewritten to another number
-        the document does not hold, purely for sitting lower. Four corpus
-        versions carried `401 -> 301` on that reasoning.
+        the document does not hold, purely for sitting lower.
         """
         numbers = ["10", "11", "12", "401", "401", "13", "14"]
 
@@ -321,7 +318,7 @@ class TestAnomalyIsNotEvidence:
         `150` is a real legislative skip the pass rightly declines, and `651` is
         a genuine `1`/`6` flip of `151` with nothing after it to confirm a
         candidate. Repairing it would mean trusting the declined number, which
-        is the reasoning that renumbered 133 articles of one statute. Nothing
+        is the reasoning the guard exists to stop. Nothing
         distinguishes "declined because sound" from "declined because damaged",
         so both are refused: this pass may now miss a tail error, and it no
         longer invents one.

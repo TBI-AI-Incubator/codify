@@ -124,16 +124,6 @@
     "publication of the agreement",
     "publication of the convention"
   ],
-  "enacting_formulae": [
-    {
-      "text": "أصدر مجلس الأمة الزرزوري القانون الآتي نصه:",
-      "position": "preamble",
-      "era": "assembly",
-      "from": "1961-07-15",
-      "to": "2011-01-01",
-      "document_class": "act"
-    }
-  ],
   "enacting_formula_markers": [
     "أصدر القرار الآتي بقانون",
     "أصدرنا القانون الآتي",
@@ -201,7 +191,7 @@
     "documents_examined": 3,
     "bluebell_tested": true,
     "unresolved_ambiguities": 0,
-    "note": "Synthetic reference jurisdiction for the Arabic RTL hierarchy. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN (experiments/synthetic_scans)."
+    "note": "Synthetic reference jurisdiction for the Arabic RTL hierarchy. Three Bluebell-authored laws round-trip through parse_to_akn to schema-valid, zero-advisory-error AKN."
   },
   "tier": 5,
   "status": "stub",

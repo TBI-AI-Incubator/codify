@@ -173,7 +173,7 @@ class TestAuditV38Extensions:
         )
         out = audit_translation("src", translated_xml, {}, target_language="eng")
         assert out["heading_alien_script_hits"] == 1
-        # Copilot #7: per-eid map lets a downstream repair loop target the
+        # A per-eid map lets a downstream repair loop target the
         # offending provision rather than just knowing the count.
         assert out["heading_alien_script_hits_by_eid"] == {"art_47": 1}
         # Body-`<p>` is clean English; the body counter stays at zero,
@@ -250,7 +250,7 @@ class TestAuditV38Extensions:
         assert out["money_duplicated_by_eid"] == {}
 
     def test_money_missing_distinct_amounts_not_covered_by_repeat(self):
-        """Copilot #2: source `2,400` + `3,000`, target `2,400` twice.
+        """Source `2,400` + `3,000`, target `2,400` twice.
         Aggregate counts match, but a distinct amount is dropped; the
         multiset compare catches it where a count compare would not."""
         translated_xml = _akn_wrap(
@@ -310,7 +310,7 @@ class TestAuditV38Extensions:
         assert out["money_duplicated_by_eid"] == {}
 
     def test_money_direct_p_eid_attributes_to_owner(self):
-        """Copilot #3: a direct `<p eId='art_1__p_1'>` (no intro/content
+        """A direct `<p eId='art_1__p_1'>` (no intro/content
         scope) must attribute to `art_1`, not to the raw `<p>` eid. The
         `_owning_eid` strip must handle the `__p_N` suffix directly."""
         translated_xml = _akn_wrap(
@@ -638,7 +638,7 @@ def test_spaced_digits_are_not_letter_spacing() -> None:
 
 
 def test_a_spelled_out_initialism_is_not_letter_spacing() -> None:
-    """UNRWA and UNESCO appear spelled out in this corpus, and the gate is a
+    """A spelled-out initialism is not letter spacing, and the gate is a
     hard fail, so a false positive would wedge the law."""
     from codify.translate.audit import count_letter_spaced_runs
 

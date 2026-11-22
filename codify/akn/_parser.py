@@ -116,13 +116,24 @@ def carried_ids(root: etree._Element) -> set[str]:
 
 
 def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
-    """Each identified `<recital>` under the preamble, as a paragraph carrying its prose."""
+    """Each identified `<recital>` under the preamble, and each enacting-formula line that
+    holds a reference, as a paragraph carrying its prose."""
     preamble = _akn_child(doc_root, "preamble")
     if preamble is None:
         return []
     out: list[BodyElement] = []
     seen: set[str] = set()
-    for el in preamble.iter(f"{{{AKN_NS}}}recital"):
+    formula_lines = (
+        p
+        for formula in preamble.iter(f"{{{AKN_NS}}}formula")
+        for p in formula.iter(f"{{{AKN_NS}}}p")
+        if not any(is_lifted_note(a) for a in p.iterancestors())
+        and any(
+            not any(is_lifted_note(a) for a in r.iterancestors())
+            for r in p.iter(f"{{{AKN_NS}}}ref")
+        )
+    )
+    for el in (*preamble.iter(f"{{{AKN_NS}}}recital"), *formula_lines):
         eid = el.get("eId", "")
         if not eid or eid in seen:
             continue
@@ -132,6 +143,11 @@ def _extract_recitals(doc_root: etree._Element) -> list[BodyElement]:
         for child in list(prose):
             if isinstance(child.tag, str) and (_local(child) == "num" or is_lifted_note(child)):
                 prose.remove(child)
+        if _local(el) == "p":
+            # Alone in a one-child container, the line is read as inline text.
+            holder = etree.Element(el.tag)
+            holder.append(prose)
+            prose = holder
         text, refs = _extract_text_and_refs(prose)
         seen.add(eid)
         out.append(
@@ -525,11 +541,34 @@ def _inner_xml_or_text(el: etree._Element) -> str:
     return (el.text or "").strip()
 
 
+def _force_periods(meta: etree._Element) -> dict[str, date]:
+    """Start date of each temporal group, read through the event its interval names."""
+    events = {
+        e.get("eId"): (e.get("date") or "")[:10]
+        for e in meta.iterfind(f"{{{AKN_NS}}}lifecycle/{{{AKN_NS}}}eventRef")
+    }
+    out: dict[str, date] = {}
+    for group in meta.iterfind(f"{{{AKN_NS}}}temporalData/{{{AKN_NS}}}temporalGroup"):
+        interval = _akn_child(group, "timeInterval")
+        start = (interval.get("start") or "").lstrip("#") if interval is not None else ""
+        try:
+            out[group.get("eId") or ""] = date.fromisoformat(events.get(start, ""))
+        except ValueError:
+            pass
+    return out
+
+
+def _force_period(mod_el: etree._Element) -> str:
+    force = _akn_child(mod_el, "force")
+    return (force.get("period") or "").lstrip("#") if force is not None else ""
+
+
 def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
     analysis = _akn_child(meta, "analysis")
     if analysis is None:
         return []
     out: list[TextualMod] = []
+    periods = _force_periods(meta)
     for container_name in ("passiveModifications", "activeModifications"):
         container = _akn_child(analysis, container_name)
         if container is None:
@@ -571,6 +610,7 @@ def _extract_analysis(meta: etree._Element) -> list[TextualMod]:
                     quoted=_quoted_content(mod_el),
                     authority_uri=authority,
                     mod_eid_ref=for_ref,
+                    in_force_date=periods.get(_force_period(mod_el)),
                 )
             )
     return out

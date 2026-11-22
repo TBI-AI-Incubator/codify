@@ -90,7 +90,7 @@ def test_windows_text_slices_actual_raw_text() -> None:
 def test_bold_wrapped_marker_normalised_before_scan() -> None:
     """The vision OCR wraps some markers in markdown bold (`# **مادة (٤٨)**`);
     the structure-stage normaliser strips the fences so the anchor regex's
-    column boundary matches (ArbReg 39/2004 lost 12 articles this way)."""
+    column boundary matches."""
     from codify.pipeline.enrich.structure import normalise_rtl_extract
 
     text = "# **مادة (٤٨)**\nنص المادة الثامنة والأربعين.\n"

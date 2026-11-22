@@ -8,6 +8,7 @@ extractor improvement becomes backfillable.
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import TYPE_CHECKING, Any
 
@@ -138,9 +139,27 @@ async def _extract_reference_rows(
     go only to its own recital row: the mapper skips one whose eId a body row holds."""
     from codify.pipeline.enrich.inline_markup import emit_inline_markup
     from codify.pipeline.enrich.references import emit_references
+    from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 
-    enriched = emit_references(akn_xml, code)
-    enriched = await emit_inline_markup(enriched, code, doctype, client)
+    def _read() -> tuple[list[CrossReference], int]:
+        marked = asyncio.run(emit_inline_markup(emit_references(akn_xml, code), code, doctype))
+        return _rows_from(marked, prov_by_eid, recital_eids)
+
+    # CPU-bound passes run on the pipeline's CPU pool; with no model call, in one hop.
+    read: tuple[list[CrossReference], int]
+    if client is None:
+        read = await on_the_cpu_pool(_read)
+    else:
+        # The model client is bound to this loop, so its pass stays on it.
+        enriched = await on_the_cpu_pool(emit_references, akn_xml, code)
+        enriched = await emit_inline_markup(enriched, code, doctype, client)
+        read = await on_the_cpu_pool(_rows_from, enriched, prov_by_eid, recital_eids)
+    return read
+
+
+def _rows_from(
+    enriched: str, prov_by_eid: dict[str, uuid.UUID], recital_eids: frozenset[str]
+) -> tuple[list[CrossReference], int]:
     doc = parse_akn(enriched)
 
     rows: list[CrossReference] = []

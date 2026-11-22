@@ -8,19 +8,9 @@ from codify.core.pricing import cost_details
 
 
 def test_ocr_is_priced_per_page_not_per_token() -> None:
-    # $4.40 per 1000 pages on the data-zone meter we are billed on, and the page
-    # count is the only usage key that bills.
+    # The global list rate, and the page count is the only usage key that bills.
     assert cost_details("mistral-ocr-4-0", {"pages_processed": 4}) == pytest.approx(
-        {"total": 0.0176}
-    )
-
-
-def test_ocr_reconciles_against_the_azure_invoice() -> None:
-    """24 Aug 2026: Langfuse recorded 3,031 pages, Azure billed quantity 3.031
-    on "OCR 4 DZ Pages" at unitPrice 4.4, costInUSD 13.3364. Pins the rate to
-    the invoice so a silent revert to the global meter fails here."""
-    assert cost_details("mistral-ocr-4-0", {"pages_processed": 3031}) == pytest.approx(
-        {"total": 13.3364}
+        {"total": 0.016}
     )
 
 
@@ -61,3 +51,14 @@ def test_unpriced_returns_none_rather_than_zero(model: str, usage: dict[str, int
 def test_the_content_filter_fallback_is_priced() -> None:
     costs = cost_details("azure/gpt-5.6-sol", {"input": 1_000_000, "output": 1_000_000})
     assert costs == pytest.approx({"input": 4.0, "output": 20.0, "total": 24.0})
+
+
+def test_batch_bills_half_the_synchronous_rate() -> None:
+    costs = cost_details(
+        "gemini/gemini-3.7-flash", {"input": 1_000_000, "output": 1_000_000}, batch=True
+    )
+    assert costs == pytest.approx({"input": 0.375, "output": 1.875, "total": 2.25})
+
+
+def test_batch_leaves_an_unpriced_model_unpriced() -> None:
+    assert cost_details("some-model-we-have-never-priced", {"input": 100}, batch=True) is None

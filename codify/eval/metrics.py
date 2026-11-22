@@ -41,7 +41,7 @@ def ndcg_at_k(ranked: Sequence[str], relevant: set[str], k: int) -> float:
 
 
 def evaluate(ranked: Sequence[str], relevant: set[str]) -> dict[str, float]:
-    """The four numbers #590 asks for, for one query against one arm."""
+    """The four retrieval metrics for one query against one arm."""
     return {
         "recall@10": recall_at_k(ranked, relevant, 10),
         "recall@50": recall_at_k(ranked, relevant, 50),

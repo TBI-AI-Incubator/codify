@@ -10,8 +10,10 @@ scaffold assembly.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from codify.pipeline.enrich.anchors import (
+    _ROMAN_TITLE_PASS,
     StructuralAnchor,
     anchor_summary,
     cached_regex,
@@ -52,6 +54,78 @@ def fill_bodies_verbatim(text: str, anchors: list[StructuralAnchor]) -> BodyFill
     return BodyFillResponse(bodies=blocks)
 
 
+def _markup_spans(text: str) -> list[tuple[int, int]]:
+    """Each outermost ``{{…}}`` span of ``text``; an unclosed opener on its line is literal."""
+    spans: list[tuple[int, int]] = []
+    depth = start = i = 0
+    while i < len(text):
+        if text.startswith("{{", i):
+            start = i if depth == 0 else start
+            depth += 1
+            i += 2
+        elif depth and text.startswith("}}", i):
+            depth -= 1
+            i += 2
+            if depth == 0:
+                spans.append((start, i))
+        else:
+            depth = 0 if text[i] == "\n" else depth
+            i += 1
+    return spans
+
+
+def _blank(scan: str, spans: list[tuple[int, int]]) -> str:
+    """Inline markup is never a heading, so the scan never sees it."""
+    out = list(scan)
+    for start, end in spans:
+        out[start:end] = " " * (end - start)
+    return "".join(out)
+
+
+def _marker_start(scan: str, offset: int) -> int:
+    """Skip the match's leading boundary, which in a blanked scan can cover hidden prose."""
+    while offset < len(scan) and scan[offset].isspace():
+        offset += 1
+    return offset
+
+
+def _same_line_gap(gap: str) -> bool:
+    return "\n" not in gap and not gap.strip()
+
+
+def _restore_heading(
+    text: str, scan: str, spans: list[tuple[int, int]], anchor: StructuralAnchor
+) -> StructuralAnchor:
+    """Read a captured heading back from ``text`` with the markup the scan blanked in it."""
+    words = (anchor.heading or "").split()
+    marker_end = anchor.char_offset + len(anchor.matched_text)
+    # A Roman-title marker carries its title inside the match.
+    floor = (
+        anchor.char_offset + len(anchor.keyword)
+        if anchor.source_pass == _ROMAN_TITLE_PASS
+        else marker_end
+    )
+    at = scan.find(words[0], floor) if words else -1
+    if at < 0:
+        return anchor
+    end = at
+    for word in words:
+        found = scan.find(word, end)
+        if found < 0 or "\n" in scan[end:found]:
+            return anchor
+        end = found + len(word)
+    for s, e in reversed(spans):
+        if floor <= s and e <= at and _same_line_gap(text[e:at]):
+            at = s
+    for s, e in spans:
+        if s >= end and _same_line_gap(text[end:s]):
+            end = e
+    if "{{" not in text[at:end]:
+        return anchor
+    matched = text[anchor.char_offset : end] if at < marker_end else anchor.matched_text
+    return replace(anchor, heading=text[at:end], matched_text=matched)
+
+
 def text_to_bluebell_verbatim(
     text: str,
     *,
@@ -69,13 +143,16 @@ def text_to_bluebell_verbatim(
     """
     if scan_text is not None and len(scan_text) != len(text):
         raise ValueError("scan_text must be offset-aligned with text")
-    regex = cached_regex(country, doctype)
-    anchors = scan_anchors(
-        scan_text if scan_text is not None else text,
-        regex,
-        country=country,
-        doctype=doctype,
-    )
+    spans = _markup_spans(text)
+    scan = _blank(scan_text if scan_text is not None else text, spans)
+    anchors = [
+        _restore_heading(
+            text, scan, spans, replace(a, char_offset=_marker_start(scan, a.char_offset))
+        )
+        for a in scan_anchors(
+            scan, cached_regex(country, doctype), country=country, doctype=doctype
+        )
+    ]
     if not anchors:
         raise ValueError("no structural anchors found — use the LLM structuring lane")
 

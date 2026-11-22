@@ -25,6 +25,7 @@ from codify.acquisition.base import (
 )
 from codify.acquisition.politeness import make_polite_client
 from codify.jurisdictions import SourceAdapter, authoritative_language
+from codify.provenance import official_ref_from_url
 
 DOCTYPE = "gazette"
 _LISTING_PATH = "/api/documents"
@@ -148,6 +149,7 @@ class GacetaAcquirer(BaseAcquirer):
                 "month": issue["month"],
                 "created_at": issue["created_at"],
             },
+            official=official_ref_from_url(url),
         )
 
 

@@ -4,7 +4,7 @@ jurisdiction needs at most a marker pattern of its own. A unit the document mark
 with a `refersTo` value its jurisdiction lists in `pool_excluded_refers_to` is law,
 but not law on the instrument's subjects, and leaves the pool too.
 
-`sentinels-by-layer` (DECISIONS.md) bans a sentinel from stored AKN. One is emitted
+A sentinel is banned from stored AKN. One is emitted
 anyway by the acquisition path that inlines annexes, so the marker is in the corpus
 and must not answer a search or feed a lens as if it were law.
 """

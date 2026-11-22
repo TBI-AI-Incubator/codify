@@ -181,25 +181,72 @@ TlcClass = Literal[
 class HierarchyEntry(BaseModel):
     model_config = _LOOSE
 
-    local_term: str
-    akn_element: AknElement
-    level: HierarchyLevel
-    bluebell_keyword: BluebellKeyword | None = None
-    numbering: str | None = None
-    # Overrides the element's canonical eId prefix. Set it only where the element
-    # cannot imply one (hcontainer: sch, xhd; two local terms on one element) or
-    # the publisher's own AKN differs (UK SIs number sections reg_N).
-    eid_abbrev: str = ""
-    note: str = ""
-    # Unified multilingual store for local_term_ara / local_script_rus / etc.
-    # Keys are ISO 639-3 language codes or "script:<iso-15924>".
-    local_terms: dict[str, str] | None = None
-    akn_name: str | None = None
-    # Genres whose levels carry no keyword: a judgment writes "DUDUK PERKARA"
-    # and "[1.1]", never its hierarchy term. Unset keeps keyword matching.
-    marker_form: MarkerForm | None = None
-    # The closed caption vocabulary a `caption` level answers to.
-    captions: list[str] = Field(default_factory=list)
+    local_term: str = Field(
+        description=(
+            'The level\'s name as the source prints it, such as "Article" or "Chapter". '
+            "Marker detection and the eId builder match it in the text."
+        )
+    )
+    akn_element: AknElement = Field(
+        description=("The AKN element this level becomes, such as `article` or `chapter`.")
+    )
+    level: HierarchyLevel = Field(
+        description=(
+            "Where the level sits: `higher` containers, the single `basic` unit and its "
+            "`subdivision`s are ordered; `grouping` and `presentational` levels may appear "
+            "anywhere."
+        )
+    )
+    bluebell_keyword: BluebellKeyword | None = Field(
+        default=None,
+        description=(
+            "The Bluebell keyword for this level. Unset uses the AKN element name in capitals."
+        ),
+    )
+    numbering: str | None = Field(
+        default=None,
+        description=(
+            "How the level is numbered, such as arabic or roman. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    eid_abbrev: str = Field(
+        default="",
+        description=(
+            "Overrides the element's canonical eId prefix. Set it only where the element cannot"
+            " imply one (an hcontainer, or two local terms on one element) or where the "
+            "publisher's own AKN uses another prefix."
+        ),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    local_terms: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "The level's local names, keyed by ISO 639-3 language code, or by \"script:<ISO "
+            '15924 code>" for a script variant.'
+        ),
+    )
+    akn_name: str | None = Field(
+        default=None,
+        description=(
+            "The element name a publisher's own AKN uses in hyphenated eIds for this level "
+            "(`section` in `section-55-2`), where it differs from `akn_element`."
+        ),
+    )
+    marker_form: MarkerForm | None = Field(
+        default=None,
+        description=(
+            "For genres whose levels carry no keyword, such as a judgment that numbers its "
+            'paragraphs "[1.1]" and never names the level. Unset keeps keyword matching.'
+        ),
+    )
+    captions: list[str] = Field(
+        default_factory=list,
+        description="The closed caption vocabulary a `caption` level answers to.",
+    )
 
     @model_validator(mode="after")
     def _captions_match_marker_form(self) -> "HierarchyEntry":
@@ -242,55 +289,202 @@ def _check_hierarchy_levels(where: str, hierarchy: list[HierarchyEntry]) -> None
 class HContainer(BaseModel):
     model_config = _LOOSE
 
-    local_term: str
-    name: str
-    description: str = ""
-    bluebell_proxy: BluebellKeyword = "SUBSECTION"
-    requires_postprocessing: bool = True
-    note: str = ""
-    numbering: str | None = None
-    label: str | None = None
-    akn_element: AknElement | None = None
-    level: str | None = None
-    position: str | None = None
-    bluebell_keyword: BluebellKeyword | None = None
+    local_term: str = Field(
+        description=(
+            "Heading text that identifies the container: a proxy element whose heading starts "
+            "with it, ignoring case, is renamed to an `hcontainer`."
+        )
+    )
+    name: str = Field(description=("The `name` attribute the resulting `hcontainer` carries."))
+    description: str = Field(
+        default="",
+        description=(
+            "Free-text description of the container. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    bluebell_proxy: BluebellKeyword = Field(
+        default="SUBSECTION",
+        description=(
+            "The Bluebell keyword the structurer uses for this container before it is renamed."
+        ),
+    )
+    requires_postprocessing: bool = Field(
+        default=True,
+        description=(
+            "Whether the proxy element is renamed to an `hcontainer` after structuring. False "
+            "leaves it as the proxy element."
+        ),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    numbering: str | None = Field(
+        default=None,
+        description=(
+            "How the container is numbered. Recorded for reference; the pipeline does not read it."
+        ),
+    )
+    label: str | None = Field(
+        default=None,
+        description=(
+            "Display label for the container. Recorded for reference; the pipeline does not "
+            "read it."
+        ),
+    )
+    akn_element: AknElement | None = Field(
+        default=None,
+        description=(
+            "The AKN element the container corresponds to, where one exists. Recorded for "
+            "reference; the pipeline does not read it."
+        ),
+    )
+    level: str | None = Field(
+        default=None,
+        description=(
+            "Where the container sits in the hierarchy. Recorded for reference; the pipeline "
+            "does not read it."
+        ),
+    )
+    position: str | None = Field(
+        default=None,
+        description=(
+            "Where the container appears in the document. Recorded for reference; the pipeline "
+            "does not read it."
+        ),
+    )
+    bluebell_keyword: BluebellKeyword | None = Field(
+        default=None,
+        description=(
+            "A Bluebell keyword for the container. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
 
 
 class DocumentClass(BaseModel):
     model_config = _LOOSE
 
-    label: str
-    # Compact display form (e.g. "VKM" for al/vendim). Falls back to the
-    # title-cased doctype when unset. Single source of truth for the UI + PDF.
-    short_label: str | None = None
-    akn_element: str = "act"
-    bluebell_compatible: bool = True
-    basic_unit: str = "section"
-    # A matching year prefix in the printed serial is separate from the URI number.
-    number_has_year_prefix: bool = False
-    # "title_identity": the URI number is always the title digest, never a stated
-    # serial, for classes whose serials repeat across issuers.
-    number_source: Literal["stated", "title_identity"] = "stated"
-    hierarchy: list[HierarchyEntry] = Field(default_factory=list)
-    hcontainers: list[HContainer] = Field(default_factory=list, alias="hcontainers")
-    direct_effect: bool | None = None
-    note: str = ""
-    # Another class of this jurisdiction whose fields this one lays over. One level.
-    extends: str | None = None
-    # Where this class sits in the legal hierarchy, for ranking a name search:
-    # higher outranks lower on a close title match. Unset means no weighting, so
-    # a jurisdiction whose hierarchy nobody has transcribed keeps pure relevance
-    # order.
-    #   4 constitutional  3 primary legislation  2 executive decree
-    #   1 subordinate regulation or decision     0 implementing instructions
-    search_rank: int | None = None
-    akn_subtype: str | None = None
-    local_label: str | None = None
-    prompt_variant: str | None = None
-    frbr_subtype: str | None = None
-    # Per-class authoritative language, falling back to the jurisdiction's when
-    # None. Vatican needs it: Latin for canon law, Italian for the City State.
-    authoritative_language: str | None = None
+    label: str = Field(description=('Display name of the class, such as "Act" or "Regulation".'))
+    short_label: str | None = Field(
+        default=None,
+        description=(
+            "Compact label for the class in the interface and in PDF exports. Falls back to the"
+            " title-cased doctype when unset."
+        ),
+    )
+    akn_element: str = Field(
+        default="act",
+        description=(
+            "The AKN document element for the class, such as `act`. `doc` or `statement` "
+            "selects an open structure rather than the legislative hierarchy."
+        ),
+    )
+    bluebell_compatible: bool = Field(
+        default=True,
+        description=(
+            "Whether the class can be expressed in Bluebell. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    basic_unit: str = Field(
+        default="section",
+        description=(
+            "The element that carries the class's numbered provisions, such as `section` or "
+            "`article`. It is given to the structurer and used by the anchor coverage check."
+        ),
+    )
+    number_has_year_prefix: bool = Field(
+        default=False,
+        description=(
+            "True where a printed serial may open with the instrument's year; a matching year "
+            "prefix is kept out of the URI number."
+        ),
+    )
+    number_source: Literal["stated", "title_identity"] = Field(
+        default="stated",
+        description=(
+            '"title_identity" makes the URI number the title digest, never a stated serial, for'
+            ' classes whose serials repeat across issuers. "stated" uses the printed serial.'
+        ),
+    )
+    hierarchy: list[HierarchyEntry] = Field(
+        default_factory=list,
+        description=(
+            "The class's structural levels. Higher levels must come before the basic unit and "
+            "its subdivisions."
+        ),
+    )
+    hcontainers: list[HContainer] = Field(
+        default_factory=list,
+        alias="hcontainers",
+        description=(
+            "Containers with no AKN element of their own, structured under a proxy keyword and "
+            "renamed to `hcontainer` afterwards."
+        ),
+    )
+    direct_effect: bool | None = Field(
+        default=None,
+        description=(
+            "Whether instruments of this class apply without domestic transposition. Only a "
+            "supranational jurisdiction may set it to true."
+        ),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    extends: str | None = Field(
+        default=None,
+        description=(
+            "Another class of this jurisdiction whose fields this one lays over. One level."
+        ),
+    )
+    search_rank: int | None = Field(
+        default=None,
+        description=(
+            "Rank of the class in the legal hierarchy, used to order a title search: higher "
+            "outranks lower on a close match, and unset means no weighting. Ranks: 4 "
+            "constitutional, 3 primary legislation, 2 executive decree, 1 subordinate "
+            "regulation or decision, 0 implementing instructions."
+        ),
+    )
+    akn_subtype: str | None = Field(
+        default=None,
+        description=(
+            "AKN subtype for the class. Recorded for reference; the pipeline does not read it."
+        ),
+    )
+    local_label: str | None = Field(
+        default=None,
+        description=(
+            "The class's name in the local language. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    prompt_variant: str | None = Field(
+        default=None,
+        description=(
+            "Name of a structuring prompt variant for the class. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    frbr_subtype: str | None = Field(
+        default=None,
+        description=(
+            "FRBR subtype of the class's works, returned by the MCP `get_jurisdiction` tool. "
+            "URI minting does not read it: it uses the doctype or `uri_patterns`."
+        ),
+    )
+    authoritative_language: str | None = Field(
+        default=None,
+        description=(
+            "Authoritative language for this class, for legal systems whose classes are enacted"
+            " in different languages. Recorded for reference; the pipeline reads only the "
+            "jurisdiction's."
+        ),
+    )
 
 
 #: The Gregorian month each kind's new year falls in when the config names none.
@@ -323,34 +517,83 @@ class CalendarConversion(BaseModel):
         "ethiopian",
         "buddhist",
         "bikram_samvat",
-    ]
-    # Integer added to the local year to give the Gregorian year (Buddhist -543,
-    # ROC and Juche 1911, since their year 1 is 1912 CE). None for calendars
-    # without a simple offset: hijri, ethiopian, era_table, bikram_samvat.
-    epoch_year: int | None = None
-    # Era table: [{"name": "Reiwa", "start": "2019-05-01"}] for Japanese-style.
-    eras: list[dict[str, Any]] | None = None
-    # Month-sensitive conversions (Bikram Samvat New Year mid-April).
-    new_year_month: int | None = None
-    new_year_day: int | None = None
-    # Offset variant for month-sensitive: subtract `offset` from local year
-    # before the new-year day, otherwise `offset + 1`.
-    offset: int | None = None
-    # Month names in the local calendar's own order, index 0 = month 1. Present
-    # only where a dated line is read off the source text.
-    month_names: list[str] = Field(default_factory=list)
-    # Whether the months and days coincide with the Gregorian ones, so only the
-    # year converts. False for any calendar with a grid of its own.
-    month_day_is_gregorian: bool = False
-    # Phrases that introduce the date a document was made. A dated line elsewhere
-    # in the text is some other instrument's.
-    date_cues: list[str] = Field(default_factory=list)
-    # Words marking a year as belonging to this calendar ("B.E.", "A.H.").
-    year_particles: list[str] = Field(default_factory=list)
-    # The local year began in this month before `new_year_reform_year`, so an
-    # earlier date carries the previous year's number and the offset is short.
-    new_year_reform_year: int | None = None
-    note: str = ""
+    ] = Field(
+        description=("Which conversion applies; it selects the optional fields that are read.")
+    )
+    epoch_year: int | None = Field(
+        default=None,
+        description=(
+            "Integer added to the local year to give the Gregorian year (for example -543 for "
+            "the Buddhist calendar, or 1911 where year 1 is 1912 CE). None for calendars "
+            "without a fixed offset, such as hijri, ethiopian, era_table and bikram_samvat."
+        ),
+    )
+    eras: list[dict[str, Any]] | None = Field(
+        default=None,
+        description=(
+            'Era table for an era-based calendar, for example [{"name": "Reiwa", "start": '
+            '"2019-05-01"}].'
+        ),
+    )
+    new_year_month: int | None = Field(
+        default=None,
+        description=(
+            "Gregorian month in which the local year begins, for conversions that depend on the"
+            " month (Bikram Samvat begins in mid-April)."
+        ),
+    )
+    new_year_day: int | None = Field(
+        default=None,
+        description=(
+            "Day the local year begins in its new-year month, for month-sensitive conversions "
+            "of a date on the Gregorian grid. Unset keeps the calendar's built-in boundary, a "
+            "band of days around the new year within which the day does not decide the year. "
+            "A date on the calendar's own grid always uses the built-in boundary."
+        ),
+    )
+    offset: int | None = Field(
+        default=None,
+        description=(
+            "For month-sensitive conversions: the years to subtract from the local year before "
+            "the new-year day; on or after it, `offset + 1`."
+        ),
+    )
+    month_names: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Month names in the local calendar's own order, index 0 = month 1. Present only "
+            "where a dated line is read off the source text."
+        ),
+    )
+    month_day_is_gregorian: bool = Field(
+        default=False,
+        description=(
+            "Whether the months and days coincide with the Gregorian ones, so only the year "
+            "converts. False for any calendar with a grid of its own."
+        ),
+    )
+    date_cues: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases that introduce the date a document was made. A dated line elsewhere in "
+            "the text is some other instrument's."
+        ),
+    )
+    year_particles: list[str] = Field(
+        default_factory=list,
+        description='Words marking a year as belonging to this calendar ("B.E.", "A.H.").',
+    )
+    new_year_reform_year: int | None = Field(
+        default=None,
+        description=(
+            "First local year that began on 1 January. Before it the year began in "
+            "`new_year_month`, so a date in an earlier month falls in the next Gregorian year."
+        ),
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
 
     @model_validator(mode="after")
     def _date_grammar_is_usable(self) -> "CalendarConversion":
@@ -402,10 +645,14 @@ class TitleIdentity(BaseModel):
 
     model_config = _STRICT
 
-    # Document-kind words opening a short title, longest first.
-    strip_prefixes: list[str] = Field(default_factory=list)
-    # Words marking the year that follows as the instrument's own.
-    year_particles: list[str] = Field(default_factory=list)
+    strip_prefixes: list[str] = Field(
+        default_factory=list,
+        description="Document-kind words opening a short title, longest first.",
+    )
+    year_particles: list[str] = Field(
+        default_factory=list,
+        description="Words marking the year that follows as the instrument's own.",
+    )
 
     @model_validator(mode="after")
     def _literals_are_not_blank(self) -> "TitleIdentity":
@@ -421,33 +668,100 @@ class TitleIdentity(BaseModel):
                 raise ValueError(f"{name} must not carry a blank entry")
         return self
 
-    # Words inside a parenthetical naming this instrument's edition, spelling
-    # variants included; the first is canonical and is what a slug carries.
-    edition_markers: list[str] = Field(default_factory=list)
-    # Parenthetical words marking a re-publication; an edition number after one
-    # is the edition folded in, not this document's.
-    consolidation_markers: list[str] = Field(default_factory=list)
+    edition_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Words inside a parenthetical naming this instrument's edition, spelling "
+            "variants included; the first is canonical and is what a slug carries."
+        ),
+    )
+    consolidation_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Parenthetical words marking a re-publication; an edition number after one is "
+            "the edition folded in, not this document's."
+        ),
+    )
 
 
 class FrbrConfig(BaseModel):
     model_config = _LOOSE
 
-    country_code: str
-    # Declared where instruments carry no number and the title is the identity.
-    title_identity: TitleIdentity | None = None
-    uri_patterns: dict[str, str] = Field(default_factory=dict)
-    date_calendar: Calendar = "gregorian"
-    date_calendar_note: str | None = None
-    # Structured conversion rule. Populated for non-Gregorian
-    # jurisdictions (NP, TW, KP, JP, IR, ET, TH). FRBR URIs always use
-    # Gregorian (ADR 001), this drives the conversion utility.
-    calendar_conversion: CalendarConversion | None = None
-    note: str | None = None
-    notes: list[str] | str | None = None
-    number_format: str | dict[str, str] | None = None
-    number_note: str | None = None
-    number_extraction: str | dict[str, Any] | None = None
-    sample_uris: list[Any] | dict[str, str] | None = None
+    country_code: str = Field(
+        description=(
+            "The country segment of minted FRBR URIs: usually the jurisdiction code, different "
+            "for a subdivision homed under its parent."
+        )
+    )
+    title_identity: TitleIdentity | None = Field(
+        default=None,
+        description="Declared where instruments carry no number and the title is the identity.",
+    )
+    uri_patterns: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "FRBR work URI template per doctype, using `{year}` and `{number}`. A doctype "
+            "without one gets the canonical default."
+        ),
+    )
+    date_calendar: Calendar = Field(
+        default="gregorian",
+        description=(
+            "The calendar the jurisdiction's FRBR dates are given in. Recorded for reference; "
+            "the pipeline does not read it."
+        ),
+    )
+    date_calendar_note: str | None = Field(
+        default=None,
+        description=(
+            "Free-text note on `date_calendar`. Recorded for reference; the pipeline does not "
+            "read it."
+        ),
+    )
+    calendar_conversion: CalendarConversion | None = Field(
+        default=None,
+        description=(
+            "Conversion rule for a jurisdiction whose instruments are dated in a non-Gregorian "
+            "calendar. FRBR URIs always use Gregorian dates (ADR 001), and this rule drives the"
+            " conversion."
+        ),
+    )
+    note: str | None = Field(
+        default=None,
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    notes: list[str] | str | None = Field(
+        default=None,
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    number_format: str | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "How instrument numbers are written. Recorded for reference; the pipeline does not "
+            "read it."
+        ),
+    )
+    number_note: str | None = Field(
+        default=None,
+        description=(
+            "Free-text note on instrument numbering. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    number_extraction: str | dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "How an instrument number is found in the source. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    sample_uris: list[Any] | dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Example FRBR URIs for the jurisdiction. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
 
     @model_validator(mode="after")
     def _grammars_suit_the_conversion(self) -> "FrbrConfig":
@@ -464,9 +778,14 @@ class SeriesCitation(BaseModel):
 
     model_config = _STRICT
 
-    # Regex for the instrument's name or abbreviation, matched case-insensitively.
-    name: str
-    doctype: str
+    name: str = Field(
+        description=(
+            "Regex for the instrument's name or abbreviation, matched case-insensitively."
+        ),
+    )
+    doctype: str = Field(
+        description=("The doctype whose FRBR work URI a matched citation links to.")
+    )
 
     @field_validator("name")
     @classmethod
@@ -480,30 +799,78 @@ class SeriesCitation(BaseModel):
 class NumberingConfig(BaseModel):
     model_config = _LOOSE
 
-    act_citation: str | None = None
-    act_citation_alt: str | None = None
-    insertion_style: str | None = None
-    note: str | None = None
-    insertion_example: str | None = None
-    insertion_note: str | None = None
-    article_numbering: str | None = None
-    # Per-instrument citation map, absorbs si_citation / decree_citation /
-    # loi_citation / law_citation / ordonnance_citation etc. without a
-    # separate field per jurisdiction.
-    citations: dict[str, str] = Field(default_factory=dict)
-    # Whether an instrument number identifies a work on its own. False almost
-    # everywhere: most jurisdictions restart numbering each year, so a citation
-    # that omits its date names one of many. Declaring it true lets a year-less
-    # citation resolve on the number, and is a claim about the whole series
-    # rather than about the corpus held, which may hold only one of the
-    # collisions and so cannot disprove it.
-    numbers_unique_across_years: bool = False
-    # Instruments cited by a never-reused series number and no year. Order
-    # matters: full names before abbreviations, so the full form wraps first.
-    series_citations: list[SeriesCitation] = Field(default_factory=list)
-    # Regex fragments that may sit between a series name and its number.
+    act_citation: str | None = Field(
+        default=None,
+        description=(
+            "Citation pattern for acts. Reference resolution reads every `<class>_citation` "
+            "field, and needs the default class's, to tell which instrument type a citation "
+            "names."
+        ),
+    )
+    act_citation_alt: str | None = Field(
+        default=None,
+        description=(
+            "An alternative citation form for acts. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    insertion_style: str | None = Field(
+        default=None,
+        description=(
+            "How inserted units are numbered. `slash_alpha` lets a marker number carry a slash "
+            'and capital letter, as in "5/A".'
+        ),
+    )
+    note: str | None = Field(
+        default=None,
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    insertion_example: str | None = Field(
+        default=None,
+        description=(
+            "An example of an inserted unit's number. Recorded for reference; the pipeline "
+            "does not read it."
+        ),
+    )
+    insertion_note: str | None = Field(
+        default=None,
+        description=(
+            "Free-text note on how inserted units are numbered. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    article_numbering: str | None = Field(
+        default=None,
+        description=(
+            "How articles are numbered. Recorded for reference; the pipeline does not read it."
+        ),
+    )
+    citations: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Citation pattern per instrument type, keyed by type. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    numbers_unique_across_years: bool = Field(
+        default=False,
+        description=(
+            "Whether an instrument number identifies a work without its year. False for most "
+            "jurisdictions, which restart numbering each year; true lets a year-less citation "
+            "resolve on the number alone, and is a claim about the whole series, not just the "
+            "documents held."
+        ),
+    )
+    series_citations: list[SeriesCitation] = Field(
+        default_factory=list,
+        description=(
+            "Instruments cited by a never-reused series number and no year. Order matters: "
+            "full names before abbreviations, so the full form wraps first."
+        ),
+    )
     series_citation_connectors: list[str] = Field(
-        default_factory=lambda: [r"No\.?", r"Nos\.?", "Numbered"]
+        default_factory=lambda: [r"No\.?", r"Nos\.?", "Numbered"],
+        description="Regex fragments that may sit between a series name and its number.",
     )
 
     @field_validator("series_citation_connectors")
@@ -526,62 +893,76 @@ class NumberingConfig(BaseModel):
         return self
 
 
-class EnactingFormula(BaseModel):
-    model_config = _LOOSE
-
-    text: str | None = None
-    position: str = "preamble"
-    era: str = ""
-    from_date: date | None = Field(default=None, alias="from")
-    to_date: date | None = Field(default=None, alias="to")
-    note: str = ""
-    document_class: str | list[str] | None = None
-    language: str | None = None
-    transliteration: str | None = None
-    instrument_type: str | None = None
-    applies_to: list[Any] | str | None = None
-    verified: bool = False
-    enacting_body_tlc: str | None = None
-
-    @field_validator("from_date", "to_date", mode="before")
-    @classmethod
-    def _empty_str_to_none(cls, v: Any) -> Any:
-        # Legacy configs store "" instead of null; coerce so date parsing
-        # doesn't fail on empty strings.
-        if v == "":
-            return None
-        return v
-
-
 class AmendmentConfig(BaseModel):
     model_config = _LOOSE
 
-    style: str | None = None
-    phrasing: str | None = None
-    cross_reference_format: str | None = None
-    # Lead-in phrases marking an embedded amendment article: a number following
-    # one of these plus a colon is quoted content, not a new top-level article.
-    trigger_phrases: list[str] = Field(default_factory=list)
-    # Body shape of an amending instrument. `two_pasal_roman`: the host's own
-    # articles are Roman, so an Arabic-numbered one after them is quoted text.
-    amending_body_structure: str | None = None
-    # Hierarchy element that numbers one amendment made by an amending article
-    # (a numbered `Angka` item). What follows it belongs to the amended statute, so
-    # it must not compete in the host's numbering. Empty leaves the pass inert.
-    amendment_item_kind: str | None = None
+    style: str | None = Field(
+        default=None,
+        description=(
+            "How the jurisdiction drafts amendments. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    phrasing: str | None = Field(
+        default=None,
+        description=(
+            "A phrase that marks a paragraph as an amendment instruction, in addition to the "
+            "built-in English cues, so its references are classed as amendments."
+        ),
+    )
+    cross_reference_format: str | None = Field(
+        default=None,
+        description=(
+            "How amendments cite the provisions they change. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    trigger_phrases: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Lead-in phrases marking an embedded amendment article: a number following one "
+            "of these plus a colon is quoted content, not a new top-level article."
+        ),
+    )
+    amending_body_structure: str | None = Field(
+        default=None,
+        description=(
+            "Body shape of an amending instrument. `two_pasal_roman`: the host instrument "
+            "numbers its own articles in Roman numerals, so an Arabic-numbered article after "
+            "them is quoted amending text."
+        ),
+    )
+    amendment_item_kind: str | None = Field(
+        default=None,
+        description=(
+            "Hierarchy element that numbers each amendment an amending article makes. What "
+            "follows it belongs to the amended statute, so it does not compete in the host's "
+            "numbering; empty leaves the pass inert."
+        ),
+    )
 
 
 class TLCEntry(BaseModel):
     model_config = _STRICT
 
-    # NCName-compatible, permitting camelCase and hyphenated forms both seen in
-    # the corpus. min_length=1 keeps the empty alias from raising an opaque
-    # pattern-mismatch.
-    eId: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9-]*$", min_length=1)
-    tlc_class: TlcClass = Field(alias="class")
-    href: str
-    showAs: str
-    note: str = ""
+    eId: str = Field(
+        pattern=r"^[A-Za-z][A-Za-z0-9-]*$",
+        min_length=1,
+        description=(
+            "An NCName-compatible identifier; camelCase and hyphenated forms are both accepted,"
+            " and an empty one is refused."
+        ),
+    )
+    tlc_class: TlcClass = Field(
+        alias="class",
+        description=("The AKN TLC element the entry becomes, such as `TLCOrganization`."),
+    )
+    href: str = Field(description=("The URI the entry refers to, written to its `href` attribute."))
+    showAs: str = Field(description=("The display name written to the entry's `showAs` attribute."))
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
 
 
 class ClassificationRule(BaseModel):
@@ -601,14 +982,40 @@ class ClassificationRule(BaseModel):
 
     model_config = _STRICT
 
-    signal: Literal["date_range", "preamble_match", "issuer_role", "gazette_series", "title_regex"]
-    pattern: str = ""
-    pattern_flags: str = ""  # e.g. "i" for case-insensitive
-    target_document_class: str
-    priority: int = 0
-    date_from: date | None = None
-    date_until: date | None = None
-    note: str = ""
+    signal: Literal[
+        "date_range", "preamble_match", "issuer_role", "gazette_series", "title_regex"
+    ] = Field(description=("Which part of the document `pattern` is tested against."))
+    pattern: str = Field(
+        default="", description=("Regex tested against the signal's text. Unused for `date_range`.")
+    )
+    pattern_flags: str = Field(
+        default="",
+        description='Regex flags for `pattern`, for example "i" for case-insensitive matching.',
+    )
+    target_document_class: str = Field(
+        description=(
+            "The document class assigned when the rule matches. It must be a key of "
+            "`document_classes`."
+        )
+    )
+    priority: int = Field(
+        default=0,
+        description=("Rules are tried from highest priority to lowest; the first match wins."),
+    )
+    date_from: date | None = Field(
+        default=None,
+        description=(
+            "First document date the rule applies to, inclusive. A rule with a date bound is "
+            "skipped for a document without a date."
+        ),
+    )
+    date_until: date | None = Field(
+        default=None, description=("Last document date the rule applies to, inclusive.")
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
 
 
 class PlaceholderStatus(StrEnum):
@@ -626,8 +1033,11 @@ class PlaceholderMarker(BaseModel):
 
     model_config = _STRICT
 
-    pattern: str
-    status: PlaceholderStatus = PlaceholderStatus.INCOMPLETE
+    pattern: str = Field(description=("Regex matched against a unit's whole text."))
+    status: PlaceholderStatus = Field(
+        default=PlaceholderStatus.INCOMPLETE,
+        description=("The AKN `status` a unit matching `pattern` carries."),
+    )
 
 
 class AttachmentCaption(BaseModel):
@@ -636,20 +1046,41 @@ class AttachmentCaption(BaseModel):
 
     model_config = _LOOSE
 
-    # Centred in the source, so the match tolerates a wide indent.
-    caption: str
-    # False for an explanatory memorandum: no norm, and no legal basis.
-    normative: bool = True
-    # Levels the attachment's own content uses: an annex can be a lettered
-    # outline rather than the article hierarchy of the body it is attached to.
-    # Empty keeps today's behaviour: the body's levels, or none.
-    hierarchy: list[HierarchyEntry] = Field(default_factory=list)
-    # True where the caption opens a longer title on the same line ("SCHEDULE of
-    # fees…"), so the caption need only begin the line. The line is the heading.
-    prefix: bool = False
-    # True where no table in the body carries this caption, so a line that opens
-    # with it always begins the attachment.
-    always_opens: bool = False
+    caption: str = Field(
+        description=(
+            "Caption that opens the attachment. Captions are centred in the source, so the "
+            "match tolerates a wide indent."
+        ),
+    )
+    normative: bool = Field(
+        default=True,
+        description=(
+            "False for an attachment with no normative force, such as an explanatory "
+            "memorandum, which cannot serve as a legal basis."
+        ),
+    )
+    hierarchy: list[HierarchyEntry] = Field(
+        default_factory=list,
+        description=(
+            "Levels the attachment's own content uses, since an annex can be a lettered outline"
+            " rather than the article hierarchy of its body. Empty uses the body's levels, or "
+            "none."
+        ),
+    )
+    prefix: bool = Field(
+        default=False,
+        description=(
+            'True where the caption opens a longer title on the same line ("SCHEDULE of '
+            'fees…"), so the caption need only begin the line. The line is the heading.'
+        ),
+    )
+    always_opens: bool = Field(
+        default=False,
+        description=(
+            "True where no table in the body carries this caption, so a line that opens "
+            "with it always begins the attachment."
+        ),
+    )
 
 
 def heading_line_pattern(pattern: str) -> re.Pattern[str]:
@@ -679,18 +1110,41 @@ class SegmentationConfig(BaseModel):
 
     model_config = _STRICT
 
-    # Regexes matched at a line start; a `number` group, where present, is the label.
-    act_heading_patterns: list[str] = Field(default_factory=list)
-    # The level above acts: a gazette issue within a bound volume.
-    issue_heading_patterns: list[str] = Field(default_factory=list)
-    # Headings of a contents listing, matched case-insensitively at a line start.
-    contents_keywords: list[str] = Field(default_factory=list)
-    # A printed page number in a page's furniture; its first participating group is the number.
-    printed_page_pattern: str | None = None
-    # Headings of instruments that are not acts (notices, appointments): kept apart, not ingested.
-    skip_heading_patterns: list[str] = Field(default_factory=list)
-    # Whole lines opening a trailing section never ingested: no engine reads from there on.
-    trailing_section_patterns: list[str] = Field(default_factory=list)
+    act_heading_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regexes matched at a line start; a `number` group, where present, is the label."
+        ),
+    )
+    issue_heading_patterns: list[str] = Field(
+        default_factory=list,
+        description="The level above acts: a gazette issue within a bound volume.",
+    )
+    contents_keywords: list[str] = Field(
+        default_factory=list,
+        description="Headings of a contents listing, matched case-insensitively at a line start.",
+    )
+    printed_page_pattern: str | None = Field(
+        default=None,
+        description=(
+            "A printed page number in a page's running header or footer; its first "
+            "participating group is the number."
+        ),
+    )
+    skip_heading_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Headings of instruments that are not acts (notices, appointments): kept apart, "
+            "not ingested."
+        ),
+    )
+    trailing_section_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Whole lines that open a trailing section which is never ingested: nothing is read "
+            "from there on."
+        ),
+    )
 
     @field_validator(
         "act_heading_patterns",
@@ -731,33 +1185,80 @@ class SegmentationConfig(BaseModel):
 class StructuringConfig(BaseModel):
     model_config = _LOOSE
 
-    prompt_variant: str | None = None
-    prompt_additions: str | None = None
-    # Deterministic classification rules, evaluated by descending priority
-    # before the AI prompt. prompt_additions keeps tacit style hints only.
-    classification_rules: list[ClassificationRule] = Field(default_factory=list)
-    # `line_anchored` where the drafting standard puts the marker on its own
-    # line and the sources keep it, so a mid-sentence citation cannot anchor.
-    marker_boundary: Literal["relaxed", "line_anchored"] = "relaxed"
-    # `number_first` where the number precedes the keyword ("15. §", "I. FEJEZET").
-    marker_order: Literal["keyword_first", "number_first"] = "keyword_first"
-    # Words ending the previous line when a citation wraps onto the next, which
-    # a boundary rule cannot see. Empty falls back to the script pack's list.
-    prose_precursors: list[str] = Field(default_factory=list)
-    # Precursors that mark a citation only when adjacent on the same line.
-    sameline_precursors: list[str] = Field(default_factory=list)
-    # Ordinal words used as container numbers ("Bagian Kesatu" is part 1).
-    # Declared in the source's own casing; matching is case-sensitive.
-    ordinal_words: dict[str, int] = Field(default_factory=dict)
-    # Words after a marker's number that mark an inserted unit ("5 bis"), mapped to the eId form.
-    # One shared table, like `ordinal_words`: never blank, a number, or a bare Latin letter.
-    insertion_suffixes: dict[str, str] = Field(default_factory=dict)
-    # Words that, following a marker's number on its own line, make the line a
-    # citation list rather than a provision ("Article 5 to Article 9 apply").
-    citation_successors: list[str] = Field(default_factory=list)
-    # True where the layout engine files footnotes and page-top captions under header
-    # or footer: furniture is then only what repeats, and a block opening on a marker is a note.
-    recurring_furniture: bool = False
+    prompt_variant: str | None = Field(
+        default=None,
+        description=(
+            "Name of a structuring prompt variant. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    prompt_additions: str | None = Field(
+        default=None,
+        description=(
+            "Jurisdiction-specific guidance appended to the structurer's context, for style "
+            "hints the deterministic rules cannot express."
+        ),
+    )
+    classification_rules: list[ClassificationRule] = Field(
+        default_factory=list,
+        description=(
+            "Deterministic classification rules, evaluated in descending priority before the "
+            "model is asked. `prompt_additions` carries only style hints the rules cannot "
+            "express."
+        ),
+    )
+    marker_boundary: Literal["relaxed", "line_anchored"] = Field(
+        default="relaxed",
+        description=(
+            "`line_anchored` where the drafting standard puts the marker on its own line "
+            "and the sources keep it, so a mid-sentence citation cannot anchor."
+        ),
+    )
+    marker_order: Literal["keyword_first", "number_first"] = Field(
+        default="keyword_first",
+        description=('`number_first` where the number precedes the keyword (as in "15. §").'),
+    )
+    prose_precursors: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Words ending the previous line when a citation wraps onto the next, which a "
+            "boundary rule cannot see. Empty falls back to the script pack's list."
+        ),
+    )
+    sameline_precursors: list[str] = Field(
+        default_factory=list,
+        description="Precursors that mark a citation only when adjacent on the same line.",
+    )
+    ordinal_words: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            'Ordinal words used as container numbers (as in "Part One"). Declared in the '
+            "source's own casing; matching is case-sensitive."
+        ),
+    )
+    insertion_suffixes: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            'Words after a marker\'s number that mark an inserted unit ("5 bis"), mapped to '
+            "the eId form. One shared table, like `ordinal_words`: never blank, a number, "
+            "or a bare Latin letter."
+        ),
+    )
+    citation_successors: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Words that, following a marker's number on its own line, make the line a "
+            'citation list rather than a provision ("Article 5 to Article 9 apply").'
+        ),
+    )
+    recurring_furniture: bool = Field(
+        default=False,
+        description=(
+            "True where the layout engine files footnotes and page-top captions as header or "
+            "footer, so only text repeated across pages counts as running header or footer, and"
+            " a block opening on a marker is a note."
+        ),
+    )
 
     @field_validator("insertion_suffixes")
     @classmethod
@@ -789,26 +1290,39 @@ class StructuringConfig(BaseModel):
             raise ValueError("a cue word cannot be blank or carry surrounding whitespace")
         return value
 
-    # Words that introduce a citation's number ("Pasal 41 ayat (3)"). A line
-    # ending in one of these makes the bracketed number on the next line part
-    # of the citation, not a structural marker opening a new provision.
-    reference_nouns: list[str] = Field(default_factory=list)
-    # True where the drafting standard puts every article inside a container, so
-    # an article before the first one is a citation in the opening material.
-    # Some laws cite the constitution that way in the legal-basis recital.
-    body_opens_with_container: bool = False
+    reference_nouns: list[str] = Field(
+        default_factory=list,
+        description=(
+            'Words that introduce a citation\'s number ("Article 41 paragraph (3)"). A line '
+            "ending in one makes the bracketed number on the next line part of the citation, "
+            "not a marker opening a new provision."
+        ),
+    )
+    body_opens_with_container: bool = Field(
+        default=False,
+        description=(
+            "True where the drafting standard puts every article inside a container, so an "
+            "article before the first one is a citation in the opening material. Some laws "
+            "cite the constitution that way in the legal-basis recital."
+        ),
+    )
     example_markers: list[str] = Field(
         default_factory=list,
         description=(
-            "Lead-ins that introduce specimen legislation in a drafting manual "
-            "(`Contoh`), whose markers are displayed rather than enacted."
+            'Lead-ins that introduce specimen legislation in a drafting manual ("Example"), '
+            "whose markers are displayed rather than enacted."
         ),
     )
-    # OCR damage the sources carry, tolerated for this jurisdiction only and
-    # byte-identical elsewhere. `missing_separator` is "Pasal24".
     marker_tolerances: list[
         Literal["missing_separator", "keyword_glyph", "digit_glyph", "split_number"]
-    ] = Field(default_factory=list)
+    ] = Field(
+        default_factory=list,
+        description=(
+            "OCR damage the sources carry, tolerated for this jurisdiction only so parsing "
+            "elsewhere is unchanged. `missing_separator` accepts a keyword run into its number,"
+            ' as in "Article24".'
+        ),
+    )
     long_title_lead_ins: list[str] = Field(
         default_factory=list,
         description=(
@@ -834,17 +1348,16 @@ class StructuringConfig(BaseModel):
     citation_subjects: list[str] = Field(
         default_factory=list,
         description=(
-            "How an instrument refers to itself when it declares its short name "
-            "(`This Act`). Required alongside `citation_lead_ins`: the same phrasing "
-            "names the schools and offices a law creates, so an unanchored clause "
-            "takes the school's name for the law's."
+            "How an instrument refers to itself when declaring its short name (`This Act`). "
+            "Required with `citation_lead_ins`, because the same phrasing names bodies a law "
+            "creates, and without it a law could take a school's or office's name as its own."
         ),
     )
     designation_rule: Literal["eu_instrument"] | None = Field(
         default=None,
         description=(
-            "Derives a short name from the title's own grammar where the tradition "
-            "declares no short title. EU acts are cited by form and number."
+            "Derives a short name from the title's own grammar where the legal tradition "
+            "declares no short title. `eu_instrument` cites an act by its form and number."
         ),
     )
 
@@ -852,44 +1365,116 @@ class StructuringConfig(BaseModel):
 class DisplayConfig(BaseModel):
     model_config = _LOOSE
 
-    heading_type: str = "marginal_note"
-    heading_case: str = "title_case"
-    script: str = "latin"
-    rtl: bool = False
-    font_preference: str = "serif"
-    # The pair a publisher prints around amended words; brackets are only the
-    # commonest. A list because a tuple crosses the schema boundary as unknown.
+    heading_type: str = Field(
+        default="marginal_note",
+        description=(
+            "How provision headings are printed. Declaring `marginal_note` explicitly also "
+            "scans for basic units whose heading is printed as a marginal note."
+        ),
+    )
+    heading_case: str = Field(
+        default="title_case",
+        description=(
+            "How headings are cased. Recorded for reference; the pipeline does not read it."
+        ),
+    )
+    script: str = Field(
+        default="latin",
+        description=(
+            "The writing system of the jurisdiction's texts, which selects the script pack "
+            "used for normalisation and marker matching."
+        ),
+    )
+    rtl: bool = Field(
+        default=False,
+        description=(
+            "Whether the script runs right to left. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    font_preference: str = Field(
+        default="serif",
+        description=(
+            "Preferred font style for display. Recorded for reference; the pipeline does not "
+            "read it."
+        ),
+    )
     amendment_markers: list[str] = Field(
-        default_factory=lambda: ["[", "]"], min_length=2, max_length=2
+        default_factory=lambda: ["[", "]"],
+        min_length=2,
+        max_length=2,
+        description=(
+            "The pair of strings a publisher prints around amended words; square brackets are "
+            "the commonest."
+        ),
     )
 
 
 class ValidationConfig(BaseModel):
     model_config = _LOOSE
 
-    status: ValidationStatus = "draft"
-    documents_examined: int = 0
-    bluebell_tested: bool = False
-    unresolved_ambiguities: int = 0
-    note: str = ""
-    documents_examined_note: str | None = None
-    ambiguities: list[str] = Field(default_factory=list)
-    # Some configs use a URL string, others a bool flag ("does laws.africa cover this?").
-    laws_africa_reference: str | bool | None = None
+    status: ValidationStatus = Field(
+        default="draft",
+        description=("How far the config has been validated: `production`, `draft` or `stub`."),
+    )
+    documents_examined: int = Field(
+        default=0, description=("How many source documents the config was checked against.")
+    )
+    bluebell_tested: bool = Field(
+        default=False,
+        description=("Whether the config's structure has been tested through Bluebell."),
+    )
+    unresolved_ambiguities: int = Field(
+        default=0, description=("How many open questions about the config remain.")
+    )
+    note: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    documents_examined_note: str | None = Field(
+        default=None, description=("Free-text note on the documents examined.")
+    )
+    ambiguities: list[str] = Field(
+        default_factory=list, description=("The open questions about the config, as free text.")
+    )
+    laws_africa_reference: str | bool | None = Field(
+        default=None,
+        description=(
+            "Whether Laws.Africa covers this jurisdiction: a URL to its collection, or a bare flag."
+        ),
+    )
 
 
 class IdentificationConfig(BaseModel):
     model_config = _LOOSE
 
-    system: str = ""
-    pattern: str = ""
-    eli_base: str = ""
+    system: str = Field(
+        default="",
+        description=(
+            "Name of the jurisdiction's own identifier scheme. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    pattern: str = Field(
+        default="",
+        description=(
+            "Pattern of identifiers in that scheme. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    eli_base: str = Field(
+        default="",
+        description=(
+            "Base URI of the jurisdiction's European Legislation Identifiers. Recorded for "
+            "reference; the pipeline does not read it."
+        ),
+    )
 
 
 # Each kind selects a concrete Acquirer; new values only when one ships.
 SourceAdapterKind = Literal[
     "akn_native",  # Native AKN3 export. legislation.gov.uk, laws.africa.
-    "eurlex_cellar",  # EUR-Lex Cellar (AKN4EU).
+    "eurlex_cellar",  # EUR-Lex Cellar (Formex).
     "html_portal",  # HTML portal, pages + linked PDFs.
     "pdf_gazette",  # PDF gazette (qbz.gov.al, consultoria.gov.do, JORF).
     "paragraf_propisi",  # Paragraf Lex slug-keyed PDFs (rs).
@@ -905,7 +1490,7 @@ SourceAdapterKind = Literal[
 # bespoke; Tier 3 unstructured PDFs. Used by JurisdictionConfig.effective_tier.
 _ADAPTER_TIER: dict[SourceAdapterKind, Literal[1, 2, 3]] = {
     "akn_native": 1,
-    "eurlex_cellar": 1,
+    "eurlex_cellar": 2,
     "html_portal": 2,
     "sparql": 2,
     "bulk_xml_archive": 2,
@@ -985,24 +1570,87 @@ class AknSource(BaseModel):
 
     model_config = _STRICT
 
-    name: str
-    url_template: str
-    format: AknSourceFormat = "pdf"
-    protocol: AknSourceProtocol = "http"
-    coverage: Literal["complete", "partial", "stub", "unknown"] = "unknown"
-    coverage_note: str | None = None
-    schema_id: str | None = None
-    schema_url: str | None = None
-    license: str | None = None
-    auth_scheme: AknSourceAuthScheme = "none"
-    auth_env_var: str = ""
-    # Token-gated source: skip in `effective_tier` when the env var is unset
-    # unless `fallback_format` declares a usable downgrade.
-    requires_token: bool = False
-    fallback_format: AknSourceFormat | None = None
-    # Free-text, these configs were hand-written before the structured shape
-    # landed and frequently carry narrative provenance.
-    description: str = ""
+    name: str = Field(description=("Name of the source."))
+    url_template: str = Field(
+        description=("URL of the source, or a template for one document's URL.")
+    )
+    format: AknSourceFormat = Field(
+        default="pdf",
+        description=(
+            "The format the source serves, which sets its tier in `effective_tier`. Defaults "
+            "to PDF."
+        ),
+    )
+    protocol: AknSourceProtocol = Field(
+        default="http",
+        description=(
+            "How documents are fetched from the source. Defaults to HTTP. Recorded for reference; "
+            "the pipeline does not read it."
+        ),
+    )
+    coverage: Literal["complete", "partial", "stub", "unknown"] = Field(
+        default="unknown",
+        description=(
+            "How much of the statute base the source holds. Recorded for reference; the pipeline "
+            "does not read it."
+        ),
+    )
+    coverage_note: str | None = Field(
+        default=None,
+        description=(
+            "Free-text note on `coverage`. Recorded for reference; the pipeline does not read it."
+        ),
+    )
+    schema_id: str | None = Field(
+        default=None,
+        description=(
+            "Identifier of the schema the source's documents follow. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    schema_url: str | None = Field(
+        default=None,
+        description=(
+            "URL of the schema the source's documents follow. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    license: str | None = Field(
+        default=None,
+        description=(
+            "Licence the source publishes under. Recorded for reference; the pipeline does not "
+            "read it."
+        ),
+    )
+    auth_scheme: AknSourceAuthScheme = Field(
+        default="none", description=("How requests to the source are authenticated.")
+    )
+    auth_env_var: str = Field(
+        default="",
+        description=(
+            "Name of the environment variable holding the credential. The credential itself is "
+            "never stored in the config."
+        ),
+    )
+    requires_token: bool = Field(
+        default=False,
+        description=(
+            "True for a source that needs an access token: `effective_tier` skips it when the "
+            "token's environment variable is unset, unless `fallback_format` declares a usable "
+            "downgrade."
+        ),
+    )
+    fallback_format: AknSourceFormat | None = Field(
+        default=None,
+        description=(
+            "The format still available when the source's credential is unset, so "
+            "`effective_tier` can count it at that format."
+        ),
+    )
+    description: str = Field(
+        default="",
+        description=("Free-text description of the source, often including its provenance."),
+    )
 
 
 class DiscoveryConfig(BaseModel):
@@ -1012,9 +1660,19 @@ class DiscoveryConfig(BaseModel):
 
     model_config = _STRICT
 
-    queries: dict[str, str] = Field(default_factory=dict)
-    max_total: int = Field(default=5000, gt=0)
-    output: str | None = None  # basket path, relative to repo root
+    queries: dict[str, str] = Field(
+        default_factory=dict,
+        description=("Discovery query per doctype, in the portal's own query syntax."),
+    )
+    max_total: int = Field(
+        default=5000,
+        gt=0,
+        description=("Most documents one discovery run returns, unless the caller sets a limit."),
+    )
+    output: str | None = Field(
+        default=None,
+        description="Path of the basket file discovery writes, relative to the repository root.",
+    )
 
 
 class SourceAdapter(BaseModel):
@@ -1026,21 +1684,62 @@ class SourceAdapter(BaseModel):
 
     model_config = _STRICT
 
-    kind: SourceAdapterKind
-    name: str
-    base_url: str | None = None
-    url_template: str | None = None
-    auth_scheme: Literal["none", "token", "bearer", "oauth"] = "none"
-    auth_env_var: str = ""
-    # Names a registered structured parser (codify.pipeline.parsers) that
-    # converts this adapter's primary body deterministically; None -> the
-    # universal structuring lane.
-    parser: str | None = None
-    rate_limit_per_minute: int | None = None
-    robots_respect: bool = True
-    licence: str | None = None
-    notes: str = ""
-    discovery: DiscoveryConfig | None = None
+    kind: SourceAdapterKind = Field(description=("Which acquirer handles this source."))
+    name: str = Field(description=("Name of the source, used in log lines and errors."))
+    base_url: str | None = Field(
+        default=None,
+        description=("Root URL requests are made against. Unset uses the acquirer's default."),
+    )
+    url_template: str | None = Field(
+        default=None,
+        description=(
+            "Template for one document's URL, for acquirers that build it from the FRBR URI."
+        ),
+    )
+    auth_scheme: Literal["none", "token", "bearer", "oauth"] = Field(
+        default="none",
+        description=("How requests are authenticated. Anything but `none` needs `auth_env_var`."),
+    )
+    auth_env_var: str = Field(
+        default="",
+        description=(
+            "Name of the environment variable holding the credential. The credential itself is "
+            "never stored in the config."
+        ),
+    )
+    parser: str | None = Field(
+        default=None,
+        description=(
+            "Registered structured parser (in `codify.pipeline.parsers`) that converts this "
+            "adapter's main body deterministically. None sends it through the general "
+            "structuring lane."
+        ),
+    )
+    rate_limit_per_minute: int | None = Field(
+        default=None,
+        description=(
+            "Most requests per minute sent to the source's host. Unset leaves the acquirer's "
+            "own default."
+        ),
+    )
+    robots_respect: bool = Field(
+        default=True, description=("Whether requests honour the host's robots.txt.")
+    )
+    licence: str | None = Field(
+        default=None,
+        description=(
+            "Licence the source publishes under, recorded on fetched documents by the acquirers "
+            "that carry it."
+        ),
+    )
+    notes: str = Field(
+        default="",
+        description=("Free-text note for config authors. The pipeline does not read it."),
+    )
+    discovery: DiscoveryConfig | None = Field(
+        default=None,
+        description=("How the source lists documents, for acquirers that support discovery."),
+    )
 
     @model_validator(mode="after")
     def _auth_env_var_required_when_secured(self) -> "SourceAdapter":
@@ -1062,29 +1761,68 @@ class LegalEra(BaseModel):
 
     model_config = _LOOSE
 
-    id: str
-    label: str = ""
-    from_: str | None = Field(default=None, alias="from")
-    to: str | None = None
-    # The calendar this era's instruments are dated in, where it differs from the
-    # jurisdiction's current one. None means it does not differ. Same closed set
-    # as the jurisdiction's own field, so the two cannot drift apart.
-    calendar: Calendar | None = None
-    enacting_authority: str = ""
-    document_class: str = ""
-    # Phrases opening the attestation that closes a document of this era, so the
-    # promulgation and signature stop being read as the last article's text.
-    # Era-scoped because the wording follows the enacting authority.
-    closing_phrases: list[str] = Field(default_factory=list)
-    # Regex for how a footnote marker opens in this era. The modern set uses
-    # superscripts and the older ones a parenthesised numeral; declaring only
-    # one form silently drops the other era.
-    footnote_markers: list[str] = Field(default_factory=list)
-    # How this era's offices are named in provision text. Review candidates, not
-    # verdicts: a match says the office is named, not that the provision grants it
-    # a power, since the same name appears in signature blocks and definitions.
-    # Opt-in per era, because an era ending is not its authority being abolished.
-    authority_patterns: list[str] = Field(default_factory=list)
+    id: str = Field(
+        description=("Identifier of the era, used to report structural quality per era.")
+    )
+    label: str = Field(
+        default="",
+        description=("Display name of the era, given to the metadata extractor with its calendar."),
+    )
+    from_: str | None = Field(
+        default=None,
+        alias="from",
+        description=("First date of the era, as an ISO date, inclusive. Unset leaves it open."),
+    )
+    to: str | None = Field(
+        default=None,
+        description=("Last date of the era, as an ISO date, inclusive. Unset leaves it open."),
+    )
+    calendar: Calendar | None = Field(
+        default=None,
+        description=(
+            "The calendar this era's instruments are dated in, where it differs from the "
+            "jurisdiction's current one. None means it does not differ. Same closed set as "
+            "the jurisdiction's own field, so the two cannot drift apart."
+        ),
+    )
+    enacting_authority: str = Field(
+        default="",
+        description=(
+            "The body that enacted instruments in this era. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    document_class: str = Field(
+        default="",
+        description=(
+            "The document class typical of the era. Recorded for reference; the pipeline does "
+            "not read it."
+        ),
+    )
+    closing_phrases: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases opening the attestation that closes a document of this era, so the "
+            "promulgation and signature stop being read as the last article's text. "
+            "Era-scoped because the wording follows the enacting authority."
+        ),
+    )
+    footnote_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Regex for how a footnote marker opens in this era. The modern set uses "
+            "superscripts and the older ones a parenthesised numeral; declaring only one "
+            "form silently drops the other era."
+        ),
+    )
+    authority_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "How this era's offices are named in provision text, to flag provisions for review."
+            " A match means the office is named, not that it is granted a power; opt-in per "
+            "era, since an era ending does not abolish its authorities."
+        ),
+    )
 
     def year_range(self) -> tuple[int | None, int | None]:
         """The era's bounds as years, for matching a work whose date is a bare year."""
@@ -1098,16 +1836,29 @@ class LegalEra(BaseModel):
 class JurisdictionConfig(BaseModel):
     model_config = _LOOSE
 
-    code: str
-    name: str
-    name_local: str | None = None
-    name_en: str | None = None
-    # ISO-639-3 language code → localised jurisdiction name. Used by the
-    # PDF exporter to render the cover in the target language without a
-    # hardcoded Python map. Mirror of `Law.title_translations`.
-    name_translations: dict[str, str] = Field(default_factory=dict)
-    type: JurisdictionType = "national"
-    tradition: list[Tradition]
+    code: str = Field(description=("The jurisdiction code, such as `xa`."))
+    name: str = Field(description=("The jurisdiction's name."))
+    name_local: str | None = Field(
+        default=None, description=("The jurisdiction's name in its own language.")
+    )
+    name_en: str | None = Field(default=None, description=("The jurisdiction's name in English."))
+    name_translations: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Localised jurisdiction names keyed by ISO 639-3 language code, in the same shape "
+            "as a law's title translations. The pipeline does not read it."
+        ),
+    )
+    type: JurisdictionType = Field(
+        default="national",
+        description=(
+            "Whether the jurisdiction is national, supranational, subnational or a crown "
+            "dependency."
+        ),
+    )
+    tradition: list[Tradition] = Field(
+        description=("The legal traditions the jurisdiction draws on. At least one is required.")
+    )
 
     @field_validator("tradition")
     @classmethod
@@ -1116,120 +1867,299 @@ class JurisdictionConfig(BaseModel):
             raise ValueError("tradition list must not be empty")
         return v
 
-    calendar: Calendar = "gregorian"
-    languages: list[str]
-    authoritative_language: str | None = None
+    calendar: Calendar = Field(
+        default="gregorian",
+        description=("The calendar the jurisdiction's instruments are dated in."),
+    )
+    languages: list[str] = Field(
+        description=(
+            "Languages of the jurisdiction's texts, as ISO 639-3 codes. Where there is only "
+            "one, it is used for a document whose language is not detected."
+        )
+    )
+    authoritative_language: str | None = Field(
+        default=None,
+        description=(
+            "The language whose text is legally authoritative, used when a document's own "
+            "language cannot be detected."
+        ),
+    )
 
-    document_classes: dict[str, DocumentClass] = Field(default_factory=dict)
-    default_document_class: str = "act"
+    document_classes: dict[str, DocumentClass] = Field(
+        default_factory=dict,
+        description=("The instrument types the jurisdiction issues, keyed by doctype."),
+    )
+    default_document_class: str = Field(
+        default="act",
+        description=(
+            "The doctype used when no classification rule matches. It must be a key of "
+            "`document_classes`."
+        ),
+    )
 
-    frbr: FrbrConfig | None = None
-    numbering: NumberingConfig | None = None
-    enacting_formulae: list[EnactingFormula] = Field(default_factory=list)
-    # Evidence the source carries its own formula, so no fallback is injected.
-    # Never a cut point: a phrase here may open the instrument, not close it.
-    enacting_formula_markers: list[str] = Field(default_factory=list)
-    # Phrases declaring the instrument adopts another body's numbered text, which
-    # every count over the document must read as an attachment, not its own structure.
-    adoption_markers: list[str] = Field(default_factory=list)
-    # Phrases the recitals precede, after which pre-body text is page bleed.
-    opening_material_terminators: list[str] = Field(default_factory=list)
-    # Captions opening an attachment, whose numbering restarts the body's.
-    attachments: list[AttachmentCaption] = Field(default_factory=list)
-    # Whole-string markers for missing or struck content, beyond the platform default.
-    placeholders: list[PlaceholderMarker] = Field(default_factory=list)
-    # `refersTo` values marking a duty on someone other than the instrument's
-    # subjects: units at or under a marked element stay readable but leave the pool.
-    pool_excluded_refers_to: list[str] = Field(default_factory=list)
-    # Where one source holds several instruments, how their openings are read.
-    segmentation: SegmentationConfig | None = None
-    amendments: AmendmentConfig | None = None
-    core_tlcs: list[TLCEntry] = Field(default_factory=list)
-    structuring: StructuringConfig | None = None
-    supranational_memberships: list[SupranationalMembership] = Field(default_factory=list)
-    # Non-membership binding regimes (treaty frameworks, bilateral regimes,
-    # constitutional annexes). Populated in migration for BA, PW, MH, VA
-    # etc., where the existing "membership" modelling was semantically wrong.
-    binding_regimes: list[BindingRegime] = Field(default_factory=list)
-    # Foreign corpora still residually applicable here: pre-independence or
-    # occupying-power law left in force, VA for suppletive Italian law, and so on.
-    # Enables amendment/consolidation agents to traverse layered systems.
-    residual_legal_systems: list[ResidualLaw] = Field(default_factory=list)
-    # Drafting periods, for reporting quality per era rather than per corpus.
-    # Empty means one undivided population. Distinct from `CalendarRule.eras`,
-    # which is a regnal year table.
-    legal_eras: list[LegalEra] = Field(default_factory=list)
-    display: DisplayConfig | None = None
-    validation: ValidationConfig | None = None
-    # Running header and footer text that leaks into article bodies during OCR.
-    # Stripped from `<p>` before translation so the LLM never sees it. Literal
-    # regex strings, so a profile author adds patterns without touching Python.
-    ocr_header_patterns: list[str] = Field(default_factory=list)
+    frbr: FrbrConfig | None = Field(
+        default=None, description=("How the jurisdiction's FRBR URIs are minted.")
+    )
+    numbering: NumberingConfig | None = Field(
+        default=None, description=("How instruments are numbered and cited.")
+    )
+    enacting_formula_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases showing the source carries its own enacting formula. Never a cut point: "
+            "a phrase here may open the instrument, not close it."
+        ),
+    )
+    adoption_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases declaring the instrument adopts another body's numbered text, which "
+            "every count over the document must read as an attachment, not its own "
+            "structure."
+        ),
+    )
+    opening_material_terminators: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases the recitals precede, after which any further pre-body text is stray page "
+            "text."
+        ),
+    )
+    attachments: list[AttachmentCaption] = Field(
+        default_factory=list,
+        description="Captions opening an attachment, whose numbering restarts the body's.",
+    )
+    placeholders: list[PlaceholderMarker] = Field(
+        default_factory=list,
+        description=(
+            "Whole-string markers for missing or struck content, checked in addition to the "
+            "built-in placeholder pattern."
+        ),
+    )
+    pool_excluded_refers_to: list[str] = Field(
+        default_factory=list,
+        description=(
+            "`refersTo` values marking a duty on someone other than the instrument's subjects. "
+            "Units at or under a marked element stay readable but are not embedded or assessed."
+        ),
+    )
+    segmentation: SegmentationConfig | None = Field(
+        default=None,
+        description="Where one source holds several instruments, how their openings are read.",
+    )
+    amendments: AmendmentConfig | None = Field(
+        default=None, description=("How amending instruments are drafted.")
+    )
+    core_tlcs: list[TLCEntry] = Field(
+        default_factory=list,
+        description=(
+            "Recurring persons, bodies and concepts, written to a document's `references` "
+            "block when the document refers to them by eId."
+        ),
+    )
+    structuring: StructuringConfig | None = Field(
+        default=None,
+        description=("Settings for marker detection, classification and the structurer."),
+    )
+    supranational_memberships: list[SupranationalMembership] = Field(
+        default_factory=list,
+        description=(
+            "Supranational bodies the jurisdiction belongs to. Recorded for reference; the "
+            "pipeline does not read it."
+        ),
+    )
+    binding_regimes: list[BindingRegime] = Field(
+        default_factory=list,
+        description=(
+            "Non-membership binding regimes (treaty frameworks, bilateral regimes, "
+            "constitutional annexes), which are not memberships."
+        ),
+    )
+    residual_legal_systems: list[ResidualLaw] = Field(
+        default_factory=list,
+        description=(
+            "Foreign legal corpora still residually applicable here, such as pre-independence "
+            "or occupying-power law left in force, so amendment and consolidation tooling can "
+            "trace layered systems."
+        ),
+    )
+    legal_eras: list[LegalEra] = Field(
+        default_factory=list,
+        description=(
+            "Drafting periods, so quality is reported per era rather than per corpus; empty "
+            "means one undivided population. Distinct from `CalendarConversion.eras`, which is "
+            "a regnal year table."
+        ),
+    )
+    display: DisplayConfig | None = Field(
+        default=None, description=("How the jurisdiction's texts are written and displayed.")
+    )
+    validation: ValidationConfig | None = Field(
+        default=None,
+        description=(
+            "How far the config has been checked against real documents. Recorded for "
+            "reference; the pipeline does not read it."
+        ),
+    )
+    ocr_header_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Running header and footer text that leaks into article bodies during OCR, stripped"
+            " from paragraphs before translation so the model never sees it. Regex strings, so "
+            "a profile author can add patterns without touching Python."
+        ),
+    )
 
-    # Furniture that shares a line with real content, so whole-line disposal would
-    # take the content with it: a portal credit run, a stamped URL. Narrower than
-    # `ocr_header_patterns`, which also matches the real title on page one.
-    furniture_inline_patterns: list[str] = Field(default_factory=list)
+    furniture_inline_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Page furniture that shares a line with real content, such as a portal credit or a "
+            "stamped URL, so it is removed from the line rather than discarding the line. "
+            "Narrower than `ocr_header_patterns`, which also matches the real title on page "
+            "one."
+        ),
+    )
 
-    # Legal vocabulary particular to this jurisdiction, folded into the language's
-    # word list when a page is scored. A term naming one jurisdiction is that
-    # jurisdiction's data, not the language's.
-    lexicon_words: list[str] = Field(default_factory=list)
+    lexicon_words: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Legal vocabulary particular to this jurisdiction, folded into the language's "
+            "word list when a page is scored. A term naming one jurisdiction is that "
+            "jurisdiction's data, not the language's."
+        ),
+    )
 
-    # Furniture whose whole line is disposable: mastheads, page numbers, stamps.
-    # Narrower than `ocr_header_patterns`, which also carries the running title
-    # and so matches the real title on page one. Substring scrubbing is safe for
-    # both sets, whole-line disposal only for this one.
-    furniture_line_patterns: list[str] = Field(default_factory=list)
+    furniture_line_patterns: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Page furniture whose whole line can be discarded: mastheads, page numbers, stamps."
+            " Narrower than `ocr_header_patterns`, which also carries the running title and so "
+            "matches the real title on page one; only this set is safe for whole-line removal."
+        ),
+    )
 
-    # The same two vocabularies for a jurisdiction that declares no eras, which
-    # is 259 of the 261 configs. An era's own lists win where it declares them.
-    closing_phrases: list[str] = Field(default_factory=list)
-    footnote_markers: list[str] = Field(default_factory=list)
+    closing_phrases: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Phrases opening the closing attestation in any era. Attestation detection reads "
+            "them together with every era's `closing_phrases`; the per-era region vocabulary "
+            "uses an era's own list instead where it declares one."
+        ),
+    )
+    footnote_markers: list[str] = Field(
+        default_factory=list,
+        description=(
+            "`LegalEra.footnote_markers` for a jurisdiction that declares no eras. "
+            "An era's own list wins where it declares one."
+        ),
+    )
 
-    # Minimum ratio of captured anchors over marker literals in the source.
-    # Ingest fails below it, so a silently-partial AKN cannot ship. 0.80
-    # tolerates in-prose cross-references without over-firing. 0.0 disables.
-    min_anchor_coverage: float = Field(default=0.80, ge=0.0, le=1.0)
+    min_anchor_coverage: float = Field(
+        default=0.80,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum ratio of captured structural anchors to marker literals in the source; "
+            "ingest fails below it, so a partial AKN cannot ship. The default 0.80 tolerates "
+            "in-prose cross-references, and 0.0 disables the check."
+        ),
+    )
 
-    # Share of a document's contents listing that may lack a body before the
-    # source is read as truncated. Off by default: the separating value was
-    # measured on the corpora that declare it, and a partial corpus cannot
-    # evidence a threshold for a series it has never seen. 0.0 disables.
-    source_truncation_floor: float = Field(default=0.0, ge=0.0, le=1.0)
+    source_truncation_floor: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Share of a document's contents listing that may lack a body before the source is "
+            "treated as truncated. Off by default (0.0), since a threshold has to be set for "
+            "each series from that series' own documents."
+        ),
+    )
 
-    # Read by codify.acquisition.
-    source_adapters: list[SourceAdapter] = Field(default_factory=list)
-    # Legacy / hand-curated list of upstreams. Coexists with `source_adapters`
-    # during the schema-migration window; `effective_tier` walks both.
-    akn_sources: list[AknSource] = Field(default_factory=list)
+    source_adapters: list[SourceAdapter] = Field(
+        default_factory=list,
+        description=(
+            "Structured acquisition adapters for this jurisdiction, read by `codify.acquisition`."
+        ),
+    )
+    akn_sources: list[AknSource] = Field(
+        default_factory=list,
+        description=(
+            "Hand-curated list of upstream sources. Read alongside `source_adapters`; "
+            "`effective_tier` considers both."
+        ),
+    )
 
     # Supranational-only fields
-    members: list[str] = Field(default_factory=list)
-    akn_profile: str | None = None
-    identification: IdentificationConfig | None = None
+    members: list[str] = Field(
+        default_factory=list,
+        description=(
+            "For a supranational jurisdiction, the codes of its members. Recorded for "
+            "reference; the pipeline does not read it."
+        ),
+    )
+    akn_profile: str | None = Field(
+        default=None,
+        description=(
+            "Name of the AKN profile the jurisdiction's publisher uses. Recorded for "
+            "reference; the pipeline does not read it."
+        ),
+    )
+    identification: IdentificationConfig | None = Field(
+        default=None,
+        description=(
+            "The jurisdiction's own identifier scheme. Recorded for reference; the pipeline "
+            "does not read it."
+        ),
+    )
 
-    # Free-text note at the jurisdiction level for cross-cutting guidance.
-    note: str = ""
+    note: str = Field(
+        default="",
+        description="Free-text note at the jurisdiction level for cross-cutting guidance.",
+    )
 
-    # Promoted from registry.json, which is derived rather than maintained.
-    # Ladder: 1 AKN native, 2 XML-structured, 3 HTML anchors, 4 PDF-only,
-    # 5 no online statute base.
-    tier: Literal[1, 2, 3, 4, 5] | None = None
-    status: ValidationStatus | None = None
-    coverage_status: Literal["in_scope", "subsumed", "no_corpus", "deferred"] = "in_scope"
-    subsumed_by: str | None = None
+    tier: Literal[1, 2, 3, 4, 5] | None = Field(
+        default=None,
+        description=(
+            "Availability tier of the jurisdiction's statute base: 1 AKN native, 2 "
+            "XML-structured, 3 HTML anchors, 4 PDF-only, 5 no online statute base."
+        ),
+    )
+    status: ValidationStatus | None = Field(
+        default=None,
+        description=("How far the config has been validated, as listed in the registry."),
+    )
+    coverage_status: Literal["in_scope", "subsumed", "no_corpus", "deferred"] = Field(
+        default="in_scope",
+        description=(
+            "Whether the jurisdiction has its own corpus: `in_scope`, `subsumed` into another "
+            "jurisdiction's, `no_corpus` or `deferred`."
+        ),
+    )
+    subsumed_by: str | None = Field(
+        default=None,
+        description=(
+            "The code of the jurisdiction whose corpus covers this one. Required when "
+            "`coverage_status` is `subsumed` and refused otherwise."
+        ),
+    )
 
-    # Fictional jurisdictions authored as synthetic test material (the AKN-spine
-    # scan factory). Discovered and validated like any other config, but kept out
-    # of the derived registry and the world atlas, which are real-only.
-    synthetic: bool = False
+    synthetic: bool = Field(
+        default=False,
+        description=(
+            "True for a fictional jurisdiction authored as synthetic test material. It is "
+            "discovered and validated like any other config but kept out of the derived "
+            "registry and the world atlas, which list real jurisdictions only."
+        ),
+    )
 
-    # Ships in the open core. Defaults False, so a jurisdiction joins the open
-    # set by a deliberate edit: excluded by default rather than included and
-    # simplified, because a simplified config is still a tell about what was
-    # studied.
-    public_reference: bool = False
+    public_reference: bool = Field(
+        default=False,
+        description=(
+            "True where the config ships in the open core. Defaults to false, so a jurisdiction"
+            " joins the open set only by a deliberate edit."
+        ),
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -1488,12 +2418,19 @@ def resolve_config(country_code: str) -> ResolvedConfig:
     jurisdiction was missing and where they looked, which a traceback buries.
     """
     code = country_code.strip().lower()
-    if "/" in code or ".." in code:
-        return ResolvedConfig(code=code)
     path = JURISDICTIONS_DIR / code / "config.json"
-    if not path.exists():
+    # A code names one directory under the root: one that escapes it is absent, and
+    # a NUL, which realpath refuses with ValueError, is absent too.
+    if "\x00" in code:
         return ResolvedConfig(code=code)
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    root = os.path.realpath(JURISDICTIONS_DIR)
+    real = os.path.realpath(os.path.join(root, code, "config.json"))
+    if "/" in code or "\\" in code or not real.startswith(root + os.sep):
+        return ResolvedConfig(code=code)
+    if not os.path.exists(real):
+        return ResolvedConfig(code=code)
+    with open(real, "rb") as source:
+        digest = hashlib.sha256(source.read()).hexdigest()
     # Recorded relative to the tree root, not absolutely: a bundle travels, and
     # an absolute path names the machine that produced it rather than the config.
     try:
@@ -1802,7 +2739,7 @@ def ordinal_word_folds() -> dict[str, str]:
     words are language-distinctive, so one table serves callers deriving an eId
     without knowing the country.
 
-    Read straight from JSON: a sweep of 257 configs would evict `load_config`'s
+    Read straight from JSON: a sweep of every config would evict `load_config`'s
     64-entry cache.
     """
     out: dict[str, str] = {}

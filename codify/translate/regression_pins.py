@@ -161,8 +161,7 @@ def check_pins(akn_xml: str, work_uri: str, language: str) -> list[PinViolation]
     if not pins:
         return []
 
-    # One pass over the tree: a law can carry many pins and the Civil Code has
-    # 1,300 articles.
+    # One pass over the tree: a law can carry many pins.
     wanted = {p.eid for p in pins}
     text_by_eid: dict[str, str] = {}
     for el in root.iter():

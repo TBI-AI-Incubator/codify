@@ -4,6 +4,32 @@
 
 Accepted
 
+## Status note, 14 November 2026
+
+The decision stands. A test fails if any shipped configuration declares a
+`frbr.date_calendar` other than `gregorian`
+(`TestFrbrDateCalendarIsAlwaysGregorian` in `tests/test_calendar.py`).
+
+Read the rest of this record with four corrections:
+
+- **No local-calendar alias is written.** The Decision and the Consequences say
+  the local date is stored as `<FRBRalias>`. No code path does this: the
+  converted Gregorian year goes into the URI and the local form is not kept.
+- **The Context list is a profiling record.** Not every jurisdiction it names
+  ships a configuration, and one shipped configuration converts from Bikram
+  Samvat, which the list omits. The `calendar` field of each `config.json` is
+  the authority.
+- **There is no "imperial era" calendar.** The model has `japanese_era` and
+  `minguo` as separate values because they convert differently (`Calendar` in
+  `codify/jurisdictions.py`).
+- **The conversion step has two sources.** A configuration may declare a rule
+  in `frbr.calendar_conversion` (`CalendarConversion` in
+  `codify/jurisdictions.py`), which can take the month and day into account.
+  Without one, ingest converts the year alone from the configuration's
+  `calendar` field with a built-in rule (`year_from_calendar` in
+  `codify/calendar.py`). `codify/pipeline/dating.py` picks between them. See
+  [Model your legal system](../guide/model-your-legal-system.md).
+
 ## Context
 
 Six jurisdictions use non-Gregorian calendar systems: Saudi Arabia (lunar Hijri), Iran (solar Hijri/Jalali), Ethiopia (Ethiopian), Japan (imperial era), Thailand (Buddhist Era), and Morocco (dual Hijri/Gregorian). Libya historically used a "Death of the Prophet" calendar (1978-2011).

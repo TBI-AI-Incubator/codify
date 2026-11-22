@@ -35,8 +35,7 @@ class WordList:
     # run keeps a bilingual page scored on the language being judged; the default
     # accepts any letter, right for a Latin-script language on a Latin-script page.
     letter_re: re.Pattern[str] | None = None
-    # Floors for `verdict_from_rates`, measured per language and not transferable:
-    # clean Arabic prose runs 91 to 176 per 1,000 where English runs 213 to 433. A
+    # Floors for `verdict_from_rates`, calibrated per language and not transferable. A
     # None lexicon floor means the content-noun tie-break is unusable here, so a
     # low-prose document reports no verdict rather than a wrong one.
     prose_floor: float | None = None
@@ -73,8 +72,7 @@ ARABIC_WORDS = register(
     WordList(
         language="ara",
         letter_re=re.compile(r"[\u0621-\u064a\u066e-\u06d3]"),
-        # Calibrated on tests/fixtures/legibility/marked.jsonl: clean prose
-        # measured 91 to 176 per 1,000.
+        # Floors calibrated on labelled clean and damaged prose.
         prose_floor=80.0,
         lexicon_floor=12.0,
         function_words=frozenset(
@@ -139,8 +137,7 @@ INDONESIAN_WORDS = register(
     WordList(
         language="ind",
         letter_re=_LATIN_RE,
-        # Measured over 61 documents: function words p5 149.5, median 181.6;
-        # lexicon median 56.2, with 5 of 64 under the floor.
+        # Floors calibrated per language, not transferred from another.
         prose_floor=80.0,
         lexicon_floor=12.0,
         function_words=frozenset(

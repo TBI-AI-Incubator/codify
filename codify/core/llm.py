@@ -1,4 +1,4 @@
-"""LLM client Protocol + LiteLLM-backed implementation."""
+"""LLM client Protocol + OpenAI-compatible implementation."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ _SchemaT = TypeVar("_SchemaT", bound=BaseModel)
 
 
 class LLMClient(Protocol):
-    """Common interface for LLM backends, addressed via the LiteLLM gateway."""
+    """Common interface for LLM backends behind an OpenAI-compatible endpoint."""
 
     async def chat(
         self, prompt: str, system: str | None = None, model: str | None = None
@@ -167,9 +167,8 @@ class OcrStatusError(RuntimeError):
 
 class RateLimiter:
     """Caps calls to a requests-per-minute ceiling across concurrent callers,
-    in-process only. The Foundry deployment's limit is per-deployment, so two API
-    replicas each get the full allowance and can overrun it together; a shared
-    limiter would need Redis. Sized from the deployment's stated RPM.
+    in-process only: each replica gets the full allowance, so replicas can overrun
+    a per-deployment limit together, and a shared limiter needs an external store.
     """
 
     def __init__(self, per_minute: int) -> None:
@@ -285,6 +284,27 @@ def _messages(prompt: str, system: str | None) -> list[ChatCompletionMessagePara
     return cast(list[ChatCompletionMessageParam], out)
 
 
+_THINK_OPEN = "<think>"
+_THINK_CLOSE = "</think>"
+
+
+def _strip_reasoning(text: str) -> str:
+    """``text`` without a leading ``<think>…</think>`` block.
+
+    A reasoning model served without a reasoning parser prints its chain of
+    thought in ``content`` before the answer. Only a closed block at the start
+    is the model's: a block later in the reply is the answer's own text. An
+    unclosed block is left whole, so a reply cut off mid-thought shows what came
+    back rather than reading as an empty answer."""
+    head = text.lstrip()
+    if not head.startswith(_THINK_OPEN):
+        return text
+    end = head.find(_THINK_CLOSE, len(_THINK_OPEN))
+    if end < 0:
+        return text
+    return head[end + len(_THINK_CLOSE) :].lstrip()
+
+
 def content_filtered(finish_reason: object) -> bool:
     """Gemini's OpenAI-compatible endpoint suffixes the cause, as in
     'content_filter: RECITATION', so an equality test never sees the block."""
@@ -303,8 +323,8 @@ class VisionText(str):
         return obj
 
 
-class LiteLLMClient:
-    """Single OpenAI-SDK-backed client pointed at a LiteLLM gateway."""
+class OpenAICompatibleClient:
+    """Single OpenAI-SDK-backed client for an OpenAI-compatible endpoint."""
 
     def __init__(
         self,
@@ -330,8 +350,7 @@ class LiteLLMClient:
         # Gemini's filter false-fires on benign legal prose and `safety_settings`
         # cannot disable it. Empty disables the retry.
         self.fallback_model = fallback_model
-        # Direct Azure Foundry Mistral OCR URL, bypasses the LiteLLM proxy
-        # (which has a routing gap on this endpoint under v1.83.7-stable).
+        # Direct OCR endpoint URL: this route is called directly, not through the gateway.
         self.azure_foundry_ocr_url = azure_foundry_ocr_url
         self.azure_foundry_ocr_key = azure_foundry_ocr_key
         self._ocr_limiter = RateLimiter(azure_foundry_ocr_rpm)
@@ -373,7 +392,7 @@ class LiteLLMClient:
                 extra_headers=self._headers(),
                 extra_body=self._body(),
             )
-        return resp.choices[0].message.content or ""
+        return _strip_reasoning(resp.choices[0].message.content or "")
 
     @_resilient
     async def chat_stream(
@@ -460,12 +479,17 @@ class LiteLLMClient:
             resp = await self.client.chat.completions.create(**kwargs)
             if observation is not None:
                 _finish_usage(observation, resolved_model, resp)
-        text = resp.choices[0].message.content or "{}"
+        # Stripped after the default, so a reply of reasoning alone is invalid
+        # JSON, not an empty object.
+        raw = resp.choices[0].message.content or "{}"
+        text = _strip_reasoning(raw)
         try:
             return cast(dict[str, Any], json.loads(text))
         except json.JSONDecodeError as exc:
-            logger.warning("invalid_json", model=model or self.model, preview=text[:500])
-            raise ValueError(f"Model returned invalid JSON: {text[:200]}") from exc
+            # The answer that failed, or the whole reply when there is none.
+            shown = text or raw
+            logger.warning("invalid_json", model=model or self.model, preview=shown[:500])
+            raise ValueError(f"Model returned invalid JSON: {shown[:200]}") from exc
 
     @_resilient
     async def chat_schema(
@@ -631,7 +655,7 @@ class LiteLLMClient:
         pdf: bytes | None = None,
         model: str,
     ) -> list[dict[str, Any]]:
-        """Azure Foundry Mistral OCR, called directly (LiteLLM proxy bypassed).
+        """Azure Foundry Mistral OCR, called directly (gateway bypassed).
 
         Give one of image OR pdf. PDF path sends the whole document in a single
         call, which is faster and higher-quality than per-page rendering: the
@@ -668,7 +692,7 @@ class LiteLLMClient:
             # become anchor zero.
             "extract_header": True,
             "extract_footer": True,
-            # Pinned, not inherited: the default was observed true on 84/84 pages.
+            # Pinned, not inherited from the endpoint default.
             "include_blocks": True,
             # Per-word confidence with a character offset into the markdown, so
             # doubt lands on the text rather than only on the page image.
@@ -715,7 +739,7 @@ def create_llm_client(
     telemetry_mode: Literal["proxy", "direct"] = "proxy",
     fallback_model: str | None = None,
 ) -> LLMClient:
-    return LiteLLMClient(
+    return OpenAICompatibleClient(
         base_url=base_url,
         api_key=api_key,
         model=model,
@@ -729,7 +753,7 @@ def create_llm_client(
 
 __all__ = [
     "LLMClient",
-    "LiteLLMClient",
+    "OpenAICompatibleClient",
     "OcrStatusError",
     "RateLimiter",
     "VisionText",
