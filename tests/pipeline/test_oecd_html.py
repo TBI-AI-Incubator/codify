@@ -1880,6 +1880,28 @@ def test_a_numbered_table_row_ends_no_group() -> None:
     ]
 
 
+def test_an_operative_section_after_a_table_row_leaves_the_group() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents light every lantern.</p>
+<p>II. RECOMMENDS that Adherents report against the reference points below.</p>
+<p>Reference points</p>
+<p>I. Lanterns lit</p>
+<table><tr><td>II. INVITES keepers to count</td><td>0.4</td></tr></table>
+<p>III. INVITES the Secretary-General to report.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert _eids(root, "section", "hcontainer") == [
+        "sec_I",
+        "sec_II",
+        "hcontainer_1",
+        "hcontainer_1__sec_I",
+        "hcontainer_1__sec_II",
+        "sec_III",
+    ]
+
+
 def test_an_unnumbered_verb_in_a_group_follows_the_groups_last_number() -> None:
     body = """
 <p>THE COUNCIL,</p>

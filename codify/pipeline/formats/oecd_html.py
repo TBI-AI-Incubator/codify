@@ -218,6 +218,7 @@ class _Node:
     name: str | None = None  # an `hcontainer`'s name
     lettered: bool = False  # an annex's own top-level `A. Heading` section
     rank: float | None = None  # set on a group opened at a restart; `_RANK` ranks a unit
+    from_row: bool = False  # made from a table row
 
 
 @dataclass
@@ -365,8 +366,12 @@ def _starts_body(block: str) -> bool:
 
 
 def _verb_sections(group: _Node) -> bool:
-    """Whether any section straight under the group is headed by an operative verb."""
-    return any(n.kind == "section" and n.heading in OPERATIVE_VERBS for n in group.children)
+    """Whether any section straight under the group is headed by an operative verb,
+    a table row's not counting."""
+    return any(
+        n.kind == "section" and n.heading in OPERATIVE_VERBS and not n.from_row
+        for n in group.children
+    )
 
 
 def _rank(node: _Node) -> float:
@@ -463,7 +468,7 @@ class _Builder:
         if num and self._restarts(kind, key):
             self._open_group(kind)
         parent = self.stack[-1] if self.stack else None
-        node = _Node(kind, num, key, heading=heading)
+        node = _Node(kind, num, key, heading=heading, from_row=self.in_row)
         if kind == "section" and re.fullmatch(_ROMAN, key):
             self.last_roman = _roman_value(key.lower())
         if parent is not None:

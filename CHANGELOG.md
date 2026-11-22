@@ -108,7 +108,7 @@ Fixed:
   first where several lines wait, for the units that start over; the first
   text or list stays as it was. The group runs to the next container above it,
   the next restart of the same kind, or a numbered section headed by an
-  operative verb where none of its own is; a number that carries on the first
+  operative verb where none of its own, table rows apart, is; a number that carries on the first
   list after it stays in the group. A table row and a verb on a line of its
   own open no group, and loose paragraphs still gather into a section at each
   heading. A list that restarts with no heading keeps its suffix, and what
