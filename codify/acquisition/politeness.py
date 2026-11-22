@@ -288,7 +288,12 @@ def _refuse_if_open(request: httpx.Request) -> None:
     flight = _IN_FLIGHT.get()
     if flight is None:
         return
-    if flight.ticket.probe:
+    if flight.robots and request.url.host != flight.host and host_circuit(request.url.host).is_open:
+        raise HostCircuitOpen(
+            f"the circuit for {request.url.host} is open; its robots.txt is not fetched",
+            request=request,
+        )
+    if flight.ticket is flight.circuit.probe:
         # The probe asks once: its robots fetch, read as any is (the client's redirect
         # limit bounds it), then one send of the request.
         if flight.sent and not flight.robots:

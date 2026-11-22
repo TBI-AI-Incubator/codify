@@ -50,7 +50,8 @@ New, additive:
   already in flight is checked before every send, its robots.txt fetch and
   each of the host's addresses included, and stops with the same error: one
   that had reached the host counts without restarting the cooldown, one that
-  had not counts as neither. One probe then goes through: it may read
+  had not counts as neither. A robots.txt fetch that redirects to another host
+  stops there if that host's circuit is open. One probe then goes through: it may read
   robots.txt as any request does, then sends its request once, to one address.
   Only that request can free its slot; an answer closes the circuit, a failure
   reopens it. A robots refusal counts as neither, and a 403 or 451 does not

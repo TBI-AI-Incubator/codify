@@ -1413,3 +1413,44 @@ async def test_the_probe_follows_a_robots_redirect_like_any_read() -> None:
     # However many hops robots.txt takes, the host can still recover.
     assert sent == ["moved.test/robots.txt"] * 5 + ["moved.test/x"]
     assert not circuit.is_open
+
+
+@pytest.mark.asyncio
+async def test_a_stale_probe_is_not_sent_once_the_circuit_has_reopened() -> None:
+    sent: list[str] = []
+    circuit = host_circuit("stale.test")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            # A straggler's success closes the circuit, then five failures reopen it.
+            circuit.record_success()
+            _trip("stale.test")
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return _ok()
+
+    _trip("stale.test")
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    async with httpx.AsyncClient(transport=_paced(handler, robots_respect=True)) as c:
+        with pytest.raises(HostCircuitOpen):
+            await c.get("https://stale.test/x")
+    assert sent == ["/robots.txt"]
+
+
+@pytest.mark.asyncio
+async def test_a_robots_redirect_is_not_sent_to_a_host_whose_circuit_is_open() -> None:
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        host = request.headers["host"]
+        sent.append(host)
+        if host == "a.test":
+            return httpx.Response(302, headers={"location": "https://b.test/robots.txt"})
+        return _ok()
+
+    _trip("b.test")
+    async with httpx.AsyncClient(transport=_paced(handler, robots_respect=True)) as c:
+        with pytest.raises(HostCircuitOpen):
+            await c.get("https://a.test/x")
+    assert sent == ["a.test"]
