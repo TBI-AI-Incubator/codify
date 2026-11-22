@@ -16,7 +16,12 @@ from types import TracebackType
 import httpx
 
 from codify.acquisition.base import PolitenessProfile, require_user_agent
-from codify.acquisition.politeness import PoliteTransport, client_tls_context
+from codify.acquisition.politeness import (
+    UNBUFFERED,
+    HostCircuitOpen,
+    PoliteTransport,
+    client_tls_context,
+)
 from codify.core.security import ssrf_guard
 
 # zipfile's local file header: signature, five shorts, three longs, name and extra lengths.
@@ -175,7 +180,12 @@ class _PoliteBridge(httpx.BaseTransport):
             async with self._sem:
                 response = await self._client.send(
                     self._client.build_request(
-                        request.method, str(request.url), headers=request.headers
+                        request.method,
+                        str(request.url),
+                        headers=request.headers,
+                        # The body is read below, no further than the range asked for,
+                        # so the transport must not download it first.
+                        extensions={UNBUFFERED: True},
                     ),
                     stream=True,
                 )
@@ -304,6 +314,9 @@ class RemoteFile:
                         if len(body) == length:
                             return body
                         last = f"{len(body)} bytes for {length}"
+            except HostCircuitOpen:
+                # The host's circuit is open: like a refusal, the caller stops and waits.
+                raise
             except httpx.TransportError as exc:
                 last = type(exc).__name__
         raise RangeRefused(f"{self.url} bytes {start}-{end}: {last} after {self._attempts} tries")

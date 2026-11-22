@@ -615,3 +615,27 @@ def test_the_shared_polite_client_follows_the_user_agent_variable(
     monkeypatch.delenv("ACQUISITION_USER_AGENT")
     with pytest.raises(MissingUserAgent):
         remote.polite_http_client(profile)
+
+
+def test_a_range_read_stops_at_once_when_the_hosts_circuit_is_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from codify.acquisition.politeness import _CIRCUIT_FAILURES, HostCircuitOpen, host_circuit
+
+    sent: list[str] = []
+    slept: list[float] = []
+    monkeypatch.setattr(remote.time, "sleep", slept.append)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+
+    circuit = host_circuit("archive.example")
+    for _ in range(_CIRCUIT_FAILURES):
+        circuit.record_failure()
+    client = _polite(handler, PolitenessProfile(rate_limit_per_minute=None))
+    with pytest.raises(HostCircuitOpen):
+        RemoteFile(_URL, client=client, attempts=6, backoff=5).read(0, 10)
+    # Refused unsent, and not retried: no backoff sat out against an open circuit.
+    assert sent == []
+    assert slept == []

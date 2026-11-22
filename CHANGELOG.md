@@ -39,6 +39,38 @@ Breaks:
 
 New, additive:
 
+- `PoliteTransport` keeps a circuit per host, shared across the process. Five
+  requests in a row that fail, each counted once after its own retries, open
+  it: a gateway failure (502, 504), a connection that never answered, or the
+  host refusing the client (403, 451, not retried, though a bodyless 403 still
+  tries the host's next address while the circuit is closed). A request still
+  refused after every backoff (429, 436, 503) opens it at once. Open, every request to
+  that host raises `HostCircuitOpen`, an `httpx.TransportError`, unsent, for 60
+  seconds or the last refusal's longer Retry-After, up to an hour. A request
+  already in flight is checked before every send, its robots.txt fetch and
+  each of the host's addresses included, and stops with the same error: one
+  that had reached the host counts without restarting the cooldown, one that
+  had not counts as neither. A robots.txt fetch that redirects to another host
+  stops there if that host's circuit is open. One probe then goes through: it may read
+  robots.txt as any request does, then sends its request once, to one address.
+  Only that request can free its slot; an answer closes the circuit, a failure
+  reopens it. A robots refusal counts as neither, and a 403 or 451 does not
+  bring the host's pace back toward its floor. `host_circuit_state` reports a
+  host's circuit. `GuardedTransport` takes two keyword-only hooks for it,
+  `before_send`, called just before each send, and `may_try_next`, asked before
+  a 403 moves on to the next address; both are optional and off by default.
+  The Riigi Teataja archive reader raises `HostCircuitOpen` at
+  once, as it does a refusal, rather than retry a range against an open circuit.
+- `PoliteTransport` retries a bodyless request on a 502 or 504, and on a
+  connect or read timeout, a dropped connection or a protocol error, with
+  exponential full jitter and without widening the host's pace. It downloads
+  such a request's body itself, inside the request's concurrency slot, so a
+  body that drops partway is retried too; the client still decodes it and
+  `aiter_raw` still reads it. A `client.stream(...)` call that passes
+  `extensions={UNBUFFERED: True}` keeps the body streaming from the socket and
+  is not retried once its headers arrive; the Riigi Teataja archive reader
+  passes it, since it reads each range no further than it asked for. A request
+  with a body is not replayed.
 - `cost_details` and `record_usage` take `batch=True` to price a provider batch
   job's result at half the synchronous rate, as Gemini batch mode and Azure
   Global Batch bill it.
