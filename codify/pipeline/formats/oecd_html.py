@@ -420,7 +420,15 @@ class _Builder:
             return False
         if _operative(self.pending_headings[0]) is not None:
             return False
-        return any((s.kind, s.key) == (kind, key) and s.num for s in self._siblings())
+        beside = self._siblings()
+        if self.stack and self.stack[-1].name == "group":
+            # In a group, the list above and the groups before this one count too.
+            outer = self.stack[-2].children if len(self.stack) > 1 else self.roots
+            beside = [
+                *beside,
+                *(c for s in outer for c in (s.children if s.name == "group" else [s])),
+            ]
+        return any((s.kind, s.key) == (kind, key) and s.num for s in beside)
 
     def _open_group(self, kind: str) -> None:
         """Open a group under the first heading line waiting, to hold the units

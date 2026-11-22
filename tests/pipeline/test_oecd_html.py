@@ -1455,6 +1455,41 @@ def test_a_second_list_of_sections_under_its_heading_is_a_group() -> None:
     assert group.find("a:section/a:heading", NS) is None
 
 
+def test_a_third_list_opens_its_own_group_beside_the_second() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. DECIDES that Members shall keep the lists set out in Annex A.</p>
+<p>Annex A</p>
+<p>Lists of Lantern Duties</p>
+<p>LIST A</p>
+<p>I. Lighting at dusk</p>
+<p>II. Lighting in fog</p>
+<p>III. Trimming of wicks</p>
+<p>IV. Storage of oil</p>
+<p>LIST B</p>
+<p>II. Lighting in fog</p>
+<p>IV. Storage of oil</p>
+<p>LIST C</p>
+<p>I. Lighting at dusk</p>
+<p>II. Lighting in fog</p>
+"""
+    xml, _, root = _convert(body, type="decision")
+    _clean(xml)
+    assert _eids(root, "section", "hcontainer") == [
+        "sec_I",
+        "att_1__sec_I",
+        "att_1__sec_II",
+        "att_1__sec_III",
+        "att_1__sec_IV",
+        "att_1__hcontainer_1",
+        "att_1__hcontainer_1__sec_II",
+        "att_1__hcontainer_1__sec_IV",
+        "att_1__hcontainer_2",
+        "att_1__hcontainer_2__sec_I",
+        "att_1__hcontainer_2__sec_II",
+    ]
+
+
 # The shape of OECD/LEGAL/0307: procedures appended to the body under a title,
 # numbered `I.` to `III.` as the sections before them are.
 _APPENDED_PROCEDURES = """
