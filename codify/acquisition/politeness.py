@@ -326,7 +326,10 @@ def _may_try_next_address() -> bool:
     if flight is None:
         return True
     # The host has answered: that was the probe's attempt, and an open circuit stops the rest.
-    return not flight.ticket.probe and not flight.circuit.is_open
+    # The probe's robots fetch is not its attempt.
+    if flight.ticket is flight.circuit.probe:
+        return flight.robots
+    return not flight.circuit.is_open
 
 
 # Response extension on the 451 this transport makes for a robots refusal. A host

@@ -1499,6 +1499,8 @@ async def test_the_probe_unable_to_connect_does_not_wait_for_another_address() -
         inner=_make_inner(handler),
         resolver=_two_addresses,
     )
+    # The first turn is free whatever the machine's uptime; only a second would wait.
+    host_bucket("slowpair.test", 60.0).last_request_at = time.monotonic() - 60.0
     async with httpx.AsyncClient(transport=transport) as c:
         with pytest.raises(httpx.ConnectError):
             await asyncio.wait_for(c.get("https://slowpair.test/x"), timeout=5)
@@ -1530,3 +1532,29 @@ def test_two_threads_cannot_both_be_admitted_as_the_probe(
     tickets.append(circuit.admit())
     other.join()
     assert sum(t is not None for t in tickets) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_probe_reads_robots_txt_from_the_next_address() -> None:
+    sent: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append((request.url.host, request.url.path))
+        if request.url.host == "93.184.216.34" and request.url.path == "/robots.txt":
+            raise httpx.ConnectError("refused", request=request)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nAllow: /\n")
+        return _ok()
+
+    _trip("robotpair.test")
+    circuit = host_circuit("robotpair.test")
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    transport = _paced(handler, resolver=_two_addresses, robots_respect=True)
+    async with httpx.AsyncClient(transport=transport) as c:
+        assert (await c.get("https://robotpair.test/x")).status_code == 200
+    assert sent == [
+        ("93.184.216.34", "/robots.txt"),
+        ("93.184.216.35", "/robots.txt"),
+        ("93.184.216.34", "/x"),
+    ]
