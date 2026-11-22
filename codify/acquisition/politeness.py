@@ -7,6 +7,7 @@ import contextvars
 import os
 import random
 import ssl
+import threading
 import time
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -143,6 +144,8 @@ _CIRCUIT_COOLDOWN_S = 60.0
 # A Retry-After past this (or infinite) would leave the host unprobed for the
 # life of the process.
 _MAX_CIRCUIT_HOLD_S = 3600.0
+# The archive reader's loop runs on its own thread: state changes are not async-safe alone.
+_CIRCUIT_LOCK = threading.Lock()
 
 
 class HostCircuitOpen(httpx.TransportError):
@@ -184,18 +187,20 @@ class _HostCircuit:
 
     def admit(self) -> _Ticket | None:
         """A ticket to send, or None to refuse unsent."""
-        if self.opened_at is None:
-            return _Ticket(probe=False)
-        if self.probe is not None or time.monotonic() - self.opened_at < self.cooldown_s:
-            return None
-        self.probe = _Ticket(probe=True)
-        return self.probe
+        with _CIRCUIT_LOCK:
+            if self.opened_at is None:
+                return _Ticket(probe=False)
+            if self.probe is not None or time.monotonic() - self.opened_at < self.cooldown_s:
+                return None
+            self.probe = _Ticket(probe=True)
+            return self.probe
 
     def record_success(self) -> None:
         # Any answer shows the host is up: the circuit closes, and a probe still
         # in flight becomes an ordinary request.
-        self.failures, self.opened_at, self.probe = 0, None, None
-        self.cooldown_s = _CIRCUIT_COOLDOWN_S
+        with _CIRCUIT_LOCK:
+            self.failures, self.opened_at, self.probe = 0, None, None
+            self.cooldown_s = _CIRCUIT_COOLDOWN_S
 
     def record_failure(
         self,
@@ -210,29 +215,34 @@ class _HostCircuit:
         `refused` marks a request that ended in 429, 436 or 503, `retry_after`
         that response's hint. `restart=False` counts a straggler stopped by the
         open circuit: its failure came before the trip, so it moves no cooldown."""
-        self.failures += 1
-        probing = ticket is not None and ticket is self.probe
-        opens = probing or (
-            self.opened_at is None and (refused or self.failures >= _CIRCUIT_FAILURES)
-        )
-        hold = _CIRCUIT_COOLDOWN_S
-        if refused:
-            hold = min(_MAX_CIRCUIT_HOLD_S, max(hold, retry_after or 0.0))
-        if opens:
-            self.cooldown_s, self.opened_at = hold, time.monotonic()
-            self.trips += 1
-        elif self.opened_at is not None and restart:
-            # A straggler admitted before the trip restarts the cooldown, never shortens it.
-            self.cooldown_s, self.opened_at = max(self.cooldown_s, hold), time.monotonic()
-        if probing:
-            self.probe = None
-        return opens
+        with _CIRCUIT_LOCK:
+            self.failures += 1
+            probing = ticket is not None and ticket is self.probe
+            opens = probing or (
+                self.opened_at is None and (refused or self.failures >= _CIRCUIT_FAILURES)
+            )
+            hold = _CIRCUIT_COOLDOWN_S
+            if refused:
+                hold = min(_MAX_CIRCUIT_HOLD_S, max(hold, retry_after or 0.0))
+            if opens:
+                if self.opened_at is not None:
+                    # A straggler's longer hold survives the probe's failure.
+                    hold = max(hold, self.opened_at + self.cooldown_s - time.monotonic())
+                self.cooldown_s, self.opened_at = hold, time.monotonic()
+                self.trips += 1
+            elif self.opened_at is not None and restart:
+                # A straggler admitted before the trip restarts the cooldown, never shortens it.
+                self.cooldown_s, self.opened_at = max(self.cooldown_s, hold), time.monotonic()
+            if probing:
+                self.probe = None
+            return opens
 
     def release(self, ticket: _Ticket) -> None:
         """Neither outcome (robots or guard refusal, cancellation). Only the probe's
         own ticket frees the slot; a straggler ending this way leaves it held."""
-        if ticket is self.probe:
-            self.probe = None
+        with _CIRCUIT_LOCK:
+            if ticket is self.probe:
+                self.probe = None
 
     def snapshot(self) -> dict[str, int | bool]:
         return {
@@ -247,10 +257,7 @@ _CIRCUITS: dict[str, _HostCircuit] = {}
 
 def host_circuit(host: str) -> _HostCircuit:
     """The process-wide circuit for a host."""
-    circuit = _CIRCUITS.get(host)
-    if circuit is None:
-        circuit = _CIRCUITS[host] = _HostCircuit()
-    return circuit
+    return _CIRCUITS.setdefault(host, _HostCircuit())
 
 
 def host_circuit_state(host: str) -> dict[str, int | bool] | None:
@@ -520,6 +527,12 @@ class GuardedTransport(httpx.AsyncBaseTransport):
         failed: httpx.ConnectError | httpx.ConnectTimeout | None = None
         for index, address in enumerate(addresses):
             if index:
+                if (
+                    failed is not None
+                    and self._may_try_next is not None
+                    and not self._may_try_next()
+                ):
+                    raise failed
                 if self._before_retry is not None:
                     await self._before_retry(host)
             if self._before_send is not None:
@@ -761,7 +774,7 @@ class PoliteTransport(httpx.AsyncBaseTransport):
             try:
                 response = await self._inner.handle_async_request(request)
                 # A failed status is retried or returned as it stands, unread.
-                if buffer and response.status_code not in _FAILED_STATUSES:
+                if buffer and response.status_code not in _NOT_ANSWERED:
                     response = await _buffered(response)
             except _TRANSIENT_ERRORS as exc:
                 # The circuit opened under it (the guard may have refused the host's next

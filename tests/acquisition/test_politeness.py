@@ -1454,3 +1454,79 @@ async def test_a_robots_redirect_is_not_sent_to_a_host_whose_circuit_is_open() -
         with pytest.raises(HostCircuitOpen):
             await c.get("https://a.test/x")
     assert sent == ["a.test"]
+
+
+@pytest.mark.asyncio
+async def test_a_refusal_whose_body_drops_is_not_sent_again(no_jitter: None) -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(403, stream=_DroppedAfter())
+
+    async with httpx.AsyncClient(transport=_quiet_transport(handler)) as c:
+        with pytest.raises(httpx.ReadError):
+            await c.get("https://refuses.test/doc")
+    assert attempts == 1
+
+
+def test_a_failed_probe_keeps_a_longer_hold_a_straggler_set() -> None:
+    circuit = host_circuit("hold.test")
+    _trip("hold.test")
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    probe = circuit.admit()
+    assert probe is not None
+    circuit.record_failure(refused=True, retry_after=600.0)
+    circuit.record_failure(probe)
+    assert circuit.cooldown_s >= 599.0
+
+
+@pytest.mark.asyncio
+async def test_the_probe_unable_to_connect_does_not_wait_for_another_address() -> None:
+    import asyncio
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    _trip("slowpair.test")
+    circuit = host_circuit("slowpair.test")
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    transport = PoliteTransport(
+        profile=PolitenessProfile(rate_limit_per_minute=1, robots_respect=False),
+        inner=_make_inner(handler),
+        resolver=_two_addresses,
+    )
+    async with httpx.AsyncClient(transport=transport) as c:
+        with pytest.raises(httpx.ConnectError):
+            await asyncio.wait_for(c.get("https://slowpair.test/x"), timeout=5)
+
+
+def test_two_threads_cannot_both_be_admitted_as_the_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import threading
+
+    circuit = host_circuit("threads.test")
+    _trip("threads.test")
+    assert circuit.opened_at is not None
+    circuit.opened_at -= _CIRCUIT_COOLDOWN_S
+    first_inside, real_monotonic = threading.Event(), time.monotonic
+    first = threading.get_ident()
+
+    def monotonic() -> float:
+        # Hold the first thread between its check and its assignment.
+        if threading.get_ident() == first and not first_inside.is_set():
+            first_inside.set()
+            time.sleep(0.3)
+        return real_monotonic()
+
+    monkeypatch.setattr(politeness.time, "monotonic", monotonic)
+    tickets = []
+    other = threading.Thread(target=lambda: (first_inside.wait(), tickets.append(circuit.admit())))
+    other.start()
+    tickets.append(circuit.admit())
+    other.join()
+    assert sum(t is not None for t in tickets) == 1
