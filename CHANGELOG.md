@@ -128,6 +128,31 @@ Fixed:
 - The OpenAPI schema's `info.version` is the package version. It was FastAPI's
   default, `0.1.0`. The drift test ignores it, so a release needs no
   regeneration of `contract/openapi.json`.
+- `oecd_html` names a unit once the tree has its final shape, so a number
+  counts as repeated only among the units it ends up beside. A list that starts
+  again at `1.` under each heading of an annex no longer carries `_dupN` for the
+  lists printed above it. A printed number names its own paragraph: an
+  unnumbered paragraph whose ordinal is the same number takes the suffix,
+  whichever of the two stands first. A heading line before a number already
+  printed beside it, in the list above or in a group before it (`LIST B` before
+  a second `III.`, `LIST C` before an `I.` the first list has, `Procedures`
+  before a second `I.`) opens an `hcontainer` named `group` under that heading, the
+  first where several lines wait, for the units that start over; the first
+  text or list stays as it was. The group runs to the next container above it,
+  the next restart of the same kind, or a numbered section headed by an
+  operative verb where none of its own, table rows apart, is; a number that carries on the first
+  list after it stays in the group. A table row and a verb on a line of its
+  own open no group, and loose paragraphs still gather into a section at each
+  heading. A list that restarts with no heading keeps its suffix, and what
+  follows a repeated number nests as it does after the number's first
+  printing. An instrument that had no `_dup` eId is unchanged. One that had
+  may convert differently, and only converting it again from its stored
+  Compendium HTML picks that up: a re-derive rebuilds rows from the stored AKN.
+  Where it changes, its eIds are a new set, not the old one renamed: a plain
+  eId can name a different paragraph (the printed `2.` takes `para_2` from the
+  unnumbered paragraph above it, which takes `para_2_dup2` in exchange, and
+  the points under each go with them), so data keyed by the old eIds is
+  replaced, not carried across.
 
 ## 0.7.0 (2026-11-13)
 
