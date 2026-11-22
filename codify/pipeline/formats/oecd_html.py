@@ -423,7 +423,7 @@ class _Builder:
         left to `_group_loose_paragraphs`, which opens a section at its heading."""
         if not self.pending_headings or self.in_row or (kind == "paragraph" and not self.stack):
             return False
-        if _operative(self.pending_headings[0]) is not None:
+        if isinstance(self.pending_headings[0], _Row) or _operative(self.pending_headings[0]):
             return False
         beside = self._siblings()
         if self.stack and self.stack[-1].name == "group":

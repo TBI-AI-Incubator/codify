@@ -1902,6 +1902,20 @@ def test_an_operative_section_after_a_table_row_leaves_the_group() -> None:
     ]
 
 
+def test_a_heading_like_table_row_opens_no_group_before_a_repeated_number() -> None:
+    body = """
+<p>THE COUNCIL,</p>
+<p>I. RECOMMENDS that Adherents:</p>
+<p>1. Light every lantern.</p>
+<p>2. Trim every wick.</p>
+<table><tr><td>Records</td></tr></table>
+<p>1. Keep a register.</p>
+"""
+    xml, _, root = _convert(body, type="recommendation")
+    validate_akn(xml)
+    assert not root.findall(".//a:hcontainer", NS)
+
+
 def test_an_unnumbered_verb_in_a_group_follows_the_groups_last_number() -> None:
     body = """
 <p>THE COUNCIL,</p>
