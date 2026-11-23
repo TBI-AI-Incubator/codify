@@ -271,9 +271,14 @@ def _annex(node: dict[str, Any], kids: Tree, pad: str, out: list[str]) -> None:
 
 
 def to_bluebell(
-    frags: list[dict[str, Any]], *, printed: str = "", title: str = "", summary: str = ""
+    frags: list[dict[str, Any]],
+    *,
+    printed: str = "",
+    title: str = "",
+    summary: str = "",
+    include_repealed: bool = False,
 ) -> str:
-    """Fragments in source order as one Bluebell document; repealed ones are left out.
+    """Fragments as one Bluebell document, optionally retaining repealed wording.
     `printed` supplies the preamble where the consolidation's root has none; `title` and
     `summary` the citation and sumário where the text does not state them."""
     if not frags:
@@ -284,7 +289,11 @@ def to_bluebell(
 
     def kept(f: dict[str, Any]) -> bool:
         # A repealed division still holding text marked in force keeps its place.
-        return f.get("state") != REPEALED or any(kept(k) for k in every.get(f["id"], []))
+        return (
+            include_repealed
+            or f.get("state") != REPEALED
+            or any(kept(k) for k in every.get(f["id"], []))
+        )
 
     root = frags[0]
     if not kept(root):
@@ -448,7 +457,13 @@ def from_printed(text: str) -> list[dict[str, Any]]:
     return frags
 
 
-def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> str:
+def _identify(
+    akn: str,
+    eli: str,
+    title: str,
+    publication: dict[str, str],
+    fragment_versions: list[dict[str, Any]] | None,
+) -> str:
     """The work ELI as an `eli` alias, the act's title as alias and preface `docTitle`, and
     its gazette publication."""
     root = parse_xml(akn)
@@ -472,6 +487,23 @@ def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> st
         identification = work.getparent()
         assert identification is not None
         identification.addnext(etree.Element(f"{{{AKN_NS}}}publication", **publication))
+    if fragment_versions:
+        identification = work.getparent()
+        meta = identification.getparent()
+        namespace = "urn:codify:pt:dre"
+        proprietary = etree.SubElement(
+            meta,
+            f"{{{AKN_NS}}}proprietary",
+            source=identification.get("source"),
+            nsmap={"dre": namespace},
+        )
+        fields = ("id", "parent", "label", "version_date", "in_force_from", "state")
+        for fragment in fragment_versions:
+            etree.SubElement(
+                proprietary,
+                f"{{{namespace}}}fragment",
+                {key: str(fragment[key]) for key in fields if fragment[key] is not None},
+            )
     return cast(str, etree.tostring(root, encoding="unicode"))
 
 
@@ -486,6 +518,7 @@ def to_akn(
     eli: str = "",
     title: str = "",
     publication: dict[str, str] | None = None,
+    fragment_versions: list[dict[str, Any]] | None = None,
 ) -> str:
     """AKN XML for the Bluebell, identified as `work` and `expression`. A Bluebell
     parse error is raised, never swallowed."""
@@ -496,7 +529,7 @@ def to_akn(
         e = errors[0]
         raise UnmappedFragment(f"Bluebell rejected line {e.line}:{e.column}: {e.message}")
     akn = set_work_uri(akn, work, expression, as_of) or akn
-    return _identify(akn, eli, title, publication or {})
+    return _identify(akn, eli, title, publication or {}, fragment_versions)
 
 
 __all__ = [

@@ -33,6 +33,7 @@ from codify.acquisition.adapters.pt.dre_akn import (
 )
 from codify.acquisition.base import MissingUserAgent
 from codify.acquisition.politeness import PoliteTransport
+from codify.akn._schema import validate_akn
 from codify.jurisdictions import SourceAdapter
 from codify.pipeline.events import Complete, Failed
 from codify.pipeline.formats import akn_native
@@ -199,6 +200,7 @@ class Gazette:
         self.last = last
         # What every screen call answers instead, when set.
         self.answer = answer
+        self.editions: dict[str, Any] = {}
         self.module = "mv-1"
         self.apis = {path: api for path, api, _ in (DETAIL, FRAG, DATA)}
         self.manifest = {f"/dr/scripts/dr.{view}.mvc.js": "?h1" for view in VIEWS}
@@ -248,6 +250,8 @@ class Gazette:
             else:
                 assert v["GetDiplomaFragByIdAndApplicationSetting"]
                 data = {"LegConsBase": {"List": self.frags}, "DataUltimaConsolidada": self.last}
+                if self.editions:
+                    data = self.editions[v["DataSelecionada"]]
             return httpx.Response(200, json={"versionInfo": info, "data": data})
         raise AssertionError(f"unexpected request {request.url}")
 
@@ -676,12 +680,56 @@ async def test_the_enacted_text_is_the_printed_one() -> None:
     assert _eids(doc) == ["art_1"]
 
 
-async def test_a_dated_version_is_refused() -> None:
+async def test_a_dated_version_requires_an_expected_id() -> None:
     ref = DocumentRef(
         jurisdiction_code="pt", doctype="dl", year=2042, number="7", as_of=date(2043, 1, 1)
     )
-    with pytest.raises(ValueError, match="as of today"):
+    with pytest.raises(ValueError, match="consolidation_id"):
         await _fetch(Gazette(), ref)
+
+
+async def test_dated_editions_and_offline_replay(tmp_path: Path) -> None:
+    gazette = Gazette()
+    gazette.editions = json.loads(
+        Path(__file__).with_name("fixtures").joinpath("pt_dated_editions.json").read_text()
+    )
+    for day, expected_id, wording in (
+        ("2043-01-01", "123", "Primeira"),
+        ("2043-03-01", "124", "Segunda"),
+    ):
+        eli = f"https://data.dre.pt/eli/dec-lei/7/2042/p/cons/{day.replace('-', '')}"
+        ref = _ref("7", 2042, eli=eli, consolidation_id=expected_id)
+        gazette.seen.clear()
+        doc, _ = await _fetch(gazette, ref, cache=tmp_path)
+        assert doc.expression_uri.endswith(f"/por@{day}")
+        assert wording.encode() in doc.primary().content
+        assert b"Texto revogado" in doc.primary().content
+        validate_akn(doc.primary().content)
+        versions = [
+            f.attrib
+            for f in etree.fromstring(doc.primary().content).iter("{urn:codify:pt:dre}fragment")
+        ]
+        assert [(f["id"], f["version_date"], f["in_force_from"], f["state"]) for f in versions] == [
+            ("1", day, "2043-03-04", "6"),
+            ("2", day, "2043-03-04", "6"),
+            ("3", day, "2043-03-04", "4"),
+        ]
+        assert [
+            json.loads(r.content)["screenData"]["variables"]["DataSelecionada"]
+            for r in gazette.seen
+            if r.url.path.endswith((FRAG[0], DATA[0]))
+        ] == [day, day]
+    for day, data in gazette.editions.items():
+        ref = _ref("7", 2042, consolidation_id=data["CurrentConsolidacaoId"]).model_copy(
+            update={"as_of": date.fromisoformat(day)}
+        )
+        replay = Gazette()
+        doc, _ = await _fetch(replay, ref, cache=tmp_path)
+        assert not replay.seen
+        assert doc.expression_uri.endswith(day)
+    ref = _ref("7", 2042, consolidation_id="777").model_copy(update={"as_of": date(2043, 1, 1)})
+    with pytest.raises(DrItemMissing, match="expected consolidation 777, got '123'"):
+        await _fetch(gazette, ref, cache=tmp_path)
 
 
 async def test_only_positive_answers_are_saved(tmp_path: Path) -> None:

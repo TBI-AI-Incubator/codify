@@ -272,23 +272,36 @@ class DiarioAcquirer(BaseAcquirer):
         return detail
 
     async def _consolidated(
-        self, tipo: str, ano: str, frag_id: str
+        self, tipo: str, ano: str, frag_id: str, *, edition: date | None, expected_id: str
     ) -> tuple[dict[str, Any], dict[str, Any], str]:
-        today = date.today().isoformat()
+        key_suffix = f"{tipo}/{ano}-{frag_id}"
+        if edition:
+            key_suffix += f" {edition.isoformat()} {expected_id}"
         v: dict[str, Any] = {
             "DiplomaFragId": frag_id,
             "Ano": int(ano),
             "Tipo": tipo,
             "Key": f"{ano}-{frag_id}",
-            "DataSelecionada": today,
+            "DataSelecionada": (edition or date.today()).isoformat(),
         }
-        frag = await self._call(FRAG, v, f"frag {tipo}/{ano}-{frag_id}")
+        frag = await self._call(FRAG, v, f"frag {key_suffix}")
         legis = frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
         v |= {"DiplomaLegisId": legis, "GetDiplomaFragByIdAndApplicationSetting": frag}
-        key = f"data {tipo}/{ano}-{frag_id}"
+        key = f"data {key_suffix}"
         data = await self._call(
-            DATA, v, key, lambda d: bool((d.get("LegConsBase") or {}).get("List"))
+            DATA,
+            v,
+            key,
+            lambda d: (
+                bool((d.get("LegConsBase") or {}).get("List"))
+                and (not edition or str(d.get("CurrentConsolidacaoId")) == expected_id)
+            ),
         )
+        returned_id = data.get("CurrentConsolidacaoId")
+        if edition and str(returned_id) != expected_id:
+            raise DrItemMissing(
+                f"{edition}: expected consolidation {expected_id}, got {returned_id!r}"
+            )
         return frag, data, key
 
     def consolidated_eli(self, ref: DocumentRef) -> str:
@@ -301,10 +314,27 @@ class DiarioAcquirer(BaseAcquirer):
         return f"{ELI_BASE}/{eli_type}/{ref.number.lower()}/{ref.year}/p/cons"
 
     async def fetch(self, ref: DocumentRef) -> AcquiredDocument:
-        """The current text (`as_of="latest"`), or the text as printed (`"enacted"`)."""
-        if ref.as_of not in ("latest", "enacted"):
-            raise ValueError(f"the gazette's consolidation is read as of today, not {ref.as_of}")
+        """Acquire latest, enacted, or an edition from the gazette's consolidation list.
+
+        Supply the listed date in `as_of` or a dated `extra["eli"]`, together
+        with the matching `extra["consolidation_id"]`.
+        """
         eli = ref.extra.get("eli", "").replace("http://", "https://").rstrip("/")
+        edition = ref.as_of if isinstance(ref.as_of, date) else None
+        if "/p/cons/" in eli:
+            official = official_ref_from_url(eli)
+            if official is None or official.publisher != "dre":
+                raise ValueError(f"invalid dated consolidation ELI: {eli!r}")
+            if official.edition_id:
+                eli_date = date.fromisoformat(official.edition_id)
+                if ref.as_of == "enacted" or (edition and edition != eli_date):
+                    raise ValueError(f"dated consolidation ELI conflicts with {ref.as_of}")
+                edition = eli_date
+        expected_id = ref.extra.get("consolidation_id", "")
+        if edition and not re.fullmatch(r"[1-9]\d*", expected_id):
+            raise ValueError("a dated edition requires extra['consolidation_id']")
+        if expected_id and not edition:
+            raise ValueError("a consolidation_id requires a dated edition")
         given = ref.extra.get("detail", "")
         link = dm.group(1) if (dm := _DETAIL_PATH.search(given)) else given.strip("/")
         detail = await self._detail(link) if link and not eli else None
@@ -318,19 +348,23 @@ class DiarioAcquirer(BaseAcquirer):
         cons: dict[str, Any] | None = None
         data_key = ""
         # The enacted text needs the consolidation only to find its detail page.
-        current = ref.as_of == "latest" or not (link or dated)
+        current = ref.as_of != "enacted" or not (link or dated)
         cons_eli = f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/pt/html"
         landed = await self._resolve(cons_eli) if current else ""
         if cm := _CONS_PATH.search(landed):
-            frag, data, data_key = await self._consolidated(*cm.groups())
+            frag, data, data_key = await self._consolidated(
+                *cm.groups(), edition=edition, expected_id=expected_id
+            )
             frags = fragments(data)
-            if frags and ref.as_of == "latest":
+            if frags and ref.as_of != "enacted":
                 last = str(data.get("DataUltimaConsolidada") or "")[:10]
+                if edition:
+                    last = edition.isoformat()
+                elif last <= "1900-01-01":
+                    last = max(f["version_date"] for f in frags)
                 cons = {
                     "url": landed,
-                    "date": last
-                    if last > "1900-01-01"
-                    else max((f["version_date"] for f in frags), default=""),
+                    "date": last,
                     "in_update": bool(
                         frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"].get("EmAtualizacao")
                     ),
@@ -345,6 +379,8 @@ class DiarioAcquirer(BaseAcquirer):
             )
             if not link and (dm := _DETAIL_PATH.search(sitemap)):
                 link = dm.group(1)
+        if edition and not cons:
+            raise DrItemMissing(f"no consolidated text for edition {edition}")
         if not link:
             if not dated:
                 raise DrItemMissing(
@@ -388,7 +424,13 @@ class DiarioAcquirer(BaseAcquirer):
         def convert() -> str:
             frags = cons["fragments"] if cons else from_printed(printed)
             return to_akn(
-                to_bluebell(frags, printed=printed, title=title, summary=summary),
+                to_bluebell(
+                    frags,
+                    printed=printed,
+                    title=title,
+                    summary=summary,
+                    include_repealed=bool(edition),
+                ),
                 number=number,
                 work=work,
                 published=published,
@@ -397,6 +439,7 @@ class DiarioAcquirer(BaseAcquirer):
                 eli=alias,
                 title=title,
                 publication=publication,
+                fragment_versions=frags if cons else None,
             )
 
         from codify.pipeline.formats.eu_directive import on_the_cpu_pool
@@ -428,6 +471,8 @@ class DiarioAcquirer(BaseAcquirer):
             "pdf": str(detail.get("URL_PDF") or ""),
             "from_cache": bool(saved),
         }
+        if cons:
+            upstream["consolidation_id"] = cons["raw"].get("CurrentConsolidacaoId")
         card = {"detail": detail, "consolidation": cons["raw"] if cons else None}
         pages = str(detail.get("Pagina") or "").split("-")[0].strip()
         alias_ref = official_ref_from_url(alias)
