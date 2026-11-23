@@ -95,6 +95,17 @@ def current_version_sql(
         LIMIT 1)"""  # noqa: S608
 
 
+def _flag_answers_today(alias: str) -> str:
+    """A dated flag suffices unless another expression could change the language or ordering."""
+    return f"""{alias}.is_current AND {alias}.expression_date <= CURRENT_DATE
+        AND NOT EXISTS (SELECT FROM versions sibling JOIN versions flag
+            ON flag.law_id = sibling.law_id AND flag.is_current
+            WHERE sibling.law_id = {alias}.law_id AND NOT sibling.is_current
+              AND (sibling.language <> flag.language OR sibling.parent_version_id IS NOT NULL
+                OR (sibling.expression_date = flag.expression_date
+                    AND sibling.ingested_at = flag.ingested_at)))"""  # noqa: S608
+
+
 async def latest_version_for_law(
     session: AsyncSession, law_id: uuid.UUID, language: str | None = None
 ) -> Version | None:
@@ -195,10 +206,12 @@ async def list_versions(
 
 def _latest_sql(language: str | None, wheres: str) -> str:
     winner = current_version_sql("l.id", language=bool(language))
+    if language:
+        return f"SELECT v.id FROM laws l JOIN versions v ON v.id = {winner} WHERE true {wheres}"  # noqa: S608
     return f"""
-        SELECT v.id FROM laws l JOIN jurisdictions j ON j.id = l.jurisdiction_id
-        JOIN versions v ON v.id = {winner}
-        WHERE true {wheres}
+        SELECT CASE WHEN {_flag_answers_today("f")} THEN f.id ELSE {winner} END
+        FROM laws l LEFT JOIN versions f ON f.law_id = l.id AND f.is_current
+        WHERE (f.id IS NOT NULL OR EXISTS (SELECT FROM versions v WHERE v.law_id = l.id)) {wheres}
     """  # noqa: S608
 
 
@@ -238,12 +251,13 @@ async def latest_versions_for_jurisdiction(
     retrieval: sieving the results instead draws the pool from every doctype, so
     one thinly represented in the top ranks reads as absent from the corpus.
     """
+    scope = "AND l.jurisdiction_id = (SELECT id FROM jurisdictions WHERE code = :code)"
     doctype_clause = "AND l.doctype = :doctype" if doctype else ""
     result = await session.execute(
         text(
             _latest_sql(
                 language,
-                f"AND j.code = :code {doctype_clause}",
+                f"{scope} {doctype_clause}",
             )
         ),
         {
@@ -304,7 +318,17 @@ def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[
     """
     if not isinstance(scope, CurrentScope):
         return "", f"{version_col} = ANY(:version_ids)", {"version_ids": list(scope)}
-    preds = [f"sv.id = {current_version_sql('sl.id')}"]
+    preds, params = _law_filters(scope)
+    trusted = f"""SELECT FROM versions f
+        WHERE f.law_id = sv.law_id AND {_flag_answers_today("f")}"""  # noqa: S608
+    winner = current_version_sql("sv.law_id")
+    preds.append(f"CASE WHEN EXISTS ({trusted}) THEN sv.is_current ELSE sv.id = {winner} END")
+    joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
+    return joins, " AND ".join(preds), params
+
+
+def _law_filters(scope: CurrentScope) -> tuple[list[str], dict[str, Any]]:
+    preds: list[str] = []
     params: dict[str, Any] = {}
     if scope.jurisdiction_ids is not None:
         preds.append("sl.jurisdiction_id = ANY(:scope_jurisdiction_ids)")
@@ -319,8 +343,7 @@ def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[
     if scope.doctype:
         preds.append("sl.doctype = :scope_doctype")
         params["scope_doctype"] = scope.doctype
-    joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
-    return joins, " AND ".join(preds), params
+    return preds, params
 
 
 def scoped_text(sql: str, params: dict[str, Any]) -> TextClause:
@@ -360,23 +383,27 @@ async def count_embedded_versions(
             return 0
         result = await session.execute(_COUNT_EMBEDDED_SQL, {"version_ids": list(version_ids)})
         return int(result.scalar_one())
-    return await _count_current(session, version_ids, "AND sv.embedded_at IS NOT NULL")
+    missing = f"""sl.id NOT IN (
+        SELECT sv.law_id FROM versions sv WHERE sv.embedded_at IS NULL
+        AND sv.id = {current_version_sql("sv.law_id")})"""  # noqa: S608
+    return await _count_laws(session, version_ids, [missing])
 
 
 async def count_in_scope(session: AsyncSession, scope: VersionScope) -> int:
     """How many versions the scope holds: one per law for a `CurrentScope`."""
     if not isinstance(scope, CurrentScope):
         return len(scope)
-    return await _count_current(session, scope, "")
+    return await _count_laws(session, scope, [])
 
 
-async def _count_current(session: AsyncSession, scope: CurrentScope, extra: str) -> int:
+async def _count_laws(session: AsyncSession, scope: CurrentScope, extra: list[str]) -> int:
     if not scope:
         return 0
-    # The scope's join puts `versions` under `sv`; the outer row is a law's.
-    joins, pred, params = scope_filter(scope, "v.id")
+    predicates, params = _law_filters(scope)
+    predicates.extend(extra)
+    predicates.append("EXISTS (SELECT FROM versions v WHERE v.law_id = sl.id)")
     statement = scoped_text(
-        f"SELECT count(*) FROM versions v {joins} WHERE {pred} {extra}",  # noqa: S608
+        f"SELECT count(*) FROM laws sl WHERE {' AND '.join(predicates)}",  # noqa: S608
         params,
     )
     return int((await session.execute(statement, params)).scalar_one())
@@ -402,7 +429,9 @@ async def latest_versions_global(
     if jurisdictions is not None:
         if not jurisdictions:
             return []
-        wheres.append("AND j.code IN :jurisdictions")
+        wheres.append(
+            "AND l.jurisdiction_id IN (SELECT id FROM jurisdictions WHERE code IN :jurisdictions)"
+        )
         params["jurisdictions"] = tuple(jurisdictions)
     if from_year is not None:
         wheres.append("AND (l.year IS NULL OR l.year >= :from_year)")

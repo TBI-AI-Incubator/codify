@@ -151,6 +151,24 @@ async def test_current_text_follows_the_session_date_without_a_write(
         assert set(ids) & {first, second} == {expected}
 
 
+async def test_a_newer_root_in_another_language_does_not_replace_the_base_text(
+    session: AsyncSession,
+) -> None:
+    number = uuid.uuid4().hex
+    base = await _save(session, "xa", number, "2020-01-01")
+    later = await _save(session, "xa", number, "2021-01-01", language="fra")
+    assert await _current(session, base) == [later]
+    ids = await latest_versions_global(session, jurisdictions=("xa",))
+    assert set(ids) & {base, later} == {base}
+    scope = await current_scope(session, jurisdictions=("xa",))
+    joins, predicate, params = scope_filter(scope, "v.id")
+    rows = await session.scalars(
+        text(f"SELECT v.id FROM versions v {joins} WHERE {predicate}"),  # noqa: S608
+        params,
+    )
+    assert set(rows) & {base, later} == {base}
+
+
 async def test_concurrent_writers_leave_one_current_version(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
