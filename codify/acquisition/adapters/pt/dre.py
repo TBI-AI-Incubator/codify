@@ -16,6 +16,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 import structlog
+from lxml import html
 
 from codify.acquisition.adapters.pt.dre_akn import (
     LISBON,
@@ -110,6 +111,19 @@ def number_and_year(numero: str, published: str) -> tuple[str, str]:
 def work_eli(eli: str) -> str:
     """The work ELI (…/p/dre) from any of its language or format forms."""
     return re.sub(r"/pt(?:/html)?/?$", "", eli.replace("http://", "https://").rstrip("/"))
+
+
+def rdfa_values(markup: str, subject: str, prop: str) -> set[str]:
+    """Values the gazette explicitly attributes to one ELI subject."""
+    if not markup.strip():
+        return set()
+    root = html.fromstring(markup)
+    return {
+        value
+        for node in root.xpath("descendant-or-self::*[@property=$prop or @rel=$prop]", prop=prop)
+        if work_eli(node.get("about", "")) == subject
+        and (value := node.get("resource") or node.get("content") or node.get("href"))
+    }
 
 
 class DiarioAcquirer(BaseAcquirer):
@@ -274,6 +288,17 @@ class DiarioAcquirer(BaseAcquirer):
             raise DrItemMissing(f"no act at {link!r}")
         return detail
 
+    async def _edition_id(self, eli: str) -> str:
+        async def get() -> dict[str, Any]:
+            response = await self._client.get(f"{eli}/pt/html", follow_redirects=True)
+            response.raise_for_status()
+            ids = rdfa_values(response.text, eli, "eli:id_local")
+            if len(ids) != 1 or not re.fullmatch(r"[1-9]\d*", value := ids.pop()):
+                raise DrItemMissing(f"{eli} has no unambiguous publisher edition ID")
+            return {"id": value}
+
+        return str((await self._cached(f"edition {eli}", get))["id"])
+
     async def _consolidated(
         self, tipo: str, ano: str, frag_id: str, *, edition: date | None, expected_id: str
     ) -> tuple[dict[str, Any], dict[str, Any], str]:
@@ -287,19 +312,11 @@ class DiarioAcquirer(BaseAcquirer):
             "Key": f"{ano}-{frag_id}",
             "DataSelecionada": (edition or datetime.now(LISBON).date()).isoformat(),
         }
-        frag = await self._call(FRAG, v, f"frag {key_suffix}")
+        frag = await self._call(FRAG, v, f"frag {key_suffix}", lambda _: False)
         legis = frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
         v |= {"DiplomaLegisId": legis, "GetDiplomaFragByIdAndApplicationSetting": frag}
         key = f"data {key_suffix}"
-        data = await self._call(
-            DATA,
-            v,
-            key,
-            lambda d: (
-                bool((d.get("LegConsBase") or {}).get("List"))
-                and (not edition or str(d.get("CurrentConsolidacaoId")) == expected_id)
-            ),
-        )
+        data = await self._call(DATA, v, key, lambda _: False)
         returned_id = data.get("CurrentConsolidacaoId")
         if edition and str(returned_id) != expected_id:
             raise DrItemMissing(
@@ -354,6 +371,7 @@ class DiarioAcquirer(BaseAcquirer):
 
         cons: dict[str, Any] | None = None
         data_key = ""
+        edition_eli = ""
         # The enacted text needs the consolidation only to find its detail page.
         current = ref.as_of != "enacted" or not (link or dated)
         cons_eli = f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/pt/html"
@@ -367,8 +385,8 @@ class DiarioAcquirer(BaseAcquirer):
                 last = civil_date(data.get("DataUltimaConsolidada"))
                 if edition:
                     last = edition.isoformat()
-                elif last <= "1900-01-01":
-                    last = max(f["version_date"] for f in frags)
+                elif not last or last <= "1900-01-01":
+                    raise DrItemMissing("no listed date for the current consolidation")
                 cons = {
                     "url": landed,
                     "date": last,
@@ -414,6 +432,32 @@ class DiarioAcquirer(BaseAcquirer):
             raise ValueError(
                 f"ref asks for {ref.number}/{ref.year} by {eli}; {link} is {number}/{year}"
             )
+        if cons:
+            edition_eli = f"{cons_eli.removesuffix('/pt/html')}/{cons['date'].replace('-', '')}"
+            listed = rdfa_values(
+                str(detail.get("ELIMetadataHTML") or ""),
+                work_eli(str(detail.get("ELI") or "")),
+                "eli:consolidated_by",
+            )
+            if edition_eli not in {work_eli(uri) for uri in listed}:
+                raise DrItemMissing(f"{edition_eli} is not listed for this act")
+            # The latest record already pairs its last date with its last ID.
+            publisher_id = (
+                str(data.get("LastConsolidacaoId") or "")
+                if cons["date"] == civil_date(data.get("DataUltimaConsolidada"))
+                else await self._edition_id(edition_eli)
+            )
+            if (
+                not re.fullmatch(r"[1-9][0-9]*", publisher_id)
+                or str(data.get("CurrentConsolidacaoId")) != publisher_id
+            ):
+                raise DrItemMissing(
+                    f"returned consolidation does not match listed edition {edition_eli}"
+                )
+            for key, answer in ((data_key.replace("data ", "frag ", 1), frag), (data_key, data)):
+                path = self._cache_path(key)
+                if path is not None and not path.exists():
+                    write_index(path, answer)
         work = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
         as_of = (cons["date"] if cons else "") or published
         expression = build_frbr_expression_uri(work, "por", as_of)
@@ -463,11 +507,7 @@ class DiarioAcquirer(BaseAcquirer):
             "text_source": "consolidated" if cons else "printed",
             "consolidation_date": cons["date"] if cons else "",
             "consolidated_url": cons["url"] if cons else "",
-            "consolidated_eli": (
-                f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/{as_of.replace('-', '')}"
-                if cons
-                else ""
-            ),
+            "consolidated_eli": edition_eli,
             "consolidation_in_update": cons["in_update"] if cons else False,
             "repealed_fragments": (
                 sum(f["state"] == REPEALED for f in cons["fragments"]) if cons else 0
@@ -498,9 +538,7 @@ class DiarioAcquirer(BaseAcquirer):
                     role="card",
                 ),
             ],
-            source_url=upstream["consolidated_eli"]
-            if edition
-            else (cons["url"] if cons else detail_url),
+            source_url=edition_eli if edition else (cons["url"] if cons else detail_url),
             # Saved answers are as old as the crawl that saved them.
             fetched_at=saved or now,
             licence=self._licence,

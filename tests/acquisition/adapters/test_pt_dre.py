@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -148,6 +149,8 @@ def _detail(did: str, numero: str, day: str, eli: str, texto: str, tipo: str = "
     }
 
 
+FIXTURES = Path(__file__).with_name("fixtures")
+
 DETAILS = {
     "decreto-lei/7-2042-900001": _detail(
         "900001",
@@ -210,6 +213,8 @@ class Gazette:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.seen.append(request)
         path = request.url.path
+        if path == "/eli/dec-lei/7/2042/p/cons/20430101/pt/html":
+            return httpx.Response(200, text=(FIXTURES / "pt_january_edition.html").read_text())
         if request.url.host == "data.dre.pt":
             search = path.removeprefix("/eli/")
             return httpx.Response(
@@ -240,7 +245,12 @@ class Gazette:
             if self.answer is not None:
                 return httpx.Response(200, json={"versionInfo": info, **self.answer})
             if path.endswith("DataActionGetAllConteudoDetalheData"):
-                data: dict[str, Any] = {"DetalheConteudo": DETAILS.get(f"{v['Tipo']}/{v['Key']}")}
+                detail = DETAILS.get(f"{v['Tipo']}/{v['Key']}")
+                data: dict[str, Any] = {"DetalheConteudo": detail}
+                if detail and detail["Id"] == "900001":
+                    data["DetalheConteudo"] = detail | {
+                        "ELIMetadataHTML": (FIXTURES / "pt_edition_list.html").read_text()
+                    }
             elif path.endswith("DataActionGetDiplomaFragByIdAndApplicationSetting"):
                 data = {
                     "ConsolidadaConteudoDetalhe": {
@@ -250,7 +260,12 @@ class Gazette:
                 }
             else:
                 assert v["GetDiplomaFragByIdAndApplicationSetting"]
-                data = {"LegConsBase": {"List": self.frags}, "DataUltimaConsolidada": self.last}
+                data = {
+                    "LegConsBase": {"List": self.frags},
+                    "DataUltimaConsolidada": self.last,
+                    "CurrentConsolidacaoId": "124",
+                    "LastConsolidacaoId": "124",
+                }
                 if self.editions:
                     data = self.editions[v["DataSelecionada"]]
             return httpx.Response(200, json={"versionInfo": info, "data": data})
@@ -766,12 +781,12 @@ async def test_an_eli_the_site_does_not_know_reads_as_no_consolidation() -> None
     assert doc.upstream_metadata["text_source"] == "printed"
 
 
-async def test_an_undated_consolidation_is_dated_by_its_versions_or_publication() -> None:
+async def test_an_undated_consolidation_cannot_mint_a_publication_day_edition() -> None:
     undated = [
         {**f, "FragmentoVersao": {**f["FragmentoVersao"], "DataVersao": ""}} for f in CONSOLIDATED
     ]
-    doc, _ = await _fetch(Gazette(undated, last=""), _ref("7", 2042))
-    assert doc.expression_uri == "/akn/pt/act/dl/2042/7/por@2042-03-02"
+    with pytest.raises(DrItemMissing, match="no listed date"):
+        await _fetch(Gazette(undated, last=""), _ref("7", 2042))
 
 
 def _shape(frags: list[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -1028,7 +1043,9 @@ def edition_ref(day: str, edition_id: str) -> DocumentRef:
 
 
 async def test_latest_and_dated_have_identical_bodies(two_editions: Gazette) -> None:
-    two_editions.editions[date.today().isoformat()] = two_editions.editions["2043-03-01"]
+    two_editions.editions[datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()] = (
+        two_editions.editions["2043-03-01"]
+    )
     latest, _ = await _fetch(two_editions, _ref("7", 2042))
     dated, _ = await _fetch(two_editions, edition_ref("2043-03-01", "124"))
     assert latest.expression_uri == dated.expression_uri
@@ -1096,7 +1113,7 @@ async def test_unvalidated_selector_cannot_return_latest() -> None:
 async def test_fragment_metadata_normalises_xml_controls(two_editions: Gazette) -> None:
     data = two_editions.editions["2043-03-01"]
     data["LegConsBase"]["List"][-1]["ConsolidacaoFragmento"]["Name"] += "\v"
-    two_editions.editions[date.today().isoformat()] = data
+    two_editions.editions[datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()] = data
     doc, _ = await _fetch(two_editions, _ref("7", 2042))
     validate_akn(doc.primary().content)
     assert b"\\u000b" in doc.bodies[1].content
@@ -1136,3 +1153,22 @@ async def test_invalid_edition_targets_return_no_document(
     ref = _ref(number, year, **extra).model_copy(update={"as_of": selector})
     with pytest.raises((ValueError, DrItemMissing), match=error):
         await _fetch(Gazette(), ref)
+
+
+async def test_unlisted_edition_is_never_cached(two_editions: Gazette, tmp_path: Path) -> None:
+    two_editions.editions["2043-01-15"] = two_editions.editions["2043-01-01"]
+    with pytest.raises(DrItemMissing, match="listed"):
+        await _fetch(two_editions, edition_ref("2043-01-15", "123"), tmp_path)
+    assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))
+
+
+async def test_wrong_pair_for_listed_date_is_never_cached(
+    two_editions: Gazette, tmp_path: Path
+) -> None:
+    two_editions.editions["2043-01-01"] = two_editions.editions["2043-03-01"]
+    with pytest.raises(DrItemMissing, match="listed edition"):
+        await _fetch(two_editions, edition_ref("2043-01-01", "124"), tmp_path)
+    cached = [json.loads(p.read_text()) for p in tmp_path.glob("*.json")]
+    assert all(
+        "LegConsBase" not in data and "ConsolidadaConteudoDetalhe" not in data for data in cached
+    )

@@ -44,7 +44,8 @@
           }
         }
       ]
-    }
+    },
+    "LastConsolidacaoId": "124"
   },
   "2043-03-01": {
     "CurrentConsolidacaoId": "124",
@@ -91,6 +92,7 @@
           }
         }
       ]
-    }
+    },
+    "LastConsolidacaoId": "124"
   }
 }
