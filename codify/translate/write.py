@@ -586,7 +586,7 @@ def _latinise_hijai_lists(root: etree._Element) -> None:
         if len(parent) < 3:
             continue
         items = [item for item in parent if item.tag in _LIST_ITEM_TAGS]
-        if not 3 <= len(items) <= 26 or any(item.tag != items[0].tag for item in items):
+        if not 3 <= len(items) <= len(_HIJAI) or any(item.tag != items[0].tag for item in items):
             continue
         labels: list[tuple[etree._Element, str]] = []
         for i, (item, expected) in enumerate(zip(items, _HIJAI, strict=False)):
@@ -601,7 +601,10 @@ def _latinise_hijai_lists(root: etree._Element) -> None:
             letter = unicodedata.normalize("NFKC", marker[start:end]).translate(_ALEF_FORMS)
             if letter != expected:
                 break
-            labels.append((num, marker[:start] + chr(ord("a") + i) + marker[end:]))
+            # The point nester counts a..z, aa..zz as consecutive positions.
+            repeat, offset = divmod(i, 26)
+            latin = chr(ord("a") + offset) * (repeat + 1)
+            labels.append((num, marker[:start] + latin + marker[end:]))
         else:
             for num, replacement in labels:
                 num.text = replacement

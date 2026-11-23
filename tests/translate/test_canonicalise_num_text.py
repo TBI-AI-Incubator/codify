@@ -91,9 +91,21 @@ def test_hijai_marker_keeps_source_punctuation_and_normalises_presentation_forms
     root = etree.Element(f"{{{AKN_NS}}}body")
     # Include a presentation-form lām late in the list. Rejecting it would
     # send the entire sequence through the traditional abjad mapping.
-    labels = ["(أ)", "ب)", "( ت )", "ث–", *"جحخدذرزسشصضطظعغفقك", "ﻟـ:"]
+    labels = ["(أ)", "ب)", "( ت )", "ث–", *"جحخدذرزسشصضطظعغفقك", "ﻟـ:", *"منهوي"]
     for label in labels:
         item = etree.SubElement(root, f"{{{AKN_NS}}}point")
         etree.SubElement(item, f"{{{AKN_NS}}}num").text = label
     _canonicalise_num_text(root, "eng")
-    assert _num_texts(root) == ["(a)", "b)", "( c )", "d–", *"efghijklmnopqrstuv", "w:"]
+    assert _num_texts(root) == [
+        "(a)",
+        "b)",
+        "( c )",
+        "d–",
+        *"efghijklmnopqrstuv",
+        "w:",
+        "x",
+        "y",
+        "z",
+        "aa",
+        "bb",
+    ]

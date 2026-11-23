@@ -213,10 +213,11 @@ def test_list_prose_outside_body_wrappers_is_not_sent() -> None:
 def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
     from lxml import etree
 
+    from codify.translate.audit import audit_translation
     from codify.translate.translate_bodies import TranslatedBlock
     from codify.translate.write import apply_translation_to_akn
 
-    table = "TABLE\n  TR\n    TH\n      Kind\n    TH\n      Rate\n  TR\n    TC\n      Clay\n    TC\n      18\n"
+    table = "TABLE\n  TR\n    TH\n      Kind\n    TH\n      Rate\n  TR\n    TC\n      Clay\n    TC\n      18 Dinars\n"
     indented = "\n".join("  " + line for line in table.splitlines())
     xml = parse_to_akn(
         f"ARTICLE 1\n  Before.\n{indented}\n  After.\n\nSCHEDULE 1\n{indented}\n",
@@ -232,10 +233,10 @@ def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
         "Before.",
         "Mineral kind",
         "Clay",
-        "18",
+        "18 Dinars",
         "After.",
     ]
-    assert cell_units[1].body_text.splitlines() == ["Mineral kind", "Clay", "18"]
+    assert cell_units[1].body_text.splitlines() == ["Mineral kind", "Clay", "18 Dinars"]
     blocks = [
         TranslatedBlock(
             eid=u.akn_eid,
@@ -245,5 +246,19 @@ def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
     ]
     out = etree.fromstring(apply_translation_to_akn(xml, blocks, []).encode())
     assert out.xpath('count(//*[local-name()="td"]/*[text()="Argile"])') == 2
-    assert out.xpath('count(//*[local-name()="td"]/*[text()="18"])') == 2
+    assert out.xpath('count(//*[local-name()="td"]/*[text()="18 Dinars"])') == 2
     assert out.xpath('count(//*[local-name()="ref" and @href="#bands" and text()="bands"])') == 2
+
+    money = {u.akn_eid: ["18"] for u in cell_units}
+    audit = audit_translation(
+        xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money
+    )
+    assert audit["money_missing_by_eid"] == audit["money_duplicated_by_eid"] == {}
+
+    # The article has the same amount. It cannot satisfy the schedule's manifest.
+    amount = out.xpath('//*[local-name()="attachment"]//*[text()="18 Dinars"]')[0]
+    amount.text = "8 Dinars"
+    audit = audit_translation(
+        xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money
+    )
+    assert audit["money_missing_by_eid"] == {cell_units[1].akn_eid: ["18"]}
