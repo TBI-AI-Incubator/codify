@@ -39,6 +39,14 @@ Breaks:
 
 New, additive:
 
+- A dated statute book: the tables `history_works`, `publisher_texts`,
+  `dated_expressions`, `provision_intervals`, `provision_links` and
+  `history_withdrawals`, and `codify.history.build.build_work`, a pure function
+  that derives a work's dated expressions, provision intervals and identity links
+  from its publisher texts. `publisher_texts` is immutable apart from its work
+  assignment; the derived tables are rebuilt per work. No existing search,
+  embedding or latest-version reader reads them. See
+  `docs/reference/history-tables.md`.
 - `PoliteTransport` keeps a circuit per host, shared across the process. Five
   requests in a row that fail, each counted once after its own retries, open
   it: a gateway failure (502, 504), a connection that never answered, or the
