@@ -14,11 +14,13 @@ from pydantic import BaseModel
 
 from codify.akn.document import Document
 from codify.akn.elements import BodyElement
-from codify.akn.vocabulary import provision_text
+from codify.akn.vocabulary import is_lifted_note, provision_text
 from codify.pipeline.enrich.kinds import kind_to_kw
 
 _AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
 _BODY_WRAPPERS = frozenset({"intro", "content", "wrapUp"})
+_WRAPPER_TAGS = {f"{{{_AKN_NS}}}{name}" for name in _BODY_WRAPPERS}
+_CELL_TAGS = {f"{{{_AKN_NS}}}th", f"{{{_AKN_NS}}}td"}
 
 
 class SourceUnit(BaseModel):
@@ -55,28 +57,67 @@ def _joined_body(el: BodyElement) -> str:
     return "\n".join(p for p in parts if p)
 
 
+def plain_text_paragraph(p: etree._Element, *, allow_lifted_notes: bool = False) -> bool:
+    """The writer preserves lifted notes but flattens other inline elements."""
+    return all(
+        not isinstance(child.tag, str) or (allow_lifted_notes and is_lifted_note(child))
+        for child in p
+    )
+
+
+def body_paragraphs(el: etree._Element) -> Iterator[etree._Element]:
+    """Paragraph slots shared by extraction and write, in source order.
+
+    Bare paragraphs in an attachment's main body have their own unit. A table
+    there belongs to the attachment; a table in a provision belongs to its
+    wrapper. Only cell paragraphs are writable, so rows and spans survive.
+    """
+    for wrapper in el:
+        if wrapper.tag not in _WRAPPER_TAGS:
+            continue
+        for child in wrapper:
+            if child.tag == f"{{{_AKN_NS}}}p":
+                yield child
+            elif child.tag == f"{{{_AKN_NS}}}table":
+                yield from _table_paragraphs(child)
+    if el.tag == f"{{{_AKN_NS}}}attachment":
+        for main in el.findall(f"{{{_AKN_NS}}}doc/{{{_AKN_NS}}}mainBody"):
+            for table in main.iterchildren(f"{{{_AKN_NS}}}table"):
+                yield from _table_paragraphs(table)
+
+
+def _table_paragraphs(table: etree._Element) -> Iterator[etree._Element]:
+    for row in table.iterchildren(f"{{{_AKN_NS}}}tr"):
+        for cell in row:
+            if cell.tag in _CELL_TAGS:
+                yield from (
+                    p
+                    for p in cell.iterchildren(f"{{{_AKN_NS}}}p")
+                    if plain_text_paragraph(p, allow_lifted_notes=True)
+                )
+
+
 def _extract_body_lines_by_eid(source_xml: str) -> dict[str, list[str]]:
-    """eId → one line per source `<p>` child of intro/content/wrapUp."""
+    """Map each unit to its nonempty paragraph slots, including table cells."""
     root = etree.fromstring(source_xml.encode("utf-8"))
     out: dict[str, list[str]] = {}
     for el in root.iter():
-        if not isinstance(el.tag, str):
-            continue
         eid = el.get("eId")
-        if not eid:
-            continue
-        lines: list[str] = []
-        for wrapper in el:
-            if etree.QName(wrapper).localname not in _BODY_WRAPPERS:
-                continue
-            for child in wrapper:
-                if etree.QName(child).localname != "p":
-                    continue
-                text = provision_text(child).strip()
-                if text:
-                    lines.append(text)
-        if lines:
-            out[eid] = lines
+        if eid:
+            # Translation batches use one newline per writable paragraph. A soft
+            # wrap inside one cell must never consume the next cell's target slot.
+            lines = [
+                " ".join(part.strip() for part in text.splitlines() if part.strip())
+                for p in body_paragraphs(el)
+                if (text := provision_text(p).strip())
+            ]
+            # An all-rich table has no writable cells. Keep its empty slot list
+            # so the document-model fallback cannot turn link text into a slot.
+            if lines or any(
+                wrapper.find(f"{{{_AKN_NS}}}table") is not None
+                for wrapper in el.iterchildren(*_WRAPPER_TAGS)
+            ):
+                out[eid] = lines
     return out
 
 
@@ -133,7 +174,7 @@ def _attachment_units(source_xml: str, eid_to_lines: dict[str, list[str]]) -> li
                 )
         for el in att.iter():
             eid = el.get("eId") if isinstance(el.tag, str) else None
-            if not eid or eid == att_eid or eid in seen or eid not in eid_to_lines:
+            if not eid or eid == att_eid or eid in seen or not eid_to_lines.get(eid):
                 continue
             seen.add(eid)
             num = None
@@ -167,7 +208,7 @@ def walk_source(
 
     def _body_for(el: BodyElement) -> str:
         lines = eid_to_lines.get(el.akn_eid)
-        if lines:
+        if lines is not None:
             return "\n".join(lines)
         # The writer patches only <p>s inside intro, content and wrapUp, never list prose.
         return "" if el.akn_type in ("item", "blockList") else _joined_body(el)
