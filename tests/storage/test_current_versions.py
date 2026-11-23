@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from codify.akn.io import parse_akn
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.storage.embeddings import embed_and_stamp
+from codify.storage.goods_codes import find_versions_by_goods_code, index_version_goods_codes
 from codify.storage.repository import save_document
 from codify.storage.retrieval import hybrid_search
 from codify.storage.versions import (
@@ -150,6 +151,56 @@ async def test_current_text_follows_the_session_date_without_a_write(
         assert current is not None and current.id == expected
         ids = await latest_versions_global(session, jurisdictions=("xa",))
         assert set(ids) & {first, second} == {expected}
+
+
+@pytest.mark.parametrize(
+    "surface", ["bulk", "count", "embedded", "lexical", "dense", "hybrid", "goods"]
+)
+async def test_a_future_law_enters_current_results_on_its_date_without_a_write(
+    session: AsyncSession, surface: str
+) -> None:
+    await session.execute(text("SET LOCAL TIME ZONE 'Etc/GMT-14'"))
+    start = (await session.execute(text("SELECT CURRENT_DATE"))).scalar_one()
+    version = await _save(
+        session,
+        "xa",
+        uuid.uuid4().hex,
+        start.isoformat(),
+        body="Thermometers under CN code 8471 30 00.",
+        year=1973,
+    )
+    await embed_and_stamp(session, version, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
+    xml = await session.scalar(text("SELECT akn_xml FROM versions WHERE id = :v"), {"v": version})
+    assert await index_version_goods_codes(session, version, xml) > 0
+    scope = await current_scope(
+        session, jurisdictions=("xa",), from_year=1973, to_year=1973, undated=False
+    )
+    for zone, eligible in [("Etc/GMT+12", False), ("Etc/GMT-14", True)]:
+        await session.execute(text("SELECT set_config('TimeZone', :zone, true)"), {"zone": zone})
+        if surface == "bulk":
+            ids = await latest_versions_global(
+                session, jurisdictions=("xa",), from_year=1973, to_year=1973
+            )
+            assert None not in ids and (version in ids) == eligible
+        elif surface == "count":
+            assert await count_in_scope(session, scope) == int(eligible)
+        elif surface == "embedded":
+            assert await count_embedded_versions(session, scope) == int(eligible)
+        elif surface == "goods":
+            rows = await find_versions_by_goods_code(session, "84713000", current_only=True)
+            assert (version in {r.version_id for r in rows}) == eligible
+        else:
+            hits = await hybrid_search(
+                session,
+                query_vec=[1.0] + [0.0] * 767,
+                query_text="" if surface == "dense" else "Thermometers",
+                model_id="absent" if surface == "lexical" else "test-model",
+                version_ids=scope,
+                k=10,
+                candidate_pool=30,
+                rrf_k=60,
+            )
+            assert bool(hits) == eligible
 
 
 async def test_a_newer_root_in_another_language_does_not_replace_the_base_text(

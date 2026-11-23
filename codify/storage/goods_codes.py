@@ -142,7 +142,9 @@ async def find_versions_by_goods_code(
     if jurisdiction_codes is not None:
         statement = statement.where(Jurisdiction.code.in_(list(jurisdiction_codes)))
     if current_only:
-        statement = statement.where(Version.id == text(current_version_sql("laws.id")))
+        statement = statement.where(
+            Version.id == text(current_version_sql("laws.id", allow_future=False))
+        )
     rows = (await session.execute(statement)).all()
     return [
         GoodsCodeMatch(
