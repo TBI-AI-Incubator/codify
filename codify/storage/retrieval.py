@@ -10,6 +10,7 @@ silently.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel
@@ -18,10 +19,12 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from codify.quality.sentinels import DOTTED_PLACEHOLDER_PATTERN
 from codify.search import tokenise
 from codify.storage.lexicon import expand_terms
 from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.versions import (
+    ENACTED_LAW_SQL,
     CurrentScope,
     VersionScope,
     held_laws_sql,
@@ -95,8 +98,16 @@ _HYBRID_TEMPLATE = """
     LIMIT :k
 """
 
-# The dense arm's body after SELECT, shared with the dense-only query.
-_DENSE_TEMPLATE = """e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
+
+def _searchable(alias: str, law_alias: str | None = None) -> str:
+    dotted_guard = f"{alias}.text !~ '{DOTTED_PLACEHOLDER_PATTERN}'"
+    if law_alias is None:
+        return dotted_guard
+    return f"{ENACTED_LAW_SQL.format(law=law_alias)} AND {dotted_guard}"
+
+
+_DENSE_TEMPLATE = """
+        e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
         FROM provision_embeddings e
         JOIN provisions p ON p.id = e.provision_id {vec_join}
         WHERE {vec_partitions} {vec_scope}
@@ -104,6 +115,7 @@ _DENSE_TEMPLATE = """e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :q
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
           AND p.excluded_from_pool IS NOT TRUE
+          AND {eligible}
         ORDER BY e.embedding <=> :query_vec"""
 
 # The relaxed scan may hand back its candidates a little out of order, so the
@@ -119,33 +131,47 @@ _DENSE_ONLY_TEMPLATE = """
 """
 
 
-def _dense_body(scope: VersionScope, partitioned: bool) -> tuple[str, dict[str, Any]]:
-    joins, pred, params = scope_filter(scope, "e.version_id")
+def _dense_body(
+    scope: VersionScope, partitioned: bool, include_drafts: bool
+) -> tuple[str, dict[str, Any]]:
+    joins, pred, params = scope_filter(scope, "e.version_id", enacted_ids_only=not include_drafts)
     partitions = "e.jurisdiction_id = ANY(:jurisdiction_ids) AND" if partitioned else ""
-    body = _DENSE_TEMPLATE.format(vec_join=joins, vec_partitions=partitions, vec_scope=pred)
+    body = _DENSE_TEMPLATE.format(
+        vec_join=joins,
+        vec_partitions=partitions,
+        vec_scope=pred,
+        eligible=_searchable("p"),
+    )
     return body, params
 
 
 _LEXICAL_MATCH = """p.search_tsv @@ to_tsquery('simple', :query_match)
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
-          AND p.excluded_from_pool IS NOT TRUE"""
+          AND p.excluded_from_pool IS NOT TRUE
+          AND {eligible}"""
 
 _SCORE = "search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')"
 
 
 def _hybrid_sql(
-    scope: VersionScope, partitioned: bool = True, scope_first: bool = False
+    scope: VersionScope,
+    partitioned: bool = True,
+    scope_first: bool = False,
+    include_drafts: bool = False,
 ) -> tuple[str, dict[str, Any]]:
-    fts_join, fts_pred, params = scope_filter(scope, "p.version_id")
-    rows = f"FROM provisions p {fts_join} WHERE {fts_pred} AND {_LEXICAL_MATCH}"
+    fts_join, fts_pred, params = scope_filter(
+        scope, "p.version_id", enacted_ids_only=not include_drafts
+    )
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p"))
+    rows = f"FROM provisions p {fts_join} WHERE {fts_pred} AND {match}"
     if scope_first:
         # Materialised, so no ordered index scan can stand in for reading the scope.
         in_scope = f"in_scope AS MATERIALIZED (SELECT p.id, p.search_tokens {rows}),\n    "
         lexical = f"SELECT id, {_SCORE} AS score FROM in_scope"  # noqa: S608
     else:
         in_scope, lexical = "", f"SELECT p.id, p.{_SCORE} AS score {rows}"
-    body, dense_params = _dense_body(scope, partitioned)
+    body, dense_params = _dense_body(scope, partitioned, include_drafts)
     sql = _HYBRID_TEMPLATE.format(in_scope=in_scope, lexical=lexical, dense_body=body)
     return sql, params | dense_params
 
@@ -189,7 +215,7 @@ async def _reads_scope_first(session: AsyncSession, scope: VersionScope) -> bool
     `SCOPE_FIRST_MAX_VERSIONS` laws holding at most `SCOPE_FIRST_MAX_ROWS`
     provisions, each counted no further than its limit."""
     if isinstance(scope, CurrentScope):
-        if scope == CurrentScope(undated=scope.undated):
+        if scope == CurrentScope(undated=scope.undated, include_drafts=scope.include_drafts):
             return False  # the whole corpus: the walk discards nothing
         _, pred, params = scope_filter(scope, "sv.id")
         held, law_params = held_laws_sql(scope)
@@ -205,8 +231,10 @@ async def _reads_scope_first(session: AsyncSession, scope: VersionScope) -> bool
     return await _count(session, rows_sql, params, SCOPE_FIRST_MAX_ROWS) <= SCOPE_FIRST_MAX_ROWS
 
 
-def _dense_only_sql(scope: VersionScope, partitioned: bool = True) -> tuple[str, dict[str, Any]]:
-    body, params = _dense_body(scope, partitioned)
+def _dense_only_sql(
+    scope: VersionScope, partitioned: bool = True, include_drafts: bool = False
+) -> tuple[str, dict[str, Any]]:
+    body, params = _dense_body(scope, partitioned, include_drafts)
     return _DENSE_ONLY_TEMPLATE.format(dense_body=body), params
 
 
@@ -273,9 +301,10 @@ async def _dense_only(
     model_id: str,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """Dense arm alone, for a query the tokeniser finds nothing lexical in."""
-    sql, params = _dense_only_sql(scope, jurisdiction_ids is not None)
+    sql, params = _dense_only_sql(scope, jurisdiction_ids is not None, include_drafts)
     params |= {
         "query_vec": query_vec,
         "k": k,
@@ -301,6 +330,7 @@ async def hybrid_search(
     model_id: str,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> list[tuple[uuid.UUID, str, str, float]]:
     """RRF-fused dense + BM25.
 
@@ -312,6 +342,8 @@ async def hybrid_search(
     legal basis, so it does not compete with law for a first page. On the flag
     alone, never on where a provision sits, because a normative annex is law."""
     scope = version_ids
+    if include_drafts and isinstance(scope, CurrentScope):
+        scope = replace(scope, include_drafts=True)
     if not scope:
         return []
     # Continue the approximate index scan past rows the version and model
@@ -335,9 +367,10 @@ async def hybrid_search(
             model_id,
             akn_type,
             include_non_normative,
+            include_drafts,
         )
     scope_first = await _reads_scope_first(session, scope)
-    sql, params = _hybrid_sql(scope, jurisdiction_ids is not None, scope_first)
+    sql, params = _hybrid_sql(scope, jurisdiction_ids is not None, scope_first, include_drafts)
     params |= {
         "query_vec": query_vec,
         "query_tokens": " ".join(tokens),
@@ -364,6 +397,7 @@ class ProvisionContext(BaseModel):
     law_id: uuid.UUID
     version_id: uuid.UUID
     law_title: str
+    status: str = "enacted"
     # Short display name where the law has one; `law_title` is the fallback.
     law_short_title: str | None = None
     jurisdiction_code: str
@@ -377,7 +411,7 @@ class ProvisionContext(BaseModel):
 
 
 async def enrich_matches(
-    session: AsyncSession, provision_ids: list[uuid.UUID]
+    session: AsyncSession, provision_ids: list[uuid.UUID], *, include_drafts: bool = False
 ) -> dict[uuid.UUID, ProvisionContext]:
     """Resolve law + jurisdiction metadata for a batch of provisions."""
     if not provision_ids:
@@ -391,6 +425,7 @@ async def enrich_matches(
                 Provision.version_id,
                 Law.id,
                 Law.title,
+                Law.status,
                 Law.short_title,
                 Law.frbr_work_uri,
                 Law.doctype,
@@ -400,7 +435,10 @@ async def enrich_matches(
             .join(Version, Version.id == Provision.version_id)
             .join(Law, Law.id == Version.law_id)
             .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
-            .where(Provision.id.in_(provision_ids))
+            .where(
+                Provision.id.in_(provision_ids),
+                text(_searchable("provisions", None if include_drafts else "laws")),
+            )
         )
     ).all()
     return {
@@ -409,6 +447,7 @@ async def enrich_matches(
             law_id=law_id,
             version_id=version_id,
             law_title=law_title,
+            status=status,
             law_short_title=law_short_title,
             jurisdiction_code=code,
             frbr_work_uri=frbr,
@@ -424,6 +463,7 @@ async def enrich_matches(
             version_id,
             law_id,
             law_title,
+            status,
             law_short_title,
             frbr,
             doctype,
@@ -460,6 +500,7 @@ async def matching_laws_ordered(
     offset: int,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> tuple[list[tuple[uuid.UUID, int]], int]:
     """Laws with a matching provision ordered by law metadata, as
     `([(law_id, match_count)], total_laws)`.
@@ -472,6 +513,7 @@ async def matching_laws_ordered(
     """
     if not version_ids or sort not in _LAW_ORDERS:
         return [], 0
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p", None if include_drafts else "l"))
     stmt = text(
         f"""
         SELECT v.law_id,
@@ -481,10 +523,7 @@ async def matching_laws_ordered(
         JOIN versions v ON v.id = p.version_id
         JOIN laws l ON l.id = v.law_id
         WHERE p.version_id = ANY(:version_ids)
-          AND p.search_tsv @@ to_tsquery('simple', :query_match)
-          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-          AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
+          AND {match}
         GROUP BY v.law_id
         ORDER BY {_LAW_ORDERS[sort]}, v.law_id
         LIMIT :limit OFFSET :offset
@@ -508,36 +547,6 @@ async def matching_laws_ordered(
     return [(r[0], int(r[1])) for r in rows], int(rows[0][2])
 
 
-# Capped here, not after the fetch: capping in Python still transfers every
-# match, so one broad term against one large law reads thousands of full
-# provision texts and throws them away.
-_LAW_PROVISIONS_SQL = text(
-    """
-    SELECT law_id, id, akn_eid, text FROM (
-        SELECT v.law_id, p.id, p.akn_eid, p.text,
-               row_number() OVER (
-                   PARTITION BY v.law_id
-                   ORDER BY p.search_tokens
-                            <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')
-               ) AS rn
-        FROM provisions p
-        JOIN versions v ON v.id = p.version_id
-        WHERE p.version_id = ANY(:version_ids)
-          AND v.law_id = ANY(:law_ids)
-          AND p.search_tsv @@ to_tsquery('simple', :query_match)
-          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-          AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
-    ) ranked
-    WHERE rn <= :per_law
-    ORDER BY law_id, rn
-    """
-).bindparams(
-    bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-    bindparam("law_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
-)
-
-
 async def provisions_for_laws(
     session: AsyncSession,
     *,
@@ -548,6 +557,7 @@ async def provisions_for_laws(
     per_law: int,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> dict[uuid.UUID, list[tuple[uuid.UUID, str, str]]]:
     """Best-matching provisions for each law on a page, BM25 first within a law.
     Bounded by `page size x per_law` because the cap is a window function inside
@@ -555,9 +565,36 @@ async def provisions_for_laws(
     """
     if not law_ids:
         return {}
+    # Capped here, not after the fetch: capping in Python still transfers every
+    # match, so one broad term against one large law reads thousands of full
+    # provision texts and throws them away.
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p", None if include_drafts else "l"))
+    stmt = text(
+        f"""
+        SELECT law_id, id, akn_eid, text FROM (
+            SELECT v.law_id, p.id, p.akn_eid, p.text,
+                   row_number() OVER (
+                       PARTITION BY v.law_id
+                       ORDER BY p.search_tokens
+                                <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')
+                   ) AS rn
+            FROM provisions p
+            JOIN versions v ON v.id = p.version_id
+            JOIN laws l ON l.id = v.law_id
+            WHERE p.version_id = ANY(:version_ids)
+              AND v.law_id = ANY(:law_ids)
+              AND {match}
+        ) ranked
+        WHERE rn <= :per_law
+        ORDER BY law_id, rn
+        """  # noqa: S608
+    ).bindparams(
+        bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+        bindparam("law_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
+    )
     rows = (
         await session.execute(
-            _LAW_PROVISIONS_SQL,
+            stmt,
             {
                 "version_ids": version_ids,
                 "law_ids": law_ids,

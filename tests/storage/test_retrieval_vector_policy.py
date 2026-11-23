@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import uuid
 from unittest.mock import AsyncMock, patch
@@ -27,7 +28,13 @@ def test_indexable_vector_selection_reads_one_model_in_scope(hybrid):
     sql = sql.replace("e.jurisdiction_id = ANY(:jurisdiction_ids)", "e.jurisdiction_id = 1")
     assert "e.jurisdiction_id = 1" in sql
     with sqlite3.connect(":memory:") as db:
+        sql = sql.replace("p.text !~", "p.text NOT REGEXP")
+        db.create_function(
+            "regexp", 2, lambda pattern, value: re.search(pattern, value) is not None
+        )
         db.executescript("""
+            CREATE TABLE laws (id INTEGER, status TEXT);
+            CREATE TABLE versions (id INTEGER, law_id INTEGER);
             CREATE TABLE provisions (
                 id INTEGER PRIMARY KEY, akn_eid TEXT, text TEXT, version_id INTEGER,
                 akn_type TEXT, normative BOOLEAN, excluded_from_pool BOOLEAN
@@ -37,6 +44,8 @@ def test_indexable_vector_selection_reads_one_model_in_scope(hybrid):
                 version_id INTEGER, jurisdiction_id INTEGER,
                 UNIQUE(provision_id, model_id, jurisdiction_id)
             );
+            INSERT INTO laws VALUES (1,'enacted'), (2,'draft');
+            INSERT INTO versions VALUES (1,1), (2,2);
             INSERT INTO provisions VALUES
                 (1,'a','both',1,'article',1,0),
                 (2,'b','fallback only',1,'article',1,0),
