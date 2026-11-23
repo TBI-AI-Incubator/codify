@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+from copy import deepcopy
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -212,6 +213,7 @@ class Gazette:
         self.answer = answer
         self.editions: dict[str, Any] = {}
         self.edition_list = (FIXTURES / "pt_edition_list.html").read_text()
+        self.local_ids = {"2043-01-01": "123", "2043-03-01": "124"}
         self.module = "mv-1"
         self.apis = {path: api for path, api, _ in (DETAIL, FRAG, DATA, EDITION)}
         self.manifest = {f"/dr/scripts/dr.{view}.mvc.js": "?h1" for view in VIEWS}
@@ -264,7 +266,7 @@ class Gazette:
             elif path.endswith(EDITION[0]):
                 day = v["DataConsolidada"]
                 eli = f"http://data.dre.pt/eli/dec-lei/7/2042/p/cons/{day.replace('-', '')}"
-                local_id = {"2043-01-01": "123", "2043-03-01": "124"}[day]
+                local_id = self.local_ids[day]
                 data = {
                     "ELIMetadataHTML": (
                         f'<div><span about="{eli}" property="eli:id_local" '
@@ -1465,3 +1467,48 @@ async def test_march_cannot_reuse_january_consolidation_in_three_edition_list(
     with pytest.raises(DrItemMissing, match="no unique consolidation ID"):
         await _fetch(two_editions, edition_ref("2043-03-01", "800"), tmp_path)
     assert not any("LegConsBase" in path.read_text() for path in tmp_path.glob("*.json"))
+
+
+@pytest.mark.parametrize("size", [4, 8])
+async def test_legacy_backfill_shares_selector_requests(
+    two_editions: Gazette, tmp_path: Path, size: int
+) -> None:
+    template = two_editions.editions["2043-01-01"]
+    entry = next(line for line in two_editions.edition_list.splitlines() if "20430101" in line)
+    dates = [f"2043-01-{i:02}" for i in range(1, size + 1)]
+    two_editions.edition_list = (
+        "<div>"
+        + "".join(entry.replace("20430101", day.replace("-", "")) for day in dates)
+        + "</div>"
+    )
+    for i, day in enumerate(dates):
+        cid = str(800 + i)
+        data = deepcopy(template)
+        data["CurrentConsolidacaoId"] = cid
+        for item in data["LegConsBase"]["List"]:
+            item["ConsolidacaoFragmento"]["Cid"] = cid
+        two_editions.editions[day] = data
+        two_editions.local_ids[day] = str(100 + i)
+
+    two_editions.editions[f"2043-01-{size + 1:02}"] = two_editions.editions[dates[-1]]
+
+    for i, day in enumerate(dates):
+        doc, _ = await _fetch(two_editions, edition_ref(day, str(800 + i)), tmp_path)
+        assert doc.expression_uri.endswith(day)
+
+    for action in (FRAG, DATA):
+        selected = [
+            json.loads(request.content)["screenData"]["variables"]["DataSelecionada"]
+            for request in two_editions.seen
+            if request.url.path.endswith(action[0])
+        ]
+        # Each listed date needs at most one body lookup and one independent check.
+        assert len(selected) <= 2 * size + 1
+        assert all(selected.count(day) <= 2 for day in dates)
+
+    # A new body claiming another edition's ID must still fail against the shared observations.
+    two_editions.editions[dates[0]] = two_editions.editions[dates[-1]]
+    two_editions.seen.clear()
+    with pytest.raises(DrItemMissing, match="no unique consolidation ID"):
+        await _fetch(two_editions, edition_ref(dates[0], str(800 + size - 1)), tmp_path)
+    assert sum(request.url.path.endswith(DATA[0]) for request in two_editions.seen) == 1

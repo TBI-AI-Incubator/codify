@@ -347,11 +347,11 @@ class DiarioAcquirer(BaseAcquirer):
         return await self._call(DATA, inputs, key, lambda _: False)
 
     async def _edition_at(
-        self, variables: dict[str, Any], day: date, key: str, expected: str, *, same: bool = True
+        self, variables: dict[str, Any], day: date, eli: str, expected: str, *, same: bool = True
     ) -> str:
         """Read an independent date selector from the publisher."""
 
-        key = f"{key} {day}"
+        key = f"edition selector {eli.rsplit('/', 1)[0]} {day}"
 
         async def get() -> dict[str, Any]:
             v = variables | {"DataSelecionada": day.isoformat()}
@@ -359,9 +359,14 @@ class DiarioAcquirer(BaseAcquirer):
             data = (await self._data(v, frag, f"check data {key}")).value
             return {"id": str(data.get("CurrentConsolidacaoId") or "")}
 
+        async def replay_or_fetch() -> dict[str, Any]:
+            # Older recordings stored the same observation under the target edition.
+            answer = await self._cached(f"edition interval {eli} {day}", get, lambda _: False)
+            return answer.value
+
         result = await self._cached(
-            f"edition interval {key}",
-            get,
+            key,
+            replay_or_fetch,
             lambda d: bool(re.fullmatch(r"[1-9][0-9]*", d["id"])) and (d["id"] == expected) == same,
         )
         return str(result.value["id"])
