@@ -8,6 +8,7 @@ from collections.abc import AsyncIterator
 from datetime import date
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from codify.search import TOKENISER_VERSION, tokenise_to_text
@@ -295,3 +296,16 @@ async def test_an_oversize_document_is_not_read_with_its_length(
     size, akn, _ = (await session.execute(bounded_akn(version_id))).one()
     assert size == len(_AKN)
     assert akn is None
+
+
+async def test_draft_table_is_readable_but_absent_from_search(session: AsyncSession) -> None:
+    version = await _a_version(session)
+    await index_version_annex_rows(session, version)
+    await session.execute(
+        text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:v)"),
+        {"v": version},
+    )
+    assert await rows_for_table(session, version, "t1")
+    assert not await search_annex_rows(
+        session, tokenise_to_text("copper", "eng"), version_ids=[version]
+    )

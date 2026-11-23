@@ -269,3 +269,31 @@ async def test_old_repeal_embedding_cannot_rank(session: AsyncSession, query: st
         model_id="fixture",
     )
     assert [match[2] for match in matches] == ["The register is public."]
+
+
+async def test_metadata_order_omits_drafts(session: AsyncSession) -> None:
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["The register is public."])
+    law = (
+        await session.execute(
+            text(
+                "UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:v) "
+                "RETURNING id"
+            ),
+            {"v": version},
+        )
+    ).scalar_one()
+    token = await retrieval.query_tokens_for(session, "register", [version])
+    assert await retrieval.matching_laws_ordered(
+        session, version_ids=[version], query_match=token, sort="title", limit=10, offset=0
+    ) == ([], 0)
+    assert (
+        await retrieval.provisions_for_laws(
+            session,
+            version_ids=[version],
+            law_ids=[law],
+            query_match=token,
+            query_tokens=token,
+            per_law=10,
+        )
+        == {}
+    )
