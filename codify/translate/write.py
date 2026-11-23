@@ -9,6 +9,7 @@ strings only and cannot introduce structure.
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date
 from typing import cast
 
@@ -575,6 +576,8 @@ def _hebrew_ordinal(text: str) -> str | None:
 # establish which order the source used.
 _HIJAI = "ابتثجحخدذرزسشصضطظعغفقكلمنهوي"
 _ALEF_FORMS = str.maketrans("أإآ", "ااا")
+# Match the punctuation retained by point ingestion, including "( أ )" and "أ)".
+_HIJAI_MARKER = re.compile(r"\(\s*(?P<enclosed>\w)\s*\)|(?P<bare>\w)[).‐-―:-]?")
 _LIST_ITEM_TAGS = {f"{{{AKN_NS}}}{name}" for name in ("point", "item", "paragraph", "subparagraph")}
 
 
@@ -586,16 +589,22 @@ def _latinise_hijai_lists(root: etree._Element) -> None:
         if not 3 <= len(items) <= 26 or any(item.tag != items[0].tag for item in items):
             continue
         labels: list[tuple[etree._Element, str]] = []
-        for item, expected in zip(items, _HIJAI, strict=False):
+        for i, (item, expected) in enumerate(zip(items, _HIJAI, strict=False)):
             num = item.find(f"{{{AKN_NS}}}num")
-            marker = (num.text or "").strip() if num is not None else ""
-            letter = marker.rstrip(".-").translate(JOINER_STRIP_TABLE).translate(_ALEF_FORMS)
-            if num is None or letter != expected:
+            if num is None or not num.text:
                 break
-            labels.append((num, marker[len(marker.rstrip(".-")) :]))
+            marker = num.text.translate(JOINER_STRIP_TABLE).strip()
+            match = _HIJAI_MARKER.fullmatch(marker)
+            if not match:
+                break
+            start, end = match.span("enclosed" if match["enclosed"] else "bare")
+            letter = unicodedata.normalize("NFKC", marker[start:end]).translate(_ALEF_FORMS)
+            if letter != expected:
+                break
+            labels.append((num, marker[:start] + chr(ord("a") + i) + marker[end:]))
         else:
-            for i, (num, suffix) in enumerate(labels):
-                num.text = chr(ord("a") + i) + suffix
+            for num, replacement in labels:
+                num.text = replacement
 
 
 def _canonicalise_num_text(root: etree._Element, target_language: str | None) -> None:
