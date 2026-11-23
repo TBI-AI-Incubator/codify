@@ -25,7 +25,9 @@ from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.versions import (
     CurrentScope,
     VersionScope,
+    held_laws_sql,
     scope_filter,
+    scope_languages_sql,
     scoped_text,
 )
 
@@ -192,7 +194,7 @@ _SCOPE_ROWS_CURRENT = """
 """
 _SCOPE_VERSIONS_CURRENT = """
     SELECT count(*) FROM (
-      SELECT 1 FROM versions sv JOIN laws sl ON sl.id = sv.law_id WHERE {pred} LIMIT :cap
+      SELECT 1 {held} LIMIT :cap
     ) capped
 """
 
@@ -210,8 +212,9 @@ async def _reads_scope_first(session: AsyncSession, scope: VersionScope) -> bool
         if scope == CurrentScope(undated=scope.undated):
             return False  # the whole corpus: the walk discards nothing
         _, pred, params = scope_filter(scope, "sv.id")
-        versions_sql = _SCOPE_VERSIONS_CURRENT.format(pred=pred)
-        versions = await _count(session, versions_sql, params, SCOPE_FIRST_MAX_VERSIONS)
+        held, law_params = held_laws_sql(scope)
+        versions_sql = _SCOPE_VERSIONS_CURRENT.format(held=held)
+        versions = await _count(session, versions_sql, law_params, SCOPE_FIRST_MAX_VERSIONS)
         rows_sql = _SCOPE_ROWS_CURRENT.format(pred=pred)
     else:
         # Distinct, as the search's `= ANY` reads them: a repeated id is one version.
@@ -247,12 +250,8 @@ async def query_tokens_for(session: AsyncSession, query_text: str, scope: Versio
     # `= ANY(array)` rather than `IN (...)`: a global search passes one version
     # per law across every jurisdiction, and `.in_()` renders a bind parameter
     # each, against a 32767 cap.
-    joins, pred, params = scope_filter(scope, "v.id")
-    statement = scoped_text(
-        f"SELECT DISTINCT v.language FROM versions v {joins} WHERE {pred}",  # noqa: S608
-        params,
-    )
-    languages = (await session.execute(statement, params)).scalars().all()
+    sql, params = scope_languages_sql(scope)
+    languages = (await session.execute(scoped_text(sql, params), params)).scalars().all()
     seen: set[str] = set()
     tokens: list[str] = []
     for language in languages or ["eng"]:
