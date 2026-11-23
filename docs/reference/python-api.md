@@ -1048,6 +1048,7 @@ async def retrieve(
     doctype: str | None = None,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> list[ProvisionMatch]
 ```
 
@@ -1073,6 +1074,7 @@ async def current_scope(
     to_year: int | None = None,
     doctype: str | None = None,
     undated: bool = True,
+    include_drafts: bool = False,
 ) -> CurrentScope
 ```
 
@@ -1095,6 +1097,7 @@ async def hybrid_search(
     model_id: str,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> list[tuple[uuid.UUID, str, str, float]]
 ```
 
