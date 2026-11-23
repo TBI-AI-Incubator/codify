@@ -14,6 +14,7 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS
+from codify.akn.vocabulary import provision_text
 from codify.lang import to_iso639_3
 from codify.pipeline.enrich.arabic_normalise import fold_arabic_for_match
 from codify.pipeline.enrich.validator import check_missing_container_titles
@@ -314,7 +315,7 @@ def _target_text_by_owning_eid(akn_xml: str) -> dict[str, str]:
             elif next(p.iterancestors(f"{{{AKN_NS}}}table"), None) is None:
                 owner = _owning_eid(p.get("eId") or "")  # Legacy direct body paragraphs.
         if owner:
-            buckets.setdefault(owner, []).append("".join(p.itertext()))
+            buckets.setdefault(owner, []).append(provision_text(p))
     return {eid: " ".join(parts) for eid, parts in buckets.items()}
 
 

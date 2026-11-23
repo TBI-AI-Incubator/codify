@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from codify.akn.document import Document
 from codify.akn.elements import BodyElement
-from codify.akn.vocabulary import provision_text
+from codify.akn.vocabulary import is_lifted_note, provision_text
 from codify.pipeline.enrich.kinds import kind_to_kw
 
 _AKN_NS = "http://docs.oasis-open.org/legaldocml/ns/akn/3.0"
@@ -57,9 +57,12 @@ def _joined_body(el: BodyElement) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def plain_text_paragraph(p: etree._Element) -> bool:
-    """Writing one text slot flattens inline elements such as links and images."""
-    return not any(isinstance(child.tag, str) for child in p)
+def plain_text_paragraph(p: etree._Element, *, allow_lifted_notes: bool = False) -> bool:
+    """The writer preserves lifted notes but flattens other inline elements."""
+    return all(
+        not isinstance(child.tag, str) or (allow_lifted_notes and is_lifted_note(child))
+        for child in p
+    )
 
 
 def body_paragraphs(el: etree._Element) -> Iterator[etree._Element]:
@@ -88,7 +91,9 @@ def _table_paragraphs(table: etree._Element) -> Iterator[etree._Element]:
         for cell in row:
             if cell.tag in _CELL_TAGS:
                 yield from (
-                    p for p in cell.iterchildren(f"{{{_AKN_NS}}}p") if plain_text_paragraph(p)
+                    p
+                    for p in cell.iterchildren(f"{{{_AKN_NS}}}p")
+                    if plain_text_paragraph(p, allow_lifted_notes=True)
                 )
 
 

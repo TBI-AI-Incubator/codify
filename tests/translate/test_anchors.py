@@ -225,6 +225,10 @@ def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
         number="17",
     )
     xml = xml.replace(">Kind</p>", ">Mineral\nkind</p>")
+    xml = xml.replace(
+        ">Clay</p>",
+        '>Clay<authorialNote placement="bottom"><p>18 in the note.</p></authorialNote></p>',
+    )
     xml = xml.replace(">Rate</p>", '>See <ref href="#bands">bands</ref></p>')
     units, _ = walk_source(parse_akn(xml), xml)
     cell_units = [u for u in units if "Clay" in u.body_text]
@@ -249,6 +253,12 @@ def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
     assert out.xpath('count(//*[local-name()="td"]/*[text()="18 Dinars"])') == 2
     assert out.xpath('count(//*[local-name()="ref" and @href="#bands" and text()="bands"])') == 2
 
+    assert (
+        out.xpath(
+            'count(//*[local-name()="authorialNote" and @placement="bottom"]/*[text()="18 in the note."])'
+        )
+        == 2
+    )
     money = {u.akn_eid: ["18"] for u in cell_units}
     audit = audit_translation(
         xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money

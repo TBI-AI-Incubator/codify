@@ -53,7 +53,7 @@ def complete_pipe_continuations(lines: list[str]) -> list[str]:
             end = i
             while end < len(lines):
                 cells = lines[end].strip().split("|")
-                if len(cells) != width or not all(cell.strip() for cell in cells):
+                if len(cells) != width or not any(cell.strip() for cell in cells):
                     break
                 end += 1
             if end - i >= 2:
