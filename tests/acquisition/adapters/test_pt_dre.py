@@ -28,6 +28,7 @@ from codify.acquisition.adapters.pt.dre import (
     DrItemMissing,
     SiteChanged,
     api_version,
+    listed_editions,
     number_and_year,
 )
 from codify.acquisition.adapters.pt.dre_akn import (
@@ -1313,6 +1314,13 @@ async def test_recorded_historical_screen_actions(tmp_path: Path) -> None:
     recorded = json.loads(gzip.decompress((FIXTURES / "pt_20240108.json.gz").read_bytes()))
     eli = "https://data.dre.pt/eli/dec-lei/555/1999/p/cons/20240108"
     landing = "/dr/legislacao-consolidada/decreto-lei/1999-34567875"
+    listed_days = sorted(
+        date.fromisoformat(uri.rsplit("/", 1)[1]).isoformat()
+        for uri in listed_editions(recorded["detail"]["DetalheConteudo"])
+        if uri != eli
+    )
+    # Only the January payload was recorded. Model distinct IDs for the other listed dates.
+    other_ids = {day: str(index) for index, day in enumerate(listed_days, start=1)}
     calls: list[str] = []
     selectors: list[str] = []
 
@@ -1346,7 +1354,10 @@ async def test_recorded_historical_screen_actions(tmp_path: Path) -> None:
             name = "metadata"
         elif path.endswith(DATA[0]):
             # The adjacent-day selector reuses the recorded edition in this transport.
-            selectors.append(body["screenData"]["variables"]["DataSelecionada"])
+            day = body["screenData"]["variables"]["DataSelecionada"]
+            selectors.append(day)
+            if day in other_ids:
+                return httpx.Response(200, json={"data": {"CurrentConsolidacaoId": other_ids[day]}})
             name = "data"
         elif path.endswith(FRAG[0]):
             name = "frag"
@@ -1371,7 +1382,7 @@ async def test_recorded_historical_screen_actions(tmp_path: Path) -> None:
             == 189
         )
         assert any(path.endswith(EDITION[0]) for path in calls)
-        assert selectors == ["2024-01-08", "2024-01-09"]
+        assert selectors == ["2024-01-08", "2024-01-09", *listed_days]
         assert landing not in calls
         calls.clear()
         replay = await adapter.fetch(ref)
@@ -1425,9 +1436,32 @@ async def test_historical_last_id_is_checked_against_later_listing(
     two_editions.editions["2043-03-01"]["CurrentConsolidacaoId"] = march_id
     ref = edition_ref("2043-01-01", "800")
     if march_id == "800":
-        with pytest.raises(DrItemMissing, match="two listed editions"):
+        with pytest.raises(DrItemMissing, match="no unique consolidation ID"):
             await _fetch(two_editions, ref, tmp_path)
         assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))
     else:
         doc, _ = await _fetch(two_editions, ref, tmp_path)
         assert doc.expression_uri.endswith("2043-01-01")
+
+
+async def test_march_cannot_reuse_january_consolidation_in_three_edition_list(
+    two_editions: Gazette, tmp_path: Path
+) -> None:
+    march_entry = next(
+        line for line in two_editions.edition_list.splitlines() if "20430301" in line
+    )
+    two_editions.edition_list = two_editions.edition_list.replace(
+        march_entry, march_entry + "\n" + march_entry.replace("20430301", "20430501")
+    )
+    january = two_editions.editions["2043-01-01"]
+    january.update(
+        CurrentConsolidacaoId="800", LastConsolidacaoId="802", DataUltimaConsolidada="2043-05-01"
+    )
+    for item in january["LegConsBase"]["List"]:
+        item["ConsolidacaoFragmento"]["Cid"] = "800"
+    two_editions.editions["2043-03-01"] = two_editions.editions["2043-03-02"] = january
+    two_editions.editions["2043-05-01"] = january | {"CurrentConsolidacaoId": "802"}
+
+    with pytest.raises(DrItemMissing, match="no unique consolidation ID"):
+        await _fetch(two_editions, edition_ref("2043-03-01", "800"), tmp_path)
+    assert not any("LegConsBase" in path.read_text() for path in tmp_path.glob("*.json"))

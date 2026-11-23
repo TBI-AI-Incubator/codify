@@ -412,19 +412,11 @@ class DiarioAcquirer(BaseAcquirer):
                     raise DrItemMissing(
                         f"returned consolidation does not match listed edition {eli}"
                     )
-                if following and str(data.get("LastConsolidacaoId") or cid) == cid:
-                    # A saved response can predate the next edition's publication.
-                    boundary = date.fromisoformat(following[0].rsplit("/", 1)[1])
-                    other_id = await self._edition_at(variables, boundary, eli, cid, same=False)
-                    if not re.fullmatch(r"[1-9][0-9]*", other_id) or other_id == cid:
-                        raise DrItemMissing(f"same consolidation at two listed editions: {eli}")
-            else:
-                # A one-day edition has no second selector. Exclude every other listed edition.
-                for other in sorted(listed - {eli}):
-                    other_day = date.fromisoformat(other.rsplit("/", 1)[1])
-                    other_id = await self._edition_at(variables, other_day, eli, cid, same=False)
-                    if not re.fullmatch(r"[1-9][0-9]*", other_id) or other_id == cid:
-                        raise DrItemMissing(f"no unique consolidation ID for listed edition {eli}")
+            for other in sorted(listed - {eli}):
+                other_day = date.fromisoformat(other.rsplit("/", 1)[1])
+                other_id = await self._edition_at(variables, other_day, eli, cid, same=False)
+                if not re.fullmatch(r"[1-9][0-9]*", other_id) or other_id == cid:
+                    raise DrItemMissing(f"no unique consolidation ID for listed edition {eli}")
         if not answer.from_cache:
             self._save_response(key, answer)
 
