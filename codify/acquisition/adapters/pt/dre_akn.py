@@ -307,8 +307,11 @@ def to_bluebell(
         return f.get("state") != REPEALED or any(kept(k) for k in every.get(f["id"], []))
 
     root = frags[0]
-    if all(f.get("state") == REPEALED for f in frags):
-        return f"PREFACE\n  {escape(title)}\nBODY\n  CROSSHEADING Diploma revogado\n"
+    if not kept(root):
+        if any(f.get("state") != REPEALED for f in frags):
+            raise UnmappedFragment("surviving fragments outside the act's tree")
+        preface_line = f"PREFACE\n  {escape(title)}\n" if title else ""
+        return preface_line + "BODY\n  CROSSHEADING Diploma revogado\n"
     live = [f | {"text": ""} if f.get("state") == REPEALED else f for f in frags if kept(f)]
     root = live[0]
     kids: Tree = defaultdict(list)

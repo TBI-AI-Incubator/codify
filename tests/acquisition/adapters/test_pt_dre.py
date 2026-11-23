@@ -1,7 +1,9 @@
-"""PT, DiarioAcquirer unit tests via httpx.MockTransport, on invented acts."""
+"""Diário da República acquisition with invented acts and an offline publisher recording."""
 
 from __future__ import annotations
 
+import asyncio
+import gzip
 import json
 import os
 import subprocess
@@ -20,6 +22,7 @@ from codify.acquisition import DocumentRef
 from codify.acquisition.adapters.pt.dre import (
     DATA,
     DETAIL,
+    EDITION,
     FRAG,
     DiarioAcquirer,
     DrItemMissing,
@@ -175,7 +178,7 @@ LANDINGS = {
 }
 
 
-VIEWS = {view for _, _, view in (DETAIL, FRAG, DATA)}
+VIEWS = {view for _, _, view in (DETAIL, FRAG, DATA, EDITION)}
 
 
 def _script(view: str, apis: dict[str, str]) -> str:
@@ -207,23 +210,25 @@ class Gazette:
         # What every screen call answers instead, when set.
         self.answer = answer
         self.editions: dict[str, Any] = {}
+        self.edition_list = (FIXTURES / "pt_edition_list.html").read_text()
         self.module = "mv-1"
-        self.apis = {path: api for path, api, _ in (DETAIL, FRAG, DATA)}
+        self.apis = {path: api for path, api, _ in (DETAIL, FRAG, DATA, EDITION)}
         self.manifest = {f"/dr/scripts/dr.{view}.mvc.js": "?h1" for view in VIEWS}
         self.seen: list[httpx.Request] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.seen.append(request)
         path = request.url.path
-        if path == "/eli/dec-lei/7/2042/p/cons/20430101/pt/html":
-            return httpx.Response(200, text=(FIXTURES / "pt_january_edition.html").read_text())
         if request.url.host == "data.dre.pt":
             search = path.removeprefix("/eli/")
             return httpx.Response(
                 301, headers={"location": f"{SITE}/redirect/LinkELI.aspx?search={search}"}
             )
         if path == "/redirect/LinkELI.aspx":
-            target = LANDINGS.get(request.url.params["search"], "/dr/error")
+            search = request.url.params["search"]
+            if search.startswith("dec-lei/7/2042/p/cons/"):
+                search = "dec-lei/7/2042/p/cons/pt/html"
+            target = LANDINGS.get(search, "/dr/error")
             return httpx.Response(301, headers={"location": SITE + target})
         if path == "/dr/moduleservices/moduleversioninfo":
             return httpx.Response(200, json={"versionToken": self.module})
@@ -235,7 +240,11 @@ class Gazette:
             return httpx.Response(200, text=_script(view, self.apis))
         if path.startswith("/dr/screenservices/dr/"):
             body = json.loads(request.content)
-            v = body["screenData"]["variables"]
+            v = (
+                body["inputParameters"]
+                if path.endswith(EDITION[0])
+                else body["screenData"]["variables"]
+            )
             sent = body["versionInfo"]
             info = {
                 "hasModuleVersionChanged": sent["moduleVersion"] != self.module,
@@ -250,9 +259,18 @@ class Gazette:
                 detail = DETAILS.get(f"{v['Tipo']}/{v['Key']}")
                 data: dict[str, Any] = {"DetalheConteudo": detail}
                 if detail and detail["Id"] == "900001":
-                    data["DetalheConteudo"] = detail | {
-                        "ELIMetadataHTML": (FIXTURES / "pt_edition_list.html").read_text()
-                    }
+                    data["DetalheConteudo"] = detail | {"ELIMetadataHTML": self.edition_list}
+            elif path.endswith(EDITION[0]):
+                day = v["DataConsolidada"]
+                eli = f"http://data.dre.pt/eli/dec-lei/7/2042/p/cons/{day.replace('-', '')}"
+                local_id = {"2043-01-01": "123", "2043-03-01": "124"}[day]
+                data = {
+                    "ELIMetadataHTML": (
+                        f'<div><span about="{eli}" property="eli:id_local" '
+                        f'content="{local_id}"></span><span about="{eli}" '
+                        f'property="eli:date_document" content="{day}"></span></div>'
+                    )
+                }
             elif path.endswith("DataActionGetDiplomaFragByIdAndApplicationSetting"):
                 data = {
                     "ConsolidadaConteudoDetalhe": {
@@ -458,13 +476,23 @@ async def test_an_undated_ref_without_consolidation_is_refused() -> None:
         await _fetch(Gazette(), _ref("4", 2043))
 
 
-async def test_a_wholly_repealed_consolidation_preserves_history() -> None:
+@pytest.mark.parametrize("dated", [False, True])
+async def test_a_wholly_repealed_consolidation_preserves_history(dated: bool) -> None:
     gone = [
         _frag("100", "0", "Diploma", text=PREAMBLE, state=4),
         _frag("101", "100", "Artigo 1.º", "Objeto", "Texto.", state=4),
     ]
     gazette = Gazette(gone)
-    doc, _ = await _fetch(gazette, _ref("7", 2042))
+    ref = _ref("7", 2042)
+    if dated:
+        gazette.editions["2043-01-01"] = {
+            "LegConsBase": {"List": gone},
+            "DataUltimaConsolidada": "2043-03-01",
+            "CurrentConsolidacaoId": "123",
+            "LastConsolidacaoId": "124",
+        }
+        ref = edition_ref("2043-01-01", "123")
+    doc, _ = await _fetch(gazette, ref)
     validate_akn(doc.primary().content, strict=True)
     root = etree.fromstring(doc.primary().content)
     assert root.xpath("normalize-space(//a:body)", namespaces=NS) == "Diploma revogado"
@@ -1186,16 +1214,54 @@ async def test_unlisted_edition_is_never_cached(two_editions: Gazette, tmp_path:
     assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))
 
 
+@pytest.mark.parametrize("reported", ["2043-01-01", "2043-03-01"])
 async def test_wrong_pair_for_listed_date_is_never_cached(
-    two_editions: Gazette, tmp_path: Path
+    reported: str, two_editions: Gazette, tmp_path: Path
 ) -> None:
     two_editions.editions["2043-01-01"] = two_editions.editions["2043-03-01"]
+    two_editions.editions["2043-01-01"]["DataUltimaConsolidada"] = reported
     with pytest.raises(DrItemMissing, match="listed edition"):
         await _fetch(two_editions, edition_ref("2043-01-01", "124"), tmp_path)
     cached = [json.loads(p.read_text()) for p in tmp_path.glob("*.json")]
     assert all(
         "LegConsBase" not in data and "ConsolidadaConteudoDetalhe" not in data for data in cached
     )
+
+
+async def test_cached_edition_list_refreshes_once_on_miss(
+    two_editions: Gazette, tmp_path: Path
+) -> None:
+    full_list = two_editions.edition_list
+    two_editions.edition_list = "\n".join(
+        line for line in full_list.splitlines() if "20430301" not in line
+    )
+    await _fetch(two_editions, edition_ref("2043-01-01", "123"), tmp_path)
+    two_editions.seen.clear()
+    two_editions.edition_list = full_list
+    doc, _ = await _fetch(two_editions, edition_ref("2043-03-01", "124"), tmp_path)
+    assert doc.expression_uri.endswith("2043-03-01")
+    assert sum(r.url.path.endswith(DETAIL[0]) for r in two_editions.seen) == 1
+    replay = Gazette()
+    await _fetch(replay, edition_ref("2043-03-01", "124"), tmp_path)
+    assert not replay.seen
+
+
+async def test_latest_without_last_id_uses_publisher_metadata(two_editions: Gazette) -> None:
+    data = two_editions.editions["2043-03-01"].copy()
+    del data["LastConsolidacaoId"]
+    two_editions.editions[datetime.now(ZoneInfo("Europe/Lisbon")).date().isoformat()] = data
+    doc, _ = await _fetch(two_editions, _ref("7", 2042))
+    assert doc.expression_uri.endswith("2043-03-01")
+    assert any(r.url.path.endswith(EDITION[0]) for r in two_editions.seen)
+
+
+async def test_enacted_by_number_replays_offline(tmp_path: Path) -> None:
+    ref = _ref("7", 2042).model_copy(update={"as_of": "enacted"})
+    first, _ = await _fetch(Gazette(), ref, tmp_path)
+    replay = Gazette()
+    doc, _ = await _fetch(replay, ref, tmp_path)
+    assert doc.primary().content == first.primary().content
+    assert not replay.seen
 
 
 def test_registry_imports_without_system_timezone_data() -> None:
@@ -1209,3 +1275,137 @@ def test_registry_imports_without_system_timezone_data() -> None:
         check=True,
         env=os.environ | {"PYTHONTZPATH": ""},
     )
+
+
+async def test_overlapping_replay_preserves_fresh_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import codify.pipeline.formats.eu_directive as cpu
+
+    waiting, release = asyncio.Event(), asyncio.Event()
+    original = cpu.on_the_cpu_pool
+
+    async def pause_first(function: Any) -> Any:
+        if not waiting.is_set():
+            waiting.set()
+            await release.wait()
+        return await original(function)
+
+    monkeypatch.setattr(cpu, "on_the_cpu_pool", pause_first)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(Gazette())) as client:
+        adapter = DiarioAcquirer(
+            SourceAdapter(kind="json_portal", name="dre"), client=client, cache_dir=tmp_path
+        )
+        first = asyncio.create_task(adapter.fetch(_ref("7", 2042)))
+        try:
+            await asyncio.wait_for(waiting.wait(), 10)
+            replay = await adapter.fetch(_ref("7", 2042))
+        finally:
+            release.set()
+        fresh = await first
+    assert not fresh.upstream_metadata["from_cache"]
+    assert replay.upstream_metadata["from_cache"]
+    assert fresh.fetched_at == replay.fetched_at
+
+
+async def test_recorded_historical_screen_actions(tmp_path: Path) -> None:
+    """Replay the recorded 8 January DATA and metadata responses with saved act details."""
+    recorded = json.loads(gzip.decompress((FIXTURES / "pt_20240108.json.gz").read_bytes()))
+    eli = "https://data.dre.pt/eli/dec-lei/555/1999/p/cons/20240108"
+    landing = "/dr/legislacao-consolidada/decreto-lei/1999-34567875"
+    calls: list[str] = []
+    selectors: list[str] = []
+
+    def serve(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        calls.append(path)
+        if request.url.host == "data.dre.pt":
+            return httpx.Response(301, headers={"location": SITE + "/redirect/LinkELI.aspx"})
+        if path == "/redirect/LinkELI.aspx":
+            return httpx.Response(
+                301, headers={"location": landing, "set-cookie": "DataConsolidada=2024-01-08"}
+            )
+        if path == landing:
+            return httpx.Response(
+                200, text="<html><body><div id='reactContainer'></div></body></html>"
+            )
+        if path.endswith("moduleversioninfo"):
+            return httpx.Response(200, json={"versionToken": "recording"})
+        body = json.loads(request.content)
+        if path.endswith(EDITION[0]):
+            inputs = body["inputParameters"]
+            assert "screenData" not in body
+            assert inputs == {
+                "DiplomaLegisId": "655682",
+                "DiplomaFragId": "34567875",
+                "FragmentoVersaoId": "0",
+                "DataConsolidada": "2024-01-08",
+                "FragmentoTitle": "",
+                "ConsolidadaConteudoDetalhe": recorded["frag"]["ConsolidadaConteudoDetalhe"],
+            }
+            name = "metadata"
+        elif path.endswith(DATA[0]):
+            # The adjacent-day selector reuses the recorded edition in this transport.
+            selectors.append(body["screenData"]["variables"]["DataSelecionada"])
+            name = "data"
+        elif path.endswith(FRAG[0]):
+            name = "frag"
+        else:
+            assert path.endswith(DETAIL[0])
+            name = "detail"
+        return httpx.Response(200, json={"data": recorded[name]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(serve)) as client:
+        shell = await client.get(eli + "/pt/html", follow_redirects=True)
+        assert shell.url.path == landing and "eli:id_local" not in shell.text
+        calls.clear()
+        adapter = DiarioAcquirer(
+            SourceAdapter(kind="json_portal", name="dre"), client=client, cache_dir=tmp_path
+        )
+        ref = _ref("555", 1999, eli=eli, consolidation_id="1130168375")
+        doc = await adapter.fetch(ref)
+        assert doc.expression_uri.endswith("/por@2024-01-08") and doc.source_url == eli
+        assert doc.upstream_metadata["consolidation_id"] == "1130168375"
+        assert (
+            len(etree.fromstring(doc.primary().content).findall(".//{urn:codify:pt:dre}fragment"))
+            == 189
+        )
+        assert any(path.endswith(EDITION[0]) for path in calls)
+        assert selectors == ["2024-01-08", "2024-01-09"]
+        assert landing not in calls
+        calls.clear()
+        replay = await adapter.fetch(ref)
+        assert replay.primary().content == doc.primary().content and not calls
+
+
+@pytest.mark.parametrize("other_id", ["801", "800"])
+async def test_one_day_edition_checks_other_listed_ids(
+    two_editions: Gazette, other_id: str
+) -> None:
+    day = "2043-01-01"
+    two_editions.edition_list = two_editions.edition_list.replace("20430301", "20430102")
+    data = two_editions.editions[day]
+    data["CurrentConsolidacaoId"] = "800"
+    for item in data["LegConsBase"]["List"]:
+        item["ConsolidacaoFragmento"]["Cid"] = "800"
+    two_editions.editions["2043-01-02"] = data | {"CurrentConsolidacaoId": other_id}
+    ref = edition_ref(day, "800")
+    if other_id == "800":
+        with pytest.raises(DrItemMissing, match="no unique consolidation ID"):
+            await _fetch(two_editions, ref)
+    else:
+        doc, _ = await _fetch(two_editions, ref)
+        assert doc.expression_uri.endswith(day)
+
+
+async def test_conflicting_independent_selector_is_refused(
+    two_editions: Gazette, tmp_path: Path
+) -> None:
+    data = two_editions.editions["2043-01-01"]
+    data["CurrentConsolidacaoId"] = "800"
+    for item in data["LegConsBase"]["List"]:
+        item["ConsolidacaoFragmento"]["Cid"] = "800"
+    two_editions.editions["2043-01-02"] = data | {"CurrentConsolidacaoId": "801"}
+    with pytest.raises(DrItemMissing, match="does not match listed edition"):
+        await _fetch(two_editions, edition_ref("2043-01-01", "800"), tmp_path)
+    assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))

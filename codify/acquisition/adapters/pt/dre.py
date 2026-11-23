@@ -9,7 +9,8 @@ import json
 import os
 import re
 from collections.abc import Awaitable, Callable
-from datetime import UTC, date, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 from urllib.parse import urljoin, urlparse
@@ -57,6 +58,11 @@ FRAG = (
 DATA = (
     "LegislacaoConsolidada/LegCons_Detalhe/DataActionGetData",
     "aIkfghOz+V3p7wVTZszP0g",
+    "LegislacaoConsolidada.LegCons_Detalhe",
+)
+EDITION = (
+    "LegislacaoConsolidada/LegCons_Detalhe/ActionGetEliGeneralInfoConsolidacao",
+    "jARdAKCRKmvGyAUAmRNRwA",
     "LegislacaoConsolidada.LegCons_Detalhe",
 )
 DOCTYPES = {"Lei": "lei", "Decreto-Lei": "dl", "Lei Orgânica": "lo", "Portaria": "portaria"}
@@ -126,6 +132,24 @@ def rdfa_values(markup: str, subject: str, prop: str) -> set[str]:
     }
 
 
+@dataclass(frozen=True)
+class Answer:
+    value: dict[str, Any]
+    fetched_at: datetime
+    from_cache: bool
+
+
+def listed_editions(detail: dict[str, Any]) -> set[str]:
+    return {
+        work_eli(uri)
+        for uri in rdfa_values(
+            str(detail.get("ELIMetadataHTML") or ""),
+            work_eli(str(detail.get("ELI") or "")),
+            "eli:consolidated_by",
+        )
+    }
+
+
 class DiarioAcquirer(BaseAcquirer):
     JURISDICTION: ClassVar[str] = "pt"
     DEFAULT_BASE_URL: ClassVar[str] = "https://diariodarepublica.pt"
@@ -150,8 +174,6 @@ class DiarioAcquirer(BaseAcquirer):
         self._module_version: str | None = None
         # apiVersions read from the site's scripts, by action path.
         self._apis: dict[str, str] = {}
-        # Acquisition time and cache provenance of each answer used by fetch.
-        self._provenance: dict[str, tuple[datetime, bool]] = {}
 
     @classmethod
     def from_config(cls, jurisdiction_code: str, adapter: object) -> DiarioAcquirer:
@@ -172,12 +194,12 @@ class DiarioAcquirer(BaseAcquirer):
             return None
         return self._cache / f"{hashlib.sha256(key.encode()).hexdigest()[:24]}.json"
 
-    def _save_response(self, key: str, value: dict[str, Any]) -> None:
+    def _save_response(self, key: str, answer: Answer) -> None:
         path = self._cache_path(key)
         if path is not None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            write_index(path, value)
-            stamp = self._provenance[key][0].timestamp()
+            write_index(path, answer.value)
+            stamp = answer.fetched_at.timestamp()
             os.utime(path, (stamp, stamp))
 
     async def _cached(
@@ -185,18 +207,22 @@ class DiarioAcquirer(BaseAcquirer):
         key: str,
         get: Callable[[], Awaitable[dict[str, Any]]],
         keep: Callable[[dict[str, Any]], bool] = lambda _: True,
-    ) -> dict[str, Any]:
-        # shortcut: a saved answer is never refreshed; delete the file to refetch.
+        *,
+        refresh: bool = False,
+    ) -> Answer:
         path = self._cache_path(key)
-        if path is not None and path.exists():
-            self._provenance[key] = datetime.fromtimestamp(path.stat().st_mtime, UTC), True
-            return dict(json.loads(path.read_text()))
+        if not refresh and path is not None and path.exists():
+            return Answer(
+                dict(json.loads(path.read_text())),
+                datetime.fromtimestamp(path.stat().st_mtime, UTC),
+                True,
+            )
         value = await get()
-        self._provenance[key] = datetime.now(UTC), False
+        answer = Answer(value, datetime.now(UTC), False)
         # Only a positive answer is saved: an error page may be passing.
         if keep(value):
-            self._save_response(key, value)
-        return value
+            self._save_response(key, answer)
+        return answer
 
     async def _resolve(self, url: str) -> str:
         """Where an ELI lands on the site, following redirects without fetching the page."""
@@ -217,7 +243,7 @@ class DiarioAcquirer(BaseAcquirer):
         def landed(v: dict[str, Any]) -> bool:
             return bool(_CONS_PATH.search(v["final"]) or _DETAIL_PATH.search(v["final"]))
 
-        return str((await self._cached(f"GET {url}", go, landed))["final"])
+        return str((await self._cached(f"GET {url}", go, landed)).value["final"])
 
     async def _version(self) -> str:
         if self._module_version is None:
@@ -250,7 +276,9 @@ class DiarioAcquirer(BaseAcquirer):
         variables: dict[str, Any],
         key: str,
         keep: Callable[[dict[str, Any]], bool] = lambda _: True,
-    ) -> dict[str, Any]:
+        *,
+        refresh: bool = False,
+    ) -> Answer:
         path, pinned, view = action
 
         async def go() -> dict[str, Any]:
@@ -259,7 +287,11 @@ class DiarioAcquirer(BaseAcquirer):
                 body = {
                     "versionInfo": {"moduleVersion": await self._version(), "apiVersion": api},
                     "viewName": view,
-                    "screenData": {"variables": variables},
+                    **(
+                        {"inputParameters": variables}
+                        if action == EDITION
+                        else {"screenData": {"variables": variables}}
+                    ),
                 }
                 resp = await self._client.post(
                     f"{self._base}/dr/screenservices/dr/{path}",
@@ -280,56 +312,121 @@ class DiarioAcquirer(BaseAcquirer):
                 raise DrItemMissing(f"{path}: {out.get('exception')!r}")
             return dict(out["data"])
 
-        return await self._cached(key, go, keep)
+        return await self._cached(key, go, keep, refresh=refresh)
 
-    async def _detail(self, link: str) -> dict[str, Any]:
+    async def _detail(self, link: str, *, refresh: bool = False) -> Answer:
         tipo, key = link.split("/", 1)
         data = await self._call(
             DETAIL,
             {"Tipo": tipo, "Key": key},
             f"detail {link}",
             lambda d: bool((d.get("DetalheConteudo") or {}).get("Id")),
+            refresh=refresh,
         )
-        detail = data.get("DetalheConteudo")
+        detail = data.value.get("DetalheConteudo")
         if not isinstance(detail, dict) or not detail.get("Id"):
             raise DrItemMissing(f"no act at {link!r}")
-        return detail
+        return Answer(detail, data.fetched_at, data.from_cache)
 
-    async def _edition_id(self, eli: str) -> str:
+    async def _printed_mapping(self, variables: dict[str, Any], suffix: str) -> Answer:
         async def get() -> dict[str, Any]:
-            response = await self._client.get(f"{eli}/pt/html", follow_redirects=True)
-            response.raise_for_status()
-            ids = rdfa_values(response.text, eli, "eli:id_local")
-            if len(ids) != 1 or not re.fullmatch(r"[1-9]\d*", value := ids.pop()):
-                raise DrItemMissing(f"{eli} has no unambiguous publisher edition ID")
-            return {"id": value}
+            answer = await self._call(FRAG, variables, f"frag {suffix}", lambda _: False)
+            record = answer.value["ConsolidadaConteudoDetalhe"]
+            return {
+                "id": str(record["DiplomaFrag"]["DiplomaLegisId"]),
+                "sitemap": str(record["DiplomaLegis"].get("LinkSitemap") or ""),
+            }
 
-        return str((await self._cached(f"edition {eli}", get))["id"])
+        return await self._cached(f"printed mapping {suffix}", get, lambda _: False)
 
-    async def _consolidated(
-        self, tipo: str, ano: str, frag_id: str, *, edition: date | None, expected_id: str
-    ) -> tuple[dict[str, Any], dict[str, Any], str]:
-        key_suffix = f"{tipo}/{ano}-{frag_id}"
-        if edition:
-            key_suffix += f" {edition.isoformat()} {expected_id}"
-        v: dict[str, Any] = {
-            "DiplomaFragId": frag_id,
-            "Ano": int(ano),
-            "Tipo": tipo,
-            "Key": f"{ano}-{frag_id}",
-            "DataSelecionada": (edition or datetime.now(LISBON).date()).isoformat(),
+    async def _data(self, variables: dict[str, Any], frag: dict[str, Any], key: str) -> Answer:
+        inputs = variables | {
+            "DiplomaLegisId": frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"],
+            "GetDiplomaFragByIdAndApplicationSetting": frag,
         }
-        frag = await self._call(FRAG, v, f"frag {key_suffix}", lambda _: False)
-        legis = frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
-        v |= {"DiplomaLegisId": legis, "GetDiplomaFragByIdAndApplicationSetting": frag}
-        key = f"data {key_suffix}"
-        data = await self._call(DATA, v, key, lambda _: False)
-        returned_id = data.get("CurrentConsolidacaoId")
-        if edition and str(returned_id) != expected_id:
-            raise DrItemMissing(
-                f"{edition}: expected consolidation {expected_id}, got {returned_id!r}"
+        return await self._call(DATA, inputs, key, lambda _: False)
+
+    async def _edition_at(
+        self, variables: dict[str, Any], day: date, key: str, expected: str, *, same: bool = True
+    ) -> str:
+        """Read an independent date selector from the publisher."""
+
+        key = f"{key} {day}"
+
+        async def get() -> dict[str, Any]:
+            v = variables | {"DataSelecionada": day.isoformat()}
+            frag = (await self._call(FRAG, v, f"check frag {key}", lambda _: False)).value
+            data = (await self._data(v, frag, f"check data {key}")).value
+            return {"id": str(data.get("CurrentConsolidacaoId") or "")}
+
+        result = await self._cached(
+            f"edition interval {key}",
+            get,
+            lambda d: bool(re.fullmatch(r"[1-9][0-9]*", d["id"])) and (d["id"] == expected) == same,
+        )
+        return str(result.value["id"])
+
+    async def _verify_edition(
+        self,
+        eli: str,
+        day: str,
+        variables: dict[str, Any],
+        frag: dict[str, Any],
+        data: dict[str, Any],
+        listed: set[str],
+    ) -> None:
+        record = frag["ConsolidadaConteudoDetalhe"]
+        inputs = {
+            "DiplomaLegisId": record["DiplomaFrag"]["DiplomaLegisId"],
+            "DiplomaFragId": variables["DiplomaFragId"],
+            "FragmentoVersaoId": "0",
+            "ConsolidadaConteudoDetalhe": record,
+            "FragmentoTitle": "",
+            "DataConsolidada": day,
+        }
+        key = f"metadata {eli}"
+        answer = await self._call(EDITION, inputs, key, lambda _: False)
+        markup = str(answer.value.get("ELIMetadataHTML") or "")
+        ids = rdfa_values(markup, eli, "eli:id_local")
+        if (
+            len(ids) != 1
+            or not re.fullmatch(r"[1-9][0-9]*", next(iter(ids)))
+            or rdfa_values(markup, eli, "eli:date_document") != {day}
+        ):
+            raise DrItemMissing(f"publisher metadata does not identify listed edition {eli}")
+        cid = str(data.get("CurrentConsolidacaoId") or "")
+        if cid not in ids:
+            # Older records use separate ELI and consolidation identifiers.
+            rows = [item["ConsolidacaoFragmento"] for item in data["LegConsBase"]["List"]]
+            start = date.fromisoformat(day)
+            following = sorted(uri for uri in listed if uri > eli)
+            last_day = (
+                date.fromisoformat(following[0].rsplit("/", 1)[1]) - timedelta(days=1)
+                if following
+                else datetime.now(LISBON).date()
             )
-        return frag, data, key
+            if {str(row.get("Cid")) for row in rows} != {cid}:
+                raise DrItemMissing(f"fragment IDs disagree with listed edition {eli}")
+            if (
+                following
+                and data.get("LastConsolidacaoId")
+                and str(data["LastConsolidacaoId"]) == cid
+            ):
+                raise DrItemMissing(f"latest ID returned for historical edition {eli}")
+            if last_day > start:
+                if await self._edition_at(variables, start + timedelta(days=1), eli, cid) != cid:
+                    raise DrItemMissing(
+                        f"returned consolidation does not match listed edition {eli}"
+                    )
+            else:
+                # A one-day edition has no second selector. Exclude every other listed edition.
+                for other in sorted(listed - {eli}):
+                    other_day = date.fromisoformat(other.rsplit("/", 1)[1])
+                    other_id = await self._edition_at(variables, other_day, eli, cid, same=False)
+                    if not re.fullmatch(r"[1-9][0-9]*", other_id) or other_id == cid:
+                        raise DrItemMissing(f"no unique consolidation ID for listed edition {eli}")
+        if not answer.from_cache:
+            self._save_response(key, answer)
 
     def consolidated_eli(self, ref: DocumentRef) -> str:
         """The undated ELI a ref's class, number and year name, for classes that have one."""
@@ -368,7 +465,8 @@ class DiarioAcquirer(BaseAcquirer):
             raise ValueError("a consolidation_id requires a dated edition")
         given = ref.extra.get("detail", "")
         link = dm.group(1) if (dm := _DETAIL_PATH.search(given)) else given.strip("/")
-        detail = await self._detail(link) if link and not eli else None
+        detail_answer = await self._detail(link) if link and not eli else None
+        detail = detail_answer.value if detail_answer else None
         if not eli:
             eli = str((detail or {}).get("ELI") or "") or self.consolidated_eli(ref)
         m = _ELI.search(eli)
@@ -382,13 +480,43 @@ class DiarioAcquirer(BaseAcquirer):
         # The enacted text needs the consolidation only to find its detail page.
         current = ref.as_of != "enacted" or not (link or dated)
         cons_eli = f"{ELI_BASE}/{eli_type}/{eli_num}/{eli_year}/p/cons/pt/html"
-        landed = await self._resolve(cons_eli) if current else ""
+        landing_eli = (
+            f"{cons_eli.removesuffix('/pt/html')}/{edition:%Y%m%d}/pt/html" if edition else cons_eli
+        )
+        landed = await self._resolve(landing_eli) if current else ""
         if cm := _CONS_PATH.search(landed):
-            frag, data, data_key = await self._consolidated(
-                *cm.groups(), edition=edition, expected_id=expected_id
-            )
-            frags = fragments(data)
-            if frags and ref.as_of != "enacted":
+            tipo, ano, frag_id = cm.groups()
+            suffix = f"{tipo}/{ano}-{frag_id}"
+            if edition:
+                suffix += f" {edition.isoformat()} {expected_id}"
+            variables = {
+                "DiplomaFragId": frag_id,
+                "Ano": int(ano),
+                "Tipo": tipo,
+                "Key": f"{ano}-{frag_id}",
+                "DataSelecionada": (edition or datetime.now(LISBON).date()).isoformat(),
+            }
+            if ref.as_of == "enacted":
+                mapping = await self._printed_mapping(variables, suffix)
+                sitemap = mapping.value["sitemap"]
+                frags = []
+            else:
+                frag_key = f"frag {suffix}"
+                frag_answer = await self._call(FRAG, variables, frag_key, lambda _: False)
+                frag = frag_answer.value
+                sitemap = str(
+                    frag["ConsolidadaConteudoDetalhe"]["DiplomaLegis"].get("LinkSitemap") or ""
+                )
+                data_key = f"data {suffix}"
+                data_answer = await self._data(variables, frag, data_key)
+                data = data_answer.value
+                returned_id = data.get("CurrentConsolidacaoId")
+                if edition and str(returned_id) != expected_id:
+                    raise DrItemMissing(
+                        f"{edition}: expected consolidation {expected_id}, got {returned_id!r}"
+                    )
+                frags = fragments(data)
+            if frags:
                 last = civil_date(data.get("DataUltimaConsolidada"))
                 if edition:
                     last = edition.isoformat()
@@ -406,9 +534,6 @@ class DiarioAcquirer(BaseAcquirer):
                         frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
                     ),
                 }
-            sitemap = str(
-                frag["ConsolidadaConteudoDetalhe"]["DiplomaLegis"].get("LinkSitemap") or ""
-            )
             if not link and (dm := _DETAIL_PATH.search(sitemap)):
                 link = dm.group(1)
         if edition and not cons:
@@ -422,7 +547,13 @@ class DiarioAcquirer(BaseAcquirer):
             if dm is None:
                 raise DrItemMissing(f"{eli} resolves to no act")
             link = dm.group(1)
-        detail = detail or await self._detail(link)
+        detail_answer = detail_answer or await self._detail(link)
+        detail = detail_answer.value
+        if cons:
+            edition_eli = f"{cons_eli.removesuffix('/pt/html')}/{cons['date'].replace('-', '')}"
+            if detail_answer.from_cache and edition_eli not in listed_editions(detail):
+                detail_answer = await self._detail(link, refresh=True)
+                detail = detail_answer.value
 
         if cons and cons["legis_id"] != str(detail.get("Id")):
             raise ValueError(f"the consolidation at {cons['url']} is not the act at {link}")
@@ -439,30 +570,33 @@ class DiarioAcquirer(BaseAcquirer):
             raise ValueError(
                 f"ref asks for {ref.number}/{ref.year} by {eli}; {link} is {number}/{year}"
             )
+        if cm and ref.as_of == "enacted":
+            if mapping.value["id"] != str(detail["Id"]):
+                raise DrItemMissing("consolidation refers to a different printed act")
+            if not mapping.from_cache:
+                self._save_response(f"printed mapping {suffix}", mapping)
         if cons:
-            edition_eli = f"{cons_eli.removesuffix('/pt/html')}/{cons['date'].replace('-', '')}"
-            listed = rdfa_values(
-                str(detail.get("ELIMetadataHTML") or ""),
-                work_eli(str(detail.get("ELI") or "")),
-                "eli:consolidated_by",
-            )
-            if edition_eli not in {work_eli(uri) for uri in listed}:
+            listed = listed_editions(detail)
+            if edition_eli not in listed:
                 raise DrItemMissing(f"{edition_eli} is not listed for this act")
-            # The latest record already pairs its last date with its last ID.
-            publisher_id = (
-                str(data.get("LastConsolidacaoId") or "")
-                if cons["date"] == civil_date(data.get("DataUltimaConsolidada"))
-                else await self._edition_id(edition_eli)
-            )
+            last_id = str(data.get("LastConsolidacaoId") or "")
+            current_id = str(data.get("CurrentConsolidacaoId") or "")
+            if not re.fullmatch(r"[1-9][0-9]*", current_id):
+                raise DrItemMissing(f"no consolidation ID for {edition_eli}")
             if (
-                not re.fullmatch(r"[1-9][0-9]*", publisher_id)
-                or str(data.get("CurrentConsolidacaoId")) != publisher_id
+                edition is None
+                and edition_eli == max(listed)
+                and last_id
+                and cons["date"] == civil_date(data.get("DataUltimaConsolidada"))
             ):
-                raise DrItemMissing(
-                    f"returned consolidation does not match listed edition {edition_eli}"
-                )
-            for key, answer in ((data_key.replace("data ", "frag ", 1), frag), (data_key, data)):
-                if not self._provenance[key][1]:
+                if current_id != last_id:
+                    raise DrItemMissing(
+                        f"returned consolidation does not match listed edition {edition_eli}"
+                    )
+            else:
+                await self._verify_edition(edition_eli, cons["date"], variables, frag, data, listed)
+            for key, answer in ((frag_key, frag_answer), (data_key, data_answer)):
+                if not answer.from_cache:
                     self._save_response(key, answer)
         work = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
         as_of = (cons["date"] if cons else "") or published
@@ -503,8 +637,7 @@ class DiarioAcquirer(BaseAcquirer):
         # Bluebell parsing is CPU-bound; it runs on the pipeline's pool, not the loop.
         akn = str(await on_the_cpu_pool(convert))
         detail_url = f"{self._base}/dr/detalhe/{link}"
-        detail_key = f"detail {link}"
-        fetched_at, from_cache = self._provenance[data_key if cons else detail_key]
+        text_answer = data_answer if cons else detail_answer
         upstream: dict[str, Any] = {
             "dr_id": str(detail.get("Id") or ""),
             "eli": alias,
@@ -522,8 +655,8 @@ class DiarioAcquirer(BaseAcquirer):
             "issuer": str(detail.get("Emissor") or ""),
             "in_force": str(detail.get("Vigencia") or ""),
             "pdf": str(detail.get("URL_PDF") or ""),
-            "from_cache": from_cache,
-            "detail_fetched_at": self._provenance[detail_key][0].isoformat(),
+            "from_cache": text_answer.from_cache,
+            "detail_fetched_at": detail_answer.fetched_at.isoformat(),
         }
         if cons:
             upstream["consolidation_id"] = cons["raw"].get("CurrentConsolidacaoId")
@@ -545,7 +678,7 @@ class DiarioAcquirer(BaseAcquirer):
             ],
             source_url=edition_eli if edition else (cons["url"] if cons else detail_url),
             # Saved answers are as old as the crawl that saved them.
-            fetched_at=fetched_at,
+            fetched_at=text_answer.fetched_at,
             licence=self._licence,
             citation_alt=title or None,
             gazette_ref=GazetteRef(
