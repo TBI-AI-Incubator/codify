@@ -599,7 +599,11 @@ async def test_saved_answers_are_read_before_the_network(tmp_path: Path) -> None
     assert again.seen == []
     assert second.upstream_metadata["from_cache"] is True
     assert second.primary().content == first.primary().content
-    assert second.fetched_at <= first.fetched_at
+    assert second.fetched_at == first.fetched_at
+    assert (
+        second.upstream_metadata["detail_fetched_at"]
+        == first.upstream_metadata["detail_fetched_at"]
+    )
 
 
 def test_the_client_is_polite_and_never_faster_than_the_gazette_allows(

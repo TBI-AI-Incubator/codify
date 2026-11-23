@@ -150,8 +150,8 @@ class DiarioAcquirer(BaseAcquirer):
         self._module_version: str | None = None
         # apiVersions read from the site's scripts, by action path.
         self._apis: dict[str, str] = {}
-        # When each answer read from the cache was saved.
-        self._read_at: dict[str, datetime] = {}
+        # Acquisition time and cache provenance of each answer used by fetch.
+        self._provenance: dict[str, tuple[datetime, bool]] = {}
 
     @classmethod
     def from_config(cls, jurisdiction_code: str, adapter: object) -> DiarioAcquirer:
@@ -172,6 +172,14 @@ class DiarioAcquirer(BaseAcquirer):
             return None
         return self._cache / f"{hashlib.sha256(key.encode()).hexdigest()[:24]}.json"
 
+    def _save_response(self, key: str, value: dict[str, Any]) -> None:
+        path = self._cache_path(key)
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write_index(path, value)
+            stamp = self._provenance[key][0].timestamp()
+            os.utime(path, (stamp, stamp))
+
     async def _cached(
         self,
         key: str,
@@ -181,14 +189,13 @@ class DiarioAcquirer(BaseAcquirer):
         # shortcut: a saved answer is never refreshed; delete the file to refetch.
         path = self._cache_path(key)
         if path is not None and path.exists():
-            self._read_at[key] = datetime.fromtimestamp(path.stat().st_mtime, UTC)
+            self._provenance[key] = datetime.fromtimestamp(path.stat().st_mtime, UTC), True
             return dict(json.loads(path.read_text()))
-        self._read_at.pop(key, None)
         value = await get()
+        self._provenance[key] = datetime.now(UTC), False
         # Only a positive answer is saved: an error page may be passing.
-        if path is not None and keep(value):
-            path.parent.mkdir(parents=True, exist_ok=True)
-            write_index(path, value)
+        if keep(value):
+            self._save_response(key, value)
         return value
 
     async def _resolve(self, url: str) -> str:
@@ -455,9 +462,8 @@ class DiarioAcquirer(BaseAcquirer):
                     f"returned consolidation does not match listed edition {edition_eli}"
                 )
             for key, answer in ((data_key.replace("data ", "frag ", 1), frag), (data_key, data)):
-                path = self._cache_path(key)
-                if path is not None and not path.exists():
-                    write_index(path, answer)
+                if not self._provenance[key][1]:
+                    self._save_response(key, answer)
         work = build_frbr_work_uri(self.JURISDICTION, doctype, year, number)
         as_of = (cons["date"] if cons else "") or published
         expression = build_frbr_expression_uri(work, "por", as_of)
@@ -497,9 +503,8 @@ class DiarioAcquirer(BaseAcquirer):
         # Bluebell parsing is CPU-bound; it runs on the pipeline's pool, not the loop.
         akn = str(await on_the_cpu_pool(convert))
         detail_url = f"{self._base}/dr/detalhe/{link}"
-        now = datetime.now(UTC)
-        detail_saved = self._read_at.get(f"detail {link}")
-        saved = self._read_at.get(data_key) if cons else detail_saved
+        detail_key = f"detail {link}"
+        fetched_at, from_cache = self._provenance[data_key if cons else detail_key]
         upstream: dict[str, Any] = {
             "dr_id": str(detail.get("Id") or ""),
             "eli": alias,
@@ -517,8 +522,8 @@ class DiarioAcquirer(BaseAcquirer):
             "issuer": str(detail.get("Emissor") or ""),
             "in_force": str(detail.get("Vigencia") or ""),
             "pdf": str(detail.get("URL_PDF") or ""),
-            "from_cache": bool(saved),
-            "detail_fetched_at": (detail_saved or now).isoformat(),
+            "from_cache": from_cache,
+            "detail_fetched_at": self._provenance[detail_key][0].isoformat(),
         }
         if cons:
             upstream["consolidation_id"] = cons["raw"].get("CurrentConsolidacaoId")
@@ -540,7 +545,7 @@ class DiarioAcquirer(BaseAcquirer):
             ],
             source_url=edition_eli if edition else (cons["url"] if cons else detail_url),
             # Saved answers are as old as the crawl that saved them.
-            fetched_at=saved or now,
+            fetched_at=fetched_at,
             licence=self._licence,
             citation_alt=title or None,
             gazette_ref=GazetteRef(
