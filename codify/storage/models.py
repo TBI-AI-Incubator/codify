@@ -13,7 +13,9 @@ from sqlalchemy import (
     Column,
     Date,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
+    LargeBinary,
     SmallInteger,
     String,
     Text,
@@ -1163,15 +1165,204 @@ class RunArtifactRow(SQLModel, table=True):
     created_at: datetime = ts_now()
 
 
+class HistoryWork(SQLModel, table=True):
+    """The act as history groups its texts. A surrogate key, so a merge or split is a row edit."""
+
+    __tablename__ = "history_works"
+
+    id: uuid.UUID = uuid_pk()
+    jurisdiction_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("jurisdictions.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    law_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(PG_UUID(as_uuid=True), ForeignKey("laws.id", ondelete="SET NULL")),
+    )
+    registry_work_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            PG_UUID(as_uuid=True), ForeignKey("registry_works.id", ondelete="SET NULL")
+        ),
+    )
+    converter_rev: str | None = Field(default=None, sa_column=Column(Text))
+    builder_rev: str | None = Field(default=None, sa_column=Column(Text))
+    built_at: datetime | None = Field(default=None, sa_column=Column(TIMESTAMP(timezone=True)))
+    created_at: datetime = ts_now()
+
+
+class PublisherText(SQLModel, table=True):
+    """A text as the publisher gave it. Immutable but for `work_id` and `work_rule`."""
+
+    __tablename__ = "publisher_texts"
+
+    jurisdiction_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("jurisdictions.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    source_ref: str = Field(sa_column=Column(Text, primary_key=True))
+    source_sha256: str = Field(sa_column=Column(Text, primary_key=True))
+    language: str = Field(sa_column=Column(Text, nullable=False))
+    publisher_valid_from: date | None = Field(default=None, sa_column=Column(Date))
+    publisher_valid_to: date | None = Field(default=None, sa_column=Column(Date))
+    published_on: date | None = Field(default=None, sa_column=Column(Date))
+    publisher_group: str | None = Field(default=None, sa_column=Column(Text))
+    source_meta: dict[str, Any] = Field(
+        default_factory=dict, sa_column=Column(JSONB, nullable=False)
+    )
+    source_locator: str | None = Field(default=None, sa_column=Column(Text))
+    work_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            PG_UUID(as_uuid=True), ForeignKey("history_works.id", ondelete="SET NULL")
+        ),
+    )
+    work_rule: str | None = Field(default=None, sa_column=Column(Text))
+    recorded_at: datetime = ts_now()
+
+
+class DatedExpression(SQLModel, table=True):
+    """Derived: one span of a work per selected text, gap or derived text. Rebuilt per work."""
+
+    __tablename__ = "dated_expressions"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["jurisdiction_id", "source_ref", "source_sha256"],
+            [
+                "publisher_texts.jurisdiction_id",
+                "publisher_texts.source_ref",
+                "publisher_texts.source_sha256",
+            ],
+        ),
+    )
+
+    work_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("history_works.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    language: str = Field(sa_column=Column(Text, primary_key=True))
+    variant: str = Field(default="", sa_column=Column(Text, primary_key=True))
+    valid_from: date = Field(sa_column=Column(Date, primary_key=True))
+    valid_to: date | None = Field(default=None, sa_column=Column(Date))
+    jurisdiction_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False))
+    source_ref: str | None = Field(default=None, sa_column=Column(Text))
+    source_sha256: str | None = Field(default=None, sa_column=Column(Text))
+    akn_xml: str | None = Field(default=None, sa_column=Column(Text))
+    version_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(PG_UUID(as_uuid=True), ForeignKey("versions.id", ondelete="SET NULL")),
+    )
+    gap_reason: str | None = Field(default=None, sa_column=Column(Text))
+    derivation: str = Field(sa_column=Column(Text, nullable=False))
+    confidence: float | None = Field(default=None, sa_column=Column(PG_REAL))
+    official: bool = Field(sa_column=Column(Boolean, nullable=False))
+    derived_from: dict[str, Any] | None = Field(default=None, sa_column=Column(JSONB))
+    converter_rev: str = Field(sa_column=Column(Text, nullable=False))
+    builder_rev: str = Field(sa_column=Column(Text, nullable=False))
+    recorded_at: datetime = Field(sa_column=Column(TIMESTAMP(timezone=True), nullable=False))
+
+
+class ProvisionInterval(SQLModel, table=True):
+    """Derived: one span per provision for each period its text did not change."""
+
+    __tablename__ = "provision_intervals"
+
+    work_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("history_works.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    language: str = Field(sa_column=Column(Text, primary_key=True))
+    variant: str = Field(default="", sa_column=Column(Text, primary_key=True))
+    akn_eid: str = Field(sa_column=Column(Text, primary_key=True))
+    valid_from: date = Field(sa_column=Column(Date, primary_key=True))
+    valid_to: date | None = Field(default=None, sa_column=Column(Date))
+    jurisdiction_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False))
+    akn_type: str = Field(sa_column=Column(Text, nullable=False))
+    position: int = Field(sa_column=Column(Integer, nullable=False))
+    text: str = Field(sa_column=Column(Text, nullable=False))
+    text_sha256: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    text_norm_sha256: bytes = Field(sa_column=Column(LargeBinary, nullable=False))
+    derivation: str = Field(sa_column=Column(Text, nullable=False))
+    confidence: float | None = Field(default=None, sa_column=Column(PG_REAL))
+    official: bool = Field(sa_column=Column(Boolean, nullable=False))
+    opened_by: str | None = Field(default=None, sa_column=Column(Text))
+    converter_rev: str = Field(sa_column=Column(Text, nullable=False))
+    builder_rev: str = Field(sa_column=Column(Text, nullable=False))
+    recorded_at: datetime = Field(sa_column=Column(TIMESTAMP(timezone=True), nullable=False))
+
+
+class ProvisionLink(SQLModel, table=True):
+    """Derived: a provision's earlier self under another eId. A wrong link is one deleted row."""
+
+    __tablename__ = "provision_links"
+
+    work_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("history_works.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    language: str = Field(sa_column=Column(Text, primary_key=True))
+    variant: str = Field(default="", sa_column=Column(Text, primary_key=True))
+    linked_on: date = Field(sa_column=Column(Date, primary_key=True))
+    to_eid: str = Field(sa_column=Column(Text, primary_key=True))
+    from_eid: str = Field(sa_column=Column(Text, primary_key=True))
+    rule: str = Field(sa_column=Column(Text, nullable=False))
+    confidence: float | None = Field(default=None, sa_column=Column(PG_REAL))
+    builder_rev: str = Field(sa_column=Column(Text, nullable=False))
+    recorded_at: datetime = Field(sa_column=Column(TIMESTAMP(timezone=True), nullable=False))
+
+
+class HistoryWithdrawal(SQLModel, table=True):
+    """A derived row a rebuild removed. The table declares no key; the model keys on every
+    identifying column."""
+
+    __tablename__ = "history_withdrawals"
+
+    jurisdiction_id: uuid.UUID = Field(sa_column=Column(PG_UUID(as_uuid=True), nullable=False))
+    work_id: uuid.UUID = Field(
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("history_works.id", ondelete="CASCADE"),
+            primary_key=True,
+        )
+    )
+    row_kind: str = Field(sa_column=Column(Text, primary_key=True))
+    language: str = Field(sa_column=Column(Text, primary_key=True))
+    variant: str = Field(sa_column=Column(Text, primary_key=True))
+    akn_eid: str | None = Field(
+        default=None, sa_column=Column(Text, primary_key=True, nullable=True)
+    )
+    valid_from: date = Field(sa_column=Column(Date, primary_key=True))
+    builder_rev: str = Field(sa_column=Column(Text, nullable=False))
+    withdrawn_at: datetime = Field(sa_column=Column(TIMESTAMP(timezone=True), primary_key=True))
+
+
 __all__ = [
     "Acquisition",
     "AmendmentEffect",
     "CrossReference",
+    "DatedExpression",
     "EventRow",
     "ExaminationRow",
     "FeedbackRow",
     "FindingNoteRow",
     "FindingRow",
+    "HistoryWithdrawal",
+    "HistoryWork",
     "Jurisdiction",
     "Law",
     "LensRunRow",
@@ -1183,6 +1374,9 @@ __all__ = [
     "PageReadDisputeRow",
     "Provision",
     "ProvisionEmbedding",
+    "ProvisionInterval",
+    "ProvisionLink",
+    "PublisherText",
     "RegistryWork",
     "RepairProposalRow",
     "RunArtifactRow",

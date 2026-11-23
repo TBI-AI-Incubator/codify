@@ -15,7 +15,7 @@ def test_registry_work_records_follows_official_sources_on_one_chain() -> None:
     scripts = ScriptDirectory.from_config(Config(str(_ROOT / "alembic.ini")))
     rev = scripts.get_revision(_REVISION)
     assert rev is not None and rev.down_revision == "0029_official_sources"
-    assert scripts.get_heads() == [_REVISION]
+    assert len(scripts.get_heads()) == 1
 
 
 def test_the_column_is_added_and_dropped() -> None:
