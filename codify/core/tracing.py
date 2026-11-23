@@ -272,7 +272,9 @@ def attach_trace_attribution(
                 merged += [t for t in context_tags(context) if t not in merged]
             span.set_attribute("langfuse.trace.tags", json.dumps(merged))
         for key, value in (metadata or {}).items():
-            span.set_attribute(f"langfuse.trace.metadata.{key}", json.dumps(value))
+            span.set_attribute(
+                f"langfuse.trace.metadata.{key}", json.dumps(value, ensure_ascii=False)
+            )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "attach_trace_attribution_failed",
