@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -703,7 +704,7 @@ async def test_dated_editions_and_offline_replay(tmp_path: Path) -> None:
         doc, _ = await _fetch(gazette, ref, cache=tmp_path)
         assert doc.expression_uri.endswith(f"/por@{day}")
         assert wording.encode() in doc.primary().content
-        assert b"Texto revogado" in doc.primary().content
+        assert b"Texto revogado" not in doc.primary().content
         validate_akn(doc.primary().content)
         versions = [
             f.attrib
@@ -1009,3 +1010,129 @@ def test_printed_html_is_decoded_once_and_a_table_is_no_heading() -> None:
     text = to_bluebell(from_printed(printed))
     assert "  ARTICLE 1\n    TABLE\n" in text
     assert "      O sinal <b> separa.\n" in text
+
+
+@pytest.fixture
+def two_editions() -> Gazette:
+    gazette = Gazette()
+    gazette.editions = json.loads(
+        Path(__file__).with_name("fixtures").joinpath("pt_dated_editions.json").read_text()
+    )
+    return gazette
+
+
+def edition_ref(day: str, edition_id: str) -> DocumentRef:
+    return _ref("7", 2042, consolidation_id=edition_id).model_copy(
+        update={"as_of": date.fromisoformat(day)}
+    )
+
+
+async def test_latest_and_dated_have_identical_bodies(two_editions: Gazette) -> None:
+    two_editions.editions[date.today().isoformat()] = two_editions.editions["2043-03-01"]
+    latest, _ = await _fetch(two_editions, _ref("7", 2042))
+    dated, _ = await _fetch(two_editions, edition_ref("2043-03-01", "124"))
+    assert latest.expression_uri == dated.expression_uri
+    assert latest.primary().content == dated.primary().content
+    assert _eids(dated) == ["art_1"]
+    card = json.loads(dated.bodies[1].content)
+    repealed = card["consolidation"]["LegConsBase"]["List"][-1]["FragmentoVersao"]
+    assert (repealed["VersaoEstadoId"], repealed["Texto"]) == (4, "Texto revogado.")
+
+
+async def test_fragment_dates_use_lisbon_midnight(two_editions: Gazette) -> None:
+    version = two_editions.editions["2043-01-01"]["LegConsBase"]["List"][1]["FragmentoVersao"]
+    version.update(DataVersao="2042-06-30T23:00:00Z", DataEntradaVigor="2042-07-01T00:00:00+01:00")
+    doc, _ = await _fetch(two_editions, edition_ref("2043-01-01", "123"))
+    article = etree.fromstring(doc.primary().content).find(
+        ".//{urn:codify:pt:dre}fragment[@id='2']"
+    )
+    assert article is not None
+    assert article.get("version_date") == article.get("in_force_from") == "2042-07-01"
+
+
+async def test_dated_source_url_names_each_edition(two_editions: Gazette) -> None:
+    for day, entry in two_editions.editions.items():
+        doc, _ = await _fetch(two_editions, edition_ref(day, entry["CurrentConsolidacaoId"]))
+        assert (
+            doc.source_url
+            == f"https://data.dre.pt/eli/dec-lei/7/2042/p/cons/{day.replace('-', '')}"
+        )
+        assert doc.upstream_metadata["consolidated_url"].endswith("/2042-555")
+
+
+async def test_shared_detail_does_not_age_new_edition(
+    two_editions: Gazette, tmp_path: Path
+) -> None:
+    await _fetch(two_editions, edition_ref("2043-01-01", "123"), tmp_path)
+    for path in tmp_path.iterdir():
+        os.utime(path, (946684800, 946684800))
+    doc, _ = await _fetch(two_editions, edition_ref("2043-03-01", "124"), tmp_path)
+    assert not doc.upstream_metadata["from_cache"]
+    assert doc.fetched_at.year > 2000
+    assert doc.upstream_metadata["detail_fetched_at"] == "2000-01-01T00:00:00+00:00"
+
+
+@pytest.mark.parametrize("origin", ["", "https://data.dre.pt"])
+@pytest.mark.parametrize("dated", [True, False])
+async def test_relative_and_absolute_eli_selectors(
+    origin: str, dated: bool, two_editions: Gazette
+) -> None:
+    path = f"{origin}/eli/dec-lei/7/2042/p/cons"
+    extra = (
+        {"eli": path + "/20430101/pt/html", "consolidation_id": "123"}
+        if dated
+        else {"eli": path + "/pt/html"}
+    )
+    doc, _ = await _fetch(two_editions if dated else Gazette(), _ref("7", 2042, **extra))
+    assert doc.expression_uri.endswith("2043-01-01" if dated else "2043-03-01")
+
+
+async def test_unvalidated_selector_cannot_return_latest() -> None:
+    ref = _ref("7", 2042).model_copy(update={"as_of": "2043-01-01"})
+    with pytest.raises(ValueError, match="selector"):
+        await _fetch(Gazette(), ref)
+
+
+async def test_fragment_metadata_normalises_xml_controls(two_editions: Gazette) -> None:
+    data = two_editions.editions["2043-03-01"]
+    data["LegConsBase"]["List"][-1]["ConsolidacaoFragmento"]["Name"] += "\v"
+    two_editions.editions[date.today().isoformat()] = data
+    doc, _ = await _fetch(two_editions, _ref("7", 2042))
+    validate_akn(doc.primary().content)
+    assert b"\\u000b" in doc.bodies[1].content
+
+
+@pytest.mark.parametrize(
+    ("number", "year", "selector", "extra", "error"),
+    [
+        ("7", 2042, "latest", {"eli": "/eli/dec-lei/7/2042/p/cons/bad"}, "invalid dated"),
+        (
+            "7",
+            2042,
+            "enacted",
+            {"eli": "https://data.dre.pt/eli/dec-lei/7/2042/p/cons/20430101"},
+            "conflicts",
+        ),
+        (
+            "7",
+            2042,
+            date(2043, 2, 1),
+            {"eli": "https://data.dre.pt/eli/dec-lei/7/2042/p/cons/20430101"},
+            "conflicts",
+        ),
+        ("7", 2042, "latest", {"consolidation_id": "123"}, "requires a dated"),
+        (
+            "4",
+            2043,
+            date(2043, 1, 10),
+            {"consolidation_id": "123", "detail": "decreto-lei/4-2043-900002"},
+            "no consolidated text",
+        ),
+    ],
+)
+async def test_invalid_edition_targets_return_no_document(
+    number: str, year: int, selector: Any, extra: dict[str, str], error: str
+) -> None:
+    ref = _ref(number, year, **extra).model_copy(update={"as_of": selector})
+    with pytest.raises((ValueError, DrItemMissing), match=error):
+        await _fetch(Gazette(), ref)

@@ -18,7 +18,9 @@ import httpx
 import structlog
 
 from codify.acquisition.adapters.pt.dre_akn import (
+    LISBON,
     REPEALED,
+    civil_date,
     fragments,
     from_printed,
     to_akn,
@@ -167,6 +169,7 @@ class DiarioAcquirer(BaseAcquirer):
         if path is not None and path.exists():
             self._read_at[key] = datetime.fromtimestamp(path.stat().st_mtime, UTC)
             return dict(json.loads(path.read_text()))
+        self._read_at.pop(key, None)
         value = await get()
         # Only a positive answer is saved: an error page may be passing.
         if path is not None and keep(value):
@@ -282,7 +285,7 @@ class DiarioAcquirer(BaseAcquirer):
             "Ano": int(ano),
             "Tipo": tipo,
             "Key": f"{ano}-{frag_id}",
-            "DataSelecionada": (edition or date.today()).isoformat(),
+            "DataSelecionada": (edition or datetime.now(LISBON).date()).isoformat(),
         }
         frag = await self._call(FRAG, v, f"frag {key_suffix}")
         legis = frag["ConsolidadaConteudoDetalhe"]["DiplomaFrag"]["DiplomaLegisId"]
@@ -320,6 +323,10 @@ class DiarioAcquirer(BaseAcquirer):
         with the matching `extra["consolidation_id"]`.
         """
         eli = ref.extra.get("eli", "").replace("http://", "https://").rstrip("/")
+        if eli.startswith("/eli/"):
+            eli = urljoin(ELI_BASE, eli)
+        if ref.as_of not in ("latest", "enacted") and type(ref.as_of) is not date:
+            raise ValueError(f"unsupported gazette selector: {ref.as_of!r}")
         edition = ref.as_of if isinstance(ref.as_of, date) else None
         if "/p/cons/" in eli:
             official = official_ref_from_url(eli)
@@ -357,7 +364,7 @@ class DiarioAcquirer(BaseAcquirer):
             )
             frags = fragments(data)
             if frags and ref.as_of != "enacted":
-                last = str(data.get("DataUltimaConsolidada") or "")[:10]
+                last = civil_date(data.get("DataUltimaConsolidada"))
                 if edition:
                     last = edition.isoformat()
                 elif last <= "1900-01-01":
@@ -398,7 +405,7 @@ class DiarioAcquirer(BaseAcquirer):
         doctype = DOCTYPES.get(source_type)
         if doctype != ref.doctype:
             raise ValueError(f"ref asks for {ref.doctype!r}; the gazette types it {source_type!r}")
-        published = str(detail.get("DataPublicacao") or "")[:10]
+        published = civil_date(detail.get("DataPublicacao"))
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published):
             raise DrItemMissing(f"{link} has no publication date")
         number, year = number_and_year(str(detail.get("Numero") or ""), published)
@@ -429,7 +436,6 @@ class DiarioAcquirer(BaseAcquirer):
                     printed=printed,
                     title=title,
                     summary=summary,
-                    include_repealed=bool(edition),
                 ),
                 number=number,
                 work=work,
@@ -447,7 +453,9 @@ class DiarioAcquirer(BaseAcquirer):
         # Bluebell parsing is CPU-bound; it runs on the pipeline's pool, not the loop.
         akn = str(await on_the_cpu_pool(convert))
         detail_url = f"{self._base}/dr/detalhe/{link}"
-        saved = [t for k in (f"detail {link}", data_key) if (t := self._read_at.get(k))]
+        now = datetime.now(UTC)
+        detail_saved = self._read_at.get(f"detail {link}")
+        saved = self._read_at.get(data_key) if cons else detail_saved
         upstream: dict[str, Any] = {
             "dr_id": str(detail.get("Id") or ""),
             "eli": alias,
@@ -470,6 +478,7 @@ class DiarioAcquirer(BaseAcquirer):
             "in_force": str(detail.get("Vigencia") or ""),
             "pdf": str(detail.get("URL_PDF") or ""),
             "from_cache": bool(saved),
+            "detail_fetched_at": (detail_saved or now).isoformat(),
         }
         if cons:
             upstream["consolidation_id"] = cons["raw"].get("CurrentConsolidacaoId")
@@ -489,9 +498,11 @@ class DiarioAcquirer(BaseAcquirer):
                     role="card",
                 ),
             ],
-            source_url=cons["url"] if cons else detail_url,
+            source_url=upstream["consolidated_eli"]
+            if edition
+            else (cons["url"] if cons else detail_url),
             # Saved answers are as old as the crawl that saved them.
-            fetched_at=min(saved) if saved else datetime.now(UTC),
+            fetched_at=saved or now,
             licence=self._licence,
             citation_alt=title or None,
             gazette_ref=GazetteRef(

@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from lxml import etree
 from lxml import html as lxml_html
@@ -123,6 +125,20 @@ def word(label: str) -> str:
     return (label.strip().split() or [""])[0]
 
 
+LISBON = ZoneInfo("Europe/Lisbon")
+INVALID_XML = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
+
+
+def civil_date(value: str | None) -> str:
+    """Gazette dates and naive timestamps already use Lisbon civil time."""
+    if not value:
+        return ""
+    stamp = datetime.fromisoformat(value)
+    if stamp.tzinfo is not None:
+        stamp = stamp.astimezone(LISBON)
+    return stamp.date().isoformat()
+
+
 def fragments(data: dict[str, Any]) -> list[dict[str, Any]]:
     """The consolidation's fragments in source order, one flat record each."""
     out = []
@@ -136,8 +152,8 @@ def fragments(data: dict[str, Any]) -> list[dict[str, Any]]:
                 "label": fv.get("Tituo") or cf.get("Name") or "",
                 "heading": fv.get("Epigrafe") or cf.get("Epigrafe") or "",
                 "text": fv.get("Texto") or "",
-                "version_date": (fv.get("DataVersao") or "")[:10],
-                "in_force_from": (fv.get("DataEntradaVigor") or "")[:10],
+                "version_date": civil_date(fv.get("DataVersao")),
+                "in_force_from": civil_date(fv.get("DataEntradaVigor")),
                 "state": fv.get("VersaoEstadoId"),
             }
         )
@@ -276,9 +292,8 @@ def to_bluebell(
     printed: str = "",
     title: str = "",
     summary: str = "",
-    include_repealed: bool = False,
 ) -> str:
-    """Fragments as one Bluebell document, optionally retaining repealed wording.
+    """Fragments as one Bluebell document, omitting repealed provisions.
     `printed` supplies the preamble where the consolidation's root has none; `title` and
     `summary` the citation and sumário where the text does not state them."""
     if not frags:
@@ -289,11 +304,7 @@ def to_bluebell(
 
     def kept(f: dict[str, Any]) -> bool:
         # A repealed division still holding text marked in force keeps its place.
-        return (
-            include_repealed
-            or f.get("state") != REPEALED
-            or any(kept(k) for k in every.get(f["id"], []))
-        )
+        return f.get("state") != REPEALED or any(kept(k) for k in every.get(f["id"], []))
 
     root = frags[0]
     if not kept(root):
@@ -502,7 +513,11 @@ def _identify(
             etree.SubElement(
                 proprietary,
                 f"{{{namespace}}}fragment",
-                {key: str(fragment[key]) for key in fields if fragment[key] is not None},
+                {
+                    key: INVALID_XML.sub(" ", str(fragment[key]))
+                    for key in fields
+                    if fragment[key] is not None
+                },
             )
     return cast(str, etree.tostring(root, encoding="unicode"))
 
