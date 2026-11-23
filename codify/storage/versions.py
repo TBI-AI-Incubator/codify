@@ -291,6 +291,7 @@ class CurrentScope:
     to_year: int | None = None
     doctype: str | None = None
     undated: bool = True
+    include_drafts: bool = False
 
     def __bool__(self) -> bool:
         """False when it names no jurisdiction, so `if not scope` reads as for a list."""
@@ -308,6 +309,7 @@ async def current_scope(
     to_year: int | None = None,
     doctype: str | None = None,
     undated: bool = True,
+    include_drafts: bool = False,
 ) -> CurrentScope:
     """A `CurrentScope` over jurisdiction codes; a code with no row matches nothing."""
     ids = None
@@ -316,26 +318,33 @@ async def current_scope(
             select(Jurisdiction.id).where(Jurisdiction.code.in_(list(jurisdictions)))
         )
         ids = tuple(rows.scalars())
-    return CurrentScope(ids, from_year, to_year, doctype, undated)
+    return CurrentScope(ids, from_year, to_year, doctype, undated, include_drafts)
 
 
+ENACTED_LAW_SQL = "{law}.status = 'enacted'"
 ENACTED_VERSION_SQL = """{version} NOT IN (
     SELECT dv.id FROM laws dl JOIN versions dv ON dv.law_id = dl.id WHERE dl.status = 'draft'
 )"""
 
 
 def scope_filter(
-    scope: VersionScope, version_col: str, *, join_law: bool = False
+    scope: VersionScope, version_col: str, *, enacted_ids_only: bool = False
 ) -> tuple[str, str, dict[str, Any]]:
     """(joins, predicate, params) holding `version_col` to the scope.
 
-    An id list binds as one array (`:version_ids`). `join_law` and `CurrentScope` join
+    An id list binds as one array (`:version_ids`). `enacted_ids_only` and `CurrentScope` join
     `versions sv` and `laws sl`, so callers must not use those aliases.
     """
     joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
     if not isinstance(scope, CurrentScope):
         pred = f"{version_col} = ANY(:version_ids)"
-        return joins if join_law else "", pred, {"version_ids": list(scope)}
+        if enacted_ids_only:
+            return (
+                joins,
+                f"{pred} AND {ENACTED_LAW_SQL.format(law='sl')}",
+                {"version_ids": list(scope)},
+            )
+        return "", pred, {"version_ids": list(scope)}
     preds, params = _law_filters(scope)
     trusted = f"""SELECT FROM versions f
         WHERE f.law_id = sv.law_id AND {_flag_answers_today("f")}"""  # noqa: S608
@@ -345,7 +354,7 @@ def scope_filter(
 
 
 def _law_filters(scope: CurrentScope) -> tuple[list[str], dict[str, Any]]:
-    preds: list[str] = []
+    preds = [] if scope.include_drafts else [ENACTED_LAW_SQL.format(law="sl")]
     params: dict[str, Any] = {}
     if scope.jurisdiction_ids is not None:
         preds.append("sl.jurisdiction_id = ANY(:scope_jurisdiction_ids)")

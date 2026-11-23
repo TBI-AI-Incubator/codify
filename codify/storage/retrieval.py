@@ -10,6 +10,7 @@ silently.
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 from typing import Any
 
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ from codify.search import tokenise
 from codify.storage.lexicon import expand_terms
 from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.versions import (
+    ENACTED_LAW_SQL,
     CurrentScope,
     VersionScope,
     held_laws_sql,
@@ -97,9 +99,11 @@ _HYBRID_TEMPLATE = """
 """
 
 
-def _searchable(alias: str, law_alias: str, include_drafts: bool) -> str:
+def _searchable(alias: str, law_alias: str | None = None) -> str:
     dotted_guard = f"{alias}.text !~ '{DOTTED_PLACEHOLDER_PATTERN}'"
-    return dotted_guard if include_drafts else f"{law_alias}.status = 'enacted' AND {dotted_guard}"
+    if law_alias is None:
+        return dotted_guard
+    return f"{ENACTED_LAW_SQL.format(law=law_alias)} AND {dotted_guard}"
 
 
 _DENSE_TEMPLATE = """
@@ -130,13 +134,13 @@ _DENSE_ONLY_TEMPLATE = """
 def _dense_body(
     scope: VersionScope, partitioned: bool, include_drafts: bool
 ) -> tuple[str, dict[str, Any]]:
-    joins, pred, params = scope_filter(scope, "e.version_id", join_law=not include_drafts)
+    joins, pred, params = scope_filter(scope, "e.version_id", enacted_ids_only=not include_drafts)
     partitions = "e.jurisdiction_id = ANY(:jurisdiction_ids) AND" if partitioned else ""
     body = _DENSE_TEMPLATE.format(
         vec_join=joins,
         vec_partitions=partitions,
         vec_scope=pred,
-        eligible=_searchable("p", "sl", include_drafts),
+        eligible=_searchable("p"),
     )
     return body, params
 
@@ -156,8 +160,10 @@ def _hybrid_sql(
     scope_first: bool = False,
     include_drafts: bool = False,
 ) -> tuple[str, dict[str, Any]]:
-    fts_join, fts_pred, params = scope_filter(scope, "p.version_id", join_law=not include_drafts)
-    match = _LEXICAL_MATCH.format(eligible=_searchable("p", "sl", include_drafts))
+    fts_join, fts_pred, params = scope_filter(
+        scope, "p.version_id", enacted_ids_only=not include_drafts
+    )
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p"))
     rows = f"FROM provisions p {fts_join} WHERE {fts_pred} AND {match}"
     if scope_first:
         # Materialised, so no ordered index scan can stand in for reading the scope.
@@ -209,7 +215,7 @@ async def _reads_scope_first(session: AsyncSession, scope: VersionScope) -> bool
     `SCOPE_FIRST_MAX_VERSIONS` laws holding at most `SCOPE_FIRST_MAX_ROWS`
     provisions, each counted no further than its limit."""
     if isinstance(scope, CurrentScope):
-        if scope == CurrentScope(undated=scope.undated):
+        if scope == CurrentScope(undated=scope.undated, include_drafts=scope.include_drafts):
             return False  # the whole corpus: the walk discards nothing
         _, pred, params = scope_filter(scope, "sv.id")
         held, law_params = held_laws_sql(scope)
@@ -336,6 +342,8 @@ async def hybrid_search(
     legal basis, so it does not compete with law for a first page. On the flag
     alone, never on where a provision sits, because a normative annex is law."""
     scope = version_ids
+    if include_drafts and isinstance(scope, CurrentScope):
+        scope = replace(scope, include_drafts=True)
     if not scope:
         return []
     # Continue the approximate index scan past rows the version and model
@@ -429,7 +437,7 @@ async def enrich_matches(
             .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
             .where(
                 Provision.id.in_(provision_ids),
-                text(_searchable("provisions", "laws", include_drafts)),
+                text(_searchable("provisions", None if include_drafts else "laws")),
             )
         )
     ).all()
@@ -505,6 +513,7 @@ async def matching_laws_ordered(
     """
     if not version_ids or sort not in _LAW_ORDERS:
         return [], 0
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p", None if include_drafts else "l"))
     stmt = text(
         f"""
         SELECT v.law_id,
@@ -514,7 +523,7 @@ async def matching_laws_ordered(
         JOIN versions v ON v.id = p.version_id
         JOIN laws l ON l.id = v.law_id
         WHERE p.version_id = ANY(:version_ids)
-          AND {_LEXICAL_MATCH.format(eligible=_searchable("p", "l", include_drafts))}
+          AND {match}
         GROUP BY v.law_id
         ORDER BY {_LAW_ORDERS[sort]}, v.law_id
         LIMIT :limit OFFSET :offset
@@ -559,6 +568,7 @@ async def provisions_for_laws(
     # Capped here, not after the fetch: capping in Python still transfers every
     # match, so one broad term against one large law reads thousands of full
     # provision texts and throws them away.
+    match = _LEXICAL_MATCH.format(eligible=_searchable("p", None if include_drafts else "l"))
     stmt = text(
         f"""
         SELECT law_id, id, akn_eid, text FROM (
@@ -573,7 +583,7 @@ async def provisions_for_laws(
             JOIN laws l ON l.id = v.law_id
             WHERE p.version_id = ANY(:version_ids)
               AND v.law_id = ANY(:law_ids)
-              AND {_LEXICAL_MATCH.format(eligible=_searchable("p", "l", include_drafts))}
+              AND {match}
         ) ranked
         WHERE rn <= :per_law
         ORDER BY law_id, rn

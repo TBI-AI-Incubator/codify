@@ -322,3 +322,30 @@ def test_an_id_list_binds_as_one_array() -> None:
         "p.version_id = ANY(:version_ids)",
         {"version_ids": ids},
     )
+
+
+async def test_draft_only_scope_counts_and_selects_only_on_opt_in(session: AsyncSession) -> None:
+    code = "xy"
+    version = await _save(session, code, uuid.uuid4().hex, "2020-01-01", body="deposit")
+    await session.execute(
+        text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:v)"),
+        {"v": version},
+    )
+    await embed_and_stamp(session, version, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
+    scope = await current_scope(session, jurisdictions=(code,))
+    assert (
+        await count_in_scope(session, scope),
+        await count_embedded_versions(session, scope),
+    ) == (
+        0,
+        0,
+    )
+    for include_drafts in (False, True):
+        scope = await current_scope(session, jurisdictions=(code,), include_drafts=include_drafts)
+        joins, predicate, params = scope_filter(scope, "v.id")
+        selected = await session.scalars(
+            text(f"SELECT v.id FROM versions v {joins} WHERE {predicate}"), params
+        )
+        assert selected.all() == ([version] if include_drafts else [])
+    assert await count_in_scope(session, scope) == 1
+    assert await count_embedded_versions(session, scope) == 1
