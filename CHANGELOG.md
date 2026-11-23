@@ -103,6 +103,10 @@ New, additive:
   work the resolver also accepts a two-digit-year pair ("95/46") or a CELEX
   number as naming the act. `refresh_references_for_version` stores them for
   documents already held.
+- The Langfuse client requirement is now `langfuse>=5.2.0`. Python SDK 5 needs
+  Python 3.11 or later and a self-hosted Langfuse server of 4.59.0 or later; on
+  an older server, stay on a Core release that allows `langfuse` 4. Trace
+  metadata values are now JSON-encoded, as the SDK does for its own spans.
 
 Fixed:
 

@@ -179,7 +179,7 @@ def test_trace_attribution_uses_langfuse_v4_attributes(monkeypatch: Any) -> None
         "session.id": "session-1",
         "langfuse.release": "v1.2.3",
         "langfuse.trace.tags": '["workflow:translation"]',
-        "langfuse.trace.metadata.run_id": "run-1",
+        "langfuse.trace.metadata.run_id": '"run-1"',
     }
 
 
