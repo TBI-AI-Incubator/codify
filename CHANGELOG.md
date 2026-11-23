@@ -103,6 +103,10 @@ New, additive:
   work the resolver also accepts a two-digit-year pair ("95/46") or a CELEX
   number as naming the act. `refresh_references_for_version` stores them for
   documents already held.
+- Core now requires `langfuse>=5.2.0`, which needs Langfuse Cloud or a
+  self-hosted server of 4.59.0 or later; on an older server, stay on a Core
+  release that allows `langfuse` 4. Trace metadata values are now JSON-encoded,
+  as the SDK does for its own spans.
 
 Fixed:
 
