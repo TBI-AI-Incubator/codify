@@ -111,7 +111,12 @@ def _extract_body_lines_by_eid(source_xml: str) -> dict[str, list[str]]:
                 for p in body_paragraphs(el)
                 if (text := provision_text(p).strip())
             ]
-            if lines:
+            # An all-rich table has no writable cells. Keep its empty slot list
+            # so the document-model fallback cannot turn link text into a slot.
+            if lines or any(
+                wrapper.find(f"{{{_AKN_NS}}}table") is not None
+                for wrapper in el.iterchildren(*_WRAPPER_TAGS)
+            ):
                 out[eid] = lines
     return out
 
@@ -169,7 +174,7 @@ def _attachment_units(source_xml: str, eid_to_lines: dict[str, list[str]]) -> li
                 )
         for el in att.iter():
             eid = el.get("eId") if isinstance(el.tag, str) else None
-            if not eid or eid == att_eid or eid in seen or eid not in eid_to_lines:
+            if not eid or eid == att_eid or eid in seen or not eid_to_lines.get(eid):
                 continue
             seen.add(eid)
             num = None
@@ -203,7 +208,7 @@ def walk_source(
 
     def _body_for(el: BodyElement) -> str:
         lines = eid_to_lines.get(el.akn_eid)
-        if lines:
+        if lines is not None:
             return "\n".join(lines)
         # The writer patches only <p>s inside intro, content and wrapUp, never list prose.
         return "" if el.akn_type in ("item", "blockList") else _joined_body(el)

@@ -272,3 +272,16 @@ def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
         xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money
     )
     assert audit["money_missing_by_eid"] == {cell_units[1].akn_eid: ["18"]}
+
+
+def test_article_with_only_a_linked_cell_does_not_request_translation_of_its_amount() -> None:
+    from codify.translate.write import apply_translation_to_akn
+
+    source = parse_to_akn(
+        "ARTICLE 1\n  TABLE\n    TR\n      TC\n        Fee 18 Dinars\n",
+        country="xa",
+        number="17",
+    ).replace("Fee 18 Dinars</p>", 'Fee <ref href="#fee">18 Dinars</ref></p>')
+    units, _ = walk_source(parse_akn(source), source)
+    assert [(u.akn_eid, u.body_text) for u in units] == [("art_1", "")]
+    assert 'Fee <ref href="#fee">18 Dinars</ref>' in apply_translation_to_akn(source, [], [])
