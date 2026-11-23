@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -1185,4 +1187,17 @@ async def test_wrong_pair_for_listed_date_is_never_cached(
     cached = [json.loads(p.read_text()) for p in tmp_path.glob("*.json")]
     assert all(
         "LegConsBase" not in data and "ConsolidadaConteudoDetalhe" not in data for data in cached
+    )
+
+
+def test_registry_imports_without_system_timezone_data() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import codify.acquisition.adapters; from zoneinfo import ZoneInfo; "
+            "ZoneInfo('Europe/Lisbon')",
+        ],
+        check=True,
+        env=os.environ | {"PYTHONTZPATH": ""},
     )
