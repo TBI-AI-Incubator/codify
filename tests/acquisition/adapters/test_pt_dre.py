@@ -108,7 +108,7 @@ CONSOLIDATED = [
     _frag("105", "101", "Artigo 6.º", "Norma revogada", "Texto revogado.", state=4),
     _frag("112", "101", "Anexo II", "Modelo", "Modelo de requerimento."),
     # A division marked repealed over an article the source still marks in force.
-    _frag("106", "100", "Capítulo II", "Comissão", state=4),
+    _frag("106", "100", "Capítulo II", "Comissão", text="Divisão revogada.", state=4),
     _frag("107", "106", "Artigo 7.º", "Funções", "A comissão acompanha o regime."),
     _frag("108", "100", "Assinatura", text="Visto e aprovado em Conselho de Ministros."),
     _frag("109", "100", "Anexo\r(a que se refere o artigo 1.º)", "Regime de exemplo"),
@@ -372,7 +372,12 @@ async def test_consolidated_act_keeps_structure_and_leaves_repealed_out() -> Non
         "chp_I__art_5__para_1__point_a",
         "chp_I__art_5__para_1__point_b",
     ]
-    assert b"Texto revogado" not in doc.primary().content
+    body = root.xpath("string(//a:act/a:body)", namespaces=NS)
+    assert "Texto revogado" not in body and "Divisão revogada." not in body
+    assert (
+        root.findtext(".//{urn:codify:pt:dre}fragment[@id='106']/{urn:codify:pt:dre}wording")
+        == "Divisão revogada."
+    )
     assert root.xpath("//a:attachment/a:heading/text()", namespaces=NS) == ["Anexo II", "Anexo"]
     work = root.xpath("//a:act/a:meta/a:identification/a:FRBRWork", namespaces=NS)[0]
     assert work.xpath("a:FRBRalias[@name='eli']/@value", namespaces=NS) == [
@@ -719,7 +724,12 @@ async def test_dated_editions_and_offline_replay(tmp_path: Path) -> None:
         doc, _ = await _fetch(gazette, ref, cache=tmp_path)
         assert doc.expression_uri.endswith(f"/por@{day}")
         assert wording.encode() in doc.primary().content
-        assert b"Texto revogado" not in doc.primary().content
+        root = etree.fromstring(doc.primary().content)
+        assert "Texto revogado" not in root.xpath("string(//a:act/a:body)", namespaces=NS)
+        assert (
+            root.findtext(".//{urn:codify:pt:dre}fragment[@id='3']/{urn:codify:pt:dre}wording")
+            == "Texto revogado."
+        )
         validate_akn(doc.primary().content)
         versions = [
             f.attrib

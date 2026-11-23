@@ -309,7 +309,8 @@ def to_bluebell(
     root = frags[0]
     if not kept(root):
         raise UnmappedFragment("the consolidation marks the whole act repealed")
-    live = [f for f in frags if kept(f)]
+    live = [f | {"text": ""} if f.get("state") == REPEALED else f for f in frags if kept(f)]
+    root = live[0]
     kids: Tree = defaultdict(list)
     for f in live:
         kids[f["parent"]].append(f)
@@ -510,7 +511,7 @@ def _identify(
         )
         fields = ("id", "parent", "label", "version_date", "in_force_from", "state")
         for fragment in fragment_versions:
-            etree.SubElement(
+            entry = etree.SubElement(
                 proprietary,
                 f"{{{namespace}}}fragment",
                 {
@@ -519,6 +520,10 @@ def _identify(
                     if fragment[key] is not None
                 },
             )
+            if fragment["state"] == REPEALED and fragment["text"]:
+                etree.SubElement(entry, f"{{{namespace}}}wording").text = INVALID_XML.sub(
+                    " ", fragment["text"]
+                )
     return cast(str, etree.tostring(root, encoding="unicode"))
 
 
