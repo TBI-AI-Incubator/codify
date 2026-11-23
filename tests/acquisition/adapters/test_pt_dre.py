@@ -458,13 +458,21 @@ async def test_an_undated_ref_without_consolidation_is_refused() -> None:
         await _fetch(Gazette(), _ref("4", 2043))
 
 
-async def test_a_wholly_repealed_consolidation_is_refused() -> None:
+async def test_a_wholly_repealed_consolidation_preserves_history() -> None:
     gone = [
         _frag("100", "0", "Diploma", text=PREAMBLE, state=4),
         _frag("101", "100", "Artigo 1.º", "Objeto", "Texto.", state=4),
     ]
-    with pytest.raises(UnmappedFragment, match="whole act repealed"):
-        await _fetch(Gazette(gone), _ref("7", 2042))
+    gazette = Gazette(gone)
+    doc, _ = await _fetch(gazette, _ref("7", 2042))
+    validate_akn(doc.primary().content, strict=True)
+    root = etree.fromstring(doc.primary().content)
+    assert root.xpath("normalize-space(//a:body)", namespaces=NS) == "Diploma revogado"
+    assert (
+        root.findtext(".//{urn:codify:pt:dre}fragment[@id='101']/{urn:codify:pt:dre}wording")
+        == "Texto."
+    )
+    assert all(f.get("state") == "4" for f in root.iter("{urn:codify:pt:dre}fragment"))
 
 
 async def test_a_ref_typed_otherwise_than_the_gazette_is_refused() -> None:

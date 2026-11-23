@@ -307,8 +307,8 @@ def to_bluebell(
         return f.get("state") != REPEALED or any(kept(k) for k in every.get(f["id"], []))
 
     root = frags[0]
-    if not kept(root):
-        raise UnmappedFragment("the consolidation marks the whole act repealed")
+    if all(f.get("state") == REPEALED for f in frags):
+        return f"PREFACE\n  {escape(title)}\nBODY\n  CROSSHEADING Diploma revogado\n"
     live = [f | {"text": ""} if f.get("state") == REPEALED else f for f in frags if kept(f)]
     root = live[0]
     kids: Tree = defaultdict(list)
