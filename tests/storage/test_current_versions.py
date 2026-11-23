@@ -24,6 +24,7 @@ from codify.storage.versions import (
     latest_version_for_law,
     latest_versions_global,
     scope_filter,
+    scope_languages_sql,
 )
 from codify.testing import postgres_url
 
@@ -155,12 +156,17 @@ async def test_a_newer_root_in_another_language_does_not_replace_the_base_text(
     session: AsyncSession,
 ) -> None:
     number = uuid.uuid4().hex
-    base = await _save(session, "xa", number, "2020-01-01")
-    later = await _save(session, "xa", number, "2021-01-01", language="fra")
+    code = "xa"
+    base = await _save(session, code, number, "2020-01-01", year=1987)
+    later = await _save(session, code, number, "2021-01-01", year=1987, language="fra")
     assert await _current(session, base) == [later]
-    ids = await latest_versions_global(session, jurisdictions=("xa",))
+    ids = await latest_versions_global(session, jurisdictions=(code,))
     assert set(ids) & {base, later} == {base}
-    scope = await current_scope(session, jurisdictions=("xa",))
+    scope = await current_scope(
+        session, jurisdictions=(code,), from_year=1987, to_year=1987, undated=False
+    )
+    languages, params = scope_languages_sql(scope)
+    assert list(await session.scalars(text(languages), params)) == ["eng"]
     joins, predicate, params = scope_filter(scope, "v.id")
     rows = await session.scalars(
         text(f"SELECT v.id FROM versions v {joins} WHERE {predicate}"),  # noqa: S608

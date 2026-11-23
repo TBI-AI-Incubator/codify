@@ -70,13 +70,16 @@ async def count_versions_for_law(session: AsyncSession, law_id: uuid.UUID) -> in
     )
 
 
+def _base_language_sql(law: str) -> str:
+    return f"""(SELECT b.language FROM versions b WHERE b.law_id = {law}
+        ORDER BY (b.parent_version_id IS NOT NULL), b.ingested_at, b.id LIMIT 1)"""  # noqa: S608
+
+
 def current_version_sql(
     law: str, *, as_at: str = "CURRENT_DATE", language: bool = False, provision_filter: str = ""
 ) -> str:
     """Select the version in force for a law. Arguments are trusted SQL fragments."""
-    base_language = f"""SELECT b.language FROM versions b WHERE b.law_id = {law}
-        ORDER BY (b.parent_version_id IS NOT NULL), b.ingested_at, b.id LIMIT 1"""  # noqa: S608
-    languages = f"c.language = ({base_language})"
+    languages = f"c.language = {_base_language_sql(law)}"
     preference = ""
     if language:
         languages = f"({languages} OR c.language = :language)"
@@ -346,6 +349,35 @@ def _law_filters(scope: CurrentScope) -> tuple[list[str], dict[str, Any]]:
     return preds, params
 
 
+def scope_languages_sql(scope: VersionScope) -> tuple[str, dict[str, Any]]:
+    if not isinstance(scope, CurrentScope):
+        _, pred, params = scope_filter(scope, "v.id")
+        return f"SELECT DISTINCT v.language FROM versions v WHERE {pred}", params  # noqa: S608
+    predicates, params = _law_filters(scope)
+    where = " AND ".join(predicates) or "true"
+    # One witness law suffices for each language; translations alone are not witnesses.
+    return (
+        f"""
+        SELECT candidate.language FROM (
+            SELECT v.language, array_agg(v.law_id) AS laws
+            FROM versions v JOIN laws sl ON sl.id = v.law_id
+            WHERE {where} GROUP BY v.language
+        ) candidate
+        WHERE EXISTS (
+            SELECT FROM unnest(candidate.laws) AS witness(law_id)
+            WHERE candidate.language = {_base_language_sql("witness.law_id")}
+        )
+    """,  # noqa: S608
+        params,
+    )
+
+
+def held_laws_sql(scope: CurrentScope) -> tuple[str, dict[str, Any]]:
+    predicates, params = _law_filters(scope)
+    predicates.append("EXISTS (SELECT FROM versions v WHERE v.law_id = sl.id)")
+    return f"FROM laws sl WHERE {' AND '.join(predicates)}", params
+
+
 def scoped_text(sql: str, params: dict[str, Any]) -> TextClause:
     """`text(sql)` with the array and vector parameters `params` carries typed."""
     types = {"query_vec": HALFVEC(768)}
@@ -386,26 +418,21 @@ async def count_embedded_versions(
     missing = f"""sl.id NOT IN (
         SELECT sv.law_id FROM versions sv WHERE sv.embedded_at IS NULL
         AND sv.id = {current_version_sql("sv.law_id")})"""  # noqa: S608
-    return await _count_laws(session, version_ids, [missing])
+    return await _count_laws(session, version_ids, f"AND {missing}")
 
 
 async def count_in_scope(session: AsyncSession, scope: VersionScope) -> int:
     """How many versions the scope holds: one per law for a `CurrentScope`."""
     if not isinstance(scope, CurrentScope):
         return len(scope)
-    return await _count_laws(session, scope, [])
+    return await _count_laws(session, scope)
 
 
-async def _count_laws(session: AsyncSession, scope: CurrentScope, extra: list[str]) -> int:
+async def _count_laws(session: AsyncSession, scope: CurrentScope, extra: str = "") -> int:
     if not scope:
         return 0
-    predicates, params = _law_filters(scope)
-    predicates.extend(extra)
-    predicates.append("EXISTS (SELECT FROM versions v WHERE v.law_id = sl.id)")
-    statement = scoped_text(
-        f"SELECT count(*) FROM laws sl WHERE {' AND '.join(predicates)}",  # noqa: S608
-        params,
-    )
+    held, params = held_laws_sql(scope)
+    statement = scoped_text(f"SELECT count(*) {held} {extra}", params)  # noqa: S608
     return int((await session.execute(statement, params)).scalar_one())
 
 
