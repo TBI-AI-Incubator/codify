@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 # Bounded so neither Python nor Postgres backtracks quadratically on a long unit;
 # Postgres caps a repetition bound at 255.
 PLACEHOLDER_PATTERN = r"^\s*\[[^\]\n]{0,200} not transcribed: [^\]\n]{0,250}\]\s*$"
+DOTTED_PLACEHOLDER_PATTERN = r"^\s*\.[.\s]*$"
 DEFAULT_MARKERS: tuple[str, ...] = (PLACEHOLDER_PATTERN,)
 # Platform defaults, recorded here until a jurisdiction gives a reason to override.
 DIGIT_SHARE_THRESHOLD = 0.3
@@ -61,6 +62,8 @@ def exclusion_reason(
     stripped = (text or "").strip()
     if not stripped:
         return None
+    if re.fullmatch(DOTTED_PLACEHOLDER_PATTERN, stripped):
+        return "placeholder"
     if is_placeholder_only(stripped, markers):
         return "placeholder"
     if marked:

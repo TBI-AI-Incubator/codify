@@ -216,3 +216,108 @@ async def test_both_arms_return_the_same_ranking(
     # The pool's four of six, every one from this scope.
     assert (len(read_first), {pid for pid, _ in read_first} <= in_scope) == (4, True)
     assert read_first == walked
+
+
+@pytest.mark.parametrize("as_ids", [False, True], ids=["current-scope", "id-list"])
+@pytest.mark.parametrize("query", ["register", "..."], ids=["hybrid", "dense"])
+async def test_draft_is_absent_from_search_and_citation(
+    session: AsyncSession, as_ids: bool, query: str
+) -> None:
+    from codify.storage.embeddings import upsert_embedding
+
+    code = f"q{uuid.uuid4().hex[:5]}"
+    enacted = await _law(session, code, ["The authority shall maintain a register."])
+    draft = await _law(session, code, ["The authority shall publish a register."])
+    await session.execute(
+        text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:id)"),
+        {"id": draft},
+    )
+    scope = [enacted, draft] if as_ids else await current_scope(session, jurisdictions=(code,))
+    draft_ids = list(
+        (
+            await session.scalars(
+                text("SELECT id FROM provisions WHERE version_id=:id"), {"id": draft}
+            )
+        ).all()
+    )
+    vector = [1.0] + [0.0] * 767
+    for pid in draft_ids:
+        await upsert_embedding(session, pid, vector, "fixture")
+    for include_drafts in (False, True):
+        matches = await hybrid_search(
+            session,
+            query_vec=vector,
+            query_text=query,
+            version_ids=scope,
+            k=10,
+            candidate_pool=10,
+            rrf_k=60,
+            model_id="fixture",
+            include_drafts=include_drafts,
+        )
+        assert set(draft_ids).issubset({m[0] for m in matches}) == include_drafts
+    assert await retrieval.enrich_matches(session, draft_ids) == {}
+
+
+@pytest.mark.parametrize("include_drafts", [False, True])
+@pytest.mark.parametrize("query", ["register", "..."])
+async def test_old_repeal_embedding_cannot_rank(
+    session: AsyncSession, query: str, include_drafts: bool
+) -> None:
+    from codify.storage.embeddings import upsert_embedding
+
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["The register is public.", ". . ."])
+    rows = await session.execute(
+        text("SELECT id, text FROM provisions WHERE version_id=:id"), {"id": version}
+    )
+    vector = [1.0] + [0.0] * 767
+    for pid, body in rows:
+        await upsert_embedding(session, pid, vector, "fixture")
+        if body == ". . .":
+            await session.execute(
+                text(
+                    "UPDATE provisions SET excluded_from_pool=false, exclusion_reason=NULL "
+                    "WHERE id=:id"
+                ),
+                {"id": pid},
+            )
+    matches = await hybrid_search(
+        session,
+        query_text=query,
+        query_vec=vector,
+        version_ids=[version],
+        k=10,
+        candidate_pool=10,
+        rrf_k=60,
+        model_id="fixture",
+        include_drafts=include_drafts,
+    )
+    assert [match[2] for match in matches] == ["The register is public."]
+
+
+async def test_metadata_order_omits_drafts(session: AsyncSession) -> None:
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["The register is public."])
+    law = (
+        await session.execute(
+            text(
+                "UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:v) "
+                "RETURNING id"
+            ),
+            {"v": version},
+        )
+    ).scalar_one()
+    token = await retrieval.query_tokens_for(session, "register", [version])
+    assert await retrieval.matching_laws_ordered(
+        session, version_ids=[version], query_match=token, sort="title", limit=10, offset=0
+    ) == ([], 0)
+    assert (
+        await retrieval.provisions_for_laws(
+            session,
+            version_ids=[version],
+            law_ids=[law],
+            query_match=token,
+            query_tokens=token,
+            per_law=10,
+        )
+        == {}
+    )

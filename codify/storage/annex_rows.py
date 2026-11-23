@@ -16,6 +16,7 @@ from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.search import TOKENISER_VERSION, tokenise_to_text
 from codify.storage.akn_size import bounded_akn, oversize_reason
 from codify.storage.models import AnnexRow, Version
+from codify.storage.versions import ENACTED_VERSION_SQL
 from codify.tables.resolve import ResolvedRow, resolve_tables
 
 logger = structlog.get_logger()
@@ -174,12 +175,13 @@ class TableRowMatch(BaseModel):
 # pagination on `(score, id)` is the fix if paging goes deep.
 #
 # Two statements, because a scoped-or-not disjunction cannot use the version index.
-_ROW_RANK_HEAD = """
+_ROW_RANK_HEAD = f"""
     WITH ranked AS (
       SELECT id, search_tokens <@> to_bm25query(:query_tokens, 'annex_rows_bm25_idx') AS score
       FROM annex_rows
       WHERE search_tsv @@ to_tsquery('simple', :query_match)
-"""
+        AND {ENACTED_VERSION_SQL.format(version="annex_rows.version_id")}
+"""  # noqa: S608
 _ROW_RANK_TAIL = """
       ORDER BY score
       LIMIT :limit OFFSET :offset

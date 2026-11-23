@@ -1,5 +1,4 @@
-"""`versions.is_current` names what `latest_versions_global` chose, and search over a
-`CurrentScope` returns what search over the equivalent id list returns."""
+"""Write-time version flags, effective dates and current-version search scopes."""
 
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from codify.akn.io import parse_akn
 from codify.pipeline.enrich.bluebell import parse_to_akn
 from codify.storage.embeddings import embed_and_stamp
+from codify.storage.goods_codes import find_versions_by_goods_code, index_version_goods_codes
 from codify.storage.repository import save_document
 from codify.storage.retrieval import hybrid_search
 from codify.storage.versions import (
@@ -22,8 +22,10 @@ from codify.storage.versions import (
     count_embedded_versions,
     count_in_scope,
     current_scope,
+    latest_version_for_law,
     latest_versions_global,
     scope_filter,
+    scope_languages_sql,
 )
 from codify.testing import postgres_url
 
@@ -130,6 +132,100 @@ async def test_the_latest_original_is_current_and_a_delete_hands_it_back(
     assert await _current(session, older) == [older]
 
 
+async def test_current_text_follows_the_session_date_without_a_write(
+    session: AsyncSession,
+) -> None:
+    number = uuid.uuid4().hex
+    await session.execute(text("SET LOCAL TIME ZONE 'Etc/GMT-14'"))
+    later = (await session.execute(text("SELECT CURRENT_DATE"))).scalar_one()
+    await session.execute(text("SET LOCAL TIME ZONE 'Etc/GMT+12'"))
+    earlier = (await session.execute(text("SELECT CURRENT_DATE"))).scalar_one()
+    first = await _save(session, "xa", number, earlier.isoformat())
+    second = await _save(session, "xa", number, later.isoformat())
+    law = (
+        await session.execute(text("SELECT law_id FROM versions WHERE id = :v"), {"v": first})
+    ).scalar_one()
+    for zone, expected in [("Etc/GMT+12", first), ("Etc/GMT-14", second)]:
+        await session.execute(text("SELECT set_config('TimeZone', :zone, true)"), {"zone": zone})
+        current = await latest_version_for_law(session, law)
+        assert current is not None and current.id == expected
+        ids = await latest_versions_global(session, jurisdictions=("xa",))
+        assert set(ids) & {first, second} == {expected}
+
+
+@pytest.mark.parametrize(
+    "surface", ["bulk", "count", "embedded", "lexical", "dense", "hybrid", "goods"]
+)
+async def test_a_future_law_enters_current_results_on_its_date_without_a_write(
+    session: AsyncSession, surface: str
+) -> None:
+    await session.execute(text("SET LOCAL TIME ZONE 'Etc/GMT-14'"))
+    start = (await session.execute(text("SELECT CURRENT_DATE"))).scalar_one()
+    version = await _save(
+        session,
+        "xa",
+        uuid.uuid4().hex,
+        start.isoformat(),
+        body="Thermometers under CN code 8471 30 00.",
+        year=1973,
+    )
+    await embed_and_stamp(session, version, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
+    xml = await session.scalar(text("SELECT akn_xml FROM versions WHERE id = :v"), {"v": version})
+    assert await index_version_goods_codes(session, version, xml) > 0
+    scope = await current_scope(
+        session, jurisdictions=("xa",), from_year=1973, to_year=1973, undated=False
+    )
+    for zone, eligible in [("Etc/GMT+12", False), ("Etc/GMT-14", True)]:
+        await session.execute(text("SELECT set_config('TimeZone', :zone, true)"), {"zone": zone})
+        if surface == "bulk":
+            ids = await latest_versions_global(
+                session, jurisdictions=("xa",), from_year=1973, to_year=1973
+            )
+            assert None not in ids and (version in ids) == eligible
+        elif surface == "count":
+            assert await count_in_scope(session, scope) == int(eligible)
+        elif surface == "embedded":
+            assert await count_embedded_versions(session, scope) == int(eligible)
+        elif surface == "goods":
+            rows = await find_versions_by_goods_code(session, "84713000", current_only=True)
+            assert (version in {r.version_id for r in rows}) == eligible
+        else:
+            hits = await hybrid_search(
+                session,
+                query_vec=[1.0] + [0.0] * 767,
+                query_text="" if surface == "dense" else "Thermometers",
+                model_id="absent" if surface == "lexical" else "test-model",
+                version_ids=scope,
+                k=10,
+                candidate_pool=30,
+                rrf_k=60,
+            )
+            assert bool(hits) == eligible
+
+
+async def test_a_newer_root_in_another_language_does_not_replace_the_base_text(
+    session: AsyncSession,
+) -> None:
+    number = uuid.uuid4().hex
+    code = "xa"
+    base = await _save(session, code, number, "2020-01-01", year=1987)
+    later = await _save(session, code, number, "2021-01-01", year=1987, language="fra")
+    assert await _current(session, base) == [later]
+    ids = await latest_versions_global(session, jurisdictions=(code,))
+    assert set(ids) & {base, later} == {base}
+    scope = await current_scope(
+        session, jurisdictions=(code,), from_year=1987, to_year=1987, undated=False
+    )
+    languages, params = scope_languages_sql(scope)
+    assert list(await session.scalars(text(languages), params)) == ["eng"]
+    joins, predicate, params = scope_filter(scope, "v.id")
+    rows = await session.scalars(
+        text(f"SELECT v.id FROM versions v {joins} WHERE {predicate}"),  # noqa: S608
+        params,
+    )
+    assert set(rows) & {base, later} == {base}
+
+
 async def test_concurrent_writers_leave_one_current_version(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -166,9 +262,10 @@ async def test_current_scope_searches_and_counts_what_the_id_list_does(
     tag = uuid.uuid4().hex[:6]
     old = await _save(session, code, f"{tag}a", "2020-01-01", body=f"tenancy deposit {tag}")
     new = await _save(session, code, f"{tag}a", "2021-01-01", body=f"tenancy deposit {tag}")
+    future = await _save(session, code, f"{tag}a", "9999-01-01", body=f"deposit {tag}")
     dated = await _save(session, code, f"{tag}b", "2020-01-01", body=f"deposit rules {tag}")
     undated = await _save(session, code, f"{tag}c", "2020-01-01", body=f"deposit {tag}", year=None)
-    for vid in (new, dated):
+    for vid in (new, dated, future):
         await embed_and_stamp(session, vid, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
     jid = (
         await session.execute(text("SELECT id FROM jurisdictions WHERE code = :c"), {"c": code})
@@ -191,9 +288,14 @@ async def test_current_scope_searches_and_counts_what_the_id_list_does(
     ids = await latest_versions_global(session, jurisdictions=(code,))
     scope = await current_scope(session, jurisdictions=(code,))
     assert scope == CurrentScope(jurisdiction_ids=(jid,))
+    assert future not in ids
     assert old not in ids and {new, dated, undated} <= set(ids)
     hits = await search(ids)
-    assert hits and await search(scope) == hits
+    hit_versions = await session.scalars(
+        text("SELECT DISTINCT version_id FROM provisions WHERE id = ANY(:ids)"), {"ids": list(hits)}
+    )
+    assert set(hit_versions) & {old, new, future} == {new}
+    assert await search(scope) == hits
     assert await count_in_scope(session, scope) == len(ids)
     assert await count_embedded_versions(session, scope) == await count_embedded_versions(
         session, ids
@@ -220,3 +322,30 @@ def test_an_id_list_binds_as_one_array() -> None:
         "p.version_id = ANY(:version_ids)",
         {"version_ids": ids},
     )
+
+
+async def test_draft_only_scope_counts_and_selects_only_on_opt_in(session: AsyncSession) -> None:
+    code = "xy"
+    version = await _save(session, code, uuid.uuid4().hex, "2020-01-01", body="deposit")
+    await session.execute(
+        text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:v)"),
+        {"v": version},
+    )
+    await embed_and_stamp(session, version, client=_FixedVectors(), path_context=False)  # type: ignore[arg-type]
+    scope = await current_scope(session, jurisdictions=(code,))
+    assert (
+        await count_in_scope(session, scope),
+        await count_embedded_versions(session, scope),
+    ) == (
+        0,
+        0,
+    )
+    for include_drafts in (False, True):
+        scope = await current_scope(session, jurisdictions=(code,), include_drafts=include_drafts)
+        joins, predicate, params = scope_filter(scope, "v.id")
+        selected = await session.scalars(
+            text(f"SELECT v.id FROM versions v {joins} WHERE {predicate}"), params
+        )
+        assert selected.all() == ([version] if include_drafts else [])
+    assert await count_in_scope(session, scope) == 1
+    assert await count_embedded_versions(session, scope) == 1

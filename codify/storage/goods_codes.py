@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import NamedTuple
 
 import structlog
-from sqlalchemy import ColumnElement, delete, literal_column, or_, select
+from sqlalchemy import ColumnElement, delete, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col
 
@@ -16,6 +16,7 @@ from codify.pipeline.enrich.goods_codes import GoodsCode, extract_goods_codes
 from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.storage.akn_size import bounded_akn, oversize_reason
 from codify.storage.models import GoodsCodeReference, Jurisdiction, Law, Version
+from codify.storage.versions import current_version_sql
 
 logger = structlog.get_logger()
 
@@ -141,8 +142,9 @@ async def find_versions_by_goods_code(
     if jurisdiction_codes is not None:
         statement = statement.where(Jurisdiction.code.in_(list(jurisdiction_codes)))
     if current_only:
-        # `is_current` is kept by trigger and deliberately unmapped.
-        statement = statement.where(literal_column("versions.is_current"))
+        statement = statement.where(
+            Version.id == text(current_version_sql("laws.id", allow_future=False))
+        )
     rows = (await session.execute(statement)).all()
     return [
         GoodsCodeMatch(
