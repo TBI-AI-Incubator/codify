@@ -81,6 +81,7 @@ async def retrieve(
     doctype: str | None = None,
     akn_type: str | None = None,
     include_non_normative: bool = False,
+    include_drafts: bool = False,
 ) -> list[ProvisionMatch]:
     """Hybrid dense + BM25 retrieval. Exactly one scope required. `language`
     prefers that expression of each law, falling back to the original where it
@@ -122,6 +123,7 @@ async def retrieve(
         model_id=model_id,
         akn_type=akn_type,
         include_non_normative=include_non_normative,
+        include_drafts=include_drafts,
     )
     return [
         ProvisionMatch(provision_id=pid, akn_eid=eid, text=txt, rrf_score=score)

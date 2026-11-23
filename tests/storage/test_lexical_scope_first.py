@@ -218,7 +218,13 @@ async def test_both_arms_return_the_same_ranking(
     assert read_first == walked
 
 
-async def test_draft_is_absent_from_search_and_citation(session: AsyncSession) -> None:
+@pytest.mark.parametrize("as_ids", [False, True], ids=["current-scope", "id-list"])
+@pytest.mark.parametrize("query", ["register", "..."], ids=["hybrid", "dense"])
+async def test_draft_is_absent_from_search_and_citation(
+    session: AsyncSession, as_ids: bool, query: str
+) -> None:
+    from codify.storage.embeddings import upsert_embedding
+
     code = f"q{uuid.uuid4().hex[:5]}"
     enacted = await _law(session, code, ["The authority shall maintain a register."])
     draft = await _law(session, code, ["The authority shall publish a register."])
@@ -226,21 +232,38 @@ async def test_draft_is_absent_from_search_and_citation(session: AsyncSession) -
         text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:id)"),
         {"id": draft},
     )
-    ids = [enacted, draft]
-    hits = await _search(session, ids, "register")
-    assert len(hits) == 1
+    scope = [enacted, draft] if as_ids else await current_scope(session, jurisdictions=(code,))
     draft_ids = list(
         (
-            await session.execute(
+            await session.scalars(
                 text("SELECT id FROM provisions WHERE version_id=:id"), {"id": draft}
             )
-        ).scalars()
+        ).all()
     )
+    vector = [1.0] + [0.0] * 767
+    for pid in draft_ids:
+        await upsert_embedding(session, pid, vector, "fixture")
+    for include_drafts in (False, True):
+        matches = await hybrid_search(
+            session,
+            query_vec=vector,
+            query_text=query,
+            version_ids=scope,
+            k=10,
+            candidate_pool=10,
+            rrf_k=60,
+            model_id="fixture",
+            include_drafts=include_drafts,
+        )
+        assert set(draft_ids).issubset({m[0] for m in matches}) == include_drafts
     assert await retrieval.enrich_matches(session, draft_ids) == {}
 
 
+@pytest.mark.parametrize("include_drafts", [False, True])
 @pytest.mark.parametrize("query", ["register", "..."])
-async def test_old_repeal_embedding_cannot_rank(session: AsyncSession, query: str) -> None:
+async def test_old_repeal_embedding_cannot_rank(
+    session: AsyncSession, query: str, include_drafts: bool
+) -> None:
     from codify.storage.embeddings import upsert_embedding
 
     version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["The register is public.", ". . ."])
@@ -267,6 +290,7 @@ async def test_old_repeal_embedding_cannot_rank(session: AsyncSession, query: st
         candidate_pool=10,
         rrf_k=60,
         model_id="fixture",
+        include_drafts=include_drafts,
     )
     assert [match[2] for match in matches] == ["The register is public."]
 

@@ -297,14 +297,18 @@ ENACTED_VERSION_SQL = """{version} NOT IN (
 )"""
 
 
-def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[str, Any]]:
+def scope_filter(
+    scope: VersionScope, version_col: str, *, join_law: bool = False
+) -> tuple[str, str, dict[str, Any]]:
     """(joins, predicate, params) holding `version_col` to the scope.
 
-    An id list binds as one array (`:version_ids`). A `CurrentScope` joins
+    An id list binds as one array (`:version_ids`). `join_law` and `CurrentScope` join
     `versions sv` and `laws sl`, so callers must not use those aliases.
     """
+    joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
     if not isinstance(scope, CurrentScope):
-        return "", f"{version_col} = ANY(:version_ids)", {"version_ids": list(scope)}
+        pred = f"{version_col} = ANY(:version_ids)"
+        return joins if join_law else "", pred, {"version_ids": list(scope)}
     preds = ["sv.is_current"]
     params: dict[str, Any] = {}
     if scope.jurisdiction_ids is not None:
@@ -320,7 +324,6 @@ def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[
     if scope.doctype:
         preds.append("sl.doctype = :scope_doctype")
         params["scope_doctype"] = scope.doctype
-    joins = f"JOIN versions sv ON sv.id = {version_col} JOIN laws sl ON sl.id = sv.law_id"
     return joins, " AND ".join(preds), params
 
 

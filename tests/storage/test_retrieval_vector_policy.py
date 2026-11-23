@@ -44,6 +44,8 @@ def test_indexable_vector_selection_reads_one_model_in_scope(hybrid):
                 version_id INTEGER, jurisdiction_id INTEGER,
                 UNIQUE(provision_id, model_id, jurisdiction_id)
             );
+            INSERT INTO laws VALUES (1,'enacted'), (2,'draft');
+            INSERT INTO versions VALUES (1,1), (2,2);
             INSERT INTO provisions VALUES
                 (1,'a','both',1,'article',1,0),
                 (2,'b','fallback only',1,'article',1,0),
