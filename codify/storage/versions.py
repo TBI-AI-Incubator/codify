@@ -292,6 +292,11 @@ async def current_scope(
     return CurrentScope(ids, from_year, to_year, doctype, undated)
 
 
+ENACTED_VERSION_SQL = """{version} NOT IN (
+    SELECT dv.id FROM laws dl JOIN versions dv ON dv.law_id = dl.id WHERE dl.status = 'draft'
+)"""
+
+
 def scope_filter(scope: VersionScope, version_col: str) -> tuple[str, str, dict[str, Any]]:
     """(joins, predicate, params) holding `version_col` to the scope.
 

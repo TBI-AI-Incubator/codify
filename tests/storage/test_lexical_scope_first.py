@@ -216,3 +216,56 @@ async def test_both_arms_return_the_same_ranking(
     # The pool's four of six, every one from this scope.
     assert (len(read_first), {pid for pid, _ in read_first} <= in_scope) == (4, True)
     assert read_first == walked
+
+
+async def test_draft_is_absent_from_search_and_citation(session: AsyncSession) -> None:
+    code = f"q{uuid.uuid4().hex[:5]}"
+    enacted = await _law(session, code, ["The authority shall maintain a register."])
+    draft = await _law(session, code, ["The authority shall publish a register."])
+    await session.execute(
+        text("UPDATE laws SET status='draft' WHERE id=(SELECT law_id FROM versions WHERE id=:id)"),
+        {"id": draft},
+    )
+    ids = [enacted, draft]
+    hits = await _search(session, ids, "register")
+    assert len(hits) == 1
+    draft_ids = list(
+        (
+            await session.execute(
+                text("SELECT id FROM provisions WHERE version_id=:id"), {"id": draft}
+            )
+        ).scalars()
+    )
+    assert await retrieval.enrich_matches(session, draft_ids) == {}
+
+
+@pytest.mark.parametrize("query", ["register", "..."])
+async def test_old_repeal_embedding_cannot_rank(session: AsyncSession, query: str) -> None:
+    from codify.storage.embeddings import upsert_embedding
+
+    version = await _law(session, f"q{uuid.uuid4().hex[:5]}", ["The register is public.", ". . ."])
+    rows = await session.execute(
+        text("SELECT id, text FROM provisions WHERE version_id=:id"), {"id": version}
+    )
+    vector = [1.0] + [0.0] * 767
+    for pid, body in rows:
+        await upsert_embedding(session, pid, vector, "fixture")
+        if body == ". . .":
+            await session.execute(
+                text(
+                    "UPDATE provisions SET excluded_from_pool=false, exclusion_reason=NULL "
+                    "WHERE id=:id"
+                ),
+                {"id": pid},
+            )
+    matches = await hybrid_search(
+        session,
+        query_text=query,
+        query_vec=vector,
+        version_ids=[version],
+        k=10,
+        candidate_pool=10,
+        rrf_k=60,
+        model_id="fixture",
+    )
+    assert [match[2] for match in matches] == ["The register is public."]

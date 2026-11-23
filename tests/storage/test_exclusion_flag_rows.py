@@ -16,6 +16,7 @@ def test_rows_carry_exclusion_flag() -> None:
         position=0,
         text="The Authority shall:",
         children=[
+            Point(akn_eid="art_1__point_c", akn_type="point", position=2, text=". . . . ."),
             Point(akn_eid="art_1__point_a", akn_type="point", position=0, text="keep a register."),
             Point(
                 akn_eid="art_1__point_b",
@@ -38,3 +39,9 @@ def test_rows_carry_exclusion_flag() -> None:
     assert flags["art_1__intro"] is False
     assert flags["art_1__point_a"] is False
     assert flags["art_1__point_b"] is True
+    repeal = next(p for p in provisions if p.akn_eid == "art_1__point_c")
+    assert (repeal.text, repeal.excluded_from_pool, repeal.exclusion_reason) == (
+        ". . . . .",
+        True,
+        "placeholder",
+    )

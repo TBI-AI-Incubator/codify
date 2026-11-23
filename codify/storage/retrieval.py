@@ -18,10 +18,12 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from codify.quality.sentinels import DOTTED_PLACEHOLDER_PATTERN
 from codify.search import tokenise
 from codify.storage.lexicon import expand_terms
 from codify.storage.models import Jurisdiction, Law, Provision, Version
 from codify.storage.versions import (
+    ENACTED_VERSION_SQL,
     CurrentScope,
     VersionScope,
     scope_filter,
@@ -93,15 +95,22 @@ _HYBRID_TEMPLATE = """
     LIMIT :k
 """
 
-# The dense arm's body after SELECT, shared with the dense-only query.
-_DENSE_TEMPLATE = """e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
+
+def _searchable(alias: str) -> str:
+    enacted = ENACTED_VERSION_SQL.format(version=f"{alias}.version_id")
+    return f"{enacted} AND {alias}.text !~ '{DOTTED_PLACEHOLDER_PATTERN}'"
+
+
+_DENSE_TEMPLATE = f"""
+        e.provision_id AS id, p.akn_eid, p.text, e.embedding <=> :query_vec AS distance
         FROM provision_embeddings e
-        JOIN provisions p ON p.id = e.provision_id {vec_join}
-        WHERE {vec_partitions} {vec_scope}
+        JOIN provisions p ON p.id = e.provision_id {{vec_join}}
+        WHERE {{vec_partitions}} {{vec_scope}}
           AND e.model_id = :model_id
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
           AND p.excluded_from_pool IS NOT TRUE
+          AND {_searchable("p")}
         ORDER BY e.embedding <=> :query_vec"""
 
 # The relaxed scan may hand back its candidates a little out of order, so the
@@ -124,10 +133,11 @@ def _dense_body(scope: VersionScope, partitioned: bool) -> tuple[str, dict[str, 
     return body, params
 
 
-_LEXICAL_MATCH = """p.search_tsv @@ to_tsquery('simple', :query_match)
+_LEXICAL_MATCH = f"""p.search_tsv @@ to_tsquery('simple', :query_match)
           AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
           AND (p.normative OR CAST(:include_non_normative AS boolean))
-          AND p.excluded_from_pool IS NOT TRUE"""
+          AND p.excluded_from_pool IS NOT TRUE
+          AND {_searchable("p")}"""
 
 _SCORE = "search_tokens <@> to_bm25query(:query_tokens, 'provisions_bm25_idx')"
 
@@ -365,6 +375,7 @@ class ProvisionContext(BaseModel):
     law_id: uuid.UUID
     version_id: uuid.UUID
     law_title: str
+    status: str = "enacted"
     # Short display name where the law has one; `law_title` is the fallback.
     law_short_title: str | None = None
     jurisdiction_code: str
@@ -392,6 +403,7 @@ async def enrich_matches(
                 Provision.version_id,
                 Law.id,
                 Law.title,
+                Law.status,
                 Law.short_title,
                 Law.frbr_work_uri,
                 Law.doctype,
@@ -401,7 +413,7 @@ async def enrich_matches(
             .join(Version, Version.id == Provision.version_id)
             .join(Law, Law.id == Version.law_id)
             .join(Jurisdiction, Jurisdiction.id == Law.jurisdiction_id)
-            .where(Provision.id.in_(provision_ids))
+            .where(Provision.id.in_(provision_ids), text(_searchable("provisions")))
         )
     ).all()
     return {
@@ -410,6 +422,7 @@ async def enrich_matches(
             law_id=law_id,
             version_id=version_id,
             law_title=law_title,
+            status=status,
             law_short_title=law_short_title,
             jurisdiction_code=code,
             frbr_work_uri=frbr,
@@ -425,6 +438,7 @@ async def enrich_matches(
             version_id,
             law_id,
             law_title,
+            status,
             law_short_title,
             frbr,
             doctype,
@@ -482,10 +496,7 @@ async def matching_laws_ordered(
         JOIN versions v ON v.id = p.version_id
         JOIN laws l ON l.id = v.law_id
         WHERE p.version_id = ANY(:version_ids)
-          AND p.search_tsv @@ to_tsquery('simple', :query_match)
-          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-          AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
+          AND {_LEXICAL_MATCH}
         GROUP BY v.law_id
         ORDER BY {_LAW_ORDERS[sort]}, v.law_id
         LIMIT :limit OFFSET :offset
@@ -513,7 +524,7 @@ async def matching_laws_ordered(
 # match, so one broad term against one large law reads thousands of full
 # provision texts and throws them away.
 _LAW_PROVISIONS_SQL = text(
-    """
+    f"""
     SELECT law_id, id, akn_eid, text FROM (
         SELECT v.law_id, p.id, p.akn_eid, p.text,
                row_number() OVER (
@@ -525,14 +536,11 @@ _LAW_PROVISIONS_SQL = text(
         JOIN versions v ON v.id = p.version_id
         WHERE p.version_id = ANY(:version_ids)
           AND v.law_id = ANY(:law_ids)
-          AND p.search_tsv @@ to_tsquery('simple', :query_match)
-          AND (CAST(:akn_type AS text) IS NULL OR p.akn_type = CAST(:akn_type AS text))
-          AND (p.normative OR CAST(:include_non_normative AS boolean))
-        AND p.excluded_from_pool IS NOT TRUE
+          AND {_LEXICAL_MATCH}
     ) ranked
     WHERE rn <= :per_law
     ORDER BY law_id, rn
-    """
+    """  # noqa: S608
 ).bindparams(
     bindparam("version_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
     bindparam("law_ids", type_=ARRAY(PG_UUID(as_uuid=True))),
