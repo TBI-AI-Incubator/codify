@@ -33,6 +33,38 @@ def _split_cells(line: str) -> list[str]:
     return [c.strip() for c in line.strip().split("|")[1:-1]]
 
 
+def complete_pipe_continuations(lines: list[str]) -> list[str]:
+    """Recover missing outside pipes on a run continuing a declared table.
+
+    Require two consecutive rows of the declared width. A lone pipe in prose
+    or a wrapped row of unknown width supplies no evidence of cell boundaries.
+    """
+    out = lines.copy()
+    width = 0
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if _is_separator_row(line) and is_pipe_row(line):
+            width = len(_split_cells(line))
+        elif is_pipe_row(line):
+            if len(_split_cells(line)) != width:
+                width = 0
+        elif width and line:
+            end = i
+            while end < len(lines):
+                cells = lines[end].strip().split("|")
+                if len(cells) != width or not all(cell.strip() for cell in cells):
+                    break
+                end += 1
+            if end - i >= 2:
+                out[i:end] = ["|" + row.strip() + "|" for row in lines[i:end]]
+                i = end
+                continue
+            width = 0
+        i += 1
+    return out
+
+
 def _table_markers(lines: list[str]) -> int:
     return sum(line.strip() == "TABLE" for line in lines)
 

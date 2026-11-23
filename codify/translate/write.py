@@ -24,6 +24,7 @@ from codify.pipeline.enrich.arabic_normalise import (
     JOINER_STRIP_TABLE,
     latinise_arabic_ordinal,
 )
+from codify.translate.anchors import body_paragraphs, plain_text_paragraph
 from codify.translate.translate_bodies import TranslatedBlock
 
 logger = structlog.get_logger()
@@ -274,13 +275,6 @@ def _descendant_ps(el: etree._Element) -> list[etree._Element]:
     ]
 
 
-def _plain_text_p(p: etree._Element) -> bool:
-    """No element children: safe for `_set_p_text`, which flattens inline
-    markup. Semantic children (`<docType>`, `<docNumber>` in AKN4EU long
-    titles) must survive, so mixed-content `<p>`s are never patch slots."""
-    return not any(isinstance(c.tag, str) for c in p)
-
-
 def preface_p_slots(root: etree._Element) -> list[etree._Element]:
     """Non-empty `<p>` slots under the first `<preface>`, document order:
     direct `<p>` children plus `<longTitle>` descendant plain-text `<p>`s.
@@ -298,7 +292,7 @@ def preface_p_slots(root: etree._Element) -> list[etree._Element]:
                 if _p_has_text(child):
                     slots.append(child)
             elif name == "longTitle":
-                slots.extend(p for p in _descendant_ps(child) if _plain_text_p(p))
+                slots.extend(p for p in _descendant_ps(child) if plain_text_paragraph(p))
         return slots
     return []
 
@@ -331,7 +325,7 @@ def conclusions_p_slots(root: etree._Element) -> list[etree._Element]:
     """Non-empty `<p>` slots under the first `<conclusions>`, document order: direct
     `<p>`s (place and date) plus `<blockContainer>` descendants (the signatory block).
 
-    `<blockContainer>` children go through `_plain_text_p` as the preface's
+    `<blockContainer>` children go through `plain_text_paragraph` as the preface's
     `<longTitle>` does: `_set_p_text` flattens inline markup, so a mixed-content `<p>`
     must never become a patch slot.
     """
@@ -347,7 +341,7 @@ def conclusions_p_slots(root: etree._Element) -> list[etree._Element]:
                 if _p_has_text(child):
                     slots.append(child)
             elif name == "blockContainer":
-                slots.extend(p for p in _descendant_ps(child) if _plain_text_p(p))
+                slots.extend(p for p in _descendant_ps(child) if plain_text_paragraph(p))
         return slots
     return []
 
@@ -544,8 +538,6 @@ def _patch_element(el: etree._Element, block: TranslatedBlock) -> None:
     `block.lines[i]` maps positionally onto the i-th non-empty source `<p>`.
     Children with their own eId (`<paragraph>`, `<blockList>/<item>`) are
     patched under their own iteration."""
-    from codify.translate.anchors import _BODY_WRAPPERS
-
     # A block keyed on a bare <p> (flat annex prose under <mainBody>) has no
     # wrappers to walk; patch the element's own text.
     if _localname(el) == "p":
@@ -560,19 +552,9 @@ def _patch_element(el: etree._Element, block: TranslatedBlock) -> None:
                 child.text = _sanitise_target_text(block.heading)
                 break
 
-    idx = 0
-    for wrapper in el:
-        if not isinstance(wrapper.tag, str) or _localname(wrapper) not in _BODY_WRAPPERS:
-            continue
-        for p in wrapper:
-            if not isinstance(p.tag, str) or _localname(p) != "p":
-                continue
-            if not _p_has_text(p):
-                continue
-            if idx >= len(block.lines):
-                return
-            _set_p_text(p, block.lines[idx])
-            idx += 1
+    slots = (p for p in body_paragraphs(el) if _p_has_text(p))
+    for p, line in zip(slots, block.lines, strict=False):
+        _set_p_text(p, line)
 
 
 def _hebrew_ordinal(text: str) -> str | None:
@@ -586,6 +568,34 @@ def _hebrew_ordinal(text: str) -> str | None:
     # `AR_ORDINAL_TO_INT.values()`; the module-level assertion above
     # guarantees every such int has a Hebrew mapping.
     return _INT_TO_HEBREW_NUMERAL[int(latin)]
+
+
+# The modern Arabic alphabet puts tāʾ and thāʾ third and fourth. The
+# traditional abjad order uses jīm and dāl there. An isolated letter cannot
+# establish which order the source used.
+_HIJAI = "ابتثجحخدذرزسشصضطظعغفقكلمنهوي"
+_ALEF_FORMS = str.maketrans("أإآ", "ااا")
+_LIST_ITEM_TAGS = {f"{{{AKN_NS}}}{name}" for name in ("point", "item", "paragraph", "subparagraph")}
+
+
+def _latinise_hijai_lists(root: etree._Element) -> None:
+    for parent in root.iter():
+        if len(parent) < 3:
+            continue
+        items = [item for item in parent if item.tag in _LIST_ITEM_TAGS]
+        if not 3 <= len(items) <= 26 or any(item.tag != items[0].tag for item in items):
+            continue
+        labels: list[tuple[etree._Element, str]] = []
+        for item, expected in zip(items, _HIJAI, strict=False):
+            num = item.find(f"{{{AKN_NS}}}num")
+            marker = (num.text or "").strip() if num is not None else ""
+            letter = marker.rstrip(".-").translate(JOINER_STRIP_TABLE).translate(_ALEF_FORMS)
+            if num is None or letter != expected:
+                break
+            labels.append((num, marker[len(marker.rstrip(".-")) :]))
+        else:
+            for i, (num, suffix) in enumerate(labels):
+                num.text = chr(ord("a") + i) + suffix
 
 
 def _canonicalise_num_text(root: etree._Element, target_language: str | None) -> None:
@@ -602,6 +612,8 @@ def _canonicalise_num_text(root: etree._Element, target_language: str | None) ->
     """
     hebrew = _is_hebrew_target(target_language)
     abjad_map = _AR_ABJAD_TO_HEBREW if hebrew else _AR_ABJAD_TO_LATIN
+    if not hebrew:
+        _latinise_hijai_lists(root)
 
     for el in root.iter():
         if not isinstance(el.tag, str) or _localname(el) != "num":

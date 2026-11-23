@@ -208,3 +208,42 @@ def test_list_prose_outside_body_wrappers_is_not_sent() -> None:
         ("list_1__item_a", ""),
         ("list_1__item_b", ""),
     ]
+
+
+def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
+    from lxml import etree
+
+    from codify.translate.translate_bodies import TranslatedBlock
+    from codify.translate.write import apply_translation_to_akn
+
+    table = "TABLE\n  TR\n    TH\n      Kind\n    TH\n      Rate\n  TR\n    TC\n      Clay\n    TC\n      18\n"
+    indented = "\n".join("  " + line for line in table.splitlines())
+    xml = parse_to_akn(
+        f"ARTICLE 1\n  Before.\n{indented}\n  After.\n\nSCHEDULE 1\n{indented}\n",
+        country="xa",
+        number="17",
+    )
+    xml = xml.replace(">Kind</p>", ">Mineral\nkind</p>")
+    xml = xml.replace(">Rate</p>", '>See <ref href="#bands">bands</ref></p>')
+    units, _ = walk_source(parse_akn(xml), xml)
+    cell_units = [u for u in units if "Clay" in u.body_text]
+    assert len(cell_units) == 2
+    assert cell_units[0].body_text.splitlines() == [
+        "Before.",
+        "Mineral kind",
+        "Clay",
+        "18",
+        "After.",
+    ]
+    assert cell_units[1].body_text.splitlines() == ["Mineral kind", "Clay", "18"]
+    blocks = [
+        TranslatedBlock(
+            eid=u.akn_eid,
+            lines=[line.replace("Clay", "Argile") for line in u.body_text.splitlines()],
+        )
+        for u in cell_units
+    ]
+    out = etree.fromstring(apply_translation_to_akn(xml, blocks, []).encode())
+    assert out.xpath('count(//*[local-name()="td"]/*[text()="Argile"])') == 2
+    assert out.xpath('count(//*[local-name()="td"]/*[text()="18"])') == 2
+    assert out.xpath('count(//*[local-name()="ref" and @href="#bands" and text()="bands"])') == 2

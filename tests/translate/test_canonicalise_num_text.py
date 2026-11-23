@@ -74,3 +74,14 @@ def test_ordinal_wins_over_abjad_first_char() -> None:
     root = _tree_with_nums("الأول")
     _canonicalise_num_text(root, None)
     assert _num_texts(root) == ["1"]
+
+
+def test_latin_labels_follow_the_order_of_each_complete_sibling_list() -> None:
+    root = etree.Element(f"{{{AKN_NS}}}body")
+    for sequence in (("أ.", "ب.", "ت.", "ث."), ("أ.", "ب.", "ج."), ("أ.", "ت.")):
+        group = etree.SubElement(root, f"{{{AKN_NS}}}article")
+        for label in sequence:
+            item = etree.SubElement(group, f"{{{AKN_NS}}}point")
+            etree.SubElement(item, f"{{{AKN_NS}}}num").text = label
+    _canonicalise_num_text(root, "eng")
+    assert _num_texts(root) == ["a.", "b.", "c.", "d.", "a.", "b.", "c.", "a.", "v."]
