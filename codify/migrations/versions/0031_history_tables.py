@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from alembic import op
 
-revision: str = "REVISION_ID_TBD"
-down_revision: str | None = "DOWN_REVISION_TBD"
+revision: str = "0031_history_tables"
+down_revision: str | None = "0030_registry_work_records"
 branch_labels: str | None = None
 depends_on: str | None = None
 
