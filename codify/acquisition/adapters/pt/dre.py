@@ -407,17 +407,17 @@ class DiarioAcquirer(BaseAcquirer):
             )
             if {str(row.get("Cid")) for row in rows} != {cid}:
                 raise DrItemMissing(f"fragment IDs disagree with listed edition {eli}")
-            if (
-                following
-                and data.get("LastConsolidacaoId")
-                and str(data["LastConsolidacaoId"]) == cid
-            ):
-                raise DrItemMissing(f"latest ID returned for historical edition {eli}")
             if last_day > start:
                 if await self._edition_at(variables, start + timedelta(days=1), eli, cid) != cid:
                     raise DrItemMissing(
                         f"returned consolidation does not match listed edition {eli}"
                     )
+                if following and str(data.get("LastConsolidacaoId") or cid) == cid:
+                    # A saved response can predate the next edition's publication.
+                    boundary = date.fromisoformat(following[0].rsplit("/", 1)[1])
+                    other_id = await self._edition_at(variables, boundary, eli, cid, same=False)
+                    if not re.fullmatch(r"[1-9][0-9]*", other_id) or other_id == cid:
+                        raise DrItemMissing(f"same consolidation at two listed editions: {eli}")
             else:
                 # A one-day edition has no second selector. Exclude every other listed edition.
                 for other in sorted(listed - {eli}):

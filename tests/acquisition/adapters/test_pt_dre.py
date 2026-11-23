@@ -1409,3 +1409,25 @@ async def test_conflicting_independent_selector_is_refused(
     with pytest.raises(DrItemMissing, match="does not match listed edition"):
         await _fetch(two_editions, edition_ref("2043-01-01", "800"), tmp_path)
     assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))
+
+
+@pytest.mark.parametrize("march_id", ["124", "800"])
+async def test_historical_last_id_is_checked_against_later_listing(
+    two_editions: Gazette, march_id: str, tmp_path: Path
+) -> None:
+    january = two_editions.editions["2043-01-01"]
+    january.update(
+        CurrentConsolidacaoId="800", LastConsolidacaoId="800", DataUltimaConsolidada="2043-01-01"
+    )
+    for item in january["LegConsBase"]["List"]:
+        item["ConsolidacaoFragmento"]["Cid"] = "800"
+    two_editions.editions["2043-01-02"] = january
+    two_editions.editions["2043-03-01"]["CurrentConsolidacaoId"] = march_id
+    ref = edition_ref("2043-01-01", "800")
+    if march_id == "800":
+        with pytest.raises(DrItemMissing, match="two listed editions"):
+            await _fetch(two_editions, ref, tmp_path)
+        assert not any("LegConsBase" in p.read_text() for p in tmp_path.glob("*.json"))
+    else:
+        doc, _ = await _fetch(two_editions, ref, tmp_path)
+        assert doc.expression_uri.endswith("2043-01-01")
