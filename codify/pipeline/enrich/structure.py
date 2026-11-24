@@ -144,6 +144,13 @@ _EMPTY_PARENS_DIGIT_RE = re.compile(r"\(\s*\)\s*(\d+)")
 # real article.
 _DIGIT_PREFIX_MADDA_RE = re.compile(r"([0-9٠-٩۰-۹]+)[ \t]*مادة")
 
+# A standalone heading can arrive in visual order, with either orientation of
+# parentheses. Reorder only a complete heading line so references keep their text.
+_PAREN_PREFIX_MADDA_RE = re.compile(
+    r"(?m)^(?P<indent>[^\S\r\n]*)(?P<label>\([ \t]*\d+[ \t]*\)|\)[ \t]*\d+[ \t]*\()"
+    r"[^\S\r\n]*(?P<marker>(?:ال)?مادة)(?=[^\S\r\n]*\r?$)"
+)
+
 # RTL reorder prefixes headers with a stray `)` on its own line (`)مادة 3`),
 # defeating the regex's column boundary. Stripped before a line-start numbered
 # article keyword, which it otherwise hides.
@@ -167,6 +174,9 @@ def normalise_rtl_extract(text: str) -> str:
     text = text.translate(_BIDI_CONTROLS)
     text = text.translate(JOINER_STRIP_TABLE)
     text = _EMPTY_PARENS_DIGIT_RE.sub(r"(\1)", text)
+    text = _PAREN_PREFIX_MADDA_RE.sub(
+        lambda m: f"{m['indent']}{m['marker']} ({m['label'][1:-1].strip()})", text
+    )
     text = _DIGIT_PREFIX_MADDA_RE.sub(r"مادة \1", text)
     return _STRAY_PAREN_MADDA_RE.sub(r"\1", text)
 

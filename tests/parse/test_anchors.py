@@ -633,6 +633,47 @@ def test_stray_paren_strip_only_targets_numbered_headers() -> None:
     assert normalise_rtl_extract(text) == text
 
 
+def test_visual_order_article_headings_keep_number_and_body() -> None:
+    from codify.pipeline.enrich.structure import normalise_rtl_extract
+
+    text = "  )٤( مادة\n1. نص.\n( ۵ ) المادة\r\nنص آخر.\n"
+    normalised = normalise_rtl_extract(text)
+    assert normalised == "  مادة (٤)\n1. نص.\nالمادة (۵)\r\nنص آخر.\n"
+    anchors = scan_anchors(normalised, build_anchor_regex(_QANUN_CONFIG, "act"), country="xx")
+    assert [a.akn_eid for a in anchors if a.kind == "article"] == ["art_4", "art_5"]
+
+
+def test_visual_order_requires_a_whole_heading_on_one_line() -> None:
+    from codify.pipeline.enrich.structure import normalise_rtl_extract
+
+    text = "مجموع (٤) مادة\n(٥) مادة أخرى\n(٦)\nمادة (٧)\n"
+    assert normalise_rtl_extract(text) == text
+
+
+def test_reordered_headings_use_the_existing_contents_and_parent_rules() -> None:
+    from codify.pipeline.enrich.structure import normalise_rtl_extract
+
+    text = (
+        "فصل (١)\n)٤( مادة\n(٤) مادة\nيسجل الطلب في الدفتر.\n"
+        "فصل (٢)\n)٤( مادة\nيرسل القرار إلى اللجنة.\n"
+    )
+    source = normalise_rtl_extract(text)
+    scan = scan_anchors_with_ambiguity(
+        source, build_anchor_regex(_QANUN_CONFIG, "act"), country="xx"
+    )
+    articles = [a for a in scan.anchors if a.kind == "article"]
+    assert [a.akn_eid for a in articles] == ["chp_1__art_4", "chp_2__art_4"]
+    assert source[articles[0].char_offset :].lstrip().startswith("مادة (٤)\nيسجل")
+    assert source[articles[1].char_offset :].lstrip().startswith("مادة (٤)\nيرسل")
+    assert any(s.detail.get("reads_as") == "toc_twin" for s in scan.ambiguity)
+
+
+def test_provision_named_in_a_sentence_keeps_its_reference_in_the_body() -> None:
+    text = "مادة (٣)\n١. يسري ما تقضي  به المادة (٨) على الطلب.\nمادة (٤)\nنص."
+    anchors = scan_anchors(text, build_anchor_regex(_QANUN_CONFIG, "act"), country="xx")
+    assert [a.akn_eid for a in anchors if a.kind == "article"] == ["art_3", "art_4"]
+
+
 def test_stray_paren_strip_stays_on_one_line() -> None:
     """A line ending in a lone `)` is not stripped just because the next line
     opens a numbered header: the strip is a same-line artifact only."""

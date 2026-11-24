@@ -96,7 +96,7 @@ _PROSE_PRECURSORS: tuple[str, ...] = (
 # Marks a citation only when adjacent on one line. "عقوبة مخالفة المادة 10" is
 # a penalty heading citing article 10, but "…ارتكب مخالفة" ends a sentence and
 # the next line may open a real article.
-_SAMELINE_PRECURSORS: tuple[str, ...] = ("مخالفة",)
+_SAMELINE_PRECURSORS: tuple[str, ...] = ("مخالفة", "تقضي به")
 
 # A list numbered in ordinal words rather than digits.
 _ORDINAL_LIST_MARKERS: tuple[tuple[str, str], ...] = (

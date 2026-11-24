@@ -135,7 +135,7 @@ def test_the_arabic_pack_carries_the_data_the_structurer_moved_out_of_anchors() 
     assert len(ARABIC.letter_order) == 28
     assert ARABIC.letter_alias == {"ه": "هـ"}
     assert ARABIC.prose_precursors and "بموجب" in ARABIC.prose_precursors
-    assert ARABIC.sameline_precursors == ("مخالفة",)
+    assert ARABIC.sameline_precursors == ("مخالفة", "تقضي به")
     assert dict(ARABIC.ordinal_list_markers)["أولاً"] == "1"
     assert ARABIC.is_letter("م") and not ARABIC.is_letter("A")
     assert ARABIC.digit_re.match("(٣)") and ARABIC.plural_marker_re.search("المواد")

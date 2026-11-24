@@ -586,7 +586,8 @@ def _fold_hamza(value: str) -> str:
 
 
 def _precursor_alt(words: Iterable[str]) -> str:
-    return "|".join(re.escape(_fold_hamza(w)) for w in words)
+    # An OCR read may separate words in a citation phrase with a tab or extra spaces.
+    return "|".join(re.escape(_fold_hamza(w)).replace(r"\ ", r"[^\S\r\n]+") for w in words)
 
 
 # Arabic prose precursors that signal "this المادة/الباب is an in-text
