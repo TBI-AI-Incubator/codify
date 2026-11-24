@@ -188,7 +188,7 @@ def _expects_body(kind: str, basic: str | None = None) -> bool:
     return kind == basic or kind not in (CONTAINER_KINDS | {"section"})
 
 
-def _anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
+def anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
     """Anchors with own body text, excluding captured headings and child spans."""
     ordered = sorted((a for a in anchors if not a.quoted_amendment), key=lambda a: a.char_offset)
     out: set[str] = set()
@@ -989,7 +989,7 @@ async def text_to_bluebell_scaffolded(
         # succeeded one can still omit some; both surface as empty anchors that have
         # source text. Bare-heading anchors are legitimately empty and left alone; the
         # rest re-fill in progressively smaller windows.
-        has_body_source = _anchors_with_body_source(text, anchors)
+        has_body_source = anchors_with_body_source(text, anchors)
         basic = basic_unit_kind(config, doctype)
         with_body = [
             a.akn_eid
