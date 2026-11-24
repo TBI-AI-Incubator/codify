@@ -28,9 +28,10 @@ from collections.abc import Sequence
 import structlog
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import keyword_aliases, opens_attachment
+from codify.pipeline.enrich.anchors import cached_regex, opens_attachment
 from codify.pipeline.enrich.ocr import PageSpan
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap, words
+from codify.pipeline.enrich.structure import normalise_rtl_extract
 
 # A one-token region ("٣" in a footer) would spuriously match a short body line,
 # so only whole multi-word blocks decide a drop or relocation. This also keeps a
@@ -231,29 +232,30 @@ def _settle_bare_numbers(
             verdicts[i] = (verdicts[i][0], "drop" if furniture else "keep")
 
 
-# A bare page number and a sentence quoting a provision are never headings here.
-_NUMBERED_LINE = re.compile(r"([^\d()]*[^\s\d()])\s*(?:\(\s*(\d{1,8})\s*\)|(\d{1,8}))")
-
-
 def _keep_confirmed_headings(
-    lines: list[str], verdicts: list[tuple[int | None, str]], country: str
+    lines: list[str], verdicts: list[tuple[int | None, str]], country: str, doctype: str | None
 ) -> None:
     if not any(page is not None and verdict == "drop" for page, verdict in verdicts):
         return
     config = load_config(country) if country else None
-    doctype = config.default_document_class if config else "act"
-    doc = config.get_document_class(doctype) if config else None
+    selected = doctype or (config.default_document_class if config else "act")
+    doc = config.get_document_class(selected) if config else None
     if config and (not doc or not doc.hierarchy):
         return
-    aliases = {
-        alias.casefold()
-        for alias in keyword_aliases(config, doctype).get(doc.basic_unit if doc else "article", ())
-    }
+    regex = cached_regex(country, selected)
+    group = "k_" + (doc.basic_unit if doc else "article").replace("-", "_")
+    if group not in regex.groupindex:
+        return
     headings: list[tuple[int, int]] = []
     for i, line in enumerate(lines):
-        match = _NUMBERED_LINE.fullmatch(line.strip())
-        if match and match[1].strip().casefold() in aliases:
-            headings.append((i, int(match[2] or match[3])))
+        # Scan a normalised copy. The verdict still refers to the original line.
+        marker = normalise_rtl_extract(line).strip()
+        match = regex.match(marker)
+        if not match or not match[group] or marker[match.end() :].strip() not in ("", ")"):
+            continue
+        number = match.groupdict().get("num")
+        if number and number.isdecimal() and len(number) <= 8:
+            headings.append((i, int(number)))
     for (prev, low), (i, number), (following, high) in zip(
         headings, headings[1:], headings[2:], strict=False
     ):
@@ -311,6 +313,7 @@ def combine_text_for_structure(
     page_spans: Sequence[PageSpan] | None = None,
     *,
     country: str = "",
+    doctype: str | None = None,
 ) -> str:
     """Filter already-combined page text for the structurer: drop header/footer
     lines, relocate footnote lines to the foot. Byte-identical to the input when
@@ -374,7 +377,7 @@ def combine_text_for_structure(
         else:
             verdicts.append((page, "keep"))
     _settle_bare_numbers(lines, verdicts, numbers)
-    _keep_confirmed_headings(lines, verdicts, country)
+    _keep_confirmed_headings(lines, verdicts, country, doctype)
     in_run = _note_runs(lines, verdicts, notes)
 
     kept: list[str] = []

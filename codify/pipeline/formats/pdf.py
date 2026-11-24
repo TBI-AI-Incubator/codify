@@ -309,7 +309,7 @@ async def _ingest_pages(
         logger.warning("regions_unavailable", error=str(exc))
         regions = {}
     structure_text = combine_text_for_structure(
-        raw_text, regions, page_spans, country=jurisdiction_code
+        raw_text, regions, page_spans, country=jurisdiction_code, doctype=desc.doctype
     )
 
     # Stage 3, Structure. Bridge the structurer's callbacks through a queue

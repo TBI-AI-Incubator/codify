@@ -206,3 +206,24 @@ def test_margin_marker_needs_a_body_and_consecutive_provisions(
     footer = Region("furniture", 1, 0, "footer", margin, 900, 920)
     actual = combine_text_for_structure(source, {1: [footer]}, spans)
     assert actual.strip() == (source if kept else first.removesuffix(margin + "\n") + overleaf)
+
+
+@pytest.mark.parametrize(
+    ("country", "doctype", "labels"),
+    [
+        ("xa", "code", ["Article 6", "**Article (7)**", "Article 8"]),
+        ("hu", "act", ["6. Szakasz", "7. Szakasz", "8. Szakasz"]),
+    ],
+)
+def test_margin_markers_use_the_resolved_doctype_and_scanner_order(
+    country: str, doctype: str, labels: list[str]
+) -> None:
+    source = "\n".join([labels[0], _BODY, labels[1], _BODY, labels[2]])
+    spans = [PageSpan(page=1, start=0, end=len(source), method="ocr")]
+    footer = Region("furniture", 1, 1, "footer", labels[1], 800, 900)
+    assert (
+        combine_text_for_structure(
+            source, {1: [footer]}, spans, country=country, doctype=doctype
+        ).strip()
+        == source
+    )
