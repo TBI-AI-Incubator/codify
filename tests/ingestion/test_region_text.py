@@ -3,16 +3,19 @@
 
 from __future__ import annotations
 
+import pytest
+
 from codify.pipeline.enrich.ocr import (
     OcrBlock,
     PageDimensions,
     PageLayout,
     PageResult,
+    PageSpan,
     combine_page_texts,
     combine_page_texts_with_spans,
 )
 from codify.pipeline.enrich.region_text import combine_text_for_structure
-from codify.pipeline.enrich.regions import classify_page
+from codify.pipeline.enrich.regions import Region, classify_page
 
 A4 = PageDimensions(dpi=87, width=720, height=1018)
 
@@ -178,3 +181,28 @@ def test_a_running_footer_is_still_dropped_from_every_page() -> None:
     out = _combine_for_structure(pages, _regions(*pages))
     assert _FOOTER not in out
     assert out.count(_BODY) == 3
+
+
+@pytest.mark.parametrize(
+    ("margin", "overleaf", "kept"),
+    [
+        ("Article (7)", "The clerk shall issue a receipt.\nArticle 8", True),
+        ("Article (7)", "Article (7)\nThe clerk shall issue a receipt.\nArticle 8", False),
+        ("Article (7)", "Article 8", False),
+        ("Article (7)", "The clerk shall issue a receipt.\nArticle 12", False),
+        ("Page 7", "The clerk shall issue a receipt.\nArticle 8", False),
+        ("See Article 7", "The clerk shall issue a receipt.\nArticle 8", False),
+    ],
+)
+def test_margin_marker_needs_a_body_and_consecutive_provisions(
+    margin: str, overleaf: str, kept: bool
+) -> None:
+    first = f"Article 6\nThe register is open.\n{margin}\n"
+    source = first + overleaf
+    spans = [
+        PageSpan(page=1, start=0, end=len(first), method="ocr"),
+        PageSpan(page=2, start=len(first), end=len(source), method="ocr"),
+    ]
+    footer = Region("furniture", 1, 0, "footer", margin, 900, 920)
+    actual = combine_text_for_structure(source, {1: [footer]}, spans)
+    assert actual.strip() == (source if kept else first.removesuffix(margin + "\n") + overleaf)

@@ -28,7 +28,7 @@ from collections.abc import Sequence
 import structlog
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import opens_attachment
+from codify.pipeline.enrich.anchors import keyword_aliases, opens_attachment
 from codify.pipeline.enrich.ocr import PageSpan
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap, words
 
@@ -231,6 +231,46 @@ def _settle_bare_numbers(
             verdicts[i] = (verdicts[i][0], "drop" if furniture else "keep")
 
 
+# A bare page number and a sentence quoting a provision are never headings here.
+_NUMBERED_LINE = re.compile(r"([^\d()]*[^\s\d()])\s*(?:\(\s*(\d{1,8})\s*\)|(\d{1,8}))")
+
+
+def _keep_confirmed_headings(
+    lines: list[str], verdicts: list[tuple[int | None, str]], country: str
+) -> None:
+    if not any(page is not None and verdict == "drop" for page, verdict in verdicts):
+        return
+    config = load_config(country) if country else None
+    doctype = config.default_document_class if config else "act"
+    doc = config.get_document_class(doctype) if config else None
+    if config and (not doc or not doc.hierarchy):
+        return
+    aliases = {
+        alias.casefold()
+        for alias in keyword_aliases(config, doctype).get(doc.basic_unit if doc else "article", ())
+    }
+    headings: list[tuple[int, int]] = []
+    for i, line in enumerate(lines):
+        match = _NUMBERED_LINE.fullmatch(line.strip())
+        if match and match[1].strip().casefold() in aliases:
+            headings.append((i, int(match[2] or match[3])))
+    for (prev, low), (i, number), (following, high) in zip(
+        headings, headings[1:], headings[2:], strict=False
+    ):
+        page, verdict = verdicts[i]
+        if (
+            page is not None
+            and verdict == "drop"
+            and verdicts[prev][1] == verdicts[following][1] == "keep"
+            and low + 1 == number == high - 1
+            and any(
+                verdicts[j][1] == "keep" and any(c.isalpha() for c in lines[j])
+                for j in range(i + 1, following)
+            )
+        ):
+            verdicts[i] = (page, "keep")
+
+
 def _agree(a: str, b: str) -> bool:
     return overlap(a, b) >= _NOTE_AGREE_FLOOR and overlap(b, a) >= _NOTE_AGREE_FLOOR
 
@@ -334,6 +374,7 @@ def combine_text_for_structure(
         else:
             verdicts.append((page, "keep"))
     _settle_bare_numbers(lines, verdicts, numbers)
+    _keep_confirmed_headings(lines, verdicts, country)
     in_run = _note_runs(lines, verdicts, notes)
 
     kept: list[str] = []
