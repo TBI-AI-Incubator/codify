@@ -633,6 +633,29 @@ def test_stray_paren_strip_only_targets_numbered_headers() -> None:
     assert normalise_rtl_extract(text) == text
 
 
+def test_visual_order_article_headings_keep_number_and_body() -> None:
+    from codify.pipeline.enrich.structure import normalise_rtl_extract
+
+    text = "  )٤( مادة\n1. نص.\n( ۵ ) المادة\r\nنص آخر.\n"
+    normalised = normalise_rtl_extract(text)
+    assert normalised == "  مادة (٤)\n1. نص.\nالمادة (۵)\r\nنص آخر.\n"
+    anchors = scan_anchors(normalised, build_anchor_regex(_QANUN_CONFIG, "act"), country="xx")
+    assert [a.akn_eid for a in anchors if a.kind == "article"] == ["art_4", "art_5"]
+
+
+def test_visual_order_requires_a_whole_heading_on_one_line() -> None:
+    from codify.pipeline.enrich.structure import normalise_rtl_extract
+
+    text = "مجموع (٤) مادة\n(٥) مادة أخرى\n(٦)\nمادة (٧)\n"
+    assert normalise_rtl_extract(text) == text
+
+
+def test_provision_named_in_a_sentence_keeps_its_reference_in_the_body() -> None:
+    text = "مادة (٣)\n١. يسري ما تقضي  به المادة (٨) على الطلب.\nمادة (٤)\nنص."
+    anchors = scan_anchors(text, build_anchor_regex(_QANUN_CONFIG, "act"), country="xx")
+    assert [a.akn_eid for a in anchors if a.kind == "article"] == ["art_3", "art_4"]
+
+
 def test_stray_paren_strip_stays_on_one_line() -> None:
     """A line ending in a lone `)` is not stripped just because the next line
     opens a numbered header: the strip is a same-line artifact only."""
