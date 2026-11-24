@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from lxml import etree
 from lxml import html as lxml_html
@@ -123,6 +125,20 @@ def word(label: str) -> str:
     return (label.strip().split() or [""])[0]
 
 
+LISBON = ZoneInfo("Europe/Lisbon")
+INVALID_XML = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
+
+
+def civil_date(value: str | None) -> str:
+    """Gazette dates and naive timestamps already use Lisbon civil time."""
+    if not value:
+        return ""
+    stamp = datetime.fromisoformat(value)
+    if stamp.tzinfo is not None:
+        stamp = stamp.astimezone(LISBON)
+    return stamp.date().isoformat()
+
+
 def fragments(data: dict[str, Any]) -> list[dict[str, Any]]:
     """The consolidation's fragments in source order, one flat record each."""
     out = []
@@ -136,8 +152,8 @@ def fragments(data: dict[str, Any]) -> list[dict[str, Any]]:
                 "label": fv.get("Tituo") or cf.get("Name") or "",
                 "heading": fv.get("Epigrafe") or cf.get("Epigrafe") or "",
                 "text": fv.get("Texto") or "",
-                "version_date": (fv.get("DataVersao") or "")[:10],
-                "in_force_from": (fv.get("DataEntradaVigor") or "")[:10],
+                "version_date": civil_date(fv.get("DataVersao")),
+                "in_force_from": civil_date(fv.get("DataEntradaVigor")),
                 "state": fv.get("VersaoEstadoId"),
             }
         )
@@ -271,9 +287,13 @@ def _annex(node: dict[str, Any], kids: Tree, pad: str, out: list[str]) -> None:
 
 
 def to_bluebell(
-    frags: list[dict[str, Any]], *, printed: str = "", title: str = "", summary: str = ""
+    frags: list[dict[str, Any]],
+    *,
+    printed: str = "",
+    title: str = "",
+    summary: str = "",
 ) -> str:
-    """Fragments in source order as one Bluebell document; repealed ones are left out.
+    """Fragments as one Bluebell document, omitting repealed provisions.
     `printed` supplies the preamble where the consolidation's root has none; `title` and
     `summary` the citation and sumário where the text does not state them."""
     if not frags:
@@ -288,8 +308,12 @@ def to_bluebell(
 
     root = frags[0]
     if not kept(root):
-        raise UnmappedFragment("the consolidation marks the whole act repealed")
-    live = [f for f in frags if kept(f)]
+        if any(f.get("state") != REPEALED for f in frags):
+            raise UnmappedFragment("surviving fragments outside the act's tree")
+        preface_line = f"PREFACE\n  {escape(title)}\n" if title else ""
+        return preface_line + "BODY\n  CROSSHEADING Diploma revogado\n"
+    live = [f | {"text": ""} if f.get("state") == REPEALED else f for f in frags if kept(f)]
+    root = live[0]
     kids: Tree = defaultdict(list)
     for f in live:
         kids[f["parent"]].append(f)
@@ -448,7 +472,13 @@ def from_printed(text: str) -> list[dict[str, Any]]:
     return frags
 
 
-def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> str:
+def _identify(
+    akn: str,
+    eli: str,
+    title: str,
+    publication: dict[str, str],
+    fragment_versions: list[dict[str, Any]] | None,
+) -> str:
     """The work ELI as an `eli` alias, the act's title as alias and preface `docTitle`, and
     its gazette publication."""
     root = parse_xml(akn)
@@ -472,6 +502,31 @@ def _identify(akn: str, eli: str, title: str, publication: dict[str, str]) -> st
         identification = work.getparent()
         assert identification is not None
         identification.addnext(etree.Element(f"{{{AKN_NS}}}publication", **publication))
+    if fragment_versions:
+        identification = work.getparent()
+        meta = identification.getparent()
+        namespace = "urn:codify:pt:dre"
+        proprietary = etree.SubElement(
+            meta,
+            f"{{{AKN_NS}}}proprietary",
+            source=identification.get("source"),
+            nsmap={"dre": namespace},
+        )
+        fields = ("id", "parent", "label", "version_date", "in_force_from", "state")
+        for fragment in fragment_versions:
+            entry = etree.SubElement(
+                proprietary,
+                f"{{{namespace}}}fragment",
+                {
+                    key: INVALID_XML.sub(" ", str(fragment[key]))
+                    for key in fields
+                    if fragment[key] is not None
+                },
+            )
+            if fragment["state"] == REPEALED and fragment["text"]:
+                etree.SubElement(entry, f"{{{namespace}}}wording").text = INVALID_XML.sub(
+                    " ", fragment["text"]
+                )
     return cast(str, etree.tostring(root, encoding="unicode"))
 
 
@@ -486,6 +541,7 @@ def to_akn(
     eli: str = "",
     title: str = "",
     publication: dict[str, str] | None = None,
+    fragment_versions: list[dict[str, Any]] | None = None,
 ) -> str:
     """AKN XML for the Bluebell, identified as `work` and `expression`. A Bluebell
     parse error is raised, never swallowed."""
@@ -496,7 +552,7 @@ def to_akn(
         e = errors[0]
         raise UnmappedFragment(f"Bluebell rejected line {e.line}:{e.column}: {e.message}")
     akn = set_work_uri(akn, work, expression, as_of) or akn
-    return _identify(akn, eli, title, publication or {})
+    return _identify(akn, eli, title, publication or {}, fragment_versions)
 
 
 __all__ = [
