@@ -28,10 +28,10 @@ from collections.abc import Sequence
 import structlog
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import cached_regex, opens_attachment
+from codify.pipeline.enrich.anchors import cached_regex, opens_attachment, scan_anchors
 from codify.pipeline.enrich.ocr import DEGRADED_MARKER_RE, PageSpan
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap, words
-from codify.pipeline.enrich.structure import normalise_rtl_extract
+from codify.pipeline.enrich.structure import anchors_with_body_source, normalise_rtl_extract
 
 # A one-token region ("٣" in a footer) would spuriously match a short body line,
 # so only whole multi-word blocks decide a drop or relocation. This also keeps a
@@ -233,7 +233,11 @@ def _settle_bare_numbers(
 
 
 def _keep_confirmed_headings(
-    lines: list[str], verdicts: list[tuple[int | None, str]], country: str, doctype: str | None
+    lines: list[str],
+    verdicts: list[tuple[int | None, str]],
+    country: str,
+    doctype: str | None,
+    note_lines: set[int],
 ) -> None:
     if not any(page is not None and verdict == "drop" for page, verdict in verdicts):
         return
@@ -246,33 +250,70 @@ def _keep_confirmed_headings(
     group = "k_" + (doc.basic_unit if doc else "article").replace("-", "_")
     if group not in regex.groupindex:
         return
-    headings: list[tuple[int, int]] = []
-    for i, line in enumerate(lines):
-        # Scan a normalised copy. The verdict still refers to the original line.
-        marker = normalise_rtl_extract(line).strip()
-        match = regex.match(marker)
-        if not match or not match[group] or marker[match.end() :].strip() not in ("", ")"):
-            continue
-        number = match.groupdict().get("num")
-        if number and number.isdecimal() and len(number) <= 8:
-            headings.append((i, int(number)))
-    for (prev, low), (i, number), (following, high) in zip(
-        headings, headings[1:], headings[2:], strict=False
-    ):
-        page, verdict = verdicts[i]
+
+    # Only invoke the context-aware scan if some dropped line is a complete
+    # unit marker. It must still be an anchor in the surrounding document.
+    def standalone(line: str) -> bool:
+        match = regex.match(line)
+        return bool(match and match[group] and line[match.end() :].strip() in ("", ")"))
+
+    candidates = {
+        i
+        for i, (page, verdict) in enumerate(verdicts)
+        if page is not None
+        and verdict == "drop"
+        and standalone(normalise_rtl_extract(lines[i]).strip())
+    }
+    if not candidates:
+        return
+    evidence = [
+        normalise_rtl_extract(line)
+        if (i in candidates or verdicts[i][1] == "keep")
+        and i not in note_lines
+        and not DEGRADED_MARKER_RE.fullmatch(line.strip())
+        else ""
+        for i, line in enumerate(lines)
+    ]
+    starts = []
+    offset = 0
+    for line in evidence:
+        starts.append(offset)
+        offset += len(line) + 1
+    text = "\n".join(evidence)
+    anchors = scan_anchors(text, regex, country=country, doctype=selected)
+    has_body = anchors_with_body_source(text, anchors)
+    units = []
+    for anchor in anchors:
         if (
-            page is not None
-            and verdict == "drop"
-            and verdicts[prev][1] == verdicts[following][1] == "keep"
-            and low + 1 == number == high - 1
-            and any(
-                verdicts[j][1] == "keep"
-                and not DEGRADED_MARKER_RE.fullmatch(lines[j].strip())
-                and any(c.isalpha() for c in lines[j])
-                for j in range(i + 1, following)
-            )
+            anchor.kind != (doc.basic_unit if doc else "article")
+            or anchor.quoted_amendment
         ):
-            verdicts[i] = (page, "keep")
+            continue
+        start = anchor.char_offset
+        while start < len(text) and text[start].isspace():
+            start += 1
+        index = bisect_right(starts, start) - 1
+        units.append((index, anchor))
+    for (prev, left), (i, unit), (following, right) in zip(
+        units, units[1:], units[2:], strict=False
+    ):
+        if i not in candidates or unit.akn_eid not in has_body:
+            continue
+        if verdicts[prev][1] != "keep" or verdicts[following][1] != "keep":
+            continue
+        numbers = [a.number or "" for a in (left, unit, right)]
+        if not all(n.isdecimal() and len(n) <= 8 for n in numbers):
+            continue
+        low, number, high = map(int, numbers)
+        if not (low + 1 == number == high - 1):
+            continue
+        # Even a lone container the scanner discarded ends a provision's body.
+        for line in evidence[i + 1 : following]:
+            if regex.match(line.strip()):
+                break
+            if any(c.isalpha() for c in line):
+                verdicts[i] = (verdicts[i][0], "keep")
+                break
 
 
 def _agree(a: str, b: str) -> bool:
@@ -379,8 +420,8 @@ def combine_text_for_structure(
         else:
             verdicts.append((page, "keep"))
     _settle_bare_numbers(lines, verdicts, numbers)
-    _keep_confirmed_headings(lines, verdicts, country, doctype)
     in_run = _note_runs(lines, verdicts, notes)
+    _keep_confirmed_headings(lines, verdicts, country, doctype, in_run)
 
     kept: list[str] = []
     relocated: list[str] = []

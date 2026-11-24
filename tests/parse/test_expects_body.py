@@ -3,7 +3,7 @@
 Wave-2 kind-vocabulary consolidation: structure.py carried its own short
 container set that omitted subchapter/subdivision/tome/subpart/subtitle. This is
 behaviour-preserving in practice (the retry call sites also gate on
-`_anchors_with_body_source`, whose `_TOP_LEVEL_KINDS` never yields those kinds),
+`anchors_with_body_source`, whose `_TOP_LEVEL_KINDS` never yields those kinds),
 but the vocabulary is now single-sourced from `kinds.CONTAINER_KINDS` (plus
 `section`, kept for parity) so the two definitions cannot drift."""
 
