@@ -313,7 +313,9 @@ async def _ingest_pages(
     # Confirming a heading against its neighbours can scan the whole document.
     structure_text = await on_the_cpu_pool(
         partial(combine_text_for_structure, country=jurisdiction_code, doctype=desc.doctype),
-        raw_text, regions, page_spans,
+        raw_text,
+        regions,
+        page_spans,
     )
 
     # Stage 3, Structure. Bridge the structurer's callbacks through a queue

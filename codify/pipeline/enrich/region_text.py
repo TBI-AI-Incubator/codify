@@ -284,10 +284,7 @@ def _keep_confirmed_headings(
     has_body = anchors_with_body_source(text, anchors)
     units = []
     for anchor in anchors:
-        if (
-            anchor.kind != (doc.basic_unit if doc else "article")
-            or anchor.quoted_amendment
-        ):
+        if anchor.kind != (doc.basic_unit if doc else "article") or anchor.quoted_amendment:
             continue
         start = anchor.char_offset
         while start < len(text) and text[start].isspace():
