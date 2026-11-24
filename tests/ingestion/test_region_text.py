@@ -189,6 +189,7 @@ def test_a_running_footer_is_still_dropped_from_every_page() -> None:
         ("Article (7)", "The clerk shall issue a receipt.\nArticle 8", True),
         ("Article (7)", "Article (7)\nThe clerk shall issue a receipt.\nArticle 8", False),
         ("Article (7)", "Article 8", False),
+        ("Article (7)", "⟦page 2 unreadable⟧\nArticle 8", False),
         ("Article (7)", "The clerk shall issue a receipt.\nArticle 12", False),
         ("Page 7", "The clerk shall issue a receipt.\nArticle 8", False),
         ("See Article 7", "The clerk shall issue a receipt.\nArticle 8", False),

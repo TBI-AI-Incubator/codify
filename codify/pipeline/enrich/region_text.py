@@ -29,7 +29,7 @@ import structlog
 
 from codify.jurisdictions import load_config
 from codify.pipeline.enrich.anchors import cached_regex, opens_attachment
-from codify.pipeline.enrich.ocr import PageSpan
+from codify.pipeline.enrich.ocr import DEGRADED_MARKER_RE, PageSpan
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap, words
 from codify.pipeline.enrich.structure import normalise_rtl_extract
 
@@ -266,7 +266,9 @@ def _keep_confirmed_headings(
             and verdicts[prev][1] == verdicts[following][1] == "keep"
             and low + 1 == number == high - 1
             and any(
-                verdicts[j][1] == "keep" and any(c.isalpha() for c in lines[j])
+                verdicts[j][1] == "keep"
+                and not DEGRADED_MARKER_RE.fullmatch(lines[j].strip())
+                and any(c.isalpha() for c in lines[j])
                 for j in range(i + 1, following)
             )
         ):

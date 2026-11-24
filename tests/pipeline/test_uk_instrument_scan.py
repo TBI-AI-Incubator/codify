@@ -1306,7 +1306,9 @@ async def test_the_pdf_lane_names_the_jurisdiction_to_the_structure_text(
         raise Reached
 
     monkeypatch.setattr(pdf, "extract_metadata", AsyncMock(return_value={"title": "Order"}))
-    monkeypatch.setattr(pdf, "resolve_descriptors", lambda *a, **k: SimpleNamespace(year="2031"))
+    monkeypatch.setattr(
+        pdf, "resolve_descriptors", lambda *a, **k: SimpleNamespace(year="2031", doctype="order")
+    )
     monkeypatch.setattr(pdf, "combine_text_for_structure", capture)
     with pytest.raises(Reached):
         async for _ in pdf._ingest_pages(
@@ -1322,7 +1324,7 @@ async def test_the_pdf_lane_names_the_jurisdiction_to_the_structure_text(
             root=None,
         ):
             pass
-    assert seen == {"country": "gb"}
+    assert seen == {"country": "gb", "doctype": "order"}
 
 
 # --- what the article scan reads and refuses ---------------------------------------------
