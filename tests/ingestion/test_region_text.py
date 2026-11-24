@@ -230,3 +230,20 @@ def test_margin_markers_use_the_resolved_doctype_and_scanner_order(
         ).strip()
         == source
     )
+
+
+@pytest.mark.parametrize(
+    ("child", "keep"),
+    [
+        ("(1) The clerk shall issue a receipt.", True),
+        ("(1)\nThe clerk shall issue a receipt.", True),
+        ("(1)", False),
+    ],
+)
+def test_margin_heading_can_own_text_through_a_child(child: str, keep: bool) -> None:
+    lines = ["Pasal 6", _BODY, "Pasal 7", child, "Pasal 8"]
+    source = "\n".join(lines)
+    spans = [PageSpan(page=1, start=0, end=len(source), method="ocr")]
+    footer = Region("furniture", 1, 1, "footer", lines[2], 800, 900)
+    result = combine_text_for_structure(source, {1: [footer]}, spans, country="xl", doctype="act")
+    assert result == (source if keep else "\n".join(lines[:2] + lines[3:]))

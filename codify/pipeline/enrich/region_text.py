@@ -283,18 +283,20 @@ def _keep_confirmed_headings(
     anchors = scan_anchors(text, regex, country=country, doctype=selected)
     has_body = anchors_with_body_source(text, anchors)
     units = []
+    by_line = {}
+    basic = doc.basic_unit if doc else "article"
     for anchor in anchors:
-        if anchor.kind != (doc.basic_unit if doc else "article") or anchor.quoted_amendment:
-            continue
         start = anchor.char_offset
         while start < len(text) and text[start].isspace():
             start += 1
         index = bisect_right(starts, start) - 1
-        units.append((index, anchor))
+        by_line[index] = anchor
+        if anchor.kind == basic and not anchor.quoted_amendment:
+            units.append((index, anchor))
     for (prev, left), (i, unit), (following, right) in zip(
         units, units[1:], units[2:], strict=False
     ):
-        if i not in candidates or unit.akn_eid not in has_body:
+        if i not in candidates:
             continue
         if verdicts[prev][1] != "keep" or verdicts[following][1] != "keep":
             continue
@@ -304,11 +306,23 @@ def _keep_confirmed_headings(
         low, number, high = map(int, numbers)
         if not (low + 1 == number == high - 1):
             continue
-        # Even a lone container the scanner discarded ends a provision's body.
-        for line in evidence[i + 1 : following]:
-            if regex.match(line.strip()):
+        # Count the unit's own text and the text of its children. A chapter
+        # between two units is a boundary even if the scan dropped it as a lone wrapper.
+        owner = unit
+        for j in range(i + 1, following):
+            line = evidence[j].strip()
+            child = by_line.get(j)
+            if child:
+                if child.quoted_amendment or not child.akn_eid.startswith(unit.akn_eid + "__"):
+                    break
+                owner = child
+                inline = line.removeprefix(child.matched_text).strip()
+                if inline != line and inline != child.heading and any(c.isalpha() for c in inline):
+                    verdicts[i] = (verdicts[i][0], "keep")
+                    break
+            elif regex.match(line):
                 break
-            if any(c.isalpha() for c in line):
+            elif owner.akn_eid in has_body and any(c.isalpha() for c in line):
                 verdicts[i] = (verdicts[i][0], "keep")
                 break
 
