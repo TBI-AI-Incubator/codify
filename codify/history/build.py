@@ -167,11 +167,13 @@ def _kind(unit: Unit, norm: str) -> str:
 
 
 def _number_path(unit: Unit, prefixes: Collection[str]) -> tuple[str, str] | None:
-    """The eId from its deepest basic-unit segment down, converter duplicate suffixes removed."""
+    """The attachment ancestry and deepest basic-unit path, independent of grouping levels."""
     segments = unit.eid.split("__")
     for i in range(len(segments) - 1, -1, -1):
         if segments[i].split("_", 1)[0] in prefixes:
-            return _DUP.sub("", "__".join(segments[i:])), unit.akn_type
+            attachments = [part for part in segments[:i] if part.startswith("att_")]
+            unit_path = _DUP.sub("", "__".join(segments[i:]))
+            return "__".join([*attachments, unit_path]), unit.akn_type
     return None
 
 

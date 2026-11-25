@@ -545,3 +545,26 @@ def test_rebuild_keeps_stamps_after_real_confidence_round_trip() -> None:
     )
     assert loaded != first
     assert build(texts, now=T1, previous=loaded) == first
+
+
+@pytest.mark.parametrize(
+    "before, after",
+    [
+        ("att_1__sec_1", "att_2__sec_1"),
+        ("sec_1", "att_1__sec_1"),
+        ("att_1__sec_1", "sec_1"),
+        ("att_1__att_2__sec_1", "att_3__att_2__sec_1"),
+        ("att_1__att_2__sec_1", "att_1__att_3__sec_1"),
+    ],
+)
+def test_independently_numbered_attachments_do_not_match(before: str, after: str) -> None:
+    first = replace(sec(1, HARBOUR), eid=before)
+    second = replace(sec(1, LIGHTS), eid=after)
+    assert build([text(START, [first]), text(d("2022-01-01"), [second])]).links == ()
+
+
+def test_grouping_changes_within_an_attachment_keep_the_number_path() -> None:
+    first = replace(sec(1, HARBOUR), eid="chp_1__att_1__chp_2__sec_1")
+    second = replace(first, eid="chp_3__att_1__chp_4__sec_1")
+    (link,) = build([text(START, [first]), text(d("2022-01-01"), [second])]).links
+    assert link.rule == "same_number"
