@@ -1346,6 +1346,9 @@ class HistoryWithdrawal(SQLModel, table=True):
     akn_eid: str | None = Field(
         default=None, sa_column=Column(Text, primary_key=True, nullable=True)
     )
+    from_eid: str | None = Field(
+        default=None, sa_column=Column(Text, primary_key=True, nullable=True)
+    )
     valid_from: date = Field(sa_column=Column(Date, primary_key=True))
     builder_rev: str = Field(sa_column=Column(Text, nullable=False))
     withdrawn_at: datetime = Field(sa_column=Column(TIMESTAMP(timezone=True), primary_key=True))

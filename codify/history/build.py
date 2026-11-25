@@ -10,7 +10,7 @@ import unicodedata
 import uuid
 from collections import defaultdict
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import date, datetime, timedelta
 from difflib import SequenceMatcher
 from typing import Any
@@ -129,6 +129,7 @@ class Withdrawal:
     language: str
     variant: str
     akn_eid: str | None
+    from_eid: str | None
     valid_from: date
     builder_rev: str
     withdrawn_at: datetime
@@ -333,10 +334,10 @@ def _build_chain(
     for i, t in enumerate(chain):
         assert t.valid_from is not None
         day = t.valid_from
-        if i + 1 < len(chain):
-            end = chain[i + 1].valid_from
-        else:
-            end = t.valid_to + timedelta(days=1) if t.valid_to else None
+        next_start = chain[i + 1].valid_from if i + 1 < len(chain) else None
+        end = next_start
+        if t.valid_to is not None and t.valid_to < (next_start or date.max):
+            end = t.valid_to + timedelta(days=1)
         gap = t.akn_xml is None
         expressions.append(
             Expression(
@@ -397,7 +398,15 @@ def _build_chain(
                         link(
                             variant, day, step.source[eid], eid, "moved_text", MOVED_TEXT_CONFIDENCE
                         )
-                elif o.sha == c.sha and o.unit.eid == eid and o.provenance == c.provenance:
+                elif (
+                    o.sha == c.sha
+                    and o.unit.eid == eid
+                    and o.unit.akn_type == c.unit.akn_type
+                    and o.unit.position == c.unit.position
+                    and o.unit.opened_by == c.unit.opened_by
+                    and o.provenance == c.provenance
+                    and o.converter_rev == c.converter_rev
+                ):
                     continue
                 else:
                     close(variant, open_.pop(key), day)
@@ -412,11 +421,11 @@ def _build_chain(
                             sim if sim < LOW_OVERLAP else None,
                         )
                 open_[key] = c
-    last = chain[-1]
-    last_end = last.valid_to + timedelta(days=1) if last.valid_to else None
-    for variant, open_ in states.items():
-        for o in open_.values():
-            close(variant, o, last_end)
+        if next_start is None or end != next_start:
+            for variant, open_ in states.items():
+                for o in open_.values():
+                    close(variant, o, end)
+            states.clear()
     return expressions, intervals, links
 
 
@@ -425,16 +434,20 @@ _Key = tuple[str, str, str, str | None, date, str]
 
 def _rows(build: WorkBuild) -> dict[_Key, tuple[datetime, tuple[Any, ...]]]:
     """Each row by key, with its `recorded_at` and the fields whose change readers must see."""
+
+    def content(row: Expression | Interval | Link) -> tuple[Any, ...]:
+        return tuple(getattr(row, f.name) for f in fields(row) if f.name != "recorded_at")
+
     rows: dict[_Key, tuple[datetime, tuple[Any, ...]]] = {}
     for e in build.expressions:
         key: _Key = ("expression", e.language, e.variant, None, e.valid_from, "")
-        rows[key] = (e.recorded_at, (e.source_sha256, e.valid_to, e.derivation))
+        rows[key] = (e.recorded_at, content(e))
     for i in build.intervals:
         key = ("interval", i.language, i.variant, i.akn_eid, i.valid_from, "")
-        rows[key] = (i.recorded_at, (i.text_sha256, i.text_norm_sha256, i.valid_to, i.derivation))
+        rows[key] = (i.recorded_at, content(i))
     for k in build.links:
         key = ("link", k.language, k.variant, k.to_eid, k.linked_on, k.from_eid)
-        rows[key] = (k.recorded_at, (k.rule, k.confidence))
+        rows[key] = (k.recorded_at, content(k))
     return rows
 
 
@@ -455,8 +468,8 @@ def build_work(
     previous: WorkBuild | None = None,
     unit_prefixes: Collection[str] = DEFAULT_UNIT_PREFIXES,
 ) -> WorkBuild:
-    """Build one work. A row keeps the `recorded_at` of its predecessor when its key, hashes, end
-    date and derivation are unchanged; a previous row with no successor becomes a withdrawal.
+    """Build one work. A row keeps the `recorded_at` of its predecessor when all other persisted
+    fields are unchanged; a previous row with no successor becomes a withdrawal.
     `unit_prefixes` names the eId prefixes of the basic unit, such as `sec` or `art`."""
     _check(texts)
     groups: dict[tuple[str, str], list[SourceText]] = defaultdict(list)
@@ -483,6 +496,14 @@ def build_work(
     fresh = _rows(built)
     if len(fresh) != len(built.expressions) + len(built.intervals) + len(built.links):
         raise ValueError("two derived rows share a key; texts of one variant overlap")
+    for earlier, later in zip(built.intervals, built.intervals[1:], strict=False):
+        if (
+            earlier.language == later.language
+            and earlier.variant == later.variant
+            and earlier.akn_eid == later.akn_eid
+            and (earlier.valid_to is None or earlier.valid_to > later.valid_from)
+        ):
+            raise ValueError("provision intervals overlap across variant chains")
     old = _rows(previous) if previous else {}
 
     def stamp(key: _Key) -> datetime:
@@ -521,11 +542,12 @@ def build_work(
             language=language,
             variant=variant,
             akn_eid=eid,
+            from_eid=source if kind == "link" else None,
             valid_from=start,
             builder_rev=BUILDER_REV,
             withdrawn_at=now,
         )
-        for kind, language, variant, eid, start, _ in sorted(
+        for kind, language, variant, eid, start, source in sorted(
             (k for k in old if k not in fresh),
             key=lambda k: (k[0], k[1], k[2], k[3] or "", k[4], k[5]),
         )

@@ -24,7 +24,7 @@ VARIANTS = ("", "", "extent:a")
 def works(draw: st.DrawFn) -> list[SourceText]:
     starts = draw(st.lists(st.integers(0, 400), min_size=1, max_size=7, unique=True))
     out = []
-    for i, offset in enumerate(sorted(starts)):
+    for offset in sorted(starts):
         converted = draw(st.booleans()) or draw(st.booleans())
         units = []
         if converted:
@@ -38,13 +38,12 @@ def works(draw: st.DrawFn) -> list[SourceText]:
                         variant=draw(st.sampled_from(VARIANTS)),
                     )
                 )
-        last = i == len(starts) - 1
         end = d("2024-01-01") + timedelta(days=offset + draw(st.integers(0, 30)))
         out.append(
             SourceText(
                 language="eng",
                 valid_from=d("2024-01-01") + timedelta(days=offset),
-                valid_to=end if last and draw(st.booleans()) else None,
+                valid_to=end if draw(st.booleans()) else None,
                 source_ref=f"ref-{offset}",
                 source_sha256=f"{offset:064x}",
                 akn_xml="<akomaNtoso/>" if converted else None,
@@ -65,7 +64,7 @@ def test_the_spans_for_a_date_are_the_text_in_force_on_it(texts: list[SourceText
         day = first + timedelta(days=offset)
         started = [t for t in texts if t.valid_from and t.valid_from <= day]
         current = started[-1] if started else None
-        if current and current is texts[-1] and current.valid_to and day > current.valid_to:
+        if current and current.valid_to and day > current.valid_to:
             current = None
         expected: dict[tuple[str, str], str] = {}
         if current and current.akn_xml:

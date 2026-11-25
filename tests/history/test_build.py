@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import replace
+from typing import Any
 
 import pytest
 
@@ -461,3 +462,49 @@ class TestInputChecks:
             r.work_id == WORK and r.builder_rev == "2" and r.converter_rev == "c1" for r in rows
         )
         assert [r for r in active(built.intervals, d("2024-01-02"))] == list(built.intervals)
+
+
+def test_expiry_breaks_provision_continuity() -> None:
+    unit = sec(1, HARBOUR)
+    later = d("2022-01-01")
+    built = build([text(START, [unit], valid_to=START), text(later, [unit])])
+    assert spans(built, unit.eid) == [(START, d("2021-04-02")), (later, None)]
+
+
+def test_chains_with_different_starts_cannot_overlap() -> None:
+    unit = sec(1, HARBOUR)
+    plain = text(START, [replace(unit, variant="extent:a")])
+    named = text(d("2022-01-01"), [unit], variant="extent:a")
+    with pytest.raises(ValueError, match="overlap"):
+        build([plain, named])
+
+
+@pytest.mark.parametrize("change", [{"position": 3}, {"akn_type": "article"}, {"opened_by": "act"}])
+def test_unchanged_wording_with_new_metadata_opens_an_interval(change: dict[str, Any]) -> None:
+    unit = sec(1, HARBOUR)
+    updated = replace(unit, **change)
+    built = build([text(START, [unit]), text(d("2022-01-01"), [updated])])
+    before, after = built.intervals
+    assert before.valid_to == after.valid_from
+    assert all(getattr(after, k) == v for k, v in change.items())
+
+
+def test_changed_converter_opens_an_interval() -> None:
+    unit = sec(1, HARBOUR)
+    built = build([text(START, [unit]), text(d("2022-01-01"), [unit], converter_rev="next")])
+    assert [i.converter_rev for i in built.intervals] == ["c1", "next"]
+
+
+def test_successful_reconversion_advances_recording_time() -> None:
+    source = text(START)
+    previous = build([replace(source, akn_xml=None)])
+    assert build([source], now=T1, previous=previous).expressions[0].recorded_at == T1
+
+
+def test_withdrawn_link_names_both_endpoints() -> None:
+    early = text(START, [sec(1, HARBOUR)])
+    late = text(d("2022-01-01"), [sec(2, HARBOUR)])
+    previous = build([early, late])
+    changed = build([replace(early, units=[sec(3, HARBOUR)]), late], previous=previous)
+    (removed,) = [w for w in changed.withdrawals if w.row_kind == "link"]
+    assert (removed.from_eid, removed.akn_eid) == (early.units[0].eid, late.units[0].eid)

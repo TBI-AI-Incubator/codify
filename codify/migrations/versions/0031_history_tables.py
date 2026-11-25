@@ -214,6 +214,7 @@ def upgrade() -> None:
             language text NOT NULL,
             variant text NOT NULL,
             akn_eid text,
+            from_eid text,
             valid_from date NOT NULL,
             builder_rev text NOT NULL,
             withdrawn_at timestamptz NOT NULL

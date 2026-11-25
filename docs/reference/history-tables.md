@@ -30,7 +30,7 @@ A text with no start date is undated or prospective. It is kept and never gets a
 
 ## What the builder derives
 
-Spans end where the next one starts; the last ends the day after its text's own end date, or stays open.
+A span ends when the next text starts or the day after its own inclusive end date, whichever comes first. With neither boundary it stays open. Expiry closes provision intervals and breaks identity matching across the gap.
 
 **One text per start date.** When several texts start on one day, a text that has an end date wins, then the latest publication. The others stay as facts and make no span. Texts of different languages or variants do not compete.
 
@@ -42,7 +42,7 @@ Spans end where the next one starts; the last ends the day after its text's own 
 
 **How a span was made.** Every span and interval carries `derivation` (a publisher text, applied amendments, an unofficial consolidation), a nullable `confidence`, and `official`. A `variant` in the keys holds parallel texts of one provision, for example by territory; the whole-act expression keeps the empty variant.
 
-**Recording time.** `recorded_at` is when a row was first written. A rebuild keeps it for a row whose key, hashes, end date and derivation are unchanged, so a reader polling by recording time sees a text reissued, retroactive or future-dated on the day it is recorded, and sees withdrawals in `history_withdrawals`.
+**Recording time.** `recorded_at` is when a row was first written. A rebuild keeps it for a row whose other stored fields are all unchanged, so a reader polling by recording time sees a text reissued, retroactive or future-dated on the day it is recorded, and sees withdrawals in `history_withdrawals`.
 
 `dated_expressions.version_id` may name a held version with the same source hash, so a reader can show the repaired document for the span.
 
@@ -56,7 +56,7 @@ from codify.history.build import SourceText, Unit, build_work
 built = build_work(work_id, jurisdiction_id, texts, now=now, previous=previous)
 ```
 
-`previous` is the last build of the work, if any. `built.expressions`, `built.intervals` and `built.links` replace the work's rows; `built.withdrawals` lists the rows `previous` held that no longer exist.
+`previous` is the last build of the work, if any. `built.expressions`, `built.intervals` and `built.links` replace the work's rows; `built.withdrawals` lists the rows `previous` held that no longer exist. A link withdrawal carries both the earlier eId (`from_eid`) and the later eId (`akn_eid`).
 
 ## Status
 
