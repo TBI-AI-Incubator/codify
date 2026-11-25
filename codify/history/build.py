@@ -21,7 +21,7 @@ LOW_OVERLAP = 0.3
 MOVED_TEXT_CONFIDENCE = 0.3
 _SIMILARITY_WINDOW = 600
 DEFAULT_UNIT_PREFIXES = ("sec", "art")
-_DUP = re.compile(r"_dup\d+")
+_DUP = re.compile(r"[_-]dup\d+(?=__|$)")
 _DASHES = re.compile("[\u2010-\u2015\u2212\u00ad]")
 _DOUBLE_QUOTES = re.compile("[\u00ab\u00bb\u201e\u201c\u201d\u201f\u2033]")
 _SINGLE_QUOTES = re.compile("[\u2018\u2019\u201a\u201b`\u00b4]")
@@ -170,7 +170,7 @@ def _number_path(unit: Unit, prefixes: Collection[str]) -> tuple[str, str] | Non
     """The attachment ancestry and deepest basic-unit path, independent of grouping levels."""
     segments = unit.eid.split("__")
     for i in range(len(segments) - 1, -1, -1):
-        if segments[i].split("_", 1)[0] in prefixes:
+        if any(segments[i].startswith((p + "_", p + "-")) or segments[i] == p for p in prefixes):
             attachments = [part for part in segments[:i] if part.startswith("att_")]
             unit_path = _DUP.sub("", "__".join(segments[i:]))
             return "__".join([*attachments, unit_path]), unit.akn_type

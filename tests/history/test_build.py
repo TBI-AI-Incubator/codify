@@ -568,3 +568,25 @@ def test_grouping_changes_within_an_attachment_keep_the_number_path() -> None:
     second = replace(first, eid="chp_3__att_1__chp_4__sec_1")
     (link,) = build([text(START, [first]), text(d("2022-01-01"), [second])]).links
     assert link.rule == "same_number"
+
+
+@pytest.mark.parametrize("eid", ["section-5", "section-5-1-a", "att_2__section-5__para_1"])
+@pytest.mark.parametrize("suffix", ["_dup2", "-dup2"])
+def test_native_number_path_survives_duplicate_suffix(eid: str, suffix: str) -> None:
+    first = replace(sec(1, HARBOUR), eid=eid)
+    second = replace(first, eid=eid + suffix, text=LIGHTS)
+    built = build(
+        [text(START, [first]), text(d("2022-01-01"), [second])], unit_prefixes=("section",)
+    )
+    assert [link.rule for link in built.links] == ["same_number"]
+
+
+def test_native_number_path_keeps_subdivision_numbers() -> None:
+    first = replace(sec(1, HARBOUR), eid="section-5-1")
+    second = replace(first, eid="section-5-2_dup2", text=LIGHTS)
+    assert (
+        build(
+            [text(START, [first]), text(d("2022-01-01"), [second])], unit_prefixes=("section",)
+        ).links
+        == ()
+    )
