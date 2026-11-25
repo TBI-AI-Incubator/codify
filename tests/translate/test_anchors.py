@@ -208,3 +208,80 @@ def test_list_prose_outside_body_wrappers_is_not_sent() -> None:
         ("list_1__item_a", ""),
         ("list_1__item_b", ""),
     ]
+
+
+def test_translate_table_cells_in_source_order_in_body_and_attachment() -> None:
+    from lxml import etree
+
+    from codify.translate.audit import audit_translation
+    from codify.translate.translate_bodies import TranslatedBlock
+    from codify.translate.write import apply_translation_to_akn
+
+    table = "TABLE\n  TR\n    TH\n      Kind\n    TH\n      Rate\n  TR\n    TC\n      Clay\n    TC\n      18 Dinars\n"
+    indented = "\n".join("  " + line for line in table.splitlines())
+    xml = parse_to_akn(
+        f"ARTICLE 1\n  Before.\n{indented}\n  After.\n\nSCHEDULE 1\n{indented}\n",
+        country="xa",
+        number="17",
+    )
+    xml = xml.replace(">Kind</p>", ">Mineral\nkind</p>")
+    xml = xml.replace(
+        ">Clay</p>",
+        '>Clay<authorialNote placement="bottom"><p>18 in the note.</p></authorialNote></p>',
+    )
+    xml = xml.replace(">Rate</p>", '>See <ref href="#bands">bands</ref></p>')
+    units, _ = walk_source(parse_akn(xml), xml)
+    cell_units = [u for u in units if "Clay" in u.body_text]
+    assert len(cell_units) == 2
+    assert cell_units[0].body_text.splitlines() == [
+        "Before.",
+        "Mineral kind",
+        "Clay",
+        "18 Dinars",
+        "After.",
+    ]
+    assert cell_units[1].body_text.splitlines() == ["Mineral kind", "Clay", "18 Dinars"]
+    blocks = [
+        TranslatedBlock(
+            eid=u.akn_eid,
+            lines=[line.replace("Clay", "Argile") for line in u.body_text.splitlines()],
+        )
+        for u in cell_units
+    ]
+    out = etree.fromstring(apply_translation_to_akn(xml, blocks, []).encode())
+    assert out.xpath('count(//*[local-name()="td"]/*[text()="Argile"])') == 2
+    assert out.xpath('count(//*[local-name()="td"]/*[text()="18 Dinars"])') == 2
+    assert out.xpath('count(//*[local-name()="ref" and @href="#bands" and text()="bands"])') == 2
+
+    assert (
+        out.xpath(
+            'count(//*[local-name()="authorialNote" and @placement="bottom"]/*[text()="18 in the note."])'
+        )
+        == 2
+    )
+    money = {u.akn_eid: ["18"] for u in cell_units}
+    audit = audit_translation(
+        xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money
+    )
+    assert audit["money_missing_by_eid"] == audit["money_duplicated_by_eid"] == {}
+
+    # The article has the same amount. It cannot satisfy the schedule's manifest.
+    amount = out.xpath('//*[local-name()="attachment"]//*[text()="18 Dinars"]')[0]
+    amount.text = "8 Dinars"
+    audit = audit_translation(
+        xml, etree.tostring(out, encoding="unicode"), {}, source_money_surfaces_by_eid=money
+    )
+    assert audit["money_missing_by_eid"] == {cell_units[1].akn_eid: ["18"]}
+
+
+def test_article_with_only_a_linked_cell_does_not_request_translation_of_its_amount() -> None:
+    from codify.translate.write import apply_translation_to_akn
+
+    source = parse_to_akn(
+        "ARTICLE 1\n  TABLE\n    TR\n      TC\n        Fee 18 Dinars\n",
+        country="xa",
+        number="17",
+    ).replace("Fee 18 Dinars</p>", 'Fee <ref href="#fee">18 Dinars</ref></p>')
+    units, _ = walk_source(parse_akn(source), source)
+    assert [(u.akn_eid, u.body_text) for u in units] == [("art_1", "")]
+    assert 'Fee <ref href="#fee">18 Dinars</ref>' in apply_translation_to_akn(source, [], [])

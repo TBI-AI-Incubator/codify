@@ -14,9 +14,11 @@ import structlog
 from lxml import etree
 
 from codify.akn import AKN_NS
+from codify.akn.vocabulary import provision_text
 from codify.lang import to_iso639_3
 from codify.pipeline.enrich.arabic_normalise import fold_arabic_for_match
 from codify.pipeline.enrich.validator import check_missing_container_titles
+from codify.translate.anchors import body_paragraphs
 from codify.translate.translate_bodies import _UNTRANSLATED_MARKER
 
 _logger = structlog.get_logger()
@@ -292,21 +294,28 @@ def _owning_eid(p_eid: str) -> str:
 
 
 def _target_text_by_owning_eid(akn_xml: str) -> dict[str, str]:
-    """Concatenate every `<p>` under `<body>` into per-owning-eid buckets.
-    Skips `<preface>` and `<meta>` (glossary and metadata are not readable
-    prose). Returns eid -> joined text with single spaces between `<p>`s."""
+    """Group readable amounts by the translation unit that owns each paragraph."""
     buckets: dict[str, list[str]] = {}
     try:
         root = etree.fromstring(akn_xml.encode())
     except etree.XMLSyntaxError:
         return {}
+    # A cell can have its own eId or none at all. The manifest belongs to
+    # the provision or attachment whose translation block included the cell.
+    owners = {p: eid for el in root.iter() if (eid := el.get("eId")) for p in body_paragraphs(el)}
     body_tag = f"{{{AKN_NS}}}body"
-    for body in root.iter(body_tag):
-        for p in body.iter(f"{{{AKN_NS}}}p"):
-            owner = _owning_eid(p.get("eId") or "")
-            if not owner:
-                continue
-            buckets.setdefault(owner, []).append("".join(p.itertext()))
+    main_tag = f"{{{AKN_NS}}}mainBody"
+    for p in root.iter(f"{{{AKN_NS}}}p"):
+        if next(p.iterancestors(body_tag, main_tag), None) is None:
+            continue
+        owner = owners.get(p)
+        if owner is None:
+            if p.getparent().tag == main_tag:
+                owner = p.get("eId")  # A bare annex paragraph is its own unit.
+            elif next(p.iterancestors(f"{{{AKN_NS}}}table"), None) is None:
+                owner = _owning_eid(p.get("eId") or "")  # Legacy direct body paragraphs.
+        if owner:
+            buckets.setdefault(owner, []).append(provision_text(p))
     return {eid: " ".join(parts) for eid, parts in buckets.items()}
 
 

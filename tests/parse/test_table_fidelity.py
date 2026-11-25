@@ -168,3 +168,22 @@ def test_omitted_separator_cannot_turn_a_single_row_table_into_prose() -> None:
         parse_to_akn(filled, country="xa", doctype="act", date="2026-01-01", number="1").encode()
     )
     assert len(root.xpath('//*[@eId="sec_1"]//*[local-name()="table"]')) == 1
+
+
+def test_restore_bare_continuation_only_after_a_matching_declared_table() -> None:
+    from codify.pipeline.enrich.tables import complete_pipe_continuations, nest_pipe_tables
+
+    header = ["| Channel | Limit |", "| --- | --- |", "| Green | 17 |"]
+    continuation = ["Blue | 31", "Gold | 42"]
+    assert complete_pipe_continuations(header + [""] + continuation) == [
+        *header,
+        "",
+        "|Blue | 31|",
+        "|Gold | 42|",
+    ]
+    for other in ([continuation[0]], ["A | B | C", "D | E | F"], ["Notes", *continuation]):
+        assert complete_pipe_continuations(header + other) == header + other
+    assert complete_pipe_continuations(continuation) == continuation
+    empty_first = complete_pipe_continuations(header + [" | Beta", " | Gamma"])
+    assert any("TC{rowspan 3}" in line for line in nest_pipe_tables(empty_first))
+    assert complete_pipe_continuations(header + [" | ", " | "]) == header + [" | ", " | "]

@@ -8,7 +8,12 @@ import structlog
 
 from codify.pipeline.enrich.anchors import StructuralAnchor
 from codify.pipeline.enrich.scaffold import BodyBlock
-from codify.pipeline.enrich.tables import has_table, is_pipe_row, literal_pipe_body
+from codify.pipeline.enrich.tables import (
+    complete_pipe_continuations,
+    has_table,
+    is_pipe_row,
+    literal_pipe_body,
+)
 
 logger = structlog.get_logger()
 
@@ -40,7 +45,7 @@ def preserve_source_tables(
         after = source[len(matched) :] if matched and source.startswith(matched) else source
         after = _DECORATIONS_RE.sub("", after, count=1)
         first_line, _, rest = after.partition("\n")
-        lines = rest.splitlines()
+        lines = complete_pipe_continuations(rest.splitlines())
         if not has_table(lines):
             continue
         body = bodies.get(anchor.akn_eid)

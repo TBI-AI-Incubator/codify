@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Callable
 from dataclasses import asdict
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +53,7 @@ from codify.pipeline.events import (
     StructureProgress,
     ValidationIssued,
 )
+from codify.pipeline.formats.eu_directive import on_the_cpu_pool
 from codify.pipeline.stages import resolve_descriptors, run_enrich_passes
 from codify.quality.invariants import halt_finding
 
@@ -308,8 +310,12 @@ async def _ingest_pages(
     except Exception as exc:  # noqa: BLE001
         logger.warning("regions_unavailable", error=str(exc))
         regions = {}
-    structure_text = combine_text_for_structure(
-        raw_text, regions, page_spans, country=jurisdiction_code
+    # Confirming a heading against its neighbours can scan the whole document.
+    structure_text = await on_the_cpu_pool(
+        partial(combine_text_for_structure, country=jurisdiction_code, doctype=desc.doctype),
+        raw_text,
+        regions,
+        page_spans,
     )
 
     # Stage 3, Structure. Bridge the structurer's callbacks through a queue

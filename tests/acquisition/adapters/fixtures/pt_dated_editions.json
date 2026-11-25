@@ -1,0 +1,98 @@
+{
+  "2043-01-01": {
+    "CurrentConsolidacaoId": "123",
+    "DataUltimaConsolidada": "2043-03-01",
+    "LegConsBase": {
+      "List": [
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "1",
+            "PaiId": "0",
+            "Name": "Diploma"
+          },
+          "FragmentoVersao": {
+            "Texto": "",
+            "VersaoEstadoId": 6,
+            "DataVersao": "2043-01-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        },
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "2",
+            "PaiId": "1",
+            "Name": "Artigo 1.º"
+          },
+          "FragmentoVersao": {
+            "Texto": "Primeira redação.",
+            "VersaoEstadoId": 6,
+            "DataVersao": "2043-01-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        },
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "3",
+            "PaiId": "1",
+            "Name": "Artigo 2.º"
+          },
+          "FragmentoVersao": {
+            "Texto": "Texto revogado.",
+            "VersaoEstadoId": 4,
+            "DataVersao": "2043-01-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        }
+      ]
+    },
+    "LastConsolidacaoId": "124"
+  },
+  "2043-03-01": {
+    "CurrentConsolidacaoId": "124",
+    "DataUltimaConsolidada": "2043-03-01",
+    "LegConsBase": {
+      "List": [
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "1",
+            "PaiId": "0",
+            "Name": "Diploma"
+          },
+          "FragmentoVersao": {
+            "Texto": "",
+            "VersaoEstadoId": 6,
+            "DataVersao": "2043-03-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        },
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "2",
+            "PaiId": "1",
+            "Name": "Artigo 1.º"
+          },
+          "FragmentoVersao": {
+            "Texto": "Segunda redação.",
+            "VersaoEstadoId": 6,
+            "DataVersao": "2043-03-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        },
+        {
+          "ConsolidacaoFragmento": {
+            "Id": "3",
+            "PaiId": "1",
+            "Name": "Artigo 2.º"
+          },
+          "FragmentoVersao": {
+            "Texto": "Texto revogado.",
+            "VersaoEstadoId": 4,
+            "DataVersao": "2043-03-01",
+            "DataEntradaVigor": "2043-03-04"
+          }
+        }
+      ]
+    },
+    "LastConsolidacaoId": "124"
+  }
+}

@@ -272,7 +272,7 @@ Point b
 @pytest.mark.parametrize("own_body", ["", "Own.\n"])
 def test_body_source_excludes_children_and_captured_heading(own_body: str) -> None:
     from codify.pipeline.enrich.anchors import StructuralAnchor
-    from codify.pipeline.enrich.structure import _anchors_with_body_source
+    from codify.pipeline.enrich.structure import anchors_with_body_source
 
     heading = "A heading long enough to exceed the old threshold"
     text = (
@@ -312,7 +312,7 @@ def test_body_source_excludes_children_and_captured_heading(own_body: str) -> No
         ),
     ]
     expected = {"sec_1__point_a"} | ({"sec_1"} if own_body else set())
-    assert _anchors_with_body_source(text, anchors) == expected
+    assert anchors_with_body_source(text, anchors) == expected
 
 
 @pytest.mark.parametrize("prefix", ["", "\n", "\n  "])

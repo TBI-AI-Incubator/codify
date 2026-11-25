@@ -28,9 +28,10 @@ from collections.abc import Sequence
 import structlog
 
 from codify.jurisdictions import load_config
-from codify.pipeline.enrich.anchors import opens_attachment
-from codify.pipeline.enrich.ocr import PageSpan
+from codify.pipeline.enrich.anchors import cached_regex, opens_attachment, scan_anchors
+from codify.pipeline.enrich.ocr import DEGRADED_MARKER_RE, PageSpan
 from codify.pipeline.enrich.regions import OVERLAP_FLOOR, Region, overlap, words
+from codify.pipeline.enrich.structure import anchors_with_body_source, normalise_rtl_extract
 
 # A one-token region ("٣" in a footer) would spuriously match a short body line,
 # so only whole multi-word blocks decide a drop or relocation. This also keeps a
@@ -231,6 +232,101 @@ def _settle_bare_numbers(
             verdicts[i] = (verdicts[i][0], "drop" if furniture else "keep")
 
 
+def _keep_confirmed_headings(
+    lines: list[str],
+    verdicts: list[tuple[int | None, str]],
+    country: str,
+    doctype: str | None,
+    note_lines: set[int],
+) -> None:
+    if not any(page is not None and verdict == "drop" for page, verdict in verdicts):
+        return
+    config = load_config(country) if country else None
+    selected = doctype or (config.default_document_class if config else "act")
+    doc = config.get_document_class(selected) if config else None
+    if config and (not doc or not doc.hierarchy):
+        return
+    regex = cached_regex(country, selected)
+    group = "k_" + (doc.basic_unit if doc else "article").replace("-", "_")
+    if group not in regex.groupindex:
+        return
+
+    # Only invoke the context-aware scan if some dropped line is a complete
+    # unit marker. It must still be an anchor in the surrounding document.
+    def standalone(line: str) -> bool:
+        match = regex.match(line)
+        return bool(match and match[group] and line[match.end() :].strip() in ("", ")"))
+
+    candidates = {
+        i
+        for i, (page, verdict) in enumerate(verdicts)
+        if page is not None
+        and verdict == "drop"
+        and standalone(normalise_rtl_extract(lines[i]).strip())
+    }
+    if not candidates:
+        return
+    evidence = [
+        normalise_rtl_extract(line)
+        if (i in candidates or verdicts[i][1] == "keep")
+        and i not in note_lines
+        and not DEGRADED_MARKER_RE.fullmatch(line.strip())
+        else ""
+        for i, line in enumerate(lines)
+    ]
+    starts = []
+    offset = 0
+    for line in evidence:
+        starts.append(offset)
+        offset += len(line) + 1
+    text = "\n".join(evidence)
+    anchors = scan_anchors(text, regex, country=country, doctype=selected)
+    has_body = anchors_with_body_source(text, anchors)
+    units = []
+    by_line = {}
+    basic = doc.basic_unit if doc else "article"
+    for anchor in anchors:
+        start = anchor.char_offset
+        while start < len(text) and text[start].isspace():
+            start += 1
+        index = bisect_right(starts, start) - 1
+        by_line[index] = anchor
+        if anchor.kind == basic and not anchor.quoted_amendment:
+            units.append((index, anchor))
+    for (prev, left), (i, unit), (following, right) in zip(
+        units, units[1:], units[2:], strict=False
+    ):
+        if i not in candidates:
+            continue
+        if verdicts[prev][1] != "keep" or verdicts[following][1] != "keep":
+            continue
+        numbers = [a.number or "" for a in (left, unit, right)]
+        if not all(n.isdecimal() and len(n) <= 8 for n in numbers):
+            continue
+        low, number, high = map(int, numbers)
+        if not (low + 1 == number == high - 1):
+            continue
+        # Count the unit's own text and the text of its children. A chapter
+        # between two units is a boundary even if the scan dropped it as a lone wrapper.
+        owner = unit
+        for j in range(i + 1, following):
+            line = evidence[j].strip()
+            child = by_line.get(j)
+            if child:
+                if child.quoted_amendment or not child.akn_eid.startswith(unit.akn_eid + "__"):
+                    break
+                owner = child
+                inline = line.removeprefix(child.matched_text).strip()
+                if inline != line and inline != child.heading and any(c.isalpha() for c in inline):
+                    verdicts[i] = (verdicts[i][0], "keep")
+                    break
+            elif regex.match(line):
+                break
+            elif owner.akn_eid in has_body and any(c.isalpha() for c in line):
+                verdicts[i] = (verdicts[i][0], "keep")
+                break
+
+
 def _agree(a: str, b: str) -> bool:
     return overlap(a, b) >= _NOTE_AGREE_FLOOR and overlap(b, a) >= _NOTE_AGREE_FLOOR
 
@@ -271,6 +367,7 @@ def combine_text_for_structure(
     page_spans: Sequence[PageSpan] | None = None,
     *,
     country: str = "",
+    doctype: str | None = None,
 ) -> str:
     """Filter already-combined page text for the structurer: drop header/footer
     lines, relocate footnote lines to the foot. Byte-identical to the input when
@@ -335,6 +432,7 @@ def combine_text_for_structure(
             verdicts.append((page, "keep"))
     _settle_bare_numbers(lines, verdicts, numbers)
     in_run = _note_runs(lines, verdicts, notes)
+    _keep_confirmed_headings(lines, verdicts, country, doctype, in_run)
 
     kept: list[str] = []
     relocated: list[str] = []

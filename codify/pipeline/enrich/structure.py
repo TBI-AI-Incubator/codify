@@ -144,6 +144,13 @@ _EMPTY_PARENS_DIGIT_RE = re.compile(r"\(\s*\)\s*(\d+)")
 # real article.
 _DIGIT_PREFIX_MADDA_RE = re.compile(r"([0-9٠-٩۰-۹]+)[ \t]*مادة")
 
+# A standalone heading can arrive in visual order, with either orientation of
+# parentheses. Reorder only a complete heading line so references keep their text.
+_PAREN_PREFIX_MADDA_RE = re.compile(
+    r"(?m)^(?P<indent>[^\S\r\n]*)(?P<label>\([ \t]*\d+[ \t]*\)|\)[ \t]*\d+[ \t]*\()"
+    r"[^\S\r\n]*(?P<marker>(?:ال)?مادة)(?=[^\S\r\n]*\r?$)"
+)
+
 # RTL reorder prefixes headers with a stray `)` on its own line (`)مادة 3`),
 # defeating the regex's column boundary. Stripped before a line-start numbered
 # article keyword, which it otherwise hides.
@@ -167,6 +174,9 @@ def normalise_rtl_extract(text: str) -> str:
     text = text.translate(_BIDI_CONTROLS)
     text = text.translate(JOINER_STRIP_TABLE)
     text = _EMPTY_PARENS_DIGIT_RE.sub(r"(\1)", text)
+    text = _PAREN_PREFIX_MADDA_RE.sub(
+        lambda m: f"{m['indent']}{m['marker']} ({m['label'][1:-1].strip()})", text
+    )
     text = _DIGIT_PREFIX_MADDA_RE.sub(r"مادة \1", text)
     return _STRAY_PAREN_MADDA_RE.sub(r"\1", text)
 
@@ -178,7 +188,7 @@ def _expects_body(kind: str, basic: str | None = None) -> bool:
     return kind == basic or kind not in (CONTAINER_KINDS | {"section"})
 
 
-def _anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
+def anchors_with_body_source(text: str, anchors: list[StructuralAnchor]) -> set[str]:
     """Anchors with own body text, excluding captured headings and child spans."""
     ordered = sorted((a for a in anchors if not a.quoted_amendment), key=lambda a: a.char_offset)
     out: set[str] = set()
@@ -979,7 +989,7 @@ async def text_to_bluebell_scaffolded(
         # succeeded one can still omit some; both surface as empty anchors that have
         # source text. Bare-heading anchors are legitimately empty and left alone; the
         # rest re-fill in progressively smaller windows.
-        has_body_source = _anchors_with_body_source(text, anchors)
+        has_body_source = anchors_with_body_source(text, anchors)
         basic = basic_unit_kind(config, doctype)
         with_body = [
             a.akn_eid
