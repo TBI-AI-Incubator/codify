@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import struct
 from dataclasses import replace
 from typing import Any
 
@@ -508,3 +509,39 @@ def test_withdrawn_link_names_both_endpoints() -> None:
     changed = build([replace(early, units=[sec(3, HARBOUR)]), late], previous=previous)
     (removed,) = [w for w in changed.withdrawals if w.row_kind == "link"]
     assert (removed.from_eid, removed.akn_eid) == (early.units[0].eid, late.units[0].eid)
+
+
+def test_latest_kind_controls_matching_after_an_unchanged_interval() -> None:
+    unit = sec(1, HARBOUR)
+    built = build(
+        [
+            text(START, [unit]),
+            text(d("2022-01-01"), [replace(unit, kind="label")]),
+            text(d("2023-01-01"), [sec(1, HARBOUR, chapter=2)]),
+        ]
+    )
+    assert built.links == ()
+    assert spans(built, unit.eid) == [(START, d("2023-01-01"))]
+
+
+def test_rebuild_keeps_stamps_after_real_confidence_round_trip() -> None:
+    texts = [
+        text(START, [sec(1, HARBOUR)], confidence=0.7),
+        text(d("2022-01-01"), [sec(2, HARBOUR)], confidence=0.7),
+    ]
+    first = build(texts)
+
+    def stored(confidence: float | None) -> float | None:
+        return (
+            struct.unpack("!f", struct.pack("!f", confidence))[0]
+            if confidence is not None
+            else None
+        )
+
+    loaded = WorkBuild(
+        expressions=tuple(replace(r, confidence=stored(r.confidence)) for r in first.expressions),
+        intervals=tuple(replace(r, confidence=stored(r.confidence)) for r in first.intervals),
+        links=tuple(replace(r, confidence=stored(r.confidence)) for r in first.links),
+    )
+    assert loaded != first
+    assert build(texts, now=T1, previous=loaded) == first

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import struct
 import unicodedata
 import uuid
 from collections import defaultdict
@@ -407,6 +408,7 @@ def _build_chain(
                     and o.provenance == c.provenance
                     and o.converter_rev == c.converter_rev
                 ):
+                    o.kind = c.kind
                     continue
                 else:
                     close(variant, open_.pop(key), day)
@@ -436,7 +438,11 @@ def _rows(build: WorkBuild) -> dict[_Key, tuple[datetime, tuple[Any, ...]]]:
     """Each row by key, with its `recorded_at` and the fields whose change readers must see."""
 
     def content(row: Expression | Interval | Link) -> tuple[Any, ...]:
-        return tuple(getattr(row, f.name) for f in fields(row) if f.name != "recorded_at")
+        values = tuple(
+            getattr(row, f.name) for f in fields(row) if f.name not in {"recorded_at", "confidence"}
+        )
+        confidence = struct.pack("!f", row.confidence) if row.confidence is not None else None
+        return (*values, confidence)
 
     rows: dict[_Key, tuple[datetime, tuple[Any, ...]]] = {}
     for e in build.expressions:
