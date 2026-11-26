@@ -18,7 +18,7 @@ const order = {
     'interoperate',
   ],
   concepts: ['architecture', 'akoma-ntoso', 'frbr', 'bluebell', 'translation', 'akn4eu-divergences'],
-  reference: ['cli', 'http-api', 'mcp-tools', 'python-api', 'jurisdiction-config', 'environment', 'bundle', 'validation-checks'],
+  reference: ['cli', 'http-api', 'mcp-tools', 'python-api', 'jurisdiction-config', 'environment', 'bundle', 'validation-checks', 'history-tables'],
   operate: ['deployment', 'database', 'models-and-costs'],
   'open-core': ['what-is-open', 'platform'],
   project: ['contributing', 'testing', 'versioning', 'security', 'decisions'],
