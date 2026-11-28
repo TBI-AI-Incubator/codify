@@ -717,6 +717,28 @@ def test_a_lead_in_without_txt_keeps_its_points_apart() -> None:
     assert out.count("every lamp lit;") == 1
 
 
+def test_a_lead_in_without_txt_keeps_words_apart_around_its_points() -> None:
+    out = formex_to_akn4eu(
+        _obligations(
+            "<P>for<LIST><ITEM><NP><NO.P>(i)</NO.P><TXT>lamps lit;</TXT></NP></ITEM></LIST>"
+            "all keepers</P>"
+        )
+    )
+    assert _point_a(out).find(f"{AKN}p").text == "for all keepers"
+
+
+def test_a_p_holding_only_a_footnote_call_is_kept() -> None:
+    """A noteRef's marker is an attribute, so the paragraph has no text of its own."""
+    out = formex_to_akn4eu(
+        _obligations(
+            "<TXT>to log the lamps;</TXT><P><FT TYPE='FOOTNOTE' REF.NOTE='E0003'>3</FT></P>"
+        )
+    )
+    paragraphs = _point_a(out).findall(f"{AKN}p")
+    assert len(paragraphs) == 2
+    assert paragraphs[1].find(f"{AKN}noteRef").get("href") == "#fn_E0003"
+
+
 def test_an_item_without_np_keeps_its_text_and_points() -> None:
     """An item may hold its text in P blocks alone; it used to become `<p> </p>`."""
     out = formex_to_akn4eu(

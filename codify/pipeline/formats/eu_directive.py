@@ -1034,11 +1034,22 @@ def _emit_paragraph(
             _serialize_inline(child, p)
 
 
-def _prose_text(element: etree._Element, emitted_apart: list[etree._Element]) -> str:
-    """The element's text, leaving out the children emitted as their own nodes."""
+def _prose_text(
+    element: etree._Element,
+    emitted_apart: list[etree._Element],
+    spaced: list[etree._Element] | None = None,
+) -> str:
+    """The element's text, leaving out the children emitted as their own nodes.
+
+    A child in `spaced` leaves a space, so the words either side of it do not fuse.
+    """
+    gaps = spaced or []
     parts = [element.text or ""]
     for child in element:
-        parts.append("" if child in emitted_apart else _prose_text(child, emitted_apart))
+        if child in emitted_apart:
+            parts.append(" " if child in gaps else "")
+        else:
+            parts.append(_prose_text(child, emitted_apart, gaps))
         parts.append(child.tail or "")
     return " ".join("".join(parts).split())
 
@@ -1193,7 +1204,8 @@ def _p_into_item(
         p[-1].tail = (p[-1].tail or "").rstrip() or None
     elif p.text:
         p.text = p.text.rstrip()
-    if not _flat(p):
+    # A footnote call is a noteRef whose marker is an attribute, so it has no text.
+    if not _flat(p) and not len(p):
         item.remove(p)
     for block in blocks:
         if _localname(block) == "LIST":
@@ -1252,7 +1264,7 @@ def _emit_item(
             p_lists = np.xpath("P/LIST")
             # Fallback: NP with no TXT but direct text content, ahead of its points.
             if not np.findall("LIST"):
-                text = _prose_text(np, [*_quoted_blocks(np), *p_lists])
+                text = _prose_text(np, [*_quoted_blocks(np), *p_lists], spaced=p_lists)
                 # Strip the marker we already extracted.
                 if marker and text.startswith(marker):
                     text = text[len(marker) :].strip()
