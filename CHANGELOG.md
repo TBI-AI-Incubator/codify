@@ -36,6 +36,14 @@ Breaks:
   The old names are not read as a fallback.
 - `codify.core.llm.LiteLLMClient` is now `OpenAICompatibleClient`. The old name
   is not kept as an alias.
+- `index-ee-archive` records the archive relative to the index file's directory
+  (the bare name when they share one), and the Estonian archive reader resolves a
+  relative `archive` against that directory rather than its own working directory,
+  so an index built in one directory and read from another finds its archive. An
+  absolute `archive` is read as written, and one on another Windows drive is written
+  absolute. An index written earlier with a relative `archive` names a file under its
+  own directory now: build it again, or set `EE_DATADUMP_ZIP`. `build_ee_index`
+  still returns the path as given; `archive_relative_to` gives the form written.
 
 New, additive:
 

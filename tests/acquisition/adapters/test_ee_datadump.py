@@ -19,6 +19,7 @@ from codify.acquisition.adapters.ee.datadump import (
     EeDatadumpAcquirer,
     EeDatadumpIndexMissing,
     EeDocNotInDump,
+    archive_relative_to,
     build_ee_index,
 )
 from codify.jurisdictions import SourceAdapter
@@ -531,3 +532,150 @@ def test_the_command_writes_the_ended_section_only_with_its_flag(
         written[" ".join(flags)] = json.loads(out.read_text(encoding="utf-8"))
     assert "ended" not in written[""]
     assert list(written["--keep-ended"]["ended"]) == ["751"]
+
+
+def _archive_in(directory: Path) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    archive = directory / "xml.2026.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr(_MEMBER, _SYNTHETIC_EE_XML)
+    return archive
+
+
+async def _fetched_from(index: Path) -> bytes:
+    doc = await EeDatadumpAcquirer(_adapter(), index_path=index).fetch(_ref())
+    return doc.bodies[0].content
+
+
+async def test_an_index_built_in_one_directory_is_read_from_another(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    # Each directory sits at its own depth, so no one relative path serves all three.
+    _archive_in(tmp_path / "dumps")
+    for cwd in ("build/deep", "read/deep"):
+        (tmp_path / cwd).mkdir(parents=True)
+    monkeypatch.chdir(tmp_path / "build" / "deep")
+    args = ["index-ee-archive", "../../dumps/xml.2026.zip", "--out", "../../indexes/ee.json"]
+    assert main([*args, "--quiet"]) == 0
+    index = tmp_path / "indexes" / "ee.json"
+    assert json.loads(index.read_text(encoding="utf-8"))["archive"] == "../dumps/xml.2026.zip"
+
+    monkeypatch.chdir(tmp_path / "read" / "deep")
+    assert await _fetched_from(Path("../../indexes/ee.json")) == _SYNTHETIC_EE_XML
+
+
+async def test_an_index_beside_its_archive_records_the_bare_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    archive = _archive_in(tmp_path / "ee")
+    monkeypatch.chdir(tmp_path)
+    assert main(["index-ee-archive", "ee/xml.2026.zip", "--out", "ee/index.json", "--quiet"]) == 0
+    assert json.loads((tmp_path / "ee" / "index.json").read_text("utf-8"))["archive"] == (
+        archive.name
+    )
+
+    (tmp_path / "elsewhere").mkdir()
+    monkeypatch.chdir(tmp_path / "elsewhere")
+    assert await _fetched_from(tmp_path / "ee" / "index.json") == _SYNTHETIC_EE_XML
+
+
+def test_an_absolute_archive_is_written_relative_to_the_index(
+    tmp_path: Path, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    archive = _archive_in(tmp_path / "dumps")
+    out = tmp_path / "runs" / "2026" / "index.json"
+    assert main(["index-ee-archive", str(archive), "--out", str(out), "--quiet"]) == 0
+    assert json.loads(out.read_text("utf-8"))["archive"] == "../../dumps/xml.2026.zip"
+
+
+async def test_an_absolute_archive_in_an_index_is_read_as_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = _archive_in(tmp_path / "dumps")
+    index = tmp_path / "indexes" / "ee.json"
+    index.parent.mkdir()
+    index.write_text(json.dumps({"archive": str(archive), "entries": {"123122022025": {}}}))
+    monkeypatch.chdir(index.parent)
+    assert await _fetched_from(index) == _SYNTHETIC_EE_XML
+
+
+def test_an_archive_no_relative_path_reaches_is_written_absolute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def other_drive(path: str, start: str) -> str:
+        raise ValueError(f"path is on mount {path[:2]!r}, start on mount {start[:2]!r}")
+
+    monkeypatch.setattr(os.path, "relpath", other_drive)
+    archive = tmp_path / "dumps" / "xml.2026.zip"
+    assert archive_relative_to(archive, tmp_path / "index.json") == str(archive)
+
+
+def test_a_relative_index_names_its_own_directory_from_each_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("a", "b"):
+        archive = _archive_in(tmp_path / name)
+        (archive.parent / "index.json").write_text(
+            json.dumps({"archive": archive.name, "entries": {name: {"member": _MEMBER}}})
+        )
+    for name in ("a", "b"):
+        monkeypatch.chdir(tmp_path / name)
+        acquirer = EeDatadumpAcquirer(_adapter(), index_path=Path("index.json"))
+        assert list(acquirer._load_index()) == [name]
+        assert acquirer._archive_path is not None
+        assert acquirer._archive_path.resolve() == (tmp_path / name / "xml.2026.zip").resolve()
+
+
+_DECOY_XML = _SYNTHETIC_EE_XML.replace(b"Synthetic Act", b"Decoy Act")
+
+
+def _behind_a_link(tmp_path: Path) -> Path:
+    """`tmp/shortcut` links to `tmp/target/sub`, so `shortcut/..` is `tmp/target`; a decoy
+    archive at `tmp/xml.2026.zip` is what collapsing `shortcut/..` to `tmp` finds."""
+    (tmp_path / "target" / "sub").mkdir(parents=True)
+    try:
+        (tmp_path / "shortcut").symlink_to(tmp_path / "target" / "sub", target_is_directory=True)
+    except OSError as exc:  # Windows without the symlink privilege
+        pytest.skip(f"cannot create a symlink here: {exc}")
+    _archive_in(tmp_path / "target")
+    with zipfile.ZipFile(tmp_path / "xml.2026.zip", "w") as zf:
+        zf.writestr(_MEMBER, _DECOY_XML)
+    return tmp_path / "shortcut"
+
+
+async def test_an_archive_named_through_a_link_and_dotdot_is_the_one_indexed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    _behind_a_link(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    args = ["index-ee-archive", "shortcut/../xml.2026.zip", "--out", "indexes/ee.json"]
+    assert main([*args, "--quiet"]) == 0
+    index = tmp_path / "indexes" / "ee.json"
+    assert json.loads(index.read_text("utf-8"))["archive"] == "../target/xml.2026.zip"
+
+    monkeypatch.chdir(tmp_path / "target" / "sub")
+    assert await _fetched_from(index) == _SYNTHETIC_EE_XML
+
+
+async def test_an_index_named_through_a_link_and_dotdot_reads_its_own_archive(
+    tmp_path: Path,
+) -> None:
+    link = _behind_a_link(tmp_path)
+    for directory, number in ((tmp_path / "target", "123122022025"), (tmp_path, "decoy")):
+        (directory / "index.json").write_text(
+            json.dumps({"archive": "xml.2026.zip", "entries": {number: {"member": _MEMBER}}})
+        )
+    decoy = EeDatadumpAcquirer(_adapter(), index_path=tmp_path / "index.json")
+    assert list(decoy._load_index()) == ["decoy"]
+
+    index = link / ".." / "index.json"
+    assert list(EeDatadumpAcquirer(_adapter(), index_path=index)._load_index()) == ["123122022025"]
+    assert await _fetched_from(index) == _SYNTHETIC_EE_XML
