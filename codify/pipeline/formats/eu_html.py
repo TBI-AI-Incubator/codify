@@ -196,10 +196,23 @@ class _Block(str):
         return block
 
 
+def _is_list_label(text: str) -> bool:
+    return bool(_LIST_LABEL.match(text) or _POINT_LABEL.match(text))
+
+
+def _only_row(tr: etree._Element) -> bool:
+    section = tr.getparent()
+    table = section if section.tag == "table" else section.getparent()
+    parts = (table, *table.iterchildren("thead", "tbody", "tfoot"))
+    return sum(1 for part in parts for _ in part.iterchildren("tr")) == 1
+
+
 def _flat_row(tr: etree._Element) -> str:
-    """A row on one line: a list label then its text; other tables' cells set apart."""
+    """A row on one line. The XHTML gives each list item a table of its own, so a
+    lone row with a list label reads as the label then its text; other rows keep
+    their cells apart."""
     cells = [_text(c) for c in _cells(tr)]
-    if len(cells) == 2 and all(cells) and _LIST_LABEL.match(cells[0]):
+    if len(cells) == 2 and all(cells) and _is_list_label(cells[0]) and _only_row(tr):
         return " ".join(cells)
     return " | ".join(c for c in cells if c)
 
@@ -276,6 +289,8 @@ _RUN_IN_DONE_AT = re.compile(r"(?<=[.:;)])\s+(?=Done at\b)", re.IGNORECASE)
 def _may_precede_heading(text: str, after_division: bool) -> bool:
     """A sentence end, or a division heading or its title; prose runs on."""
     text = _RUNNING_HEAD.sub("", text).strip()
+    if _is_list_label(text):
+        return False  # `2. Article 5 ...` is an item citing an article
     return not text or after_division or text[-1] in _SENTENCE_END or bool(_DIVISION.match(text))
 
 
@@ -327,7 +342,11 @@ def _split_run_in(blocks: list[str]) -> list[str]:
         rest = block[start:].strip()
         parts = _RUN_IN_DONE_AT.split(rest, maxsplit=1) if last else [rest]
         # A signature run into the text starts the conclusions only after the last article.
-        if len(parts) == 2 and _heading_ahead([parts[1], *blocks[index + 1 :]], last):
+        # Nor does one after a bare list label: `(b) Done at sea ...` is a point.
+        if len(parts) == 2 and (
+            _is_list_label(parts[0].strip())
+            or _heading_ahead([parts[1], *blocks[index + 1 :]], last)
+        ):
             parts = [rest]
         if start == 0 and len(parts) == 1:
             out.append(block)  # unsplit, so a point row keeps its tree

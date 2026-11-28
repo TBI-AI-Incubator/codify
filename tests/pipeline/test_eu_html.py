@@ -1133,3 +1133,73 @@ def test_a_point_cell_with_text_outside_its_blocks_stays_one_flat_point() -> Non
     assert lamp.find("a:point", NS) is None
     assert _texts(lamp, "a:content/a:p") == ["loose words (i) the wick used."]
     assert "body_discarded_text" not in provenance
+
+
+def test_prose_after_a_last_sub_point_opens_a_wrap_up_for_its_parent() -> None:
+    xml, _, root = _convert(
+        _with_points(
+            _point_table(
+                "(b)",
+                _p("a lamp record showing:"),
+                _point_table("(i)", _p("the wick used;")),
+                _point_table("(ii)"),
+            ),
+            after=_p("The record shall be signed."),
+        )
+    )
+    lamp = _point(root, "art_1__para_1__point_b")
+    assert [child.tag.split("}")[1] for child in lamp] == [
+        "num",
+        "intro",
+        "point",
+        "point",
+        "wrapUp",
+    ]
+    assert _texts(lamp, "a:wrapUp/a:p") == ["The record shall be signed."]
+    # An empty cell still gives its point the content AKN requires.
+    assert _texts(_point(root, "art_1__para_1__point_b__point_ii"), "a:content/a:p") == [""]
+    from codify.akn._schema import validate_akn as schema_validate
+
+    schema_validate(xml, strict=True)
+
+
+def test_a_long_roman_point_and_a_numbered_row_lose_the_separator_too() -> None:
+    _, _, root = _convert(
+        _with_points(
+            _point_table("(xviii)", _p("a stamp.")), after=_point_table("2.", _p("Seals."))
+        )
+    )
+    assert _texts(_point(root, "art_1__para_1__point_xviii"), "a:content/a:p") == ["a stamp."]
+    para = root.find(".//a:paragraph[@eId='art_1__para_2']", NS)
+    assert para is not None and _texts(para, "a:content/a:p") == ["Seals."]
+
+
+def test_a_data_table_led_by_dashes_or_numbers_keeps_its_cells_apart() -> None:
+    _, _, root = _convert(
+        _with_points(
+            after="<table><tbody><tr><td>–</td><td>100</td></tr>"
+            "<tr><td>(2)</td><td>200</td></tr></tbody></table>"
+        )
+    )
+    texts = _texts(root, ".//a:article[@eId='art_1']//a:p")
+    assert texts[-2:] == ["– | 100", "(2) | 200"]
+
+
+def test_an_item_citing_an_article_or_opening_done_at_stays_in_its_article() -> None:
+    page = _with_points(
+        after=_point_table("2.", _p("Article 2 Member States shall keep lamps lit."))
+    ).replace(
+        '<p class="oj-normal">The form is set out below.</p>',
+        _p("The form records:")
+        + _point_table("(a)", _p("the date."))
+        + _point_table("(b)", _p("Done at sea, the record is closed.")),
+    )
+    _, _, root = _convert(page)
+    assert [a.get("eId") for a in root.iterfind(".//a:body/a:article", NS)] == ["art_1", "art_2"]
+    para = root.find(".//a:paragraph[@eId='art_1__para_2']", NS)
+    assert para is not None
+    assert _texts(para, "a:content/a:p") == ["Article 2 Member States shall keep lamps lit."]
+    assert _texts(_point(root, "art_2__para_1__point_a"), "a:content/a:p") == ["the date."]
+    point_b = _texts(_point(root, "art_2__para_1__point_b"), "a:content/a:p")
+    assert point_b[0] == "Done at sea, the record is closed."
+    assert _texts(root, ".//a:conclusions/a:p")[0] == "Done at Brussels, January 2042."

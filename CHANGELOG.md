@@ -172,9 +172,11 @@ Fixed:
   cell holds point tables now has its lead-in as `intro`, each sub-point as a
   `point` (`art_22__para_2__point_c__point_i`) and text after the last as
   `wrapUp`. A cell with text outside its blocks keeps the flat text, so none is
-  lost. A list row (`(a)`, `(1)`, `2.`, a dash) reads as its label then its
-  text: a point's text no longer starts with `| `. Other tables keep the
-  separator. Existing eIds are unchanged. Only converting an act again from its
+  lost. A table whose one row starts with a list label (`(a)`, `(1)`, `2.`, a
+  dash) reads as the label then its text, so a point's text no longer starts
+  with `| `. Tables of more rows keep the separator. A list item citing an
+  article (`2. Article 5 Member States ...`) or opening with "Done at" no
+  longer starts an article or the signature. Existing eIds are unchanged. Only converting an act again from its
   stored HTML picks this up: a re-derive rebuilds rows from the stored AKN.
 
 ## 0.7.0 (2026-11-13)
