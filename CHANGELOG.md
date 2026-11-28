@@ -165,6 +165,18 @@ Fixed:
   unnumbered paragraph above it, which takes `para_2_dup2` in exchange, and
   the points under each go with them), so data keyed by the old eIds is
   replaced, not carried across.
+- The FORMEX converter keeps the text an EU list item holds beside its lead-in.
+  The points a lettered point introduces in a `P` beside its `TXT`, such as
+  points (i) to (iv) of Article 22(2)(d) of Regulation (EU) 2021/241, become a
+  `blockList` inside that point, and any other `P` there follows the lead-in as
+  its own `<p>`; both were dropped, so the point ended at its colon. A lead-in
+  with no `TXT` no longer runs the points in such a `P` into its own text. An item
+  with neither `NP` nor `ITEM.CONT` keeps the text of its `P` blocks, which used
+  to leave it as `<p> </p>`, and reads them, its `TXT` and its `ALINEA` in source
+  order. A `P`'s quotes follow its prose in place. The new points take eIds under
+  their parent point; a list or quote in the same item that follows one recovered
+  is numbered after it, so its eId can change. Only converting an act again from
+  its stored FORMEX picks this up: a re-derive rebuilds rows from the stored AKN.
 
 ## 0.7.0 (2026-11-13)
 
