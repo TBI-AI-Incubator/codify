@@ -557,7 +557,7 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
     """Build index of active statutes from Estonian Riigi Teataja bulk XML zip."""
     from datetime import date
 
-    from codify.acquisition.adapters.ee.datadump import build_ee_index
+    from codify.acquisition.adapters.ee.datadump import archive_relative_to, build_ee_index
     from codify.acquisition.index import index_path
 
     archive = Path(args.archive)
@@ -577,6 +577,8 @@ def _run_index_ee_archive(args: argparse.Namespace) -> int:
         keep_ended=args.keep_ended,
     )
     out = Path(args.out or index_path("ee"))
+    # The reader resolves it against the index, so either can run from any directory.
+    payload["archive"] = archive_relative_to(archive, out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     stats = payload["stats"]

@@ -84,7 +84,8 @@ class EeDatadumpAcquirer(BaseAcquirer):
             return self._index
         if not self._index_path.exists():
             raise EeDatadumpIndexMissing(f"Estonian datadump index missing at {self._index_path}")
-        key = str(self._index_path)
+        # Absolute: one relative path names a different index from each working directory.
+        key = os.path.abspath(self._index_path)
         payload = _INDEX_CACHE.get(key)
         if payload is None:
             payload = json.loads(self._index_path.read_text(encoding="utf-8"))
@@ -101,7 +102,7 @@ class EeDatadumpAcquirer(BaseAcquirer):
                     f"Estonian datadump index at {self._index_path} names no archive; "
                     "set EE_DATADUMP_ZIP"
                 )
-            self._archive_path = Path(archive)
+            self._archive_path = _archive_from_index(archive, self._index_path)
         self._index = entries
         return entries
 
@@ -404,6 +405,26 @@ def build_ee_index(
     return payload
 
 
+def archive_relative_to(archive: Path | str, index: Path | str) -> str:
+    """`archive` as an index written at `index` records it: relative to the index's
+    directory in forward slashes, or absolute when no relative path joins them (another
+    Windows drive). Lexical, like `_archive_from_index`, so symlinks stay unresolved."""
+    target = os.path.abspath(archive)
+    try:
+        return Path(os.path.relpath(target, os.path.dirname(os.path.abspath(index)))).as_posix()
+    except ValueError:
+        return target
+
+
+def _archive_from_index(archive: str, index: Path | str) -> Path:
+    """The archive an index at `index` names: an absolute path as written, a relative one
+    against the index's directory, whatever the reader's working directory."""
+    path = Path(archive)
+    if path.is_absolute():
+        return path
+    return Path(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(index)), path)))
+
+
 def index_remote_ee_archive(
     url: str,
     *,
@@ -486,6 +507,7 @@ __all__ = [
     "EeDatadumpIndexMissing",
     "EeDocNotInDump",
     "TooManyMembers",
+    "archive_relative_to",
     "build_ee_index",
     "index_remote_ee_archive",
 ]
