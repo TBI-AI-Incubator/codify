@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import copy
 import re
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -1167,14 +1168,49 @@ def _emit_list(
         _emit_item(item, blocklist, new_path, index)
 
 
+def _p_into_item(
+    src_p: etree._Element, item: etree._Element, eid_path: tuple[str, ...]
+) -> list[etree._Element]:
+    """A P in an item: its prose as a `<p>`, then the points and quotes it holds,
+    in source order. Returns the quotes, which the item must not emit again."""
+    apart = {"LIST", "QUOT.S"}
+    blocks = [c for c in src_p if isinstance(c.tag, str) and _localname(c) in apart]
+    # The prose is the P without its lists and quotes, so its inline markup survives.
+    prose = copy.deepcopy(src_p)
+    for child in [c for c in prose if isinstance(c.tag, str) and _localname(c) in apart]:
+        # A space where the block stood, so the words either side do not fuse.
+        tail = " " + (child.tail or "")
+        before = child.getprevious()
+        if before is not None:
+            before.tail = (before.tail or "") + tail
+        else:
+            prose.text = (prose.text or "") + tail
+        prose.remove(child)
+    p = _akn(item, "p")
+    _serialize_inline(prose, p)
+    p.text = (p.text or "").lstrip() or None
+    if len(p):
+        p[-1].tail = (p[-1].tail or "").rstrip() or None
+    elif p.text:
+        p.text = p.text.rstrip()
+    if not _flat(p):
+        item.remove(p)
+    for block in blocks:
+        if _localname(block) == "LIST":
+            _emit_list(block, item, eid_path)
+        else:
+            _emit_quoted(block, item, eid_path)
+    return [b for b in blocks if _localname(b) == "QUOT.S"]
+
+
 def _emit_item(
     formex: etree._Element,
     parent: etree._Element,
     eid_path: tuple[str, ...],
     index: int,
 ) -> None:
-    """ITEM → <item>; marker from NO.ITEM or NP/NO.P, content from NP/TXT, ITEM.CONT,
-    ALINEA or direct TXT.
+    """ITEM → <item>; marker from NO.ITEM or NP/NO.P, content from NP (its TXT, then
+    its LIST and P blocks), ITEM.CONT, P, ALINEA or direct TXT.
 
     Canonical FORMEX 5.x is `<ITEM><NP><NO.P>(1)</NO.P><TXT>…</TXT></NP></ITEM>`, but
     both marker shapes are common; the more specific NO.P wins when both are present.
@@ -1196,22 +1232,46 @@ def _emit_item(
 
     # Content extraction, try each known shape in turn.
     new_path = (*eid_path, f"item_{ident}")
+    cont = formex.find("ITEM.CONT")
+    placed: list[etree._Element] = []  # quotes already emitted beside their text
     if np is not None:
-        # NP wraps the item content. TXT and LIST may be siblings of NO.P.
+        # NP wraps the item content. TXT and LIST may be siblings of NO.P, and a P
+        # beside the TXT carries the points a lead-in introduces or a further
+        # subparagraph: `<NP><NO.P>(d)</NO.P><TXT>…data:</TXT><P><LIST/></P></NP>`.
         np_txt = np.find("TXT")
         if np_txt is not None:
             p = _akn(item, "p")
             _serialize_inline(np_txt, p)
-        for nested in np.findall("LIST"):
-            _emit_list(nested, item, new_path)
-        # Fallback: NP with no TXT but direct text content.
-        if np_txt is None and not np.findall("LIST"):
-            text = _prose_text(np, _quoted_blocks(np))
-            # Strip the marker we already extracted.
-            if marker and text.startswith(marker):
-                text = text[len(marker) :].strip()
-            if text:
-                _akn(item, "p").text = text
+            for child in np:
+                local = _localname(child) if isinstance(child.tag, str) else ""
+                if local == "LIST":
+                    _emit_list(child, item, new_path)
+                elif local == "P":
+                    placed += _p_into_item(child, item, new_path)
+        else:
+            p_lists = np.xpath("P/LIST")
+            # Fallback: NP with no TXT but direct text content, ahead of its points.
+            if not np.findall("LIST"):
+                text = _prose_text(np, [*_quoted_blocks(np), *p_lists])
+                # Strip the marker we already extracted.
+                if marker and text.startswith(marker):
+                    text = text[len(marker) :].strip()
+                if text:
+                    _akn(item, "p").text = text
+            for nested in np.xpath("LIST | P/LIST"):
+                _emit_list(nested, item, new_path)
+    elif cont is None:
+        # An item with no NP or ITEM.CONT holds its text, and any points, in a TXT,
+        # ALINEA or P blocks, read in source order.
+        direct_txt = formex.find("TXT")
+        for child in formex:
+            local = _localname(child) if isinstance(child.tag, str) else ""
+            if child is direct_txt:
+                _serialize_inline(child, _akn(item, "p"))
+            elif local == "ALINEA":
+                _alinea_into_content(child, item, new_path)
+            elif local == "P":
+                placed += _p_into_item(child, item, new_path)
 
     # `NP` first: canonical Formex nests the quote beside the lead-in inside it,
     # `<NP><NO.P/><TXT/><P><QUOT.S/></P></NP>`, and only some dialects hang it
@@ -1219,9 +1279,9 @@ def _emit_item(
     quotes = _quoted_blocks(np) if np is not None else []
     quotes += _quoted_blocks(formex)
     for quoted in quotes:
-        _emit_quoted(quoted, item, new_path)
+        if quoted not in placed:
+            _emit_quoted(quoted, item, new_path)
 
-    cont = formex.find("ITEM.CONT")
     if cont is not None:
         cont_quotes = _quoted_blocks(cont)
         cont_lists = cont.findall("LIST")
@@ -1242,18 +1302,6 @@ def _emit_item(
             _emit_quoted(quoted, item, new_path)
         for nested in cont_lists:
             _emit_list(nested, item, new_path)
-
-    # Direct ALINEA siblings (some FORMEX dialects skip ITEM.CONT/NP wrappers).
-    # Guarded against double-emission: only fires when neither NP nor ITEM.CONT supplied content.
-    if np is None and cont is None:
-        for alinea in formex.findall("ALINEA"):
-            _alinea_into_content(alinea, item, new_path)
-
-    # Direct TXT child (rare but seen).
-    direct_txt = formex.find("TXT")
-    if direct_txt is not None and np is None and cont is None:
-        p = _akn(item, "p")
-        _serialize_inline(direct_txt, p)
 
     # AKN <item> requires content beyond bare <num>; emit minimal <p> only if
     # we found nothing, this guards a degenerate ITEM with only a marker.

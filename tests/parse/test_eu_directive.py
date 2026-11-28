@@ -632,6 +632,143 @@ def test_list_emits_blocklist_with_items() -> None:
     assert "<num>(b)</num>" in out
 
 
+# --- Text an item holds beside its lead-in (#120) ----------------------------
+
+AKN = "{http://docs.oasis-open.org/legaldocml/ns/akn/3.0}"
+
+
+def _obligations(item_inner: str) -> str:
+    """Article 4(2) of an invented act, one lettered point under its lead-in."""
+    return _wrap(
+        "<TI.ART>Article 4</TI.ART>"
+        "<PARAG IDENTIFIER='004.002'><NO.PARAG>2.</NO.PARAG>"
+        "<ALINEA>The lantern agreements shall oblige the keepers:"
+        f"<LIST TYPE='alpha'><ITEM><NP><NO.P>(a)</NO.P>{item_inner}</NP></ITEM></LIST>"
+        "</ALINEA></PARAG>"
+    )
+
+
+# Formex hangs the points a lettered point introduces in a P beside its TXT,
+# with the OJ page break between them.
+ROMAN_POINTS = (
+    "<TXT>to record the following categories of lantern data:</TXT><?PAGE NO='9'?>"
+    "<P><LIST TYPE='roman'>"
+    "<ITEM><NP><NO.P>(i)</NO.P><TXT>the name of the keeper;</TXT></NP></ITEM>"
+    "<ITEM><NP><NO.P>(ii)</NO.P><TXT>the colour of the flame;</TXT></NP></ITEM>"
+    "<ITEM><NP><NO.P>(iii)</NO.P><TXT>the hours of burning"
+    "<NOTE NOTE.ID='E0001' NUMBERING='ARAB' TYPE='FOOTNOTE'><P>OJ L 9, 1.1.2024.</P></NOTE>;</TXT>"
+    "</NP></ITEM>"
+    "<ITEM><NP><NO.P>(iv)</NO.P><TXT>the oil consumed in each season.</TXT></NP></ITEM>"
+    "</LIST></P>"
+)
+
+
+def _point_a(out: str) -> Any:
+    from lxml import etree
+
+    root = etree.fromstring(out.encode())
+    (point,) = root.iterfind(f".//{AKN}item[@eId='art_1__para_2__list_1__item_a']")
+    return point
+
+
+def test_points_in_a_p_beside_the_lead_in_are_kept() -> None:
+    """Regulation (EU) 2021/241, Article 22(2)(d) stopped at its colon: the
+    points (i) to (iv) sit in `NP/P/LIST`, which the walk never read."""
+    out = formex_to_akn4eu(_obligations(ROMAN_POINTS))
+    point = _point_a(out)
+    children = [c.tag.removeprefix(AKN) for c in point]
+    assert children == ["num", "p", "blockList"]
+    assert point[1].text == "to record the following categories of lantern data:"
+    subpoints = point[2].findall(f"{AKN}item")
+    assert [s.findtext(f"{AKN}num") for s in subpoints] == ["(i)", "(ii)", "(iii)", "(iv)"]
+    assert [s.get("eId") for s in subpoints] == [
+        f"art_1__para_2__list_1__item_a__list_1__item_{n}" for n in ("i", "ii", "iii", "iv")
+    ]
+    assert 'eId="fn_E0001"' in out
+    assert out.count("the oil consumed in each season.") == 1
+
+
+def test_a_subparagraph_beside_the_lead_in_is_kept() -> None:
+    out = formex_to_akn4eu(
+        _obligations(
+            "<TXT>to trim each wick daily;</TXT>"
+            "<P>That obligation lapses on <DATE ISO='20250101'>1 January 2025</DATE>.</P>"
+        )
+    )
+    paragraphs = _point_a(out).findall(f"{AKN}p")
+    assert [p.text for p in paragraphs] == [
+        "to trim each wick daily;",
+        "That obligation lapses on ",
+    ]
+    assert '<date date="2025-01-01">1 January 2025</date>' in out
+
+
+def test_a_lead_in_without_txt_keeps_its_points_apart() -> None:
+    """With no TXT the NP's prose is the lead-in; its points no longer fuse into it."""
+    out = formex_to_akn4eu(
+        _obligations(
+            "to keep a register of:"
+            "<P><LIST><ITEM><NP><NO.P>(i)</NO.P><TXT>every lamp lit;</TXT></NP></ITEM></LIST></P>"
+        )
+    )
+    point = _point_a(out)
+    assert point.find(f"{AKN}p").text == "to keep a register of:"
+    assert point.find(f"{AKN}blockList/{AKN}item/{AKN}p").text == "every lamp lit;"
+    assert out.count("every lamp lit;") == 1
+
+
+def test_an_item_without_np_keeps_its_text_and_points() -> None:
+    """An item may hold its text in P blocks alone; it used to become `<p> </p>`."""
+    out = formex_to_akn4eu(
+        _wrap(
+            "<PARAG><ALINEA>Keepers are appointed by:"
+            "<LIST TYPE='DASH'>"
+            "<ITEM><P>their harbour board;</P></ITEM>"
+            "<ITEM><P>their guild, which shall consult:</P>"
+            "<P><LIST><ITEM><NP><NO.P>(a)</NO.P><TXT>the pilots.</TXT></NP></ITEM></LIST></P>"
+            "</ITEM>"
+            "</LIST></ALINEA></PARAG>"
+        )
+    )
+    assert "<p>their harbour board;</p>" in out
+    assert "<p>their guild, which shall consult:</p>" in out
+    assert "<p>the pilots.</p>" in out
+    assert "<p> </p>" not in out
+    assert out.index("which shall consult:") < out.index("the pilots.")
+
+
+def test_prose_beside_points_keeps_its_markup_and_drops_page_breaks() -> None:
+    """The prose of a P holding a list is the P without the list: a page break
+    is no text, a footnote stays a note and the words either side do not fuse."""
+    out = formex_to_akn4eu(
+        _obligations(
+            "<TXT>to log the lamps;</TXT>"
+            "<P>see <HT TYPE='ITALIC'>the register</HT>"
+            "<NOTE NOTE.ID='E0002' NUMBERING='ARAB' TYPE='FOOTNOTE'><P>OJ L 9.</P></NOTE>"
+            " for:<?PAGE NO='10'?><LIST><ITEM><NP><NO.P>(i)</NO.P><TXT>lamps lit;</TXT></NP>"
+            "</ITEM></LIST>which the warden keeps.</P>"
+        )
+    )
+    assert "NO=" not in out
+    assert "<i>the register</i>" in out
+    assert 'eId="fn_E0002"' in out
+    assert "for: which the warden keeps." in out
+    assert out.index("for:") < out.index("lamps lit;")
+
+
+def test_an_item_without_np_keeps_its_txt_ahead_of_its_points() -> None:
+    out = formex_to_akn4eu(
+        _wrap(
+            "<PARAG><ALINEA>Keepers shall:<LIST>"
+            "<ITEM><NO.ITEM>(a)</NO.ITEM><TXT>report weekly on:</TXT>"
+            "<P><LIST><ITEM><NP><NO.P>(i)</NO.P><TXT>the oil;</TXT></NP></ITEM></LIST></P></ITEM>"
+            "</LIST></ALINEA></PARAG>"
+        )
+    )
+    assert out.count("report weekly on:") == 1
+    assert out.index("report weekly on:") < out.index("the oil;")
+
+
 # --- Quoted structures in amending acts ------------------------------------
 
 
