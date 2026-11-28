@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from itertools import islice
 
 from lxml import etree, html
 
@@ -125,12 +126,7 @@ def _blocks(text: str) -> tuple[list[str], dict[str, str], dict[str, int]]:
         if is_title and previous_title:
             blocks[-1] += " " + " ".join(el.text_content().split())
             continue
-        if el.tag == "tr":
-            # A table row is one block, its cells separated; the table's shape is not kept.
-            cells = [" ".join(c.text_content().split()) for c in el if c.tag in ("td", "th")]
-            joined = " | ".join(c for c in cells if c)
-        else:
-            joined = " ".join(el.text_content().split())
+        joined = _row_block(el) if el.tag == "tr" else _text(el)
         if joined:
             blocks.append(joined)
         previous_title = is_title and bool(joined)
@@ -156,6 +152,110 @@ def _inside_block(el: etree._Element, container: etree._Element) -> bool:
             return True
         parent = parent.getparent()
     return False
+
+
+def _text(el: etree._Element) -> str:
+    return " ".join(el.text_content().split())
+
+
+def _cells(tr: etree._Element) -> list[etree._Element]:
+    return [c for c in tr if c.tag in ("td", "th")]
+
+
+_POINT_NUM = r"[a-z]{1,2}|[ivxl]+"
+_POINT_LABEL = re.compile(rf"^\(({_POINT_NUM})\)$")
+# A list's label cell: `(a)`, `(12)`, `3.`, `2.1.`, a dash, or one opening a quotation.
+_LIST_LABEL = re.compile(
+    r"^\u2018?(?:\([0-9A-Za-z]{1,4}\)|\d{1,3}(?:\.\d{1,3})*\.|[\u2013\u2014\u2022-])$"
+)
+
+
+@dataclass
+class _Point:
+    """A point whose sub-points the XHTML nests as tables inside its text cell."""
+
+    num: str
+    lead: list[str] = field(default_factory=list)
+    points: list[_Point] = field(default_factory=list)
+    wrap: list[str] = field(default_factory=list)
+
+    def add_text(self, blocks: list[str]) -> None:
+        (self.wrap if self.points else self.lead).extend(blocks)
+
+    def text(self) -> str:
+        return " ".join([f"({self.num})", *self.lead, *(p.text() for p in self.points), *self.wrap])
+
+
+class _Block(str):
+    """A point row's flat text, which every pass reads, and the tree of its sub-points."""
+
+    point: _Point
+
+    def __new__(cls, text: str, point: _Point) -> _Block:
+        block = super().__new__(cls, text)
+        block.point = point
+        return block
+
+
+def _is_list_label(text: str) -> bool:
+    return bool(_LIST_LABEL.match(text) or _POINT_LABEL.match(text.removeprefix("\u2018")))
+
+
+def _only_row(tr: etree._Element) -> bool:
+    section = tr.getparent()
+    table = section if section.tag == "table" else section.getparent()
+    parts = (table, *table.iterchildren("thead", "tbody", "tfoot"))
+    rows = (row for part in parts for row in part.iterchildren("tr"))
+    return len(list(islice(rows, 2))) == 1  # a second row settles it
+
+
+def _flat_row(tr: etree._Element) -> str:
+    """A row on one line. The XHTML gives each list item a table of its own, so a
+    lone row with a list label reads as the label then its text; other rows keep
+    their cells apart."""
+    cells = [_text(c) for c in _cells(tr)]
+    if len(cells) == 2 and all(cells) and _is_list_label(cells[0]) and _only_row(tr):
+        return " ".join(cells)
+    return " | ".join(c for c in cells if c)
+
+
+def _point_tree(tr: etree._Element) -> _Point | None:
+    """A point row as a tree: text before its first nested point row is the lead-in,
+    and text after a nested point stays with it, except after the last."""
+    cells = _cells(tr)
+    m = _POINT_LABEL.match(_text(cells[0])) if len(cells) == 2 else None
+    if m is None:
+        return None
+    point = _Point(m.group(1))
+    after: list[str] = []
+    for el in cells[1].iter(*_BLOCK_TAGS):
+        if _inside_block(el, cells[1]):
+            continue
+        child = _point_tree(el) if el.tag == "tr" else None
+        if child is None:
+            text = _flat_row(el) if el.tag == "tr" else _text(el)
+            if text:
+                (after if point.points else point.lead).append(text)
+            continue
+        if after:
+            point.points[-1].add_text(after)
+            after = []
+        point.points.append(child)
+    point.wrap = after
+    return point
+
+
+_UNCOUNTED = re.compile(r"[\s|]")
+
+
+def _row_block(tr: etree._Element) -> str:
+    """A table row is one block; a point row holding point rows also keeps their tree."""
+    flat = _flat_row(tr)
+    point = _point_tree(tr)
+    # Only a tree holding every character of the row, in order, replaces the flat text.
+    if point and point.points and _UNCOUNTED.sub("", point.text()) == _UNCOUNTED.sub("", flat):
+        return _Block(flat, point)
+    return flat
 
 
 def _uncaptured_chars(container: etree._Element) -> int:
@@ -191,6 +291,8 @@ _RUN_IN_DONE_AT = re.compile(r"(?<=[.:;)])\s+(?=Done at\b)", re.IGNORECASE)
 def _may_precede_heading(text: str, after_division: bool) -> bool:
     """A sentence end, or a division heading or its title; prose runs on."""
     text = _RUNNING_HEAD.sub("", text).strip()
+    if _is_list_label(text):
+        return False  # `2. Article 5 ...` is an item citing an article
     return not text or after_division or text[-1] in _SENTENCE_END or bool(_DIVISION.match(text))
 
 
@@ -242,8 +344,15 @@ def _split_run_in(blocks: list[str]) -> list[str]:
         rest = block[start:].strip()
         parts = _RUN_IN_DONE_AT.split(rest, maxsplit=1) if last else [rest]
         # A signature run into the text starts the conclusions only after the last article.
-        if len(parts) == 2 and _heading_ahead([parts[1], *blocks[index + 1 :]], last):
+        # Nor does one after a bare list label: `(b) Done at sea ...` is a point.
+        if len(parts) == 2 and (
+            _is_list_label(parts[0].strip())
+            or _heading_ahead([parts[1], *blocks[index + 1 :]], last)
+        ):
             parts = [rest]
+        if start == 0 and len(parts) == 1:
+            out.append(block)  # unsplit, so a point row keeps its tree
+            continue
         out.extend(p.strip() for p in parts if p.strip())
     return out
 
@@ -342,7 +451,7 @@ def _akn(parent: etree._Element, tag: str, **attrs: str) -> etree._Element:
 
 # A chapeau and its first item run together in one block: `... shall apply: 1. to ...`.
 _INLINE_FIRST_ITEM = re.compile(r"^(.*?:)\s+(1\.\s+.*)$", re.DOTALL)
-_POINT = re.compile(r"^\(([a-z]{1,2}|[ivxl]+)\)\s+(.*)$", re.DOTALL)
+_POINT = re.compile(rf"^\(({_POINT_NUM})\)\s+(.*)$", re.DOTALL)
 
 
 def _split_inline_first_item(blocks: list[str]) -> list[str]:
@@ -353,10 +462,45 @@ def _split_inline_first_item(blocks: list[str]) -> list[str]:
     return out
 
 
+def _point_leaf(letter: str, seen: dict[str, int]) -> str:
+    seen[letter] = seen.get(letter, 0) + 1
+    return f"point_{letter}" if seen[letter] == 1 else f"point_{letter}_dup{seen[letter]}"
+
+
+def _emit_sub_points(point: etree._Element, eid: str, tree: _Point) -> None:
+    """The lead-in as `intro`, each nested point a `point`, and text after them `wrapUp`."""
+    if not tree.points:
+        content = _akn(point, "content")
+        for block in tree.lead or [""]:
+            _akn(content, "p").text = block
+        return
+    if tree.lead:
+        intro = _akn(point, "intro")
+        for block in tree.lead:
+            _akn(intro, "p").text = block
+    seen: dict[str, int] = {}
+    for sub in tree.points:
+        leaf = _point_leaf(sub.num, seen)
+        child = _akn(point, "point", eId=f"{eid}__{leaf}")
+        _akn(child, "num").text = f"({sub.num})"
+        _emit_sub_points(child, f"{eid}__{leaf}", sub)
+    if tree.wrap:
+        wrap_up = _akn(point, "wrapUp")
+        for block in tree.wrap:
+            _akn(wrap_up, "p").text = block
+
+
+def _continuation(point: etree._Element) -> etree._Element:
+    """Where text after a point goes: its `content`, or a `wrapUp` after its points."""
+    if point[-1].tag in (f"{{{AKN_NS}}}content", f"{{{AKN_NS}}}wrapUp"):
+        return point[-1]
+    return _akn(point, "wrapUp")
+
+
 def _fill_paragraph(para: etree._Element, eid: str, blocks: list[str]) -> None:
     """Prose into `content`; lettered points make it the `intro` and follow as `point`s."""
     holder: etree._Element | None = None
-    point_content: etree._Element | None = None
+    point: etree._Element | None = None
     seen: dict[str, int] = {}
     for block in blocks:
         m = _POINT.match(block)
@@ -364,14 +508,15 @@ def _fill_paragraph(para: etree._Element, eid: str, blocks: list[str]) -> None:
             if holder is not None:
                 holder.tag = f"{{{AKN_NS}}}intro"
             letter = m.group(1)
-            seen[letter] = seen.get(letter, 0) + 1
-            leaf = f"point_{letter}" if seen[letter] == 1 else f"point_{letter}_dup{seen[letter]}"
+            leaf = _point_leaf(letter, seen)
             point = _akn(para, "point", eId=f"{eid}__{leaf}")
             _akn(point, "num").text = f"({letter})"
-            point_content = _akn(point, "content")
-            _akn(point_content, "p").text = m.group(2)
-        elif point_content is not None:
-            _akn(point_content, "p").text = block  # a continuation stays with its point
+            if isinstance(block, _Block):
+                _emit_sub_points(point, f"{eid}__{leaf}", block.point)
+            else:
+                _akn(_akn(point, "content"), "p").text = m.group(2)
+        elif point is not None:
+            _akn(_continuation(point), "p").text = block  # a continuation stays with its point
         else:
             if holder is None:
                 holder = _akn(para, "content")
