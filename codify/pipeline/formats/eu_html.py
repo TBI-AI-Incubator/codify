@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from itertools import islice
 
 from lxml import etree, html
 
@@ -197,14 +198,15 @@ class _Block(str):
 
 
 def _is_list_label(text: str) -> bool:
-    return bool(_LIST_LABEL.match(text) or _POINT_LABEL.match(text))
+    return bool(_LIST_LABEL.match(text) or _POINT_LABEL.match(text.removeprefix("\u2018")))
 
 
 def _only_row(tr: etree._Element) -> bool:
     section = tr.getparent()
     table = section if section.tag == "table" else section.getparent()
     parts = (table, *table.iterchildren("thead", "tbody", "tfoot"))
-    return sum(1 for part in parts for _ in part.iterchildren("tr")) == 1
+    rows = (row for part in parts for row in part.iterchildren("tr"))
+    return len(list(islice(rows, 2))) == 1  # a second row settles it
 
 
 def _flat_row(tr: etree._Element) -> str:

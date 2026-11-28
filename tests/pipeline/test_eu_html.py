@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -1203,3 +1204,24 @@ def test_an_item_citing_an_article_or_opening_done_at_stays_in_its_article() -> 
     point_b = _texts(_point(root, "art_2__para_1__point_b"), "a:content/a:p")
     assert point_b[0] == "Done at sea, the record is closed."
     assert _texts(root, ".//a:conclusions/a:p")[0] == "Done at Brussels, January 2042."
+
+
+def test_a_quoted_long_roman_label_reads_like_a_short_one() -> None:
+    _, _, root = _convert(
+        _with_points(
+            after=_p("\u2018(xviii) Article 2 Member States shall keep lamps lit.")
+            + _point_table("\u2018(xviii)", _p("a seal."))
+        )
+    )
+    assert [a.get("eId") for a in root.iterfind(".//a:body/a:article", NS)] == ["art_1", "art_2"]
+    texts = _texts(root, ".//a:article[@eId='art_1']//a:p")
+    assert "\u2018(xviii) a seal." in texts
+
+
+def test_a_long_dash_led_table_reads_each_row_once() -> None:
+    rows = "<tr><td>-</td><td>1</td></tr>" * 8000
+    page = _with_points(after=f"<table><tbody>{rows}</tbody></table>")
+    began = time.perf_counter()
+    _, _, root = _convert(page)
+    assert time.perf_counter() - began < 2.0  # rescanning the table per row took 9 s
+    assert _texts(root, ".//a:article[@eId='art_1']//a:p")[-1] == "- | 1"
