@@ -630,3 +630,52 @@ def test_a_relative_index_names_its_own_directory_from_each_working_directory(
         assert list(acquirer._load_index()) == [name]
         assert acquirer._archive_path is not None
         assert acquirer._archive_path.resolve() == (tmp_path / name / "xml.2026.zip").resolve()
+
+
+_DECOY_XML = _SYNTHETIC_EE_XML.replace(b"Synthetic Act", b"Decoy Act")
+
+
+def _behind_a_link(tmp_path: Path) -> Path:
+    """`tmp/shortcut` links to `tmp/target/sub`, so `shortcut/..` is `tmp/target`; a decoy
+    archive at `tmp/xml.2026.zip` is what collapsing `shortcut/..` to `tmp` finds."""
+    (tmp_path / "target" / "sub").mkdir(parents=True)
+    try:
+        (tmp_path / "shortcut").symlink_to(tmp_path / "target" / "sub", target_is_directory=True)
+    except OSError as exc:  # Windows without the symlink privilege
+        pytest.skip(f"cannot create a symlink here: {exc}")
+    _archive_in(tmp_path / "target")
+    with zipfile.ZipFile(tmp_path / "xml.2026.zip", "w") as zf:
+        zf.writestr(_MEMBER, _DECOY_XML)
+    return tmp_path / "shortcut"
+
+
+async def test_an_archive_named_through_a_link_and_dotdot_is_the_one_indexed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _restore_structlog: None
+) -> None:
+    from codify.cli import main
+
+    _behind_a_link(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    args = ["index-ee-archive", "shortcut/../xml.2026.zip", "--out", "indexes/ee.json"]
+    assert main([*args, "--quiet"]) == 0
+    index = tmp_path / "indexes" / "ee.json"
+    assert json.loads(index.read_text("utf-8"))["archive"] == "../target/xml.2026.zip"
+
+    monkeypatch.chdir(tmp_path / "target" / "sub")
+    assert await _fetched_from(index) == _SYNTHETIC_EE_XML
+
+
+async def test_an_index_named_through_a_link_and_dotdot_reads_its_own_archive(
+    tmp_path: Path,
+) -> None:
+    link = _behind_a_link(tmp_path)
+    for directory, number in ((tmp_path / "target", "123122022025"), (tmp_path, "decoy")):
+        (directory / "index.json").write_text(
+            json.dumps({"archive": "xml.2026.zip", "entries": {number: {"member": _MEMBER}}})
+        )
+    decoy = EeDatadumpAcquirer(_adapter(), index_path=tmp_path / "index.json")
+    assert list(decoy._load_index()) == ["decoy"]
+
+    index = link / ".." / "index.json"
+    assert list(EeDatadumpAcquirer(_adapter(), index_path=index)._load_index()) == ["123122022025"]
+    assert await _fetched_from(index) == _SYNTHETIC_EE_XML

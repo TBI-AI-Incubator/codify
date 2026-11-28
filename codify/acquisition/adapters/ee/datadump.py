@@ -84,8 +84,9 @@ class EeDatadumpAcquirer(BaseAcquirer):
             return self._index
         if not self._index_path.exists():
             raise EeDatadumpIndexMissing(f"Estonian datadump index missing at {self._index_path}")
-        # Absolute: one relative path names a different index from each working directory.
-        key = os.path.abspath(self._index_path)
+        # The file opened: one relative path names a different index from each working
+        # directory, and `link/..` is not the directory `abspath` makes of it.
+        key = os.path.realpath(self._index_path)
         payload = _INDEX_CACHE.get(key)
         if payload is None:
             payload = json.loads(self._index_path.read_text(encoding="utf-8"))
@@ -405,13 +406,20 @@ def build_ee_index(
     return payload
 
 
+def _directory_of(path: Path | str) -> str:
+    """The directory `path` is opened in, through any symlink, so a `..` after a link
+    climbs from where the link points, as the system does, not from the link."""
+    return os.path.realpath(Path(path).absolute().parent)
+
+
 def archive_relative_to(archive: Path | str, index: Path | str) -> str:
     """`archive` as an index written at `index` records it: relative to the index's
     directory in forward slashes, or absolute when no relative path joins them (another
-    Windows drive). Lexical, like `_archive_from_index`, so symlinks stay unresolved."""
-    target = os.path.abspath(archive)
+    Windows drive). The archive keeps its own name, so a symlinked archive is named by
+    where it sits, not by where it points."""
+    target = os.path.join(_directory_of(archive), Path(archive).name)
     try:
-        return Path(os.path.relpath(target, os.path.dirname(os.path.abspath(index)))).as_posix()
+        return Path(os.path.relpath(target, _directory_of(index))).as_posix()
     except ValueError:
         return target
 
@@ -422,7 +430,7 @@ def _archive_from_index(archive: str, index: Path | str) -> Path:
     path = Path(archive)
     if path.is_absolute():
         return path
-    return Path(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(index)), path)))
+    return Path(_directory_of(index)) / path
 
 
 def index_remote_ee_archive(
