@@ -945,3 +945,191 @@ def test_eli_and_celex_urls_name_the_same_work(eli: str, celex: str) -> None:
     )
     assert by_celex is not None
     assert work_uri_from_url(eli) == by_celex
+
+
+def _p(text: str) -> str:
+    return f'<p class="oj-normal">{text}</p>'
+
+
+def _point_table(label: str, *cell: str) -> str:
+    """A point as the XHTML renders it: a two-column table, its label then its text."""
+    return (
+        '<table width="100%" border="0" cellspacing="0" cellpadding="0">'
+        '<col width="4%"/><col width="96%"/><tbody><tr>\n'
+        f'<td valign="top">{_p(label)}</td>\n<td valign="top">{"".join(cell)}</td>\n'
+        "</tr></tbody></table>\n"
+    )
+
+
+def _with_points(*tables: str, after: str = "") -> str:
+    """Article 1 as a numbered paragraph whose lead-in the point tables follow."""
+    page = _CONVEX_XHTML.replace(
+        '<div id="001.001"><p class="oj-normal">Each keeper shall hold an arrêté.</p></div>',
+        f'<div id="001.001">{_p("1. Each keeper shall keep:")}{"".join(tables)}{after}</div>',
+    )
+    assert page != _CONVEX_XHTML
+    return page
+
+
+_LAMP_RECORD = _point_table(
+    "(b)",
+    _p("a lamp record showing:"),
+    _point_table("(i)", _p("the wick used;")),
+    _point_table("(ii)", _p("the oil burned;")),
+    _p("for each night of service;"),
+)
+
+
+def _point(root: etree._Element, eid: str) -> etree._Element:
+    point = root.find(f".//a:point[@eId='{eid}']", NS)
+    assert point is not None, eid
+    return point
+
+
+def _texts(el: etree._Element, path: str) -> list[str]:
+    return [p.text or "" for p in el.iterfind(path, NS)]
+
+
+def test_a_point_table_inside_a_point_becomes_its_sub_points() -> None:
+    xml, _, root = _convert(
+        _with_points(
+            _point_table("(a)", _p("a logbook;")), _LAMP_RECORD, _point_table("(c)", _p("a stamp."))
+        )
+    )
+    para = root.find(".//a:paragraph[@eId='art_1__para_1']", NS)
+    assert para is not None
+    assert [p.get("eId") for p in para.findall("a:point", NS)] == [
+        "art_1__para_1__point_a",
+        "art_1__para_1__point_b",
+        "art_1__para_1__point_c",
+    ]
+    lamp = _point(root, "art_1__para_1__point_b")
+    assert [child.tag.split("}")[1] for child in lamp] == [
+        "num",
+        "intro",
+        "point",
+        "point",
+        "wrapUp",
+    ]
+    assert _texts(lamp, "a:intro/a:p") == ["a lamp record showing:"]
+    subs = lamp.findall("a:point", NS)
+    assert [(s.get("eId"), s.find("a:num", NS).text, _texts(s, "a:content/a:p")) for s in subs] == [
+        ("art_1__para_1__point_b__point_i", "(i)", ["the wick used;"]),
+        ("art_1__para_1__point_b__point_ii", "(ii)", ["the oil burned;"]),
+    ]
+    assert _texts(lamp, "a:wrapUp/a:p") == ["for each night of service;"]
+    from codify.akn._schema import validate_akn as schema_validate
+
+    schema_validate(xml, strict=True)
+
+
+def test_a_list_row_reads_as_its_label_then_its_text_with_no_cell_separator() -> None:
+    _, _, root = _convert(
+        _with_points(
+            _point_table("(a)", _p("a logbook;")),
+            after=_point_table("(1)", _p("the harbour lamp;")) + _point_table("—", _p("a spare.")),
+        )
+    )
+    assert _texts(_point(root, "art_1__para_1__point_a"), "a:content/a:p") == [
+        "a logbook;",
+        "(1) the harbour lamp;",
+        "— a spare.",
+    ]
+    assert not [t for t in _texts(root, ".//a:body//a:p") if "|" in t]
+
+
+def test_text_between_sub_points_stays_with_the_one_before_it() -> None:
+    _, _, root = _convert(
+        _with_points(
+            _point_table(
+                "(b)",
+                _p("a lamp record showing:"),
+                _point_table("(i)", _p("the wick used;")),
+                _p("and, where one was trimmed, its length;"),
+                _point_table("(ii)", _p("the oil burned.")),
+            )
+        )
+    )
+    lamp = _point(root, "art_1__para_1__point_b")
+    assert lamp.find("a:wrapUp", NS) is None
+    assert _texts(_point(root, "art_1__para_1__point_b__point_i"), "a:content/a:p") == [
+        "the wick used;",
+        "and, where one was trimmed, its length;",
+    ]
+    assert _texts(_point(root, "art_1__para_1__point_b__point_ii"), "a:content/a:p") == [
+        "the oil burned."
+    ]
+
+
+def test_sub_points_nest_to_any_depth_and_other_lists_stay_in_their_point() -> None:
+    xml, _, root = _convert(
+        _with_points(
+            _point_table(
+                "(b)",
+                _p("a lamp record showing:"),
+                _point_table(
+                    "(i)",
+                    _p("the oil burned, as:"),
+                    _point_table("(aa)", _p("lamp oil;")),
+                    _point_table("(bb)", _p("whale oil;")),
+                ),
+                _point_table(
+                    "(ii)", _p("the wicks, as:"), _point_table("—", _p("cotton;")), _p("or flax.")
+                ),
+            )
+        )
+    )
+    oil = _point(root, "art_1__para_1__point_b__point_i")
+    assert _texts(oil, "a:intro/a:p") == ["the oil burned, as:"]
+    assert [p.get("eId") for p in oil.findall("a:point", NS)] == [
+        "art_1__para_1__point_b__point_i__point_aa",
+        "art_1__para_1__point_b__point_i__point_bb",
+    ]
+    wicks = _point(root, "art_1__para_1__point_b__point_ii")
+    assert wicks.find("a:point", NS) is None
+    assert _texts(wicks, "a:content/a:p") == ["the wicks, as:", "— cotton;", "or flax."]
+    from codify.akn._schema import validate_akn as schema_validate
+
+    schema_validate(xml, strict=True)
+
+
+def test_a_repeated_sub_point_label_keeps_a_unique_eid() -> None:
+    _, _, root = _convert(
+        _with_points(
+            _point_table(
+                "(b)",
+                _p("a lamp record showing:"),
+                _point_table("(i)", _p("the wick used;")),
+                _point_table("(i)", _p("the oil burned.")),
+            )
+        )
+    )
+    assert [
+        p.get("eId") for p in _point(root, "art_1__para_1__point_b").findall("a:point", NS)
+    ] == [
+        "art_1__para_1__point_b__point_i",
+        "art_1__para_1__point_b__point_i_dup2",
+    ]
+
+
+def test_prose_after_a_point_with_sub_points_joins_its_wrap_up() -> None:
+    xml, _, root = _convert(_with_points(_LAMP_RECORD, after=_p("The record shall be signed.")))
+    lamp = _point(root, "art_1__para_1__point_b")
+    assert _texts(lamp, "a:wrapUp/a:p") == [
+        "for each night of service;",
+        "The record shall be signed.",
+    ]
+    from codify.akn._schema import validate_akn as schema_validate
+
+    schema_validate(xml, strict=True)
+
+
+def test_a_point_cell_with_text_outside_its_blocks_stays_one_flat_point() -> None:
+    """A tree would drop the loose words, so the point keeps its text whole instead."""
+    _, provenance, root = _convert(
+        _with_points(_point_table("(b)", "loose words", _point_table("(i)", _p("the wick used."))))
+    )
+    lamp = _point(root, "art_1__para_1__point_b")
+    assert lamp.find("a:point", NS) is None
+    assert _texts(lamp, "a:content/a:p") == ["loose words (i) the wick used."]
+    assert "body_discarded_text" not in provenance

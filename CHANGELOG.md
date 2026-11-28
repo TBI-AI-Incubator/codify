@@ -165,6 +165,17 @@ Fixed:
   unnumbered paragraph above it, which takes `para_2_dup2` in exchange, and
   the points under each go with them), so data keyed by the old eIds is
   replaced, not carried across.
+- `eu_html` keeps the sub-points of a point. Cellar's XHTML prints a point as a
+  two-column table and its sub-points as tables inside the point's text cell,
+  and the converter ran them into the point's text: Article 22(2)(c) of
+  Regulation (EU) 2021/241 was one `p` reading "(i) … (ii) …". A point whose
+  cell holds point tables now has its lead-in as `intro`, each sub-point as a
+  `point` (`art_22__para_2__point_c__point_i`) and text after the last as
+  `wrapUp`. A cell with text outside its blocks keeps the flat text, so none is
+  lost. A list row (`(a)`, `(1)`, `2.`, a dash) reads as its label then its
+  text: a point's text no longer starts with `| `. Other tables keep the
+  separator. Existing eIds are unchanged. Only converting an act again from its
+  stored HTML picks this up: a re-derive rebuilds rows from the stored AKN.
 
 ## 0.7.0 (2026-11-13)
 
